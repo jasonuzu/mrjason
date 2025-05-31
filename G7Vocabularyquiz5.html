@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G7 Vocabulary Quiz 5</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .question {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .score {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .scramble {
+            font-family: monospace;
+            letter-spacing: 2px;
+            color: #e67e22;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>G7 Advanced Vocabulary Quiz</h1>
+    <div id="quiz-container">
+        <!-- Word Scramble 1 -->
+        <div class="question">
+            <p>1. Unscramble this science word: <span class="scramble">exepmertni</span> (Hint: A scientific test)</p>
+            <input type="text" id="q1" data-answer="experiment">
+            <button onclick="checkAnswer('q1')">Check</button>
+            <div id="feedback-q1" class="feedback"></div>
+        </div>
+
+        <!-- Syllable Count -->
+        <div class="question">
+            <p>2. How many syllables in "<strong>accountability</strong>"? (Hint: From Unit 9)</p>
+            <input type="number" id="q2" data-answer="6">
+            <button onclick="checkAnswer('q2')">Check</button>
+            <div id="feedback-q2" class="feedback"></div>
+        </div>
+
+        <!-- Grammar: nor/neither/so -->
+        <div class="question">
+            <p>3. Complete: "She doesn't like pollution, and ________ do I." (Grammar)</p>
+            <input type="text" id="q3" data-answer="neither">
+            <button onclick="checkAnswer('q3')">Check</button>
+            <div id="feedback-q3" class="feedback"></div>
+        </div>
+
+        <!-- Word Scramble 2 -->
+        <div class="question">
+            <p>4. Unscramble this job: <span class="scramble">lianrutsjo</span> (Hint: News profession)</p>
+            <input type="text" id="q4" data-answer="journalist">
+            <button onclick="checkAnswer('q4')">Check</button>
+            <div id="feedback-q4" class="feedback"></div>
+        </div>
+
+        <!-- Present Continuous -->
+        <div class="question">
+            <p>5. Complete with present continuous: "Scientists ________ (research) new cures now."</p>
+            <input type="text" id="q5" data-answer="are researching">
+            <button onclick="checkAnswer('q5')">Check</button>
+            <div id="feedback-q5" class="feedback"></div>
+        </div>
+
+        <!-- Syllable Count 2 -->
+        <div class="question">
+            <p>6. How many syllables in "<strong>archaeologist</strong>"? (Hint: From Unit 7)</p>
+            <input type="number" id="q6" data-answer="5">
+            <button onclick="checkAnswer('q6')">Check</button>
+            <div id="feedback-q6" class="feedback"></div>
+        </div>
+
+        <!-- Grammar: nor/neither/so 2 -->
+        <div class="question">
+            <p>7. Complete: "He can't operate the machine, ________ can I." (Grammar)</p>
+            <input type="text" id="q7" data-answer="nor">
+            <button onclick="checkAnswer('q7')">Check</button>
+            <div id="feedback-q7" class="feedback"></div>
+        </div>
+
+        <!-- Word Scramble 3 -->
+        <div class="question">
+            <p>8. Unscramble this science tool: <span class="scramble">cosmicerope</span> (Hint: For viewing tiny objects)</p>
+            <input type="text" id="q8" data-answer="microscope">
+            <button onclick="checkAnswer('q8')">Check</button>
+            <div id="feedback-q8" class="feedback"></div>
+        </div>
+
+        <!-- Question Tag -->
+        <div class="question">
+            <p>9. Complete the question tag: "Robots can't feel emotions, ________?" (Grammar)</p>
+            <input type="text" id="q9" data-answer="can they">
+            <button onclick="checkAnswer('q9')">Check</button>
+            <div id="feedback-q9" class="feedback"></div>
+        </div>
+
+        <!-- Word Scramble 4 -->
+        <div class="question">
+            <p>10. Unscramble this work term: <span class="scramble">moortep</span> (Hint: Move to a better job position)</p>
+            <input type="text" id="q10" data-answer="promote">
+            <button onclick="checkAnswer('q10')">Check</button>
+            <div id="feedback-q10" class="feedback"></div>
+        </div>
+    </div>
+
+    <div class="score">
+        Score: <span id="score">0</span>/10
+    </div>
+
+    <script>
+        let score = 0;
+        const answeredQuestions = new Set();
+
+        function checkAnswer(inputId) {
+            const input = document.getElementById(inputId);
+            const feedback = document.getElementById(`feedback-${inputId}`);
+            let userAnswer = input.value.trim().toLowerCase();
+            const correctAnswer = input.dataset.answer.toLowerCase();
+
+            // Special handling for "are researching" vs "are researching"
+            if (inputId === 'q5') {
+                userAnswer = userAnswer.replace(/\s+/g, ' ').trim();
+            }
+
+            if (answeredQuestions.has(inputId)) {
+                feedback.textContent = "You've already answered this question!";
+                feedback.className = "feedback incorrect";
+                feedback.style.display = "block";
+                return;
+            }
+
+            if (userAnswer === correctAnswer) {
+                feedback.textContent = "✓ Correct! Well done!";
+                feedback.className = "feedback correct";
+                score++;
+                answeredQuestions.add(inputId);
+            } else {
+                feedback.textContent = `✗ Incorrect. The correct answer is: ${correctAnswer}`;
+                feedback.className = "feedback incorrect";
+            }
+
+            feedback.style.display = "block";
+            document.getElementById("score").textContent = score;
+        }
+    </script>
+</body>
+</html>
