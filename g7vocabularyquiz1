@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G7 Vocabulary Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .question {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .score {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>G7 Vocabulary Quiz</h1>
+    <div id="quiz-container">
+        <!-- Question 1 -->
+        <div class="question">
+            <p>1. Scientists use a ________ to look at very small things.</p>
+            <input type="text" id="q1" data-answer="microscope">
+            <button onclick="checkAnswer('q1')">Check</button>
+            <div id="feedback-q1" class="feedback"></div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question">
+            <p>2. Unscramble this word: ralobtoy (Hint: where scientists work)</p>
+            <input type="text" id="q2" data-answer="laboratory">
+            <button onclick="checkAnswer('q2')">Check</button>
+            <div id="feedback-q2" class="feedback"></div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question">
+            <p>3. How many syllables in "astronaut"?</p>
+            <input type="number" id="q3" data-answer="3">
+            <button onclick="checkAnswer('q3')">Check</button>
+            <div id="feedback-q3" class="feedback"></div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question">
+            <p>4. The police officer works ________ to catch criminals.</p>
+            <input type="text" id="q4" data-answer="undercover">
+            <button onclick="checkAnswer('q4')">Check</button>
+            <div id="feedback-q4" class="feedback"></div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question">
+            <p>5. Complete the sentence: "She hasn't finished the report, and ________ have I."</p>
+            <input type="text" id="q5" data-answer="neither">
+            <button onclick="checkAnswer('q5')">Check</button>
+            <div id="feedback-q5" class="feedback"></div>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question">
+            <p>6. The telephone was an important ________.</p>
+            <input type="text" id="q6" data-answer="invention">
+            <button onclick="checkAnswer('q6')">Check</button>
+            <div id="feedback-q6" class="feedback"></div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question">
+            <p>7. Unscramble this word: rsearhc (Hint: study to find new facts)</p>
+            <input type="text" id="q7" data-answer="research">
+            <button onclick="checkAnswer('q7')">Check</button>
+            <div id="feedback-q7" class="feedback"></div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question">
+            <p>8. How many syllables in "accountability"?</p>
+            <input type="number" id="q8" data-answer="6">
+            <button onclick="checkAnswer('q8')">Check</button>
+            <div id="feedback-q8" class="feedback"></div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question">
+            <p>9. Complete with present continuous: "The archaeologist ________ (dig) carefully now."</p>
+            <input type="text" id="q9" data-answer="is digging">
+            <button onclick="checkAnswer('q9')">Check</button>
+            <div id="feedback-q9" class="feedback"></div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question">
+            <p>10. Question tag: "Robots can perform complex tasks, ________?"</p>
+            <input type="text" id="q10" data-answer="can't they">
+            <button onclick="checkAnswer('q10')">Check</button>
+            <div id="feedback-q10" class="feedback"></div>
+        </div>
+    </div>
+
+    <div class="score">
+        Score: <span id="score">0</span>/10
+    </div>
+
+    <script>
+        let score = 0;
+
+        function checkAnswer(inputId) {
+            const input = document.getElementById(inputId);
+            const feedback = document.getElementById(`feedback-${inputId}`);
+            const userAnswer = input.value.trim().toLowerCase();
+            const correctAnswer = input.dataset.answer.toLowerCase();
+
+            if (userAnswer === correctAnswer) {
+                feedback.textContent = "Correct! Well done!";
+                feedback.className = "feedback correct";
+                score++;
+            } else {
+                feedback.textContent = `Incorrect. The correct answer is: ${correctAnswer}`;
+                feedback.className = "feedback incorrect";
+            }
+
+            feedback.style.display = "block";
+            document.getElementById("score").textContent = score;
+        }
+    </script>
+</body>
+</html>
