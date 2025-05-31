@@ -60,7 +60,7 @@
                     <i class="fas fa-book-reader text-indigo-600 text-2xl"></i>
                     <span class="text-xl font-bold text-gray-800">707 Online English</span>
                 </div>
-                <div class="hidden md:flex space-x-8">
+                <div class="hidden md:flex space-x-4">
                     <a href="#home" class="nav-link text-gray-700 hover:text-indigo-600">Home</a>
                     <a href="#quiz" class="nav-link text-gray-700 hover:text-indigo-600">Quiz</a>
                     <a href="#games" class="nav-link text-gray-700 hover:text-indigo-600">Games</a>
