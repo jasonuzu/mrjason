@@ -341,13 +341,13 @@
             <nav>
                 <ul>
                     <li><a href="index.html" class="active">Home</a></li>
-                    <li><a href="quiz.html">Quiz</a></li>
-                    <li><a href="games.html">Games</a></li>
+                    <li><a href="707_quiz_page.html">Quiz</a></li>
+                    <li><a href="707_games_page.html">Games</a></li>
                     <li><a href="vocabulary.html">Vocabulary</a></li>
-                    <li><a href="writing.html">Writing</a></li>
-                    <li><a href="listening.html">Listening</a></li>
-                    <li><a href="reading.html">Reading</a></li>
-                    <li><a href="grammar.html">Grammar</a></li>
+                    <li><a href="707_writing_page.html">Writing</a></li>
+                    <li><a href="707_listening_page.html">Listening</a></li>
+                    <li><a href="707_reading_page.html">Reading</a></li>
+                    <li><a href="707_grammar_page.html">Grammar</a></li>
                 </ul>
             </nav>
         </div>
