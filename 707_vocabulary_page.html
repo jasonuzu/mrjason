@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary - 707 Online English Learning Center</title>
+    <style>
+        /* Global Styles */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-main);
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header Styles */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .logo span {
+            font-weight: 300;
+        }
+        
+        /* Navigation */
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+        }
+        
+        nav a:hover, nav a.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Page Banner */
+        .page-banner {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            color: white;
+            text-align: center;
+            padding: 2.5rem 1rem;
+        }
+        
+        .page-banner h2 {
+            font-size: 2.2rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        .page-banner p {
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: white;
+            color: var(--primary-color);
+            padding: 0.8rem 1.5rem;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        
+        /* Main Content */
+        main {
+            padding: 3rem 0;
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        
+        .section-title h2 {
+            font-size: 2rem;
+            color: var(--dark-color);
+        }
+        
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 4px;
+            background-color: #f39c12;
+            margin: 0.5rem auto;
+        }
+        
+        /* Page Content */
+        .page-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        
+        .resource-list {
+            list-style: none;
+            margin: 1.5rem 0;
+        }
+        
+        .resource-list li {
+            margin-bottom: 1rem;
+            border-left: 4px solid #f39c12;
+            padding-left: 1rem;
+        }
+        
+        .resource-list a {
+            color: #e67e22;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: block;
+        }
+        
+        .resource-list a:hover {
+            color: #f39c12;
+            transform: translateX(5px);
+        }
+        
+        .resource-category {
+            margin: 2.5rem 0;
+        }
+        
+        .resource-category h3 {
+            color: var(--dark-color);
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--light-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        /* Footer */
+        footer {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 2rem 0 1rem;
+            text-align: center;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .footer-links a {
+            color: var(--light-color);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .footer-links a:hover {
+            color: var(--secondary-color);
+        }
+        
+        .copyright {
+            font-size: 0.9rem;
+            margin-top: 2rem;
+            color: rgba(255,255,255,0.7);
+        }
+        
+        /* Media Queries */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+            }
+            
+            nav ul {
+                margin-top: 1rem;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .page-banner h2 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <h1>707 <span>Online English Learning Center</span></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="quiz.html">Quiz</a></li>
+                    <li><a href="games.html">Games</a></li>
+                    <li><a href="vocabulary.html" class="active">Vocabulary</a></li>
+                    <li><a href="writing.html">Writing</a></li>
+                    <li><a href="listening.html">Listening</a></li>
+                    <li><a href="reading.html">Reading</a></li>
+                    <li><a href="grammar.html">Grammar</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Page Banner -->
+    <section class="page-banner">
+        <div class="container">
+            <h2>Expand Your English Vocabulary</h2>
+            <p>Build a rich vocabulary with our collection of word lists, flashcards, and learning resources</p>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <div class="page-content">
+                <div class="section-title">
+                    <h2>Vocabulary Resources</h2>
+                </div>
+                
+                <p>Vocabulary is the foundation of language learning. The more words you know, the better you can express yourself and understand others. Our vocabulary resources are designed to help you build your word bank effectively and remember new words long-term. Explore our collection below to enhance your English vocabulary.</p>
+                
+                <div class="resource-category">
+                    <h3>Word Lists by Topic</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Everyday Conversations Vocabulary</a></li>
+                        <li><a href="#">Travel and Transportation Words</a></li>
+                        <li><a href="#">Food and Dining Vocabulary</a></li>
+                        <li><a href="#">Business English Terminology</a></li>
+                        <li><a href="#">Academic Words for IELTS and TOEFL</a></li>
+                        <li><a href="#">Health and Medical Vocabulary</a></li>
+                        <li><a href="#">Technology and Digital Terms</a></li>
+                        <li><a href="#">Environment and Nature Words</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Vocabulary by Level</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Beginner's Essential Word List (A1)</a></li>
+                        <li><a href="#">Elementary Vocabulary Building (A2)</a></li>
+                        <li><a href="#">Intermediate Word Collections (B1)</a></li>
+                        <li><a href="#">Upper Intermediate Vocabulary (B2)</a></li>
+                        <li><a href="#">Advanced Academic Vocabulary (C1)</a></li>
+                        <li><a href="#">Proficiency Level Words and Phrases (C2)</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Vocabulary Learning Tools</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Interactive Flashcards by Topic</a></li>
+                        <li><a href="#">Word Association Games</a></li>
+                        <li><a href="#">Picture Dictionary for Visual Learners</a></li>
+                        <li><a href="#">Word Formation and Word Families</a></li>
+                        <li><a href="#">Collocations and Phrases Dictionary</a></li>
+                        <li><a href="#">Vocabulary Notebook Templates</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Special Vocabulary Collections</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Idioms and Expressions Library</a></li>
+                        <li><a href="#">Phrasal Verbs Dictionary</a></li>
+                        <li><a href="#">Common English Slang Words</a></li>
+                        <li><a href="#">Synonyms and Antonyms Lists</a></li>
+                        <li><a href="#">Commonly Confused Words</a></li>
+                        <li><a href="#">Metaphors and Similes Collection</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Exam Preparation Vocabulary</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Cambridge KET Vocabulary List</a></li>
+                        <li><a href="#">Cambridge PET Essential Words</a></li>
+                        <li><a href="#">Cambridge FCE Word Bank</a></li>
+                        <li><a href="#">IELTS High-Frequency Words</a></li>
+                        <li><a href="#">TOEFL Academic Word List</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="quiz.html">Quiz</a>
+                <a href="games.html">Games</a>
+                <a href="vocabulary.html">Vocabulary</a>
+                <a href="writing.html">Writing</a>
+                <a href="listening.html">Listening</a>
+                <a href="reading.html">Reading</a>
+                <a href="grammar.html">Grammar</a>
+            </div>
+            <p class="copyright">© 2025 707 Online English Learning Center. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

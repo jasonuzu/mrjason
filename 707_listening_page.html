@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listening - 707 Online English Learning Center</title>
+    <style>
+        /* Global Styles */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-main);
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header Styles */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .logo span {
+            font-weight: 300;
+        }
+        
+        /* Navigation */
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 1.5rem;
+        }
+        
+        nav a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 0.8rem;
+            border-radius: 4px;
+        }
+        
+        nav a:hover, nav a.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Page Banner */
+        .page-banner {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            text-align: center;
+            padding: 2.5rem 1rem;
+        }
+        
+        .page-banner h2 {
+            font-size: 2.2rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        .page-banner p {
+            font-size: 1.1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .btn {
+            display: inline-block;
+            background-color: white;
+            color: var(--primary-color);
+            padding: 0.8rem 1.5rem;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        
+        /* Main Content */
+        main {
+            padding: 3rem 0;
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        
+        .section-title h2 {
+            font-size: 2rem;
+            color: var(--dark-color);
+        }
+        
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 80px;
+            height: 4px;
+            background-color: #9b59b6;
+            margin: 0.5rem auto;
+        }
+        
+        /* Page Content */
+        .page-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        
+        .resource-list {
+            list-style: none;
+            margin: 1.5rem 0;
+        }
+        
+        .resource-list li {
+            margin-bottom: 1rem;
+            border-left: 4px solid #9b59b6;
+            padding-left: 1rem;
+        }
+        
+        .resource-list a {
+            color: #9b59b6;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: block;
+        }
+        
+        .resource-list a:hover {
+            color: #8e44ad;
+            transform: translateX(5px);
+        }
+        
+        .resource-category {
+            margin: 2.5rem 0;
+        }
+        
+        .resource-category h3 {
+            color: var(--dark-color);
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--light-color);
+            padding-bottom: 0.5rem;
+        }
+        
+        /* Audio Player Styles */
+        .audio-resources {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .audio-card {
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .audio-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .audio-icon {
+            background-color: #f0e6f6;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: #8e44ad;
+        }
+        
+        .audio-content {
+            padding: 1rem;
+        }
+        
+        .audio-content h4 {
+            margin-bottom: 0.5rem;
+            color: #8e44ad;
+        }
+        
+        .audio-content p {
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .audio-button {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #9b59b6;
+            color: white;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .audio-button:hover {
+            background-color: #8e44ad;
+        }
+        
+        /* Footer */
+        footer {
+            background-color: var(--dark-color);
+            color: white;
+            padding: 2rem 0 1rem;
+            text-align: center;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin: 1rem 0;
+        }
+        
+        .footer-links a {
+            color: var(--light-color);
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .footer-links a:hover {
+            color: var(--secondary-color);
+        }
+        
+        .copyright {
+            font-size: 0.9rem;
+            margin-top: 2rem;
+            color: rgba(255,255,255,0.7);
+        }
+        
+        /* Media Queries */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+            }
+            
+            nav ul {
+                margin-top: 1rem;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .page-banner h2 {
+                font-size: 1.8rem;
+            }
+            
+            .audio-resources {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <h1>707 <span>Online English Learning Center</span></h1>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="quiz.html">Quiz</a></li>
+                    <li><a href="games.html">Games</a></li>
+                    <li><a href="vocabulary.html">Vocabulary</a></li>
+                    <li><a href="writing.html">Writing</a></li>
+                    <li><a href="listening.html" class="active">Listening</a></li>
+                    <li><a href="reading.html">Reading</a></li>
+                    <li><a href="grammar.html">Grammar</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Page Banner -->
+    <section class="page-banner">
+        <div class="container">
+            <h2>Enhance Your Listening Skills</h2>
+            <p>Improve your comprehension with our diverse collection of listening resources and activities</p>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <div class="page-content">
+                <div class="section-title">
+                    <h2>Listening Resources</h2>
+                </div>
+                
+                <p>Listening is a crucial skill for language acquisition and real-world communication. Our listening resources are designed to help you develop your comprehension abilities with authentic materials covering various accents, speech rates, and topics. Explore our collection below to enhance your English listening skills.</p>
+                
+                <div class="resource-category">
+                    <h3>Featured Audio Resources</h3>
+                    <div class="audio-resources">
+                        <div class="audio-card">
+                            <div class="audio-icon">🎧</div>
+                            <div class="audio-content">
+                                <h4>Daily Conversations</h4>
+                                <p>Practice with everyday dialogues between native speakers.</p>
+                                <a href="#" class="audio-button">Listen Now</a>
+                            </div>
+                        </div>
+                        
+                        <div class="audio-card">
+                            <div class="audio-icon">🎙️</div>
+                            <div class="audio-content">
+                                <h4>News Reports</h4>
+                                <p>Listen to simplified news stories with comprehension questions.</p>
+                                <a href="#" class="audio-button">Listen Now</a>
+                            </div>
+                        </div>
+                        
+                        <div class="audio-card">
+                            <div class="audio-icon">📻</div>
+                            <div class="audio-content">
+                                <h4>Podcast Series</h4>
+                                <p>English learning podcasts with transcripts and activities.</p>
+                                <a href="#" class="audio-button">Listen Now</a>
+                            </div>
+                        </div>
+                        
+                        <div class="audio-card">
+                            <div class="audio-icon">🎭</div>
+                            <div class="audio-content">
+                                <h4>Short Stories</h4>
+                                <p>Entertaining stories narrated clearly with follow-up exercises.</p>
+                                <a href="#" class="audio-button">Listen Now</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Listening by Level</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Beginner Listening Exercises (A1)</a></li>
+                        <li><a href="#">Elementary Audio Practice (A2)</a></li>
+                        <li><a href="#">Intermediate Listening Materials (B1)</a></li>
+                        <li><a href="#">Upper Intermediate Listening Tasks (B2)</a></li>
+                        <li><a href="#">Advanced Listening Comprehension (C1)</a></li>
+                        <li><a href="#">Proficiency Level Audio Resources (C2)</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Listening by Topic</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Everyday Conversations and Interactions</a></li>
+                        <li><a href="#">Travel and Tourism Dialogues</a></li>
+                        <li><a href="#">Business and Professional Discussions</a></li>
+                        <li><a href="#">Academic Lectures and Presentations</a></li>
+                        <li><a href="#">Entertainment and Media Clips</a></li>
+                        <li><a href="#">Science and Technology Talks</a></li>
+                        <li><a href="#">Cultural Topics and Traditions</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Accent Variety</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">British English Accent Practice</a></li>
+                        <li><a href="#">American English Pronunciation</a></li>
+                        <li><a href="#">Australian and New Zealand Accents</a></li>
+                        <li><a href="#">Canadian English Listening</a></li>
+                        <li><a href="#">Global English Varieties</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Listening Skills Development</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Active Listening Strategies</a></li>
+                        <li><a href="#">Note-Taking While Listening</a></li>
+                        <li><a href="#">Understanding Fast Speech</a></li>
+                        <li><a href="#">Recognizing Connected Speech</a></li>
+                        <li><a href="#">Inferring Meaning from Context</a></li>
+                        <li><a href="#">Identifying Main Ideas and Details</a></li>
+                    </ul>
+                </div>
+                
+                <div class="resource-category">
+                    <h3>Exam Preparation Listening</h3>
+                    <ul class="resource-list">
+                        <li><a href="#">Cambridge KET Listening Practice</a></li>
+                        <li><a href="#">Cambridge PET Listening Format</a></li>
+                        <li><a href="#">Cambridge FCE Listening Tasks</a></li>
+                        <li><a href="#">IELTS Listening Practice Tests</a></li>
+                        <li><a href="#">TOEFL Listening Preparation</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <a href="index.html">Home</a>
+                <a href="quiz.html">Quiz</a>
+                <a href="games.html">Games</a>
+                <a href="vocabulary.html">Vocabulary</a>
+                <a href="writing.html">Writing</a>
+                <a href="listening.html">Listening</a>
+                <a href="reading.html">Reading</a>
+                <a href="grammar.html">Grammar</a>
+            </div>
+            <p class="copyright">© 2025 707 Online English Learning Center. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
