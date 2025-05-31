@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -79,7 +78,7 @@
             </div>
         </div>
         <!-- Mobile Navigation Menu -->
-        <div id="mobile-menu" class="hidden md:hidden bg-white border-t">
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-t px-4">
             <div class="container mx-auto px-4 py-2">
                 <a href="#home" class="block py-2 text-gray-700 hover:text-indigo-600">Home</a>
                 <a href="#quiz" class="block py-2 text-gray-700 hover:text-indigo-600">Quiz</a>
