@@ -339,10 +339,10 @@
             </div>
             <nav>
                 <ul>
-                    <li><a href="index.html" class="active">Home</a></li>
+                    <li><a href="index.md" class="active">Home</a></li>
                     <li><a href="707_quiz_page.html">Quiz</a></li>
                     <li><a href="707_games_page.html">Games</a></li>
-                    <li><a href="vocabulary.html">Vocabulary</a></li>
+                    <li><a href="707_vocabulary_page.html">Vocabulary</a></li>
                     <li><a href="707_writing_page.html">Writing</a></li>
                     <li><a href="707_listening_page.html">Listening</a></li>
                     <li><a href="707_reading_page.html">Reading</a></li>
@@ -447,14 +447,14 @@
     <footer>
         <div class="container">
             <div class="footer-links">
-                <a href="index.html">Home</a>
-                <a href="quiz.html">Quiz</a>
-                <a href="games.html">Games</a>
-                <a href="vocabulary.html">Vocabulary</a>
-                <a href="writing.html">Writing</a>
-                <a href="listening.html">Listening</a>
-                <a href="reading.html">Reading</a>
-                <a href="grammar.html">Grammar</a>
+                    <li><a href="index.md" class="active">Home</a></li>
+                    <li><a href="707_quiz_page.html">Quiz</a></li>
+                    <li><a href="707_games_page.html">Games</a></li>
+                    <li><a href="707_vocabulary_page.html">Vocabulary</a></li>
+                    <li><a href="707_writing_page.html">Writing</a></li>
+                    <li><a href="707_listening_page.html">Listening</a></li>
+                    <li><a href="707_reading_page.html">Reading</a></li>
+                    <li><a href="707_grammar_page.html">Grammar</a></li>
             </div>
             <p class="copyright">© 2025 707 Online English Learning Center. All rights reserved.</p>
         </div>
