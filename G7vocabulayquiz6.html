@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G7 Vocabulary and Grammar Quiz 6</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .question {
+            background-color: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .score {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .scramble {
+            font-family: monospace;
+            letter-spacing: 2px;
+            color: #e67e22;
+            font-weight: bold;
+        }
+        #celebration {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+            animation: bounce 0.5s infinite alternate;
+        }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-10px); }
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>G7 Vocabulary and Grammar Quiz 6</h1>
+    <div id="quiz-container">
+        <!-- Question 1 -->
+        <div class="question">
+            <p>1. Unscramble: <span class="scramble">ivnetn</span> (Hint: To create something new)</p>
+            <input type="text" id="q1" data-answer="invent" onchange="checkAnswerAuto('q1')">
+            <div id="feedback-q1" class="feedback"></div>
+        </div>
+
+        <!-- Question 2 -->
+        <div class="question">
+            <p>2. How many syllables in "nanotechnology"?</p>
+            <input type="number" id="q2" data-answer="6" onchange="checkAnswerAuto('q2')">
+            <div id="feedback-q2" class="feedback"></div>
+        </div>
+
+        <!-- Question 3 -->
+        <div class="question">
+            <p>3. Complete with nor,neither or so: "I don't like working overtime, and ________ does my colleague."</p>
+            <input type="text" id="q3" data-answer="neither" onchange="checkAnswerAuto('q3')">
+            <div id="feedback-q3" class="feedback"></div>
+        </div>
+
+        <!-- Question 4 -->
+        <div class="question">
+            <p>4. Unscramble: <span class="scramble">rehcesra</span> (Hint: Systematic investigation)</p>
+            <input type="text" id="q4" data-answer="research" onchange="checkAnswerAuto('q4')">
+            <div id="feedback-q4" class="feedback"></div>
+        </div>
+
+        <!-- Question 5 -->
+        <div class="question">
+            <p>5. Complete with present continuous: "The students ________ (study) vocabulary now."</p>
+            <input type="text" id="q5" data-answer="are studying" onchange="checkAnswerAuto('q5')">
+            <div id="feedback-q5" class="feedback"></div>
+        </div>
+
+        <!-- Question 6 -->
+        <div class="question">
+            <p>6. How many syllables in "responsibility"?</p>
+            <input type="number" id="q6" data-answer="6" onchange="checkAnswerAuto('q6')">
+            <div id="feedback-q6" class="feedback"></div>
+        </div>
+
+        <!-- Question 7 -->
+        <div class="question">
+            <p>7. Complete with nor,neither or so: "She can't attend the meeting, ________ can her assistant."</p>
+            <input type="text" id="q7" data-answer="nor" onchange="checkAnswerAuto('q7')">
+            <div id="feedback-q7" class="feedback"></div>
+        </div>
+
+        <!-- Question 8 -->
+        <div class="question">
+            <p>8. Unscramble: <span class="scramble">nvinetrnmoe</span> (Hint: Natural world around us)</p>
+            <input type="text" id="q8" data-answer="environment" onchange="checkAnswerAuto('q8')">
+            <div id="feedback-q8" class="feedback"></div>
+        </div>
+
+        <!-- Question 9 -->
+        <div class="question">
+            <p>9. Question tag: "Scientists haven't found a cure, ________?"</p>
+            <input type="text" id="q9" data-answer="have they" onchange="checkAnswerAuto('q9')">
+            <div id="feedback-q9" class="feedback"></div>
+        </div>
+
+        <!-- Question 10 -->
+        <div class="question">
+            <p>10. Unscramble: <span class="scramble">motepor</span> (Hint: Move to a higher position)</p>
+            <input type="text" id="q10" data-answer="promote" onchange="checkAnswerAuto('q10')">
+            <div id="feedback-q10" class="feedback"></div>
+        </div>
+    </div>
+
+    <div class="score">
+        Score: <span id="score">0</span>/10
+    </div>
+
+    <div id="celebration">
+        <img src="https://jasonuzu.github.io/mrjason/image1.webp" alt="Perfect Score!" style="max-width:300px;">
+        <h2 style="color:#e67e22;">Perfect Score! Amazing Work!</h2>
+    </div>
+
+    <script>
+        let score = 0;
+        const answeredQuestions = new Set();
+
+        function checkAnswerAuto(inputId) {
+            const input = document.getElementById(inputId);
+            const feedback = document.getElementById(`feedback-${inputId}`);
+            let userAnswer = input.value.trim().toLowerCase();
+            const correctAnswer = document.getElementById(inputId).dataset.answer.toLowerCase();
+
+            // Skip if already answered correctly
+            if (answeredQuestions.has(inputId)) return;
+
+            // Special handling for multi-word answers
+            if (inputId === 'q5' || inputId === 'q9') {
+                userAnswer = userAnswer.replace(/\s+/g, ' ').trim();
+            }
+
+            if (userAnswer === correctAnswer) {
+                feedback.textContent = "✓ Correct!";
+                feedback.className = "feedback correct";
+                score++;
+                answeredQuestions.add(inputId);
+                input.disabled = true;
+            } else if (userAnswer !== "") {
+                feedback.textContent = "✗ Try again!";
+                feedback.className = "feedback incorrect";
+            } else {
+                feedback.style.display = "none";
+                return;
+            }
+
+            feedback.style.display = "block";
+            document.getElementById("score").textContent = score;
+
+            // Check for perfect score
+            if (score === 10) {
+                document.getElementById("celebration").style.display = "block";
+            }
+        }
+    </script>
+</body>
+</html>
