@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Jason's Vocabulary and Grammar Challenge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --success: #4cc9f0;
+            --warning: #f72585;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        header::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            transform: rotate(30deg);
+            animation: shine 8s infinite linear;
+        }
+        
+        @keyframes shine {
+            0% { transform: rotate(30deg) translate(-10%, -10%); }
+            100% { transform: rotate(30deg) translate(10%, 10%); }
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 0.5rem;
+            position: relative;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        
+        .main-content {
+            background-color: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .challenge-box {
+            background: linear-gradient(to right, #e0f7fa, #b2ebf2);
+            border-left: 5px solid var(--accent);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        
+        .challenge-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .challenge-box::after {
+            content: "✨";
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            font-size: 3rem;
+            opacity: 0.2;
+        }
+        
+        .prize-info {
+            background: linear-gradient(to right, #fff8e1, #ffecb3);
+            border-left: 5px solid #ffc107;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+        
+        .prize-info:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+        
+        .prize-info h3 {
+            color: #ff6d00;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .prize-info ol {
+            padding-left: 1.5rem;
+            margin-top: 1rem;
+        }
+        
+        .prize-info li {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .prize-info li::before {
+            content: "🏆";
+            position: absolute;
+            left: -1.8rem;
+        }
+        
+        .quiz-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .quiz-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .quiz-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+            border-color: var(--accent);
+        }
+        
+        .quiz-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+        }
+        
+        .quiz-card a {
+            text-decoration: none;
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .quiz-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .quiz-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--secondary);
+            text-align: center;
+        }
+        
+        .quiz-desc {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        
+        .start-btn {
+            display: inline-block;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            text-align: center;
+            margin-top: auto;
+            align-self: center;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        
+        .quiz-card:hover .start-btn {
+            background: linear-gradient(to right, var(--accent), var(--primary));
+            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.4);
+        }
+        
+        .hidden-image-container {
+            display: none;
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            margin: 2rem 0;
+            box-shadow: var(--shadow);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(67, 97, 238, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
+        }
+        
+        .hidden-image-title {
+            color: var(--secondary);
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+        
+        .hidden-image {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 5px solid white;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            margin: 1rem 0;
+        }
+        
+        .congrats-text {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--dark);
+        }
+        
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--dark);
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .floating-icons {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .floating-icon {
+            position: absolute;
+            opacity: 0.1;
+            animation: float linear infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .quiz-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-icons">
+        <div class="floating-icon" style="top: 10%; left: 5%; font-size: 2rem; animation-duration: 20s;">📚</div>
+        <div class="floating-icon" style="top: 20%; left: 80%; font-size: 3rem; animation-duration: 25s;">✏️</div>
+        <div class="floating-icon" style="top: 60%; left: 15%; font-size: 2.5rem; animation-duration: 30s;">🔠</div>
+        <div class="floating-icon" style="top: 70%; left: 70%; font-size: 2rem; animation-duration: 35s;">🎯</div>
+    </div>
+    
+    <div class="container">
+        <header>
+            <h1>Mr. Jason's Vocabulary & Grammar Challenge</h1>
+            <p class="subtitle">Expand your knowledge and win exciting rewards!</p>
+        </header>
+        
+        <div class="main-content">
+            <section>
+                <h2 style="color: var(--secondary); margin-bottom: 1rem;">Welcome, Word Explorers!</h2>
+                <p style="margin-bottom: 1.5rem;">Prepare for the upcoming THINK exam by finishing these quizzes. Each quiz is designed to challenge your understanding.</p>
+                
+                <div class="challenge-box">
+                    <h3 style="color: var(--secondary); margin-bottom: 0.5rem;"><i class="fas fa-trophy"></i> Special Challenge!</h3>
+                    <p>Hidden within one of these quizzes is a secret image that only reveals itself to those who achieve perfection!</p>
+                    <p style="margin-top: 0.5rem; font-weight: 600;">The first 3 explorers to decipher the hidden image will be rewarded with <span style="color: var(--warning);">5 class points</span> each!</p>
+                </div>
+                
+                <div class="prize-info">
+                    <h3><i class="fas fa-award"></i> How to Claim Your Prize:</h3>
+                    <ol>
+                        <li>Complete all the vocabulary quests (persistence is key!)</li>
+                        <li>When you score 100% on the special quiz, the hidden image will appear</li>
+                        <li>Memorize the secret image carefully</li>
+                        <li>Tell Mr. Jason what the image is</li>
+                        <li>The first three correct answers win the points!</li>
+                    </ol>
+                </div>
+                
+                <div class="hidden-image-container" id="hiddenImageContainer">
+                    <h3 class="hidden-image-title">Congratulations, Word Master! 🎉</h3>
+                    <p class="congrats-text">You've unlocked the hidden image! Study it carefully and tell Mr. Jason what you see to claim your reward.</p>
+                    <img id="hiddenImage" src="" alt="Hidden image" class="hidden-image">
+                    <p class="congrats-text">Remember: Only the first 3 students to report this image correctly will win the points!</p>
+                </div>
+                
+                <h2 style="color: var(--secondary); margin: 2rem 0 1rem 0;">Your Vocabulary Quests</h2>
+                <div class="quiz-list">
+                    <div class="quiz-card">
+                        <a href="g7vocabularyquiz1.html">
+                            <div class="quiz-icon"><i class="fas fa-book-open"></i></div>
+                            <h3 class="quiz-title">Vocabulary Quiz 3</h3>
+                            <p class="quiz-desc">U7, U8 and U9 vocabulary words.</p>
+                            <span class="start-btn">Begin Quest</span>
+                        </a>
+                    </div>
+                    
+                    <div class="quiz-card">
+                        <a href="g7vocabularyquiz4.html">
+                            <div class="quiz-icon"><i class="fas fa-spell-check"></i></div>
+                            <h3 class="quiz-title">Vocabulary Quiz 4</h3>
+                            <p class="quiz-desc">U7, U8 and U9 vocabulary words and grammar practice</p>
+                            <span class="start-btn">Begin Quest</span>
+                        </a>
+                    </div>
+                    
+                    <div class="quiz-card">
+                        <a href="G7Vocabularyquiz5.html">
+                            <div class="quiz-icon"><i class="fas fa-puzzle-piece"></i></div>
+                            <h3 class="quiz-title">Vocabulary Quiz 5</h3>
+                            <p class="quiz-desc">Master the vocabulary</p>
+                            <span class="start-btn">Begin Quest</span>
+                        </a>
+                    </div>
+                    
+                    <div class="quiz-card">
+                        <a href="G7vocabulayquiz6.html">
+                            <div class="quiz-icon"><i class="fas fa-brain"></i></div>
+                            <h3 class="quiz-title">Vocabulary Quiz 6</h3>
+                            <p class="quiz-desc">Practice makes perfect. U7, U8 and U9 vocabulary and grammar</p>
+                            <span class="start-btn">Begin Quest</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 2rem;">
+                    <p style="font-size: 1.1rem; font-style: italic; color: var(--secondary);">"The limits of my language mean the limits of my world." — Ludwig Wittgenstein</p>
+                </div>
+            </section>
+        </div>
+        
+        <footer>
+            <p>© 2023 Mr. Jason's English Academy | Crafted with <i class="fas fa-heart" style="color: var(--warning);"></i> for learning</p>
+        </footer>
+    </div>
+
+    <script>
+        // This would be implemented in the actual quiz page
+        function checkForPerfectScore() {
+            // Simulating finding the image after 3 seconds
+            setTimeout(function() {
+                const container = document.getElementById('hiddenImageContainer');
+                const image = document.getElementById('hiddenImage');
+                
+                container.style.display = 'block';
+                image.src = 'https://example.com/hidden-image.jpg';
+                
+                // Scroll to the image with smooth animation
+                container.scrollIntoView({ behavior: 'smooth' });
+                
+                // Confetti effect
+                const confettiSettings = { target: 'confetti-canvas', max: 150 };
+                const confetti = new ConfettiGenerator(confettiSettings);
+                confetti.render();
+                
+                setTimeout(() => confetti.clear(), 5000);
+            }, 3000);
+        }
+        
+        // Note: For actual implementation, you'll need to:
+        // 1. Include the confetti.js library for the effect
+        // 2. Add the canvas element <canvas id="confetti-canvas"></canvas>
+        // 3. Implement real score checking in the quiz pages
+    </script>
+</body>
+</html>
