@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lucan's Rest Map</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    html, body, #map {
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map').setView([0, 0], 2); // Adjust based on your map's center
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data © OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  fetch('lucan_s_rest.json')
+    .then(res => res.json())
+    .then(data => {
+      const styleMap = {
+        roads: { color: '#555', weight: 3 },
+        rivers: { color: 'blue', weight: 4 },
+        walls: { color: 'gray', weight: 5 },
+        earth: { color: '#654321', fillOpacity: 0.1 },
+        buildings: { color: '#aa0000', fillOpacity: 0.6 }
+      };
+
+      data.features.forEach(feature => {
+        if (feature.type === "Feature") {
+          if (feature.geometry || feature.coordinates) {
+            L.geoJSON(feature, { style: styleMap[feature.id] || {} }).addTo(map);
+          }
+        } else if (feature.type === "GeometryCollection" || feature.type === "MultiPolygon") {
+          const geometries = feature.geometries || feature.coordinates.map(coords => ({
+            type: "Polygon",
+            coordinates: coords
+          }));
+          geometries.forEach(geom => {
+            const layer = L.geoJSON({
+              type: "Feature",
+              geometry: geom
+            }, { style: styleMap[feature.id] || {} }).addTo(map);
+          });
+        }
+      });
+
+      map.fitBounds(L.geoJSON(data).getBounds());
+    });
+</script>
+</body>
+</html>
