@@ -1,211 +1,131 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8"/>
-<title>Tsunami Simulator</title>
-<style>
-  body{margin:0;overflow:hidden;font-family:Arial,Helvetica,sans-serif}
-  #ui{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.85);padding:12px;border-radius:6px;z-index:10}
-  #ui label{display:block;margin-bottom:6px}
-  #ui input{width:80px}
-  #ui button{margin-right:6px}
-  #stats p{margin:4px 0;font-weight:bold}
-  input:invalid{border:2px solid red}
-</style>
+  <meta charset="utf-8"/>
+  <title>Tsunami Mini-Demo</title>
+  <style>
+    body{margin:0;overflow:hidden;font-family:Arial}
+    #ui{position:absolute;top:10px;left:10px;background:rgba(255,255,255,.85);padding:10px;border-radius:6px;z-index:100}
+    canvas{display:block}
+  </style>
 </head>
 <body>
   <div id="ui">
-    <h1>Tsunami Simulator</h1>
-    <label>
-      Earthquake Magnitude (Richter):
-      <input id="magInput" type="number" min="0" max="9.9" step="0.1" value="7.0"/>
+    <label>Magnitude 0-9.9:
+      <input id="mag" type="number" min="0" max="9.9" step="0.1" value="7.0"/>
     </label>
-    <button id="runBtn">Run Tsunami</button>
-    <button id="resetBtn">Reset</button>
-    <div id="stats">
-      <p>Wave Height: <span id="waveH">0.0 m</span></p>
-      <p>Total Damage: $<span id="damage">0</span></p>
-    </div>
+    <button id="run">Run Tsunami</button>
+    <button id="reset">Reset</button>
+    <p>Wave height: <span id="wh">0.0 m</span></p>
+    <p>Damage: $<span id="dmg">0</span></p>
   </div>
 
-  <canvas id="canvas"></canvas>
+  <!-- Three.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    /* BASIC THREE.JS SET-UP */
+    const scene    = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // sky
+    const camera   = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+    camera.position.set(0, 15, 40);
+    camera.lookAt(0, 0, 0);
 
-<!-- Three.js from CDN -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script>
-//////////////////////////////////////////////////////////////////////////
-// CONFIGURATION
-//////////////////////////////////////////////////////////////////////////
-const COSTS = { car:25000, building:400000, tree:1000 };
-const SCENE_W = 80, SCENE_D = 60;
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-//////////////////////////////////////////////////////////////////////////
-// THREE.JS SET-UP
-//////////////////////////////////////////////////////////////////////////
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+    /* LIGHTING */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(10, 20, 10);
+    scene.add(dir);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
-camera.position.set(0,25,40);
-camera.lookAt(0,0,0);
+    /* GROUND (yellow) */
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(80, 60),
+      new THREE.MeshStandardMaterial({ color:0xe6c288 })
+    );
+    ground.rotation.x = -Math.PI/2;
+    scene.add(ground);
 
-const renderer = new THREE.WebGLRenderer({canvas:document.getElementById('canvas'), antialias:true});
-renderer.setSize(innerWidth, innerHeight);
-window.addEventListener('resize', ()=>{
-  renderer.setSize(innerWidth,innerHeight);
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-});
+    /* STATIC OBJECTS */
+    const things = [];
+    function addThing(x, z, w, d, h, color, cost) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshStandardMaterial({ color })
+      );
+      m.position.set(x, h/2, z);
+      scene.add(m);
+      things.push({ mesh:m, cost });
+      return m;
+    }
+    // cars
+    addThing(-15,  0, 4, 2, 2, 0xff0000, 25000);
+    addThing(  0,  0, 4, 2, 2, 0xff0000, 25000);
+    addThing( 15,  0, 4, 2, 2, 0xff0000, 25000);
+    // buildings
+    addThing(-10, -10, 5, 5, 8, 0x888888, 400000);
+    addThing(  0, -10, 5, 5, 8, 0x888888, 400000);
+    addThing( 10, -10, 5, 5, 8, 0x888888, 400000);
 
-// LIGHTS
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-const sun = new THREE.DirectionalLight(0xffffff,1);
-sun.position.set(10,30,10);
-scene.add(sun);
+    /* WAVE */
+    let waveMesh = null;
+    function makeWave(height) {
+      if (waveMesh) scene.remove(waveMesh);
+      const g = new THREE.PlaneGeometry(80, 60, 1, 1);
+      const pos = g.attributes.position;
+      const h = Math.min(height, 20); // cap
+      for (let i = 0; i < pos.count; i++) {
+        const z = pos.getZ(i);
+        pos.setY(i, Math.max(0, z + 30) / 60 * h);
+      }
+      g.computeVertexNormals();
+      waveMesh = new THREE.Mesh(
+        g,
+        new THREE.MeshStandardMaterial({ color:0x0088ff, transparent:true, opacity:0.7 })
+      );
+      waveMesh.rotation.x = -Math.PI/2;
+      waveMesh.position.z = -30;
+      scene.add(waveMesh);
+      return h;
+    }
 
-//////////////////////////////////////////////////////////////////////////
-// GROUND & WATER
-//////////////////////////////////////////////////////////////////////////
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(SCENE_W,SCENE_D),
-  new THREE.MeshStandardMaterial({color:0xE6D19A})
-);
-ground.rotation.x = -Math.PI/2;
-scene.add(ground);
+    /* UI */
+    const magIn = document.getElementById('mag');
+    const whOut = document.getElementById('wh');
+    const dmgOut = document.getElementById('dmg');
+    document.getElementById('run').onclick = () => {
+      const M = parseFloat(magIn.value);
+      if (isNaN(M) || M < 0 || M > 9.9) return;
+      const h = makeWave(Math.pow(10, M - 5.5) * 1.5);
+      whOut.textContent = h.toFixed(1) + ' m';
+      const ratio = Math.min(1, Math.pow(h / 10, 1.5));
+      let cost = 0;
+      things.forEach(t => cost += t.cost * ratio);
+      dmgOut.textContent = Math.round(cost).toLocaleString();
+      /* simple forward animation */
+      waveMesh.position.z = -30;
+      const anim = () => {
+        if (waveMesh.position.z < 30) {
+          waveMesh.position.z += 0.3;
+          requestAnimationFrame(anim);
+        }
+      };
+      anim();
+    };
+    document.getElementById('reset').onclick = () => {
+      if (waveMesh) { scene.remove(waveMesh); waveMesh = null; }
+      whOut.textContent = '0.0 m';
+      dmgOut.textContent = '0';
+    };
 
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(SCENE_W,SCENE_D),
-  new THREE.MeshStandardMaterial({color:0x0077be, transparent:true, opacity:0.7})
-);
-water.rotation.x = -Math.PI/2;
-water.position.y = 0.05;
-scene.add(water);
-
-//////////////////////////////////////////////////////////////////////////
-// CITY OBJECTS
-//////////////////////////////////////////////////////////////////////////
-const objects = [];
-function box(x,z,w,d,h,color,type){
-  const m = new THREE.Mesh(
-    new THREE.BoxGeometry(w,h,d),
-    new THREE.MeshStandardMaterial({color})
-  );
-  m.position.set(x,h/2,z);
-  scene.add(m);
-  m.userData = {type,cost:COSTS[type]};
-  objects.push(m);
-}
-function car(x,z){box(x,z,4,2,2,0xff4444,'car')}
-function building(x,z,w,d,h){box(x,z,w,d,h,0xcccccc,'building')}
-function tree(x,z){
-  const trunk = new THREE.Mesh(
-    new THREE.BoxGeometry(0.6,5,0.6),
-    new THREE.MeshStandardMaterial({color:0x8B4513})
-  );
-  trunk.position.set(x,2.5,z);
-  scene.add(trunk);
-  const crown = new THREE.Mesh(
-    new THREE.BoxGeometry(3,4,3),
-    new THREE.MeshStandardMaterial({color:0x228B22})
-  );
-  crown.position.set(x,5+2,z);
-  scene.add(crown);
-  const tree = new THREE.Group();
-  tree.add(trunk); tree.add(crown);
-  tree.userData = {type:'tree',cost:COSTS.tree};
-  objects.push(tree);
-}
-
-// lay out scene
-const startZ = -SCENE_D/2 + 5;
-building(-10,startZ+5,8,6,12);
-building(5,startZ+4,10,5,8);
-building(-18,startZ+10,6,6,6);
-car(-5,startZ);
-car(7,startZ+2);
-car(-12,startZ-2);
-tree(-15,startZ-5);
-tree(12,startZ-4);
-
-//////////////////////////////////////////////////////////////////////////
-// WAVE
-//////////////////////////////////////////////////////////////////////////
-let wave;
-function buildWave(m){
-  if(wave) scene.remove(wave);
-  const H = Math.min(m,30); // cap display
-  const g = new THREE.PlaneGeometry(SCENE_W,SCENE_D,32,1);
-  const pos = g.attributes.position;
-  for(let i=0;i<pos.count;i++){
-    const z = pos.getZ(i);
-    const crest = Math.max(0,(z-startZ+5)/20);
-    pos.setY(i,Math.sin(Math.min(crest,1)*Math.PI)*H);
-  }
-  g.computeVertexNormals();
-  wave = new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x0077be,transparent:true,opacity:0.75}));
-  wave.rotation.x = -Math.PI/2;
-  scene.add(wave);
-  return H;
-}
-
-//////////////////////////////////////////////////////////////////////////
-// DAMAGE
-//////////////////////////////////////////////////////////////////////////
-function calcDamage(waveM){
-  const ratio = Math.min(1,Math.pow(waveM/10,1.5));
-  let total=0;
-  objects.forEach(o=>{
-    total += o.userData.cost*ratio;
-    if(o.material) o.material.color.setHex(0xff4444);
-  });
-  return Math.round(total);
-}
-
-//////////////////////////////////////////////////////////////////////////
-// UI
-//////////////////////////////////////////////////////////////////////////
-const magIn = document.getElementById('magInput');
-const waveHSpan = document.getElementById('waveH');
-const dmgSpan = document.getElementById('damage');
-const runBtn = document.getElementById('runBtn');
-const resetBtn = document.getElementById('resetBtn');
-
-let anim;
-function reset(){
-  if(anim) cancelAnimationFrame(anim);
-  objects.forEach(o=>{if(o.material) o.material.color.setHex(o.userData.type==='car'?0xff4444:0xcccccc)});
-  waveHSpan.textContent='0.0 m';
-  dmgSpan.textContent='0';
-  if(wave){scene.remove(wave);wave=null;}
-}
-function run(){
-  reset();
-  const M = parseFloat(magIn.value);
-  if(isNaN(M)||M<0||M>9.9){magIn.setCustomValidity('Invalid');return;}
-  magIn.setCustomValidity('');
-  const waveM = Math.round(10*(Math.pow(10,M-5.5)*1.5))/10;
-  buildWave(waveM);
-  waveHSpan.textContent = waveM.toFixed(1)+' m';
-  const dmg = calcDamage(waveM);
-  const speed = 0.3;
-  function animate(){
-    if(wave.position.z < SCENE_D/2){
-      wave.position.z += speed;
-      anim=requestAnimationFrame(animate);
-    }else dmgSpan.textContent = dmg.toLocaleString();
-  }
-  wave.position.z = -SCENE_D/2;
-  animate();
-}
-runBtn.onclick = run;
-resetBtn.onclick = reset;
-magIn.onkeydown = e=>{if(e.key==='Enter')run();};
-
-//////////////////////////////////////////////////////////////////////////
-// RENDER LOOP
-//////////////////////////////////////////////////////////////////////////
-function render(){ requestAnimationFrame(render); renderer.render(scene,camera); }
-render();
-</script>
+    /* RENDER LOOP */
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
 </body>
 </html>
