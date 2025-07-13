@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tsunami Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #container { position: relative; width: 100vw; height: 100vh; }
+        #input-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            width: 300px;
+        }
+        #magnitude-input {
+            width: 100%;
+            padding: 10px;
+            font-size: 18px;
+            margin-bottom: 10px;
+            border: 2px solid #4CAF50;
+            border-radius: 5px;
+        }
+        #magnitude-input.invalid { border-color: #f44336; }
+        #severity-ring {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        #controls {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #play-btn { background-color: #4CAF50; color: white; }
+        #pause-btn { background-color: #FFC107; color: black; }
+        #reset-btn { background-color: #f44336; color: white; }
+        #damage-counter {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+            color: #f44336;
+        }
+        #summary-card {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            width: 300px;
+            display: none;
+        }
+        .summary-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .summary-label { font-weight: bold; }
+        #xray-toggle {
+            margin-top: 10px;
+            background-color: #2196F3;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="input-panel">
+            <h2>Tsunami Simulator</h2>
+            <label for="magnitude-input">Earthquake Magnitude (0-9.9):</label>
+            <input type="number" id="magnitude-input" min="0" max="9.9" step="0.1" value="5.0">
+            <span id="severity-ring"></span>
+            <div id="controls">
+                <button id="play-btn">Play</button>
+                <button id="pause-btn">Pause</button>
+                <button id="reset-btn">Reset</button>
+            </div>
+            <button id="xray-toggle">Toggle X-ray View</button>
+            <div id="damage-counter">$ 0</div>
+        </div>
+        <div id="summary-card">
+            <h3>Simulation Summary</h3>
+            <div class="summary-item">
+                <span class="summary-label">Magnitude:</span>
+                <span id="summary-magnitude">0.0</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Wave Height:</span>
+                <span id="summary-wave-height">0.0 m</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Total Damage:</span>
+                <span id="summary-damage">$0</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">Objects Destroyed:</span>
+                <span id="summary-destroyed">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.11.4/dist/gsap.min.js"></script>
+    <script src="simulator.js"></script>
+</body>
+</html>
