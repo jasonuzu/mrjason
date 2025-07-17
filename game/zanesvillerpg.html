@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zanesville Treasure Hunt</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Basic styling for the game layout */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden; /* Hide scrollbars */
+            background-color: #1e293b; /* Deep slate blue */
+        }
+        #game-container {
+            display: flex;
+            height: 100%;
+            width: 100%;
+        }
+        #map-area {
+            height: 100%;
+            flex-grow: 1;
+            position: relative;
+            background-color: #334155; /* Darker slate */
+            background-size: cover;
+            background-position: center;
+            /* Makes the image look slightly pixelated */
+            image-rendering: pixelated;
+        }
+        #grid-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(30, 1fr);
+            grid-template-rows: repeat(20, 1fr);
+        }
+        .grid-cell {
+            border: 1px solid rgba(253, 224, 71, 0.2);
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+        .grid-cell:hover {
+            background-color: rgba(253, 224, 71, 0.3);
+        }
+        .grid-cell.searched {
+            background-color: rgba(0, 0, 0, 0.6);
+            border-color: rgba(50, 50, 50, 0.4);
+            cursor: not-allowed;
+        }
+        #sidebar {
+            width: 25%;
+            min-width: 340px;
+            max-width: 380px;
+            background-color: #483d8b; /* Dark Slate Blue */
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            border-left: 4px solid #333;
+        }
+        #game-info, #message-log, #inventory, #inventory-list-box {
+            background-color: #e2e8f0;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 4px solid #fde047; /* Vibrant Yellow */
+            box-shadow: 6px 6px 0px #ca8a04; /* Darker Gold */
+        }
+        h1, h2 {
+            color: #1e293b;
+            border-bottom: 4px solid #fde047;
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 16px;
+        }
+        h1 {
+           font-size: 20px; 
+        }
+        #ask-historian-btn {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #a78bfa; /* Lavender */
+            color: #1e293b;
+            border: 4px solid #7c3aed; /* Purple */
+            box-shadow: 6px 6px 0px #5b21b6; /* Darker Purple */
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        #ask-historian-btn:active {
+            box-shadow: 2px 2px 0px #5b21b6;
+            transform: translate(4px, 4px);
+        }
+        #message-log {
+            height: 100px;
+            overflow-y: auto;
+            background-color: #e2e8f0;
+            color: #334155;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+        #inventory-list-box {
+            height: 120px;
+            overflow-y: auto;
+        }
+        #inventory-list {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+            font-size: 12px;
+            color: #475569;
+        }
+        #inventory-list li {
+            padding: 4px 8px;
+            border-bottom: 2px dotted #cbd5e1;
+            cursor: pointer;
+        }
+        #inventory-list li:hover {
+            background-color: #fde047;
+        }
+        #inventory { /* This now acts as the gallery container */
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        #image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .gallery-image {
+            width: 100%;
+            height: 80px;
+            object-fit: cover;
+            border: 4px solid #483d8b;
+            image-rendering: pixelated;
+        }
+        #footer {
+            margin-top: auto;
+            padding-top: 15px;
+            text-align: center;
+            font-size: 10px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="map-area">
+            <div id="grid-container"></div>
+        </div>
+        <div id="sidebar">
+            <div id="game-info">
+                <h1>Zanesville RPG</h1>
+                <p><strong>Cash:</strong> $<span id="cash">0</span></p>
+                <button id="ask-historian-btn">Ask Historian</button>
+            </div>
+            <div id="message-log">
+                <p>Welcome! Click on the map grid to search for treasure.</p>
+            </div>
+            <div id="inventory-list-box">
+                <h2>Inventory</h2>
+                <ul id="inventory-list">
+                    <!-- Found items will be listed here -->
+                </ul>
+            </div>
+            <div id="inventory">
+                <h2>The Gallery</h2>
+                <div id="image-gallery"></div>
+            </div>
+            <div id="footer">
+                Created by LavaHouse Media
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Configuration ---
+        const GRID_ROWS = 20;
+        const GRID_COLS = 30;
+
+        // --- Zanesville Fact Database ---
+        const historianFacts = [
+            "Zanesville was founded in 1797 by Ebenezer Zane.",
+            "The city was named after Ebenezer Zane, who built a road called Zane's Trace.",
+            "Zanesville briefly served as the second state capital of Ohio from 1810 to 1812.",
+            "The famous Y-Bridge in Zanesville is one of the few of its kind in the world.",
+            "You can cross the Y-Bridge and still be in the same city.",
+            "The Y-Bridge spans the confluence of the Licking and Muskingum rivers.",
+            "Famed western author Zane Grey was born in Zanesville in 1872.",
+            "Zane Grey was a descendant of the city's founder, Ebenezer Zane.",
+            "Zanesville was once known as the 'Clay City' due to its numerous pottery factories.",
+            "The Weller Pottery company, a major name in American art pottery, was located here.",
+            "Roseville Pottery, another famous pottery maker, also had roots in the Zanesville area.",
+            "The Lorena Sternwheeler, an authentic paddle-wheeler, offers tours on the Muskingum River.",
+            "The Muskingum River Parkway is recognized as a National Historic Civil Engineering Landmark.",
+            "The lock and dam system on the Muskingum River is one of the oldest in the nation.",
+            "The Secrest Auditorium has hosted famous performers for decades.",
+            "The Putnam Hill neighborhood is known for its historic and beautiful Victorian homes.",
+            "Amelia Earhart once called the Y-Bridge 'the most recognizable landmark in the country'.",
+            "The iconic Zanesville High School building is known as the 'Castle on the Hill'.",
+            "The National Road, America's first federally funded highway, runs through Zanesville.",
+            "The city was a significant stop for travelers heading west in the 19th century.",
+            "The Zanesville Art Center showcases art from around the world.",
+            "Mission Oaks Gardens is a beautiful public garden located in the city.",
+            "The area was once home to many Native American tribes, including the Shawnee.",
+            "During the Civil War, Zanesville was a recruitment and training center for the Union Army.",
+            "The city's economy was historically driven by clay, coal, and manufacturing.",
+            "The first traffic light in Zanesville was installed in the 1920s.",
+            "The Ohio University Zanesville campus provides higher education for the region.",
+            "The 'Tom's Ice Cream Bowl' has been a local favorite since 1948.",
+            "The Y-Bridge has been rebuilt five times since its first version in 1814.",
+            "The current Y-Bridge was completed in 1984.",
+            "The John and Annie Glenn Museum is located nearby in New Concord.",
+            "The Alan Cottrill Sculpture Studio is one of the largest bronze foundries in the U.S.",
+            "The Zanesville Swamp Dogs was a professional baseball team in the Frontier League.",
+            "The city has a rich history of high school sports rivalries.",
+            "The 'Zane's Trace Commemoration' celebrates the city's pioneer history.",
+            "The Putnam Historic District is listed on the National Register of Historic Places.",
+            "The Stone Academy was a former school building and now houses a historical museum.",
+            "The Muskingum County Courthouse is a prominent architectural landmark.",
+            "The city's location made it an important hub for river and road transportation.",
+            "The first settlers in Zanesville had to contend with dense forests and wildlife."
+        ];
+
+        // --- Zanesville Flavor Text Database ---
+        const flavorTextSentences = [
+            "You see a group of kids playing near the river.",
+            "A friendly local waves as you walk by.",
+            "The smell of fresh-cut grass hangs in the air.",
+            "You hear the distant sound of a train horn.",
+            "A cardinal lands on a nearby fence post.",
+            "You notice a historic plaque on the side of a building.",
+            "A car drives by with a Blue Devils sticker on the bumper.",
+            "You find a perfectly smooth skipping stone.",
+            "The wind rustles the leaves in the tall oak trees.",
+            "You meet some people outside Genesis hospital and they say hello.",
+            "Someone is walking their dog in Putnam Hill Park.",
+            "You overhear a conversation about last night's high school football game.",
+            "A delivery truck from a local pottery rumbles past.",
+            "You see a fisherman casting a line into the Muskingum River.",
+            "The sun glints off the windows of the courthouse.",
+            "You pause to watch a barge move slowly through a river lock.",
+            "A group of cyclists rides down the National Road.",
+            "You spot a 'Welcome to Zanesville' sign.",
+            "A squirrel chatters at you from a telephone wire.",
+            "You see a mural depicting the city's history.",
+            "The afternoon light makes the brick buildings glow.",
+            "You find a lost library book on a park bench.",
+            "Someone is tending to their flowers in a beautiful garden.",
+            "You see a 'Zane's Trace' historical marker.",
+            "The air smells like rain is on the way.",
+            "You hear the faint sound of church bells.",
+            "You see a group of students from Ohio University Zanesville.",
+            "A monarch butterfly flutters past you.",
+            "You notice the unique architecture of an old downtown building.",
+            "You see a family having a picnic in a park.",
+            "You find a shiny penny on the sidewalk.",
+            "A jogger gives you a nod as they pass by.",
+            "The sound of children's laughter comes from a nearby playground.",
+            "You see a historical reenactor in period clothing.",
+            "You spot an old, faded advertisement painted on a brick wall.",
+            "A flock of geese flies overhead in a V formation.",
+            "You see a sign for a local farmers market.",
+            "The smell of coffee wafts from a nearby cafe.",
+            "You watch as the Y-Bridge traffic flows in three directions.",
+            "You find an old arrowhead near the riverbank."
+        ];
+
+        // --- Simulated Image Database with Descriptions ---
+        const imageDatabase = [
+            { id: 1, name: 'The Y-Bridge', url: 'https://placehold.co/150x150/E8117F/white?text=Y-Bridge', frequency: 0.20, description: "This famous three-way bridge is a true Zanesville icon." },
+            { id: 2, name: 'Secrest Auditorium', url: 'https://placehold.co/150x150/367588/white?text=Secrest+Auditorium', frequency: 0.15, description: "A historic venue that has hosted countless concerts and events." },
+            { id: 3, name: 'The Zane Grey Museum', url: 'https://placehold.co/150x150/F28C28/white?text=Zane+Grey+Museum', frequency: 0.10, description: "Honoring the life of the famous author of Western novels." },
+            { id: 4, name: 'Mission Oaks Gardens', url: 'https://placehold.co/150x150/00A36C/white?text=Mission+Oaks+Gardens', frequency: 0.10, description: "A peaceful, beautiful garden with rare and unusual plants." },
+            { id: 5, name: 'Putnam Hill Park', url: 'https://placehold.co/150x150/702963/white?text=Putnam+Hill+Park', frequency: 0.05, description: "A historic area with stunning Victorian architecture." }
+        ];
+
+        // --- Game State ---
+        let cash = 0;
+        let foundImages = new Set();
+
+        // --- UI Elements ---
+        const mapArea = document.getElementById('map-area');
+        const cashElement = document.getElementById('cash');
+        const askHistorianBtn = document.getElementById('ask-historian-btn');
+        const messageLogElement = document.getElementById('message-log');
+        const imageGalleryElement = document.getElementById('image-gallery');
+        const inventoryListElement = document.getElementById('inventory-list');
+        const gridContainer = document.getElementById('grid-container');
+        
+        // --- Initial Map Setup ---
+        const mapUrl = 'http://googleusercontent.com/file_content/2';
+        mapArea.style.backgroundImage = `url('${mapUrl}')`;
+
+        /**
+         * Displays a random fact from the historian's database.
+         */
+        function askHistorian() {
+            messageLogElement.innerHTML = ''; // Clear the log
+            const randomIndex = Math.floor(Math.random() * historianFacts.length);
+            const randomFact = historianFacts[randomIndex];
+            logMessage(`HISTORIAN: "${randomFact}"`);
+        }
+
+        /**
+         * Creates the clickable grid overlay.
+         */
+        function createStaticGrid() {
+            gridContainer.innerHTML = '';
+            const totalCells = GRID_ROWS * GRID_COLS;
+            for (let i = 0; i < totalCells; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('grid-cell');
+                cell.dataset.cellId = i;
+                cell.addEventListener('click', () => searchCell(cell), { once: true });
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        /**
+         * Handles the logic when a user clicks a grid cell.
+         */
+        function searchCell(cell) {
+            cell.classList.add('searched');
+            messageLogElement.innerHTML = ''; // Clear the log
+
+            // Display a random flavor text sentence
+            const randomFlavorIndex = Math.floor(Math.random() * flavorTextSentences.length);
+            logMessage(flavorTextSentences[randomFlavorIndex]);
+            
+            const outcome = Math.random();
+
+            if (outcome < 0.5) {
+                logMessage("...You found nothing else of note.");
+            } else if (outcome < 0.85) {
+                const foundCash = Math.floor(Math.random() * 50) + 10;
+                cash += foundCash;
+                cashElement.textContent = cash;
+                logMessage(`...You also found a bundle of cash! Added $${foundCash} to your wallet.`);
+            } else {
+                findRandomImage();
+            }
+        }
+
+        /**
+         * Selects a random image from the database.
+         */
+        function findRandomImage() {
+            const rand = Math.random();
+            let cumulativeFrequency = 0;
+            for (const image of imageDatabase) {
+                cumulativeFrequency += image.frequency;
+                if (rand < cumulativeFrequency) {
+                    if (foundImages.has(image.id)) {
+                        logMessage("...You also found a picture, but you already have this one!");
+                    } else {
+                        logMessage(`...And a treasure! You found a picture of ${image.name}.`);
+                        addImageToInventory(image);
+                    }
+                    return;
+                }
+            }
+            logMessage("...And an interesting-looking rock.");
+        }
+
+        /**
+         * Adds a newly found image to the gallery and its name to the inventory list.
+         */
+        function addImageToInventory(image) {
+            foundImages.add(image.id);
+            
+            // Add image to the visual gallery
+            const imgElement = document.createElement('img');
+            imgElement.src = image.url;
+            imgElement.alt = `A picture of ${image.name}`;
+            imgElement.title = image.name;
+            imgElement.className = 'gallery-image';
+            imageGalleryElement.appendChild(imgElement);
+
+            // Add item name to the inventory list
+            const listItem = document.createElement('li');
+            listItem.textContent = image.name;
+            // Add click event to show description
+            listItem.addEventListener('click', () => {
+                messageLogElement.innerHTML = ''; // Clear the log
+                logMessage(`ABOUT ${image.name.toUpperCase()}: "${image.description}"`);
+            });
+            inventoryListElement.appendChild(listItem);
+        }
+
+        /**
+         * Appends a message to the message panel.
+         */
+        function logMessage(message) {
+            const messageP = document.createElement('p');
+            messageP.textContent = message;
+            messageLogElement.appendChild(messageP);
+            messageLogElement.scrollTop = messageLogElement.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // --- Event Listeners ---
+        askHistorianBtn.addEventListener('click', askHistorian);
+        window.onload = createStaticGrid;
+    </script>
+</body>
+</html>
