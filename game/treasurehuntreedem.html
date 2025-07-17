@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zanesville Treasure Hunt Reedem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the pixel game theme */
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1e1b4b; /* Deep indigo */
+            color: #f8fafc; /* Slate 50 */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        /* 8-bit button style */
+        .pixel-button {
+            background: #4f46e5; /* Indigo 600 */
+            border: none;
+            padding: 12px 24px;
+            position: relative;
+            box-shadow: inset -4px -4px 0px 0px #3730a3; /* Indigo 800 */
+            transition: all 0.1s ease-in-out;
+            cursor: pointer;
+        }
+        .pixel-button:hover, .pixel-button:focus {
+            background: #6366f1; /* Indigo 500 */
+            box-shadow: inset -6px -6px 0px 0px #3730a3;
+        }
+        .pixel-button:active {
+            box-shadow: inset 4px 4px 0px 0px #3730a3;
+        }
+
+        /* 8-bit panel/container style */
+        .pixel-panel {
+            border: 4px solid #f8fafc;
+            box-shadow: 0 0 0 4px #1e1b4b, 0 0 0 8px #f8fafc;
+            background-color: #312e81; /* Indigo 900 */
+            padding: 2rem;
+        }
+
+        /* Input field style */
+        .pixel-input {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #1e1b4b;
+            border: 4px solid #4f46e5;
+            color: #f8fafc;
+            padding: 1rem;
+            width: 100%;
+            outline: none;
+        }
+        .pixel-input:focus {
+            border-color: #818cf8; /* Indigo 400 */
+            box-shadow: 0 0 15px #6366f1;
+        }
+
+        /* Blinking cursor effect for the title */
+        .blinking-cursor::after {
+            content: '_';
+            animation: blink 1s step-start infinite;
+        }
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Image styling */
+        .treasure-image {
+             border: 4px solid #f8fafc;
+             box-shadow: 0 0 0 4px #1e1b4b, 0 0 0 8px #f8fafc;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <!-- Main container for the app -->
+        <div id="app-container" class="pixel-panel">
+
+            <!-- Initial view for entering the code -->
+            <div id="initial-view">
+                <h1 class="text-2xl md:text-3xl text-center mb-4 text-yellow-300 blinking-cursor">TREASURE HUNT</h1>
+                <p class="text-center mb-8">Enter your secret code!</p>
+                <form id="coupon-form" class="space-y-6">
+                    <div>
+                        <label for="coupon-code" class="sr-only">Coupon Code</label>
+                        <input type="text" id="coupon-code" name="coupon-code" class="pixel-input text-center uppercase" placeholder="TYPE CODE HERE">
+                    </div>
+                    <button type="submit" class="pixel-button w-full">FIND TREASURE</button>
+                </form>
+            </div>
+
+            <!-- View to display the result (success or error) -->
+            <div id="result-view" class="hidden text-center">
+                 <h2 id="result-title" class="text-2xl md:text-3xl text-yellow-300 mb-6"></h2>
+                 <div id="success-content" class="hidden">
+                    <img id="treasure-image" src="" alt="Treasure Image" class="treasure-image max-w-full h-auto mx-auto mb-6" onerror="this.src='https://placehold.co/400x300/1e1b4b/f8fafc?text=Image+Not+Found'; this.onerror=null;">
+                    <p id="success-message" class="text-green-400 text-lg"></p>
+                 </div>
+                 <p id="error-message" class="text-red-400 text-lg"></p>
+                 <button id="reset-button" class="pixel-button w-full mt-8">TRY AGAIN</button>
+            </div>
+             <!-- Note about Google Sheets limitation -->
+            <p id="api-note" class="text-xs text-gray-400 mt-8 text-center hidden">
+                Note: In a real app, the coupon status would be permanently updated on a server. This demo only checks the sheet.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const initialView = document.getElementById('initial-view');
+        const resultView = document.getElementById('result-view');
+        const couponForm = document.getElementById('coupon-form');
+        const couponInput = document.getElementById('coupon-code');
+        const resultTitle = document.getElementById('result-title');
+        const successContent = document.getElementById('success-content');
+        const treasureImage = document.getElementById('treasure-image');
+        const successMessage = document.getElementById('success-message');
+        const errorMessage = document.getElementById('error-message');
+        const resetButton = document.getElementById('reset-button');
+        const apiNote = document.getElementById('api-note');
+
+        // --- Google Sheet Configuration ---
+        // The public URL of the Google Sheet
+        const sheetUrl = 'https://docs.google.com/spreadsheets/d/12L53yiUpAZXvIIAADgda0gLZrizb1yL__2eO9QSKK2w/gviz/tq?tqx=out:csv&sheet=Sheet1';
+
+        // In-memory store to track redeemed codes for the current session
+        const sessionRedeemedCodes = new Set();
+
+        // --- Event Listeners ---
+        couponForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const code = couponInput.value.trim().toUpperCase();
+            if (!code) {
+                showError("Please enter a code!");
+                return;
+            }
+            await processCode(code);
+        });
+
+        resetButton.addEventListener('click', () => {
+            // Reset the UI to the initial state
+            resultView.classList.add('hidden');
+            successContent.classList.add('hidden');
+            initialView.classList.remove('hidden');
+            couponInput.value = '';
+            errorMessage.textContent = '';
+            successMessage.textContent = '';
+            apiNote.classList.add('hidden');
+        });
+
+        // --- Core Logic ---
+
+        /**
+         * Fetches and processes the coupon code from the Google Sheet.
+         * @param {string} userCode The coupon code entered by the user.
+         */
+        async function processCode(userCode) {
+            try {
+                const response = await fetch(sheetUrl);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+                const csvText = await response.text();
+                const data = parseCSV(csvText);
+
+                // Find the row that matches the user's code
+                // Assumes 'adcode' is the first column (index 0)
+                const header = data[0]; // First row is the header
+                const adCodeIndex = header.indexOf('adcode');
+                const redeemedIndex = header.indexOf('redeemed');
+                const imageUrlIndex = header.indexOf('imageurl');
+
+                if (adCodeIndex === -1 || redeemedIndex === -1 || imageUrlIndex === -1) {
+                    showError("Spreadsheet columns are misconfigured. Missing 'adcode', 'redeemed', or 'imageurl'.");
+                    return;
+                }
+
+                const couponRow = data.slice(1).find(row => row[adCodeIndex].toUpperCase() === userCode);
+
+                if (couponRow) {
+                    handleFoundCoupon(couponRow, userCode, redeemedIndex, imageUrlIndex);
+                } else {
+                    showError("Invalid coupon code. Try again!");
+                }
+
+            } catch (error) {
+                console.error('Error fetching or parsing sheet data:', error);
+                showError("Could not connect to the treasure database. Check your connection.");
+            }
+        }
+
+        /**
+         * Handles the logic when a matching coupon code is found in the sheet.
+         * @param {string[]} couponRow The data row for the found coupon.
+         * @param {string} userCode The code the user entered.
+         * @param {number} redeemedIndex The index of the 'redeemed' column.
+         * @param {number} imageUrlIndex The index of the 'imageurl' column.
+         */
+        function handleFoundCoupon(couponRow, userCode, redeemedIndex, imageUrlIndex) {
+             // Check if already redeemed in this session first
+            if (sessionRedeemedCodes.has(userCode)) {
+                showError("This coupon has already been found.");
+                return;
+            }
+
+            const isRedeemed = couponRow[redeemedIndex].toUpperCase() === 'YES';
+            const imageUrl = couponRow[imageUrlIndex];
+
+            if (isRedeemed) {
+                showError("This coupon has already been found.");
+            } else {
+                // Mark as redeemed for this session
+                sessionRedeemedCodes.add(userCode);
+                showSuccess(imageUrl);
+            }
+        }
+
+        /**
+         * Displays the success view with the treasure image.
+         * @param {string} imageUrl The URL of the image to display.
+         */
+        function showSuccess(imageUrl) {
+            initialView.classList.add('hidden');
+            resultView.classList.remove('hidden');
+            successContent.classList.remove('hidden');
+            errorMessage.textContent = '';
+            
+            resultTitle.textContent = "Zanesville Treasure Hunt Coupon";
+            treasureImage.src = imageUrl;
+            successMessage.textContent = "TREASURE FOUND!";
+            apiNote.classList.remove('hidden');
+        }
+
+        /**
+         * Displays an error message to the user.
+         * @param {string} message The error message to show.
+         */
+        function showError(message) {
+            initialView.classList.add('hidden');
+            resultView.classList.remove('hidden');
+            successContent.classList.add('hidden');
+            
+            resultTitle.textContent = "OH NO!";
+            errorMessage.textContent = message;
+            apiNote.classList.add('hidden');
+        }
+
+        /**
+         * A simple CSV parser to handle the Google Sheet output.
+         * It handles quoted fields.
+         * @param {string} csvText The raw CSV text from the fetch response.
+         * @returns {string[][]} A 2D array representing the sheet data.
+         */
+        function parseCSV(csvText) {
+            // This regex handles fields that are quoted and may contain commas
+            const rows = csvText.trim().split(/\r?\n/);
+            return rows.map(row => {
+                const results = [];
+                // Regex to split by comma but ignore commas inside double quotes
+                const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
+                let match;
+                while (match = regex.exec(row)) {
+                    let value = match[0];
+                    // Remove quotes from the start and end if they exist
+                    if (value.startsWith('"') && value.endsWith('"')) {
+                        value = value.slice(1, -1);
+                    }
+                    results.push(value);
+                }
+                return results;
+            });
+        }
+
+    </script>
+</body>
+</html>
