@@ -68,7 +68,7 @@
             flex-direction: column;
             border-left: 4px solid #333;
         }
-        #game-info, #message-log, #inventory, #inventory-list-box {
+        #game-info, #message-log, #inventory-list-box {
             background-color: #e2e8f0;
             padding: 15px;
             margin-bottom: 20px;
@@ -84,6 +84,9 @@
         }
         h1 {
            font-size: 20px; 
+        }
+        #game-info p {
+            margin-bottom: 15px;
         }
         .pixel-btn {
             display: block;
@@ -126,7 +129,7 @@
             line-height: 1.5;
         }
         #inventory-list-box {
-            height: 120px;
+            flex-grow: 1;
             overflow-y: auto;
         }
         #inventory-list {
@@ -143,23 +146,6 @@
         }
         #inventory-list li:hover {
             background-color: #fde047;
-        }
-        #inventory { /* This now acts as the gallery container */
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-        #image-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .gallery-image {
-            width: 100%;
-            height: 80px;
-            object-fit: cover;
-            border: 4px solid #483d8b;
-            image-rendering: pixelated;
         }
         #footer {
             margin-top: auto;
@@ -211,11 +197,11 @@
             h2 {
                 font-size: 14px;
             }
-            #game-info, #message-log, #inventory, #inventory-list-box {
+            #game-info, #message-log, #inventory-list-box {
                 padding: 10px;
                 margin-bottom: 10px;
             }
-            #message-log, #inventory-list-box {
+            #message-log {
                 height: 90px;
             }
         }
@@ -242,10 +228,6 @@
                 <ul id="inventory-list">
                     <!-- Found items will be listed here -->
                 </ul>
-            </div>
-            <div id="inventory">
-                <h2>The Gallery</h2>
-                <div id="image-gallery"></div>
             </div>
             <div id="footer">
                 <a href="http://lavahousemedia.com/" target="_blank">Created by LavaHouse Media</a>
@@ -376,7 +358,6 @@
         const cashElement = document.getElementById('cash');
         const askHistorianBtn = document.getElementById('ask-historian-btn');
         const messageLogElement = document.getElementById('message-log');
-        const imageGalleryElement = document.getElementById('image-gallery');
         const inventoryListElement = document.getElementById('inventory-list');
         const gridContainer = document.getElementById('grid-container');
         
@@ -464,20 +445,12 @@
         }
 
         /**
-         * Adds a newly found image to the gallery and its name to the inventory list.
+         * Adds a newly found image to the inventory list.
          */
         function addImageToInventory(image) {
             playTreasureSound(); // Play the special sound for finding a treasure
             foundImages.add(image.id);
             
-            // Add image to the visual gallery
-            const imgElement = document.createElement('img');
-            imgElement.src = image.url;
-            imgElement.alt = `A picture of ${image.name}`;
-            imgElement.title = image.name;
-            imgElement.className = 'gallery-image';
-            imageGalleryElement.appendChild(imgElement);
-
             // Add item name to the inventory list
             const listItem = document.createElement('li');
             listItem.textContent = image.name;
@@ -521,4 +494,5 @@
     </script>
 </body>
 </html>
+
 
