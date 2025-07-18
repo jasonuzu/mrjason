@@ -73,20 +73,55 @@
 
     <script>
         // --- Backend Configuration ---
-        const backendUrl = 'admin_handler.php'; // URL to your new PHP admin script
+        // IMPORTANT: You MUST replace this placeholder with the FULL URL 
+        // to where you uploaded your 'admin_handler.php' script on your web server.
+        // For example: 'https://www.your-domain.com/treasure-hunt/admin_handler.php'
+        const backendUrl = 'https://jasonuzu.github.io/mrjason/game/admin.html';
 
         // --- DOM Elements ---
         const tableBody = document.getElementById('coupons-table-body');
         const addCouponForm = document.getElementById('add-coupon-form');
 
         // --- Functions ---
+        
+        /**
+         * Validates the backend URL to ensure the placeholder has been replaced.
+         * If the placeholder is still present, it displays an error and disables the form.
+         * @returns {boolean} - True if the URL is valid, false otherwise.
+         */
+        function validateBackendUrl() {
+            if (backendUrl.includes('YOUR_WEBSITE_DOMAIN')) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-red-600 font-bold text-lg">
+                            <p class="text-2xl mb-4">Configuration Error!</p>
+                            You must update the 'backendUrl' variable in this script.
+                            <br><br>
+                            Replace the placeholder URL with the actual link to your admin_handler.php file.
+                        </td>
+                    </tr>`;
+                // Disable the form to prevent further errors
+                const submitButton = addCouponForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                return false;
+            }
+            return true;
+        }
 
         /**
          * Fetches all coupons from the backend and renders them in the table.
          */
         async function fetchAndRenderCoupons() {
+            // Stop if the URL is not configured
+            if (!validateBackendUrl()) return;
+            
             try {
                 const response = await fetch(backendUrl);
+                 if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
                 const coupons = await response.json();
 
                 tableBody.innerHTML = ''; // Clear existing rows
@@ -118,7 +153,10 @@
 
             } catch (error) {
                 console.error('Failed to fetch coupons:', error);
-                tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-8 text-red-500">Failed to load coupons. Check backend connection.</td></tr>';
+                const errorMessage = error.name === 'TypeError' 
+                    ? `A network error occurred. This is often a CORS issue or an incorrect URL. Please ensure the backendUrl is correct and your server allows requests from this origin. <br><br> Details: ${error.message}`
+                    : `Failed to load coupons. <br> ${error.message}`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8 text-red-500">${errorMessage}</td></tr>`;
             }
         }
 
@@ -141,16 +179,22 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
+
                 const result = await response.json();
                 if (result.success) {
                     addCouponForm.reset();
                     fetchAndRenderCoupons(); // Refresh the table
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error from server: ' + result.message);
                 }
             } catch (error) {
                 console.error('Failed to add coupon:', error);
-                alert('An error occurred while adding the coupon.');
+                alert('An error occurred while adding the coupon. See console for details.\n\n' + error.message);
             }
         });
 
@@ -169,15 +213,21 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'delete', adcode: adcode })
                 });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
+
                 const result = await response.json();
                 if (result.success) {
                     fetchAndRenderCoupons(); // Refresh the table
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error from server: ' + result.message);
                 }
             } catch (error) {
                 console.error('Failed to delete coupon:', error);
-                alert('An error occurred while deleting the coupon.');
+                alert('An error occurred while deleting the coupon. See console for details.\n\n' + error.message);
             }
         }
 
@@ -192,15 +242,21 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'toggle', adcode: adcode })
                 });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server responded with status ${response.status}: ${errorText}`);
+                }
+
                 const result = await response.json();
                 if (result.success) {
                     fetchAndRenderCoupons(); // Refresh the table
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Error from server: ' + result.message);
                 }
             } catch (error) {
                 console.error('Failed to toggle status:', error);
-                alert('An error occurred while toggling the status.');
+                alert('An error occurred while toggling the status. See console for details.\n\n' + error.message);
             }
         }
 
