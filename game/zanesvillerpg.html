@@ -185,6 +185,40 @@
         .screen-shake {
             animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
         }
+
+        /* Responsive Design for Mobile */
+        @media (max-width: 768px) {
+            #game-container {
+                flex-direction: column;
+            }
+            #map-area {
+                height: 55%;
+                flex-grow: 0;
+            }
+            #sidebar {
+                width: 100%;
+                height: 45%;
+                min-width: unset;
+                max-width: unset;
+                border-left: none;
+                border-top: 4px solid #333;
+                overflow-y: auto;
+                padding: 10px;
+            }
+            h1 {
+                font-size: 18px;
+            }
+            h2 {
+                font-size: 14px;
+            }
+            #game-info, #message-log, #inventory, #inventory-list-box {
+                padding: 10px;
+                margin-bottom: 10px;
+            }
+            #message-log, #inventory-list-box {
+                height: 90px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -347,7 +381,7 @@
         const gridContainer = document.getElementById('grid-container');
         
         // --- Initial Map Setup ---
-        const mapUrl = 'https://jasonuzu.github.io/mrjason/game/map.png';
+        const mapUrl = 'http://googleusercontent.com/file_content/2';
         mapArea.style.backgroundImage = `url('${mapUrl}')`;
 
         /**
@@ -487,3 +521,4 @@
     </script>
 </body>
 </html>
+
