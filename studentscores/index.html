@@ -66,6 +66,10 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
                         Add Assignment
                     </button>
+                    <button id="get-parent-link-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                        Get Parent Link
+                    </button>
                 </div>
 
                 <!-- Step 2: Data Table -->
@@ -88,9 +92,9 @@
                 </div>
             </div>
 
-            <!-- Student View: Hidden by default, shown when a student link is used -->
-            <div id="student-view" class="hidden">
-                 <!-- Student report will be generated here -->
+            <!-- Student/Parent View: Hidden by default, shown when a link is used -->
+            <div id="shared-view" class="hidden">
+                 <!-- Student report or Parent page will be generated here -->
             </div>
         </div>
         
@@ -163,7 +167,7 @@
         const appHeader = document.getElementById('app-header');
         const csvFileInput = document.getElementById('csv-file');
         const teacherView = document.getElementById('teacher-view');
-        const studentView = document.getElementById('student-view');
+        const sharedView = document.getElementById('shared-view');
         const dataTableContainer = document.getElementById('data-table-container');
         const tableHead = document.getElementById('table-head');
         const tableBody = document.getElementById('table-body');
@@ -181,6 +185,7 @@
         const studentIdInput = document.getElementById('student-id-input');
         const confirmIdBtn = document.getElementById('confirm-id-btn');
         const cancelIdBtn = document.getElementById('cancel-id-btn');
+        const getParentLinkBtn = document.getElementById('get-parent-link-btn');
 
         // --- CORE LOGIC ---
 
@@ -188,9 +193,22 @@
          * Initializes the application on page load.
          */
         function initialize() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewType = urlParams.get('view');
             const hash = window.location.hash.substring(1);
-            if (hash) {
-                // Student View
+
+            if (viewType === 'parent' && hash) {
+                // Parent Portal View
+                try {
+                    const decodedJson = atob(hash);
+                    const parentData = JSON.parse(decodedJson);
+                    displayParentPage(parentData);
+                } catch (e) {
+                    console.error("Failed to decode parent data from URL:", e);
+                    displayError("The parent link appears to be broken or invalid.");
+                }
+            } else if (hash) {
+                // Individual Student View
                 try {
                     const decodedJson = atob(hash);
                     const studentData = JSON.parse(decodedJson);
@@ -214,6 +232,7 @@
                     e.preventDefault();
                     saveNewAssignment();
                 });
+                getParentLinkBtn.addEventListener('click', openParentPage);
             }
         }
 
@@ -320,8 +339,32 @@
         }
 
         /**
+         * Generates and opens the parent-facing page in a new tab.
+         */
+        function openParentPage() {
+            if (classData.length === 0) {
+                alert("Please add at least one student before creating a parent link.");
+                return;
+            }
+
+            const parentData = classData.map((row, index) => {
+                return {
+                    name: row['Student Name'],
+                    url: generateShareUrl(index) // This already creates the full URL with hash
+                };
+            });
+
+            const jsonString = JSON.stringify(parentData);
+            const base64String = btoa(jsonString);
+
+            const baseUrl = window.location.href.split('?')[0].split('#')[0];
+            const parentUrl = `${baseUrl}?view=parent#${base64String}`;
+
+            window.open(parentUrl, '_blank');
+        }
+
+        /**
          * Shows a modal to ask for the student's ID for verification.
-         * @param {Object} studentData - The data for the student, decoded from the URL.
          */
         function promptForStudentId(studentData) {
             teacherView.classList.add('hidden');
@@ -332,7 +375,7 @@
             const handleConfirm = () => {
                 const enteredId = studentIdInput.value;
                 const correctId = studentData.data['Student ID'];
-                if (enteredId.trim() === correctId.trim()) {
+                if (enteredId.trim().toLowerCase() === correctId.trim().toLowerCase()) {
                     studentIdModal.classList.add('hidden');
                     appHeader.classList.remove('hidden');
                     displayStudentReport(studentData);
@@ -372,24 +415,23 @@
                 
                 const match = headerText.match(/(.+) \[(.+)\]$/);
                 if (match) {
-                    const name = match[1];
-                    const score = match[2];
-                    th.innerHTML = `${name} <span class="font-bold text-gray-600">[${score}]</span>`;
+                    th.innerHTML = `${match[1]} <span class="font-bold text-gray-600">[${match[2]}]</span>`;
                 } else {
                     th.textContent = headerText;
                 }
-                
                 headerRow.appendChild(th);
             });
+
             const actionTh = document.createElement('th');
             actionTh.scope = 'col';
-            actionTh.className = 'relative px-6 py-3';
-            actionTh.innerHTML = '<span class="sr-only">Report</span>';
+            actionTh.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+            actionTh.textContent = 'Report';
             headerRow.appendChild(actionTh);
             tableHead.appendChild(headerRow);
 
             classData.forEach((row, index) => {
                 const tr = document.createElement('tr');
+
                 classHeaders.forEach(header => {
                     const td = document.createElement('td');
                     td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-700 border-r border-gray-300';
@@ -402,11 +444,11 @@
                 });
 
                 const actionTd = document.createElement('td');
-                actionTd.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium';
+                actionTd.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
                 
                 const reportLink = document.createElement('a');
                 reportLink.textContent = 'View Report';
-                reportLink.className = 'text-indigo-600 hover:text-indigo-900 font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-md';
+                reportLink.className = 'text-indigo-600 hover:text-indigo-900 font-semibold';
                 reportLink.href = generateShareUrl(index);
                 reportLink.target = '_blank';
 
@@ -424,7 +466,7 @@
          */
         function displayStudentReport(studentData) {
             teacherView.classList.add('hidden');
-            studentView.classList.remove('hidden');
+            sharedView.classList.remove('hidden');
 
             const headers = studentData.headers;
             const data = studentData.data;
@@ -432,21 +474,15 @@
             const studentName = data[headers[0]] || 'Student';
             const studentIdentifier = data[headers[1]] ? `(${data[headers[1]]})` : '';
 
-            let reportHTML = `
-                <div class="text-center mb-8">
-                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900">${studentName}</h1>
-                    <p class="text-gray-600 mt-2">Score Report ${studentIdentifier}</p>
-                </div>
-                <div class="border border-gray-200 rounded-lg overflow-hidden">
-                    <ul class="divide-y divide-gray-200">
-            `;
+            appHeader.querySelector('h1').textContent = studentName;
+            appHeader.querySelector('p').textContent = `Score Report ${studentIdentifier}`;
+
+            let reportHTML = `<div class="border border-gray-200 rounded-lg overflow-hidden"><ul class="divide-y divide-gray-200">`;
             headers.slice(2).forEach(header => {
                 let headerDisplay = header;
                 const match = header.match(/(.+) \[(.+)\]$/);
                 if (match) {
-                    const name = match[1];
-                    const score = match[2];
-                    headerDisplay = `${name} <span class="font-normal text-gray-500">[${score}]</span>`;
+                    headerDisplay = `${match[1]} <span class="font-normal text-gray-500">[${match[2]}]</span>`;
                 }
 
                  reportHTML += `
@@ -457,7 +493,30 @@
                 `;
             });
             reportHTML += `</ul></div>`;
-            studentView.innerHTML = reportHTML;
+            sharedView.innerHTML = reportHTML;
+        }
+
+        /**
+         * Displays the parent-facing page with links to individual reports.
+         */
+        function displayParentPage(parentData) {
+            teacherView.classList.add('hidden');
+            sharedView.classList.remove('hidden');
+
+            appHeader.querySelector('h1').textContent = 'Class Report Links';
+            appHeader.querySelector('p').textContent = 'Click "View Report" next to a student\'s name.';
+
+            let pageHTML = `<div class="border border-gray-200 rounded-lg overflow-hidden"><ul class="divide-y divide-gray-200">`;
+            parentData.forEach(student => {
+                pageHTML += `
+                    <li class="px-6 py-4 flex items-center justify-between">
+                        <span class="text-lg font-medium text-gray-800">${student.name}</span>
+                        <a href="${student.url}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-semibold py-2 px-4 rounded-lg">View Report</a>
+                    </li>
+                `;
+            });
+            pageHTML += `</ul></div>`;
+            sharedView.innerHTML = pageHTML;
         }
         
         /**
@@ -492,7 +551,7 @@
             const jsonString = JSON.stringify(dataToEncode);
             const base64String = btoa(jsonString);
             
-            const baseUrl = window.location.href.split('#')[0];
+            const baseUrl = window.location.href.split('#')[0].split('?')[0];
             return `${baseUrl}#${base64String}`;
         }
 
