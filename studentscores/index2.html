@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Score Sharer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Papaparse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        /* Custom font and minor style adjustments */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for editable cells to provide user feedback */
+        [contenteditable="true"] {
+            outline: 2px solid transparent;
+            transition: outline-color 0.3s;
+            cursor: cell;
+        }
+        [contenteditable="true"]:hover {
+            background-color: #f0f9ff; /* light-blue-50 */
+        }
+        [contenteditable="true"]:focus {
+            outline-color: #3b82f6; /* blue-500 */
+            background-color: #dbeafe; /* blue-100 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-8 max-w-7xl">
+
+        <!-- Main container for the app's content -->
+        <div id="main-content" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg transition-all duration-500">
+            
+            <!-- App Header -->
+            <div id="app-header" class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Student Score Sharer</h1>
+                <p class="text-gray-600 mt-2">Add students and assignments below, or upload a CSV file to begin.</p>
+            </div>
+
+            <!-- Teacher View: Shown by default -->
+            <div id="teacher-view">
+                <!-- Step 1: File Upload -->
+                <div id="file-upload-area" class="mb-6 p-6 border-2 border-dashed border-gray-300 rounded-xl text-center">
+                    <label for="csv-file" class="cursor-pointer">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span class="mt-2 block text-sm font-semibold text-indigo-600">Upload a CSV File</span>
+                        <span class="mt-1 block text-xs text-gray-500">This will replace any data in the table below</span>
+                    </label>
+                    <input id="csv-file" type="file" class="sr-only" accept=".csv">
+                </div>
+                
+                <!-- Action Buttons -->
+                <div id="action-buttons" class="my-4 flex flex-wrap gap-3">
+                    <button id="add-student-btn" class="bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors flex items-center shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        Add Student
+                    </button>
+                    <button id="add-assignment-btn" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors flex items-center shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>
+                        Add Assignment
+                    </button>
+                    <button id="toggle-parent-view-btn" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                        Create Parent View
+                    </button>
+                </div>
+                <button id="exit-parent-view-btn" class="hidden bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition-colors flex items-center shadow-sm my-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    Exit Parent View
+                </button>
+
+                <!-- Step 2: Data Table -->
+                <div id="data-table-container">
+                    <h2 class="text-2xl font-semibold mb-4">Class Roster & Scores</h2>
+                    <div class="overflow-x-auto rounded-lg border border-gray-300">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead id="table-head" class="bg-gray-50">
+                                <!-- Header row will be generated by JavaScript -->
+                            </thead>
+                            <tbody id="table-body" class="bg-white divide-y divide-gray-300">
+                                <!-- Data rows will be generated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                 <div id="loading-spinner" class="hidden text-center p-8">
+                    <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <p class="mt-2 text-gray-600">Processing...</p>
+                </div>
+            </div>
+
+            <!-- Student View: Hidden by default, shown when a student link is used -->
+            <div id="student-view" class="hidden">
+                 <!-- Student report will be generated here -->
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="text-center mt-8 text-sm text-gray-500">
+            <p>Created for educational purposes. All data is processed locally in your browser.</p>
+        </footer>
+    </div>
+
+    <!-- Add Assignment Modal -->
+    <div id="assignment-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Add New Assignment</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="assignment-form">
+                        <div>
+                            <label for="assignment-name" class="block text-sm font-medium text-gray-700 text-left">Assignment Name:</label>
+                            <input type="text" id="assignment-name" name="assignment-name" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                        </div>
+                        <div class="mt-4">
+                            <label for="total-score" class="block text-sm font-medium text-gray-700 text-left">Total Score Possible:</label>
+                            <input type="number" id="total-score" name="total-score" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., 100">
+                        </div>
+                    </form>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="save-assignment-btn" class="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        Save Assignment
+                    </button>
+                    <button id="cancel-assignment-btn" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student ID Confirmation Modal -->
+    <div id="student-id-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Your Identity</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="student-id-form">
+                        <label for="student-id-input" class="block text-sm font-medium text-gray-700 text-left">Please enter your Student ID:</label>
+                        <input type="text" id="student-id-input" name="student-id-input" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </form>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="confirm-id-btn" class="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        View Report
+                    </button>
+                     <button id="cancel-id-btn" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        let classData = [];
+        let classHeaders = [];
+        let isParentViewActive = false;
+
+        // --- DOM ELEMENT REFERENCES ---
+        const mainContent = document.getElementById('main-content');
+        const appHeader = document.getElementById('app-header');
+        const csvFileInput = document.getElementById('csv-file');
+        const teacherView = document.getElementById('teacher-view');
+        const studentView = document.getElementById('student-view');
+        const dataTableContainer = document.getElementById('data-table-container');
+        const tableHead = document.getElementById('table-head');
+        const tableBody = document.getElementById('table-body');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const addStudentBtn = document.getElementById('add-student-btn');
+        const addAssignmentBtn = document.getElementById('add-assignment-btn');
+        const assignmentModal = document.getElementById('assignment-modal');
+        const assignmentForm = document.getElementById('assignment-form');
+        const assignmentNameInput = document.getElementById('assignment-name');
+        const totalScoreInput = document.getElementById('total-score');
+        const saveAssignmentBtn = document.getElementById('save-assignment-btn');
+        const cancelAssignmentBtn = document.getElementById('cancel-assignment-btn');
+        const studentIdModal = document.getElementById('student-id-modal');
+        const studentIdForm = document.getElementById('student-id-form');
+        const studentIdInput = document.getElementById('student-id-input');
+        const confirmIdBtn = document.getElementById('confirm-id-btn');
+        const cancelIdBtn = document.getElementById('cancel-id-btn');
+        const toggleParentViewBtn = document.getElementById('toggle-parent-view-btn');
+        const exitParentViewBtn = document.getElementById('exit-parent-view-btn');
+        const fileUploadArea = document.getElementById('file-upload-area');
+        const actionButtons = document.getElementById('action-buttons');
+
+        // --- CORE LOGIC ---
+
+        /**
+         * Initializes the application on page load.
+         */
+        function initialize() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                // Student View
+                try {
+                    const decodedJson = atob(hash);
+                    const studentData = JSON.parse(decodedJson);
+                    promptForStudentId(studentData);
+                } catch (e) {
+                    console.error("Failed to decode or parse student data from URL:", e);
+                    displayError("The link appears to be broken or invalid.");
+                }
+            } else {
+                // Teacher View - Setup default state
+                classHeaders = ['Student Name', 'Student ID'];
+                displayTeacherTable();
+                setupEventListeners();
+            }
+        }
+
+        /**
+         * Sets up all the event listeners for the teacher's controls.
+         */
+        function setupEventListeners() {
+            csvFileInput.addEventListener('change', handleFileSelect);
+            addStudentBtn.addEventListener('click', addStudent);
+            addAssignmentBtn.addEventListener('click', openAssignmentModal);
+            saveAssignmentBtn.addEventListener('click', saveNewAssignment);
+            cancelAssignmentBtn.addEventListener('click', closeAssignmentModal);
+            assignmentForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveNewAssignment();
+            });
+            toggleParentViewBtn.addEventListener('click', toggleParentView);
+            exitParentViewBtn.addEventListener('click', toggleParentView);
+        }
+
+        /**
+         * Handles CSV file selection, parses it, and updates the state.
+         */
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            loadingSpinner.classList.remove('hidden');
+            dataTableContainer.classList.add('hidden');
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    loadingSpinner.classList.add('hidden');
+                    if (results.data && results.data.length > 0) {
+                        classData = results.data;
+                        classHeaders = results.meta.fields;
+                        displayTeacherTable();
+                    } else {
+                        displayError("The CSV file is empty or could not be read.");
+                    }
+                },
+                error: function(error) {
+                    loadingSpinner.classList.add('hidden');
+                    console.error("CSV Parsing Error:", error);
+                    displayError("There was an error parsing the CSV file.");
+                }
+            });
+        }
+
+        /**
+         * Adds a new, empty student row to the state and re-renders the table.
+         */
+        function addStudent() {
+            const newStudent = {};
+            classHeaders.forEach(header => {
+                newStudent[header] = ''; // Initialize with empty strings for all current headers
+            });
+            classData.push(newStudent);
+            displayTeacherTable();
+        }
+
+        /**
+         * Opens the modal for adding a new assignment.
+         */
+        function openAssignmentModal() {
+            assignmentModal.classList.remove('hidden');
+            assignmentNameInput.focus();
+        }
+
+        /**
+         * Closes the modal for adding a new assignment.
+         */
+        function closeAssignmentModal() {
+            assignmentModal.classList.add('hidden');
+            assignmentForm.reset();
+        }
+
+        /**
+         * Saves the new assignment from the modal form.
+         */
+        function saveNewAssignment() {
+            const newAssignmentName = assignmentNameInput.value;
+            const totalScore = totalScoreInput.value;
+
+            if (newAssignmentName && newAssignmentName.trim() !== '') {
+                let trimmedName = newAssignmentName.trim();
+                
+                if (totalScore && totalScore.trim() !== '') {
+                    trimmedName = `${trimmedName} [${totalScore.trim()}]`;
+                }
+
+                if (classHeaders.includes(trimmedName)) {
+                    alert('An assignment with this name and score already exists.');
+                    return;
+                }
+                
+                classHeaders.push(trimmedName);
+                classData.forEach(student => {
+                    student[trimmedName] = '';
+                });
+                
+                displayTeacherTable();
+                closeAssignmentModal();
+            } else {
+                alert('Please enter a valid assignment name.');
+            }
+        }
+        
+        /**
+         * Updates the central `classData` state when a cell is edited.
+         */
+        function updateCellData(event) {
+            const rowIndex = event.target.dataset.rowIndex;
+            const header = event.target.dataset.header;
+            const newValue = event.target.textContent;
+            if (classData[rowIndex]) {
+                classData[rowIndex][header] = newValue;
+            }
+        }
+
+        /**
+         * Toggles the parent-safe view on and off.
+         */
+        function toggleParentView() {
+            isParentViewActive = !isParentViewActive;
+
+            fileUploadArea.classList.toggle('hidden', isParentViewActive);
+            actionButtons.classList.toggle('hidden', isParentViewActive);
+            exitParentViewBtn.classList.toggle('hidden', !isParentViewActive);
+
+            const mainTitle = document.querySelector('#app-header h1');
+            const mainSubtitle = document.querySelector('#app-header p');
+            if (isParentViewActive) {
+                mainTitle.textContent = "Parent View";
+                mainSubtitle.textContent = "This is a safe view for sharing. Scores are hidden.";
+            } else {
+                mainTitle.textContent = "Student Score Sharer";
+                mainSubtitle.textContent = "Add students and assignments below, or upload a CSV file to begin.";
+            }
+
+            displayTeacherTable();
+        }
+
+        /**
+         * Shows a modal to ask for the student's ID for verification.
+         */
+        function promptForStudentId(studentData) {
+            teacherView.classList.add('hidden');
+            appHeader.classList.add('hidden');
+            studentIdModal.classList.remove('hidden');
+            studentIdInput.focus();
+
+            const handleConfirm = () => {
+                const enteredId = studentIdInput.value;
+                const correctId = studentData.data['Student ID'];
+                if (enteredId.trim().toLowerCase() === correctId.trim().toLowerCase()) {
+                    studentIdModal.classList.add('hidden');
+                    appHeader.classList.remove('hidden');
+                    displayStudentReport(studentData);
+                } else {
+                    alert('The entered Student ID is incorrect. Please try again.');
+                    studentIdInput.value = '';
+                    studentIdInput.focus();
+                }
+            };
+
+            const handleCancel = () => {
+                window.location.href = window.location.pathname;
+            };
+
+            confirmIdBtn.onclick = handleConfirm;
+            cancelIdBtn.onclick = handleCancel;
+            studentIdForm.onsubmit = (e) => {
+                e.preventDefault();
+                handleConfirm();
+            };
+        }
+
+        // --- VIEW RENDERING ---
+
+        /**
+         * Renders the main data table from the current state (`classData`, `classHeaders`).
+         */
+        function displayTeacherTable() {
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            const headerRow = document.createElement('tr');
+            const columnsToShow = isParentViewActive ? ['Student Name'] : classHeaders;
+
+            columnsToShow.forEach(headerText => {
+                const th = document.createElement('th');
+                th.scope = 'col';
+                th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-300';
+                
+                const match = headerText.match(/(.+) \[(.+)\]$/);
+                if (match && !isParentViewActive) {
+                    th.innerHTML = `${match[1]} <span class="font-bold text-gray-600">[${match[2]}]</span>`;
+                } else {
+                    th.textContent = headerText;
+                }
+                headerRow.appendChild(th);
+            });
+
+            const actionTh = document.createElement('th');
+            actionTh.scope = 'col';
+            actionTh.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+            actionTh.textContent = 'Report';
+            headerRow.appendChild(actionTh);
+            tableHead.appendChild(headerRow);
+
+            classData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+
+                columnsToShow.forEach(header => {
+                    const td = document.createElement('td');
+                    td.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-700 border-r border-gray-300';
+                    td.textContent = row[header];
+                    
+                    if (!isParentViewActive) {
+                        td.setAttribute('contenteditable', 'true');
+                        td.dataset.rowIndex = index;
+                        td.dataset.header = header;
+                        td.addEventListener('blur', updateCellData);
+                    }
+                    tr.appendChild(td);
+                });
+
+                const actionTd = document.createElement('td');
+                actionTd.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium';
+                
+                const reportLink = document.createElement('a');
+                reportLink.textContent = 'View Report';
+                reportLink.className = 'text-indigo-600 hover:text-indigo-900 font-semibold';
+                reportLink.href = generateShareUrl(index);
+                reportLink.target = '_blank';
+
+                actionTd.appendChild(reportLink);
+                tr.appendChild(actionTd);
+
+                tableBody.appendChild(tr);
+            });
+
+            dataTableContainer.classList.remove('hidden');
+        }
+
+        /**
+         * Displays the individual student report view.
+         */
+        function displayStudentReport(studentData) {
+            teacherView.classList.add('hidden');
+            studentView.classList.remove('hidden');
+
+            const headers = studentData.headers;
+            const data = studentData.data;
+
+            const studentName = data[headers[0]] || 'Student';
+            const studentIdentifier = data[headers[1]] ? `(${data[headers[1]]})` : '';
+
+            let reportHTML = `
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900">${studentName}</h1>
+                    <p class="text-gray-600 mt-2">Score Report ${studentIdentifier}</p>
+                </div>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <ul class="divide-y divide-gray-200">
+            `;
+            headers.slice(2).forEach(header => {
+                let headerDisplay = header;
+                const match = header.match(/(.+) \[(.+)\]$/);
+                if (match) {
+                    const name = match[1];
+                    const score = match[2];
+                    headerDisplay = `${name} <span class="font-normal text-gray-500">[${score}]</span>`;
+                }
+
+                 reportHTML += `
+                    <li class="px-6 py-5 flex items-center justify-between">
+                        <span class="text-md font-medium text-gray-700">${headerDisplay}</span>
+                        <span class="text-lg font-semibold text-indigo-600">${data[header] || 'N/A'}</span>
+                    </li>
+                `;
+            });
+            reportHTML += `</ul></div>`;
+            studentView.innerHTML = reportHTML;
+        }
+        
+        /**
+         * Displays an error message in the main content area.
+         */
+        function displayError(message) {
+            mainContent.innerHTML = `<div class="text-center py-12"><h2 class="text-2xl font-bold text-red-600">An Error Occurred</h2><p class="mt-2 text-gray-600">${message}</p></div>`;
+        }
+
+        // --- UTILITY FUNCTIONS ---
+
+        /**
+         * Generates a unique, shareable URL for a single student.
+         */
+        function generateShareUrl(rowIndex) {
+            const rowData = classData[rowIndex];
+            if (!rowData) {
+                console.error("Could not find data for row index:", rowIndex);
+                return "#"; // Return a safe fallback
+            }
+            const dataToEncode = {
+                headers: classHeaders,
+                data: rowData
+            };
+            const jsonString = JSON.stringify(dataToEncode);
+            const base64String = btoa(jsonString);
+            
+            const baseUrl = window.location.href.split('#')[0];
+            return `${baseUrl}#${base64String}`;
+        }
+
+        // --- INITIALIZATION ---
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>
