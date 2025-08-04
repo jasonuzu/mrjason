@@ -144,6 +144,12 @@
                 return;
             }
 
+            // Always set up the teacher view and its listeners first.
+            setupEventListeners();
+            classHeaders = ['Student Name', 'Student ID'];
+            displayTeacherTable();
+
+            // Then, check if a specific student view should be displayed.
             const hash = window.location.hash.substring(1);
             if (hash) {
                 try {
@@ -151,12 +157,9 @@
                     const studentData = JSON.parse(decodedJson);
                     promptForStudentId(studentData);
                 } catch (e) {
-                    displayError("The student link appears to be broken or invalid.");
+                    console.error("Could not parse student data from hash:", e);
+                    // Don't display an error, just stay on the teacher view.
                 }
-            } else {
-                classHeaders = ['Student Name', 'Student ID'];
-                displayTeacherTable();
-                setupEventListeners();
             }
         }
 
@@ -417,21 +420,21 @@
         }
 
         // --- INITIALIZATION ---
-        function waitForConfig() {
+        function waitForConfig(callback) {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 try {
                     const config = JSON.parse(__firebase_config);
                     if (config && config.apiKey) {
-                        main();
+                        callback();
                         return;
                     }
                 } catch (e) {
                     // Not valid JSON yet, wait...
                 }
             }
-            setTimeout(waitForConfig, 100);
+            setTimeout(() => waitForConfig(callback), 100);
         }
-        window.addEventListener('load', waitForConfig);
+        window.addEventListener('load', () => waitForConfig(main));
     </script>
 </body>
 </html>
