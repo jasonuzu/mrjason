@@ -126,13 +126,10 @@
 
         // --- CORE LOGIC ---
         
-        async function initialize() {
+        async function main() {
             // Initialize Firebase
             try {
                 const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                if (!firebaseConfig.apiKey) {
-                    throw new Error("Firebase config is not available.");
-                }
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -422,10 +419,17 @@
         // --- INITIALIZATION ---
         function waitForConfig() {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                initialize();
-            } else {
-                setTimeout(waitForConfig, 100);
+                try {
+                    const config = JSON.parse(__firebase_config);
+                    if (config && config.apiKey) {
+                        main();
+                        return;
+                    }
+                } catch (e) {
+                    // Not valid JSON yet, wait...
+                }
             }
+            setTimeout(waitForConfig, 100);
         }
         window.addEventListener('load', waitForConfig);
     </script>
