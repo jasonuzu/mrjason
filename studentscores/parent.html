@@ -38,6 +38,9 @@
             let db, auth;
             try {
                 const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                if (!firebaseConfig.apiKey) {
+                    throw new Error("Firebase config is not available.");
+                }
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -108,7 +111,7 @@
             parentViewContent.innerHTML = `<div class="text-center py-12"><p class="mt-2 text-gray-600">${message}</p></div>`;
         }
         
-        document.addEventListener('DOMContentLoaded', initialize);
+        window.addEventListener('load', initialize);
     </script>
 </body>
 </html>
