@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <div id="main-content" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+            <div id="app-header" class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Class Report Links</h1>
+                <p class="text-gray-600 mt-2">Click "View Report" next to a student's name.</p>
+            </div>
+            <div id="parent-view-content">
+                <!-- Student list will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const parentViewContent = document.getElementById('parent-view-content');
+        const appHeader = document.getElementById('app-header');
+
+        async function initialize() {
+            let db, auth;
+            try {
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                displayError("Could not connect to the database. Please refresh.");
+                return;
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const classId = urlParams.get('classId');
+
+            if (!classId) {
+                displayError("No class ID was found in the link. Please check the URL.");
+                return;
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const docRef = doc(db, `artifacts/${appId}/public/data/student-scores`, classId);
+            
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const classInfo = docSnap.data();
+                    displayParentPage(classInfo);
+                } else {
+                    displayError("This class was not found. The link may be old or incorrect.");
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                displayError("Could not load class data. Please check your connection and try again.");
+            }
+        }
+
+        function displayParentPage(classInfo) {
+            const { headers, data } = classInfo;
+            
+            let pageHTML = `<div class="border border-gray-200 rounded-lg overflow-hidden"><ul class="divide-y divide-gray-200">`;
+            data.forEach((studentRow, index) => {
+                const studentName = studentRow['Student Name'] || 'Unnamed Student';
+                const reportUrl = generateShareUrl(studentRow, headers);
+                pageHTML += `
+                    <li class="px-6 py-4 flex items-center justify-between">
+                        <span class="text-lg font-medium text-gray-800">${studentName}</span>
+                        <a href="${reportUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-semibold py-2 px-4 rounded-lg">View Report</a>
+                    </li>
+                `;
+            });
+            pageHTML += `</ul></div>`;
+            parentViewContent.innerHTML = pageHTML;
+        }
+
+        function generateShareUrl(rowData, headers) {
+            const dataToEncode = { headers, data: rowData };
+            const base64String = btoa(JSON.stringify(dataToEncode));
+            const baseUrl = window.location.href.split('?')[0].replace('parent.html', 'index.html');
+            return `${baseUrl}#${base64String}`;
+        }
+
+        function displayError(message) {
+            appHeader.querySelector('h1').textContent = "Error";
+            appHeader.querySelector('p').textContent = "";
+            parentViewContent.innerHTML = `<div class="text-center py-12"><p class="mt-2 text-gray-600">${message}</p></div>`;
+        }
+        
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
