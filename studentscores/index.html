@@ -37,7 +37,7 @@
         <div id="main-content" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg transition-all duration-500">
             
             <!-- App Header -->
-            <div class="text-center mb-8">
+            <div id="app-header" class="text-center mb-8">
                 <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Student Score Sharer</h1>
                 <p class="text-gray-600 mt-2">Add students and assignments below, or upload a CSV file to begin.</p>
             </div>
@@ -129,6 +129,29 @@
         </div>
     </div>
 
+    <!-- Student ID Confirmation Modal -->
+    <div id="student-id-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Confirm Your Identity</h3>
+                <div class="mt-2 px-7 py-3">
+                    <form id="student-id-form">
+                        <label for="student-id-input" class="block text-sm font-medium text-gray-700 text-left">Please enter your Student ID:</label>
+                        <input type="text" id="student-id-input" name="student-id-input" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </form>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="confirm-id-btn" class="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        View Report
+                    </button>
+                     <button id="cancel-id-btn" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <script>
         // --- STATE MANAGEMENT ---
@@ -137,6 +160,7 @@
 
         // --- DOM ELEMENT REFERENCES ---
         const mainContent = document.getElementById('main-content');
+        const appHeader = document.getElementById('app-header');
         const csvFileInput = document.getElementById('csv-file');
         const teacherView = document.getElementById('teacher-view');
         const studentView = document.getElementById('student-view');
@@ -152,6 +176,11 @@
         const totalScoreInput = document.getElementById('total-score');
         const saveAssignmentBtn = document.getElementById('save-assignment-btn');
         const cancelAssignmentBtn = document.getElementById('cancel-assignment-btn');
+        const studentIdModal = document.getElementById('student-id-modal');
+        const studentIdForm = document.getElementById('student-id-form');
+        const studentIdInput = document.getElementById('student-id-input');
+        const confirmIdBtn = document.getElementById('confirm-id-btn');
+        const cancelIdBtn = document.getElementById('cancel-id-btn');
 
         // --- CORE LOGIC ---
 
@@ -165,7 +194,7 @@
                 try {
                     const decodedJson = atob(hash);
                     const studentData = JSON.parse(decodedJson);
-                    displayStudentReport(studentData);
+                    promptForStudentId(studentData);
                 } catch (e) {
                     console.error("Failed to decode or parse student data from URL:", e);
                     displayError("The link appears to be broken or invalid.");
@@ -257,7 +286,6 @@
             if (newAssignmentName && newAssignmentName.trim() !== '') {
                 let trimmedName = newAssignmentName.trim();
                 
-                // Format the header string to include the total score if provided
                 if (totalScore && totalScore.trim() !== '') {
                     trimmedName = `${trimmedName} [${totalScore.trim()}]`;
                 }
@@ -289,6 +317,42 @@
             if (classData[rowIndex]) {
                 classData[rowIndex][header] = newValue;
             }
+        }
+
+        /**
+         * Shows a modal to ask for the student's ID for verification.
+         * @param {Object} studentData - The data for the student, decoded from the URL.
+         */
+        function promptForStudentId(studentData) {
+            teacherView.classList.add('hidden');
+            appHeader.classList.add('hidden');
+            studentIdModal.classList.remove('hidden');
+            studentIdInput.focus();
+
+            const handleConfirm = () => {
+                const enteredId = studentIdInput.value;
+                const correctId = studentData.data['Student ID'];
+                if (enteredId.trim() === correctId.trim()) {
+                    studentIdModal.classList.add('hidden');
+                    appHeader.classList.remove('hidden');
+                    displayStudentReport(studentData);
+                } else {
+                    alert('The entered Student ID is incorrect. Please try again.');
+                    studentIdInput.value = '';
+                    studentIdInput.focus();
+                }
+            };
+
+            const handleCancel = () => {
+                window.location.href = window.location.pathname;
+            };
+
+            confirmIdBtn.onclick = handleConfirm;
+            cancelIdBtn.onclick = handleCancel;
+            studentIdForm.onsubmit = (e) => {
+                e.preventDefault();
+                handleConfirm();
+            };
         }
 
         // --- VIEW RENDERING ---
