@@ -130,6 +130,9 @@
             // Initialize Firebase
             try {
                 const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                if (!firebaseConfig.apiKey) {
+                    throw new Error("Firebase config is not available.");
+                }
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -417,7 +420,7 @@
         }
 
         // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', initialize);
+        window.addEventListener('load', initialize);
     </script>
 </body>
 </html>
