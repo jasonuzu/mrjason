@@ -420,8 +420,14 @@
         }
 
         // --- INITIALIZATION ---
-        window.addEventListener('load', initialize);
+        function waitForConfig() {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                initialize();
+            } else {
+                setTimeout(waitForConfig, 100);
+            }
+        }
+        window.addEventListener('load', waitForConfig);
     </script>
 </body>
 </html>
-
