@@ -111,7 +111,14 @@
             parentViewContent.innerHTML = `<div class="text-center py-12"><p class="mt-2 text-gray-600">${message}</p></div>`;
         }
         
-        window.addEventListener('load', initialize);
+        function waitForConfig() {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                initialize();
+            } else {
+                setTimeout(waitForConfig, 100);
+            }
+        }
+        window.addEventListener('load', waitForConfig);
     </script>
 </body>
 </html>
