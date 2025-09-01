@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Jason's Vocabulary Quizzes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        :root {
+            --primary: #3f51b5;
+            --primary-dark: #303f9f;
+            --accent: #ff4081;
+            --light: #f5f5f5;
+            --dark: #212121;
+            --gray: #757575;
+            --transition: all 0.3s ease;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .quiz-container {
+            padding: 30px;
+        }
+        
+        .quiz-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            border-left: 5px solid var(--accent);
+            transition: var(--transition);
+        }
+        
+        .quiz-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .quiz-title {
+            font-size: 1.5rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .quiz-icon {
+            margin-right: 10px;
+            color: var(--accent);
+        }
+        
+        .quiz-description {
+            color: var(--gray);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        
+        .quiz-link {
+            display: inline-block;
+            padding: 12px 25px;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: 600;
+            transition: var(--transition);
+            box-shadow: 0 4px 10px rgba(63, 81, 181, 0.3);
+        }
+        
+        .quiz-link:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(63, 81, 181, 0.4);
+        }
+        
+        .quiz-link i {
+            margin-left: 5px;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--gray);
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .quiz-title {
+                font-size: 1.3rem;
+            }
+            
+            .quiz-link {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Mr. Jason's Vocabulary Quizzes</h1>
+            <p class="subtitle">Expand your vocabulary with interactive quizzes</p>
+        </header>
+        
+        <div class="quiz-container">
+            <div class="quiz-card">
+                <h2 class="quiz-title">
+                    <i class="quiz-icon fas fa-puzzle-piece"></i>
+                    Vocabulary Quiz 1
+                </h2>
+                <p class="quiz-description">
+                    Test your knowledge with this interactive vocabulary quiz. Practice and improve your language skills with a variety of words and contexts.
+                </p>
+                <a href="http://uzu.unaux.com/vocabularyquizzes/u1vocabulary1.html" class="quiz-link">
+                    Take Quiz Now <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            
+           <h2 class="quiz-title">
+                    <i class="quiz-icon fas fa-puzzle-piece"></i>
+                    Vocabulary Quiz 2
+                </h2>
+                <p class="quiz-description">
+                    Test your knowledge with this interactive vocabulary quiz. Practice and improve your language skills with a variety of words and contexts.
+                </p>
+                <a href="http://uzu.unaux.com/vocabularyquizzes/u1vocabulary1.html" class="quiz-link">
+                    Take Quiz Now <i class="fas fa-arrow-right"></i>
+                </a>
+        </div>
+        
+        <div class="footer">
+            <p>© 2023 Mr. Jason's Vocabulary Quizzes</p>
+        </div>
+    </div>
+</body>
+</html>
