@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Think Vocabulary Quiz 1</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f7fa;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 30px;
+    }
+
+    .quiz-container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .question {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fafafa;
+      transition: background 0.3s;
+    }
+
+    .question p {
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      padding: 5px 0;
+      cursor: pointer;
+    }
+
+    input[type="radio"] {
+      margin-right: 8px;
+    }
+
+    .correct {
+      color: #27ae60;
+      font-weight: bold;
+    }
+
+    .incorrect {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    #result {
+      margin-top: 25px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 20px;
+      color: #2c3e50;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vocabulary Quiz</h1>
+  <div class="quiz-container">
+    <form id="quizForm">
+
+      <div class="question" id="q1-box">
+        <p>1. You should ______ if you want to be healthier.</p>
+        <label><input type="radio" name="q1" value="change your ways"> change your ways</label>
+        <label><input type="radio" name="q1" value="cheer up"> cheer up</label>
+        <label><input type="radio" name="q1" value="wake up"> wake up</label>
+        <div class="feedback" id="q1-feedback"></div>
+      </div>
+
+      <div class="question" id="q2-box">
+        <p>2. She studies hard because she wants to ______ in school.</p>
+        <label><input type="radio" name="q2" value="do well"> do well</label>
+        <label><input type="radio" name="q2" value="worry less"> worry less</label>
+        <label><input type="radio" name="q2" value="give up"> give up</label>
+        <div class="feedback" id="q2-feedback"></div>
+      </div>
+
+      <div class="question" id="q3-box">
+        <p>3. I want to ______ reading every night before bed.</p>
+        <label><input type="radio" name="q3" value="get into the habit of"> get into the habit of</label>
+        <label><input type="radio" name="q3" value="start a family"> start a family</label>
+        <label><input type="radio" name="q3" value="retire"> retire</label>
+        <div class="feedback" id="q3-feedback"></div>
+      </div>
+
+      <div class="question" id="q4-box">
+        <p>4. Don’t ______! You can finish this test.</p>
+        <label><input type="radio" name="q4" value="give up"> give up</label>
+        <label><input type="radio" name="q4" value="settle down"> settle down</label>
+        <label><input type="radio" name="q4" value="time management"> time management</label>
+        <div class="feedback" id="q4-feedback"></div>
+      </div>
+
+      <div class="question" id="q5-box">
+        <p>5. At New Year, many people ______ to exercise more.</p>
+        <label><input type="radio" name="q5" value="make a resolution"> make a resolution</label>
+        <label><input type="radio" name="q5" value="What's up?"> What's up?</label>
+        <label><input type="radio" name="q5" value="run out of money"> run out of money</label>
+        <div class="feedback" id="q5-feedback"></div>
+      </div>
+
+      <div class="question" id="q6-box">
+        <p>6. I sometimes ______ my homework because it’s hard.</p>
+        <label><input type="radio" name="q6" value="struggle with"> struggle with</label>
+        <label><input type="radio" name="q6" value="travel the world"> travel the world</label>
+        <label><input type="radio" name="q6" value="wake up"> wake up</label>
+        <div class="feedback" id="q6-feedback"></div>
+      </div>
+
+      <div class="question" id="q7-box">
+        <p>7. He wants to ______ playing the guitar this year.</p>
+        <label><input type="radio" name="q7" value="take up"> take up</label>
+        <label><input type="radio" name="q7" value="grow up"> grow up</label>
+        <label><input type="radio" name="q7" value="get promoted"> get promoted</label>
+        <div class="feedback" id="q7-feedback"></div>
+      </div>
+
+      <div class="question" id="q8-box">
+        <p>8. You should ______ when you see a good opportunity.</p>
+        <label><input type="radio" name="q8" value="take the chance"> take the chance</label>
+        <label><input type="radio" name="q8" value="save up money"> save up money</label>
+        <label><input type="radio" name="q8" value="leave school"> leave school</label>
+        <div class="feedback" id="q8-feedback"></div>
+      </div>
+
+      <div class="question" id="q9-box">
+        <p>9. Exercise helps people ______ better.</p>
+        <label><input type="radio" name="q9" value="manage stress"> manage stress</label>
+        <label><input type="radio" name="q9" value="career path"> career path</label>
+        <label><input type="radio" name="q9" value="retire"> retire</label>
+        <div class="feedback" id="q9-feedback"></div>
+      </div>
+
+      <div class="question" id="q10-box">
+        <p>10. Don’t think too much, try to ______.</p>
+        <label><input type="radio" name="q10" value="worry less"> worry less</label>
+        <label><input type="radio" name="q10" value="settle down"> settle down</label>
+        <label><input type="radio" name="q10" value="grow up"> grow up</label>
+        <div class="feedback" id="q10-feedback"></div>
+      </div>
+
+    </form>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const answers = {
+      q1: "change your ways",
+      q2: "do well",
+      q3: "get into the habit of",
+      q4: "give up",
+      q5: "make a resolution",
+      q6: "struggle with",
+      q7: "take up",
+      q8: "take the chance",
+      q9: "manage stress",
+      q10: "worry less"
+    };
+
+    let score = 0;
+    let total = Object.keys(answers).length;
+    let answered = {};
+
+    document.querySelectorAll('input[type=radio]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        const qName = this.name;
+        const feedbackEl = document.getElementById(qName + '-feedback');
+        if (this.value === answers[qName]) {
+          feedbackEl.textContent = '✔ Correct!';
+          feedbackEl.className = 'feedback correct';
+          if (!answered[qName]) {
+            score++;
+            answered[qName] = true;
+          }
+        } else {
+          feedbackEl.textContent = `✘ Incorrect. Correct answer: ${answers[qName]}`;
+          feedbackEl.className = 'feedback incorrect';
+          if (!answered[qName]) {
+            answered[qName] = true;
+          }
+        }
+        document.getElementById('result').textContent = `Your score: ${score} / ${total}`;
+      });
+    });
+  </script>
+</body>
+</html>
