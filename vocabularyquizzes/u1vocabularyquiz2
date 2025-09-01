@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vocabulary Quiz Set</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f7fa;
+      color: #333;
+    }
+
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .quiz-container {
+      max-width: 800px;
+      margin: 20px auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .question {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    .question p {
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    label {
+      display: block;
+      padding: 5px 0;
+      cursor: pointer;
+    }
+
+    input[type="radio"] {
+      margin-right: 8px;
+    }
+
+    .correct {
+      color: #27ae60;
+      font-weight: bold;
+    }
+
+    .incorrect {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    #result {
+      margin-top: 25px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 20px;
+      color: #2c3e50;
+    }
+
+    hr {
+      margin: 40px 0;
+      border: 0;
+      border-top: 2px solid #ddd;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vocabulary Quiz Set</h1>
+
+  <!-- Quiz 1 and Quiz 2 as before -->
+
+  <hr>
+
+  <div class="quiz-container" id="quiz3">
+    <h2>Quiz 3</h2>
+    <form>
+      <div class="question">
+        <p>1. You need to ______ to reach your goal of saving for a trip.</p>
+        <label><input type="radio" name="q1" value="save up money"> save up money</label>
+        <label><input type="radio" name="q1" value="run out of money"> run out of money</label>
+        <label><input type="radio" name="q1" value="take up"> take up</label>
+        <div class="feedback" id="q1-feedback"></div>
+      </div>
+      <div class="question">
+        <p>2. Be careful, or you might ______ during your holiday.</p>
+        <label><input type="radio" name="q2" value="run out of money"> run out of money</label>
+        <label><input type="radio" name="q2" value="get promoted"> get promoted</label>
+        <label><input type="radio" name="q2" value="leave school"> leave school</label>
+        <div class="feedback" id="q2-feedback"></div>
+      </div>
+      <div class="question">
+        <p>3. Sometimes it’s important to ______ when someone is feeling sad.</p>
+        <label><input type="radio" name="q3" value="cheer up"> cheer up</label>
+        <label><input type="radio" name="q3" value="worry less"> worry less</label>
+        <label><input type="radio" name="q3" value="struggle with"> struggle with</label>
+        <div class="feedback" id="q3-feedback"></div>
+      </div>
+      <div class="question">
+        <p>4. You need to ______ early in the morning to catch the train.</p>
+        <label><input type="radio" name="q4" value="wake up"> wake up</label>
+        <label><input type="radio" name="q4" value="settle down"> settle down</label>
+        <label><input type="radio" name="q4" value="take the chance"> take the chance</label>
+        <div class="feedback" id="q4-feedback"></div>
+      </div>
+      <div class="question">
+        <p>5. It’s important to ______ with new challenges at work.</p>
+        <label><input type="radio" name="q5" value="struggle with"> struggle with</label>
+        <label><input type="radio" name="q5" value="do well"> do well</label>
+        <label><input type="radio" name="q5" value="make a resolution"> make a resolution</label>
+        <div class="feedback" id="q5-feedback"></div>
+      </div>
+    </form>
+    <div id="result3"></div>
+  </div>
+
+  <script>
+    function setupQuiz(quizId, answers) {
+      let score = 0;
+      let total = Object.keys(answers).length;
+      let answered = {};
+      document.querySelectorAll(`#${quizId} input[type=radio]`).forEach(radio => {
+        radio.addEventListener('change', function() {
+          const qName = this.name;
+          const feedbackEl = document.getElementById(`${qName}-feedback`);
+          if (this.value === answers[qName]) {
+            feedbackEl.textContent = '✔ Correct!';
+            feedbackEl.className = 'feedback correct';
+            if (!answered[qName]) {
+              score++;
+              answered[qName] = true;
+            }
+          } else {
+            feedbackEl.textContent = `✘ Incorrect. Correct answer: ${answers[qName]}`;
+            feedbackEl.className = 'feedback incorrect';
+            if (!answered[qName]) {
+              answered[qName] = true;
+            }
+          }
+          document.getElementById(`result${quizId.replace('quiz','')}`).textContent = `Your score: ${score} / ${total}`;
+        });
+      });
+    }
+
+    // Setup all quizzes
+    setupQuiz('quiz1', {
+      q1: 'get a degree', q2: 'get promoted', q3: 'leave school', q4: 'retire', q5: 'settle down'
+    });
+    setupQuiz('quiz2', {
+      q1: 'start a career', q2: 'start a family', q3: 'travel the world', q4: 'career path', q5: 'time management'
+    });
+    setupQuiz('quiz3', {
+      q1: 'save up money', q2: 'run out of money', q3: 'cheer up', q4: 'wake up', q5: 'struggle with'
+    });
+  </script>
+</body>
+</html>
