@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Project Holiday Tasks</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 10px;
+            border-bottom: 4px solid #667eea;
+            padding-bottom: 15px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #764ba2;
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+        
+        .deadline {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8787 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(255,107,107,0.3);
+        }
+        
+        .task-card {
+            background: #f8f9fa;
+            border-left: 6px solid #667eea;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+        }
+        
+        .task-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        
+        .task-number {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 15px;
+            float: left;
+        }
+        
+        .task-content {
+            overflow: hidden;
+        }
+        
+        .task-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        
+        .task-title-cn {
+            font-size: 1.1em;
+            color: #764ba2;
+            margin-bottom: 15px;
+        }
+        
+        .task-description {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .task-description-cn {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .checkbox {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: white;
+        }
+        
+        .checkbox.checked {
+            background-color: #667eea;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        
+        .checkbox:hover {
+            background: #667eea;
+            transform: scale(1.1);
+        }
+        
+        .important-note {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .important-note h3 {
+            color: #856404;
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+        
+        .important-note p {
+            color: #856404;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+        
+        .tip-box {
+            background: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .tip-box strong {
+            color: #0c5460;
+        }
+        
+        .progress-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            .task-card:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Community Project Holiday Tasks</h1>
+        <div class="subtitle">社区设计假期任务清单</div>
+        
+        <div class="progress-container">
+            <div class="progress-text">Progress: <span id="progress-percent">0%</span></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="1">
+            <div class="checkbox" data-task="1"></div>
+            <div class="task-number">1</div>
+            <div class="task-content">
+                <div class="task-title">Choose Your Community Project Topic</div>
+                <div class="task-title-cn">选择你的社区设计主题</div>
+                <div class="task-description">
+                    Identify a community need that you're passionate about. Think about:
+                    • What problems do you see in your community?
+                    • What change would you like to create?
+                    • How can you help others?
+                </div>
+                <div class="task-description-cn">
+                    确定一个你关心的社区需求。思考：
+                    • 你在社区中看到什么问题？
+                    • 你想创造什么改变？
+                    • 你如何帮助他人？
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="2">
+            <div class="checkbox" data-task="2"></div>
+            <div class="task-number">2</div>
+            <div class="task-content">
+                <div class="task-title">Review the Assessment Criteria</div>
+                <div class="task-title-cn">澄清社区设计评估标准</div>
+                <div class="task-description">
+                    Study pages 22-26 in your student handbook. Understand how you'll be assessed on:
+                    • Investigating (Criterion A)
+                    • Planning (Criterion B)
+                    • Taking Action (Criterion C)
+                    • Reflecting (Criterion D)
+                </div>
+                <div class="task-description-cn">
+                    学习学生手册第22-26页。了解你将如何被评估：
+                    • 调查（标准A）
+                    • 规划（标准B）
+                    • 采取行动（标准C）
+                    • 反思（标准D）
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="3">
+            <div class="checkbox" data-task="3"></div>
+            <div class="task-number">3</div>
+            <div class="task-content">
+                <div class="task-title">Investigate If Your Service Action is an Authentic Need</div>
+                <div class="task-title-cn">调查你的服务行动是否真实需要</div>
+                <div class="task-description">
+                    Research to prove your community need is real. You can:
+                    • Create and distribute a questionnaire (online or paper)
+                    • Interview community members
+                    • Research online for data and statistics
+                    • Take photos of the problem you've observed
+                </div>
+                <div class="task-description-cn">
+                    研究证明你的社区需求是真实的。你可以：
+                    • 创建和分发问卷（在线或纸质）
+                    • 采访社区成员
+                    • 在线研究数据和统计
+                    • 拍摄你观察到的问题的照片
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="4">
+            <div class="checkbox" data-task="4"></div>
+            <div class="task-number">4</div>
+            <div class="task-content">
+                <div class="task-title">Start Your Process Journal</div>
+                <div class="task-title-cn">开始你的过程日志</div>
+                <div class="task-description">
+                    Using the template provided, write AT LEAST ONE detailed entry. Include:
+                    • What research/investigation you've done
+                    • What you've learned about your topic
+                    • Your initial ideas and plans
+                    • Which ATL skills you've used
+                    • Evidence (photos, survey results, etc.)
+                </div>
+                <div class="task-description-cn">
+                    使用提供的模板，至少写一篇详细的日志。包括：
+                    • 你做了什么研究/调查
+                    • 你对主题学到了什么
+                    • 你的初步想法和计划
+                    • 你使用了哪些ATL技能
+                    • 证据（照片、问卷结果等）
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="5">
+            <div class="checkbox" data-task="5"></div>
+            <div class="task-number">5</div>
+            <div class="task-content">
+                <div class="task-title">Define Your Goal and Global Context</div>
+                <div class="task-title-cn">确定你的目标和全球背景</div>
+                <div class="task-description">
+                    Write a clear goal statement: "I will [goal type] in order to [how you'll make a difference]"
+                    <br>Choose ONE global context that connects to your project.
+                </div>
+                <div class="task-description-cn">
+                    写一个清晰的目标陈述："我将[目标类型]以便[你将如何产生影响]"
+                    <br>选择一个与你的项目相关的全球背景。
+                </div>
+            </div>
+        </div>
+        
+        <div class="task-card" data-task="6">
+            <div class="checkbox" data-task="6"></div>
+            <div class="task-number">6</div>
+            <div class="task-content">
+                <div class="task-title">Schedule Your Second Meeting with Supervisor</div>
+                <div class="task-title-cn">安排与督导员的第二次会议</div>
+                <div class="task-description">
+                    Contact your supervisor to arrange the next meeting date.
+                    Be prepared to share your investigation results and initial ideas.
+                </div>
+                <div class="task-description-cn">
+                    联系你的督导员安排下次会议日期。
+                    准备分享你的调查结果和初步想法。
+                </div>
+            </div>
+        </div>
+        
+        <div class="important-note">
+            <h3>⚠️ Important Reminders | 重要提醒</h3>
+            <p><strong>✓</strong> Keep ALL evidence (photos, survey results, interviews, research notes) - you'll need this for your report!</p>
+            <p><strong>✓</strong> 保留所有证据（照片、问卷结果、采访、研究笔记）- 你的报告需要这些！</p>
+            <p><strong>✓</strong> Be honest in your process journal - challenges and mistakes are valuable learning!</p>
+            <p><strong>✓</strong> 在过程日志中诚实记录 - 挑战和错误都是宝贵的学习！</p>
+            <p><strong>✓</strong> Don't wait until the last minute - start investigating NOW!</p>
+            <p><strong>✓</strong> 不要等到最后一刻 - 现在就开始调查！</p>
+        </div>
+        
+        <div class="tip-box">
+            <strong>💡 Pro Tip | 专业提示:</strong> The more thorough your investigation during the holiday, the easier your project will be later. Take time to do quality research now!
+            <br><strong>假期期间调查越彻底，以后的项目就越容易。现在花时间做好质量研究！</strong>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved checkbox states
+            loadCheckboxStates();
+            
+            // Add click event listeners to all checkboxes
+            document.querySelectorAll('.checkbox').forEach(checkbox => {
+                checkbox.addEventListener('click', function() {
+                    const taskId = this.getAttribute('data-task');
+                    const isChecked = this.classList.contains('checked');
+                    
+                    if (isChecked) {
+                        this.classList.remove('checked');
+                        localStorage.setItem(`task-${taskId}`, 'false');
+                    } else {
+                        this.classList.add('checked');
+                        localStorage.setItem(`task-${taskId}`, 'true');
+                    }
+                    
+                    // Update progress
+                    updateProgress();
+                });
+            });
+            
+            function loadCheckboxStates() {
+                document.querySelectorAll('.checkbox').forEach(checkbox => {
+                    const taskId = checkbox.getAttribute('data-task');
+                    const isChecked = localStorage.getItem(`task-${taskId}`) === 'true';
+                    
+                    if (isChecked) {
+                        checkbox.classList.add('checked');
+                    }
+                });
+                
+                // Update progress on load
+                updateProgress();
+            }
+            
+            function updateProgress() {
+                const totalTasks = document.querySelectorAll('.checkbox').length;
+                const completedTasks = document.querySelectorAll('.checkbox.checked').length;
+                const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                
+                document.getElementById('progress-percent').textContent = `${progressPercent}%`;
+                document.getElementById('progress-fill').style.width = `${progressPercent}%`;
+            }
+        });
+    </script>
+</body>
+</html>
