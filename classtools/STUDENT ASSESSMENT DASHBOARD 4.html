@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Assessment Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        :root {
+            --primary: #6a11cb;
+            --secondary: #2575fc;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --danger: #e17055;
+            --info: #0984e3;
+            --dark: #2d3436;
+            --light: #f5f7fa;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 30px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--success), var(--warning), var(--danger), var(--info));
+        }
+
+        h1 {
+            font-size: 3.2rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: #7f8c8d;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 3fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .upload-section {
+            background-color: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 450px;
+            transition: all 0.3s ease;
+            border: 3px dashed #e0e0e0;
+        }
+
+        .upload-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            border-color: var(--primary);
+        }
+
+        .upload-icon {
+            font-size: 5rem;
+            color: var(--primary);
+            margin-bottom: 25px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .upload-section h2 {
+            color: var(--dark);
+            margin-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .upload-section p {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            max-width: 400px;
+            font-size: 1.1rem;
+        }
+
+        .input-methods {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .file-upload-label {
+            display: block;
+            padding: 18px 25px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            box-shadow: 0 5px 15px rgba(106, 17, 203, 0.4);
+        }
+
+        .file-upload-label:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(106, 17, 203, 0.5);
+        }
+
+        #fileInput {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .paste-section {
+            width: 100%;
+        }
+
+        .paste-section h3 {
+            margin-bottom: 10px;
+            color: var(--dark);
+            text-align: left;
+        }
+
+        .paste-textarea {
+            width: 100%;
+            height: 120px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+
+        .paste-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
+        }
+
+        .paste-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+        }
+
+        .paste-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 184, 148, 0.5);
+        }
+
+        .file-requirements {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-size: 0.95rem;
+            color: #7f8c8d;
+            width: 100%;
+            max-width: 400px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .file-requirements h3 {
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+
+        .file-requirements ul {
+            padding-left: 20px;
+        }
+
+        .file-requirements li {
+            margin-bottom: 8px;
+        }
+
+        .student-list-container {
+            background-color: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .student-list-container.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .student-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f2f5;
+        }
+
+        .student-list-header h2 {
+            color: var(--dark);
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .student-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .control-btn:hover {
+            background: #e9ecef;
+            color: var(--dark);
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px 15px 50px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(106, 17, 203, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+
+        .student-list {
+            list-style-type: none;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .student-item {
+            padding: 18px;
+            margin-bottom: 12px;
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            border-left: 4px solid transparent;
+        }
+
+        .student-item:hover {
+            background-color: #e9ecef;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .student-item.selected {
+            background-color: #e3f2fd;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 5px 15px rgba(33, 150, 243, 0.2);
+        }
+
+        .student-avatar {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 18px;
+            font-size: 1.3rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .student-info {
+            flex: 1;
+        }
+
+        .student-name {
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 1.2rem;
+        }
+
+        .student-id {
+            font-size: 0.95rem;
+            color: #7f8c8d;
+        }
+
+        .action-buttons {
+            display: none;
+            margin-top: 25px;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .action-buttons.show {
+            display: flex;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .btn {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            min-width: 180px;
+            justify-content: center;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-speaking {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: #d63031;
+        }
+
+        .btn-writing {
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            color: #0984e3;
+        }
+
+        .btn-notes {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #006644;
+        }
+
+        .btn-management {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #e17055;
+        }
+
+        .btn-inquirer {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #c2185b;
+        }
+
+        .btn-thinker {
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            color: #1565c0;
+        }
+
+        .btn-communicator {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #00695c;
+        }
+
+        .btn-principled {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #e65100;
+        }
+
+        .btn-open-minded {
+            background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+            color: #33691e;
+        }
+
+        .btn-caring {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            color: #880e4f;
+        }
+
+        .btn-risk-taker {
+            background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+            color: #0d47a1;
+        }
+
+        .btn-balanced {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #004d40;
+        }
+
+        .btn-reflective {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #bf360c;
+        }
+
+        .btn-publish {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            font-size: 1.2rem;
+            padding: 18px 40px;
+            margin: 40px auto;
+            display: block;
+            min-width: auto;
+        }
+
+        .walls-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .walls-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .wall {
+            background-color: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            min-height: 320px;
+            transition: all 0.3s ease;
+            border-top: 6px solid;
+        }
+
+        .wall:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .wall h2 {
+            color: var(--dark);
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.3rem;
+        }
+
+        .wall-icon {
+            font-size: 1.5rem;
+        }
+
+        .wall-list {
+            list-style-type: none;
+            min-height: 250px;
+        }
+
+        .wall-item {
+            padding: 15px;
+            margin-bottom: 12px;
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            animation: fadeIn 0.5s ease;
+            transition: all 0.3s ease;
+            border-left: 4px solid;
+        }
+
+        .wall-item:hover {
+            transform: translateX(5px);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .speaking-wall {
+            border-top-color: #ff9a9e;
+        }
+
+        .speaking-wall .wall-item {
+            border-left-color: #ff9a9e;
+        }
+
+        .writing-wall {
+            border-top-color: #a1c4fd;
+        }
+
+        .writing-wall .wall-item {
+            border-left-color: #a1c4fd;
+        }
+
+        .notes-wall {
+            border-top-color: #006644;
+        }
+
+        .notes-wall .wall-item {
+            border-left-color: #006644;
+        }
+
+        .management-wall {
+            border-top-color: #f6d365;
+        }
+
+        .management-wall .wall-item {
+            border-left-color: #f6d365;
+        }
+
+        .inquirer-wall {
+            border-top-color: #ff9a9e;
+        }
+
+        .inquirer-wall .wall-item {
+            border-left-color: #ff9a9e;
+        }
+
+        .thinker-wall {
+            border-top-color: #a1c4fd;
+        }
+
+        .thinker-wall .wall-item {
+            border-left-color: #a1c4fd;
+        }
+
+        .communicator-wall {
+            border-top-color: #84fab0;
+        }
+
+        .communicator-wall .wall-item {
+            border-left-color: #84fab0;
+        }
+
+        .principled-wall {
+            border-top-color: #f6d365;
+        }
+
+        .principled-wall .wall-item {
+            border-left-color: #f6d365;
+        }
+
+        .open-minded-wall {
+            border-top-color: #d4fc79;
+        }
+
+        .open-minded-wall .wall-item {
+            border-left-color: #d4fc79;
+        }
+
+        .caring-wall {
+            border-top-color: #ff9a9e;
+        }
+
+        .caring-wall .wall-item {
+            border-left-color: #ff9a9e;
+        }
+
+        .risk-taker-wall {
+            border-top-color: #a1c4fd;
+        }
+
+        .risk-taker-wall .wall-item {
+            border-left-color: #a1c4fd;
+        }
+
+        .balanced-wall {
+            border-top-color: #84fab0;
+        }
+
+        .balanced-wall .wall-item {
+            border-left-color: #84fab0;
+        }
+
+        .reflective-wall {
+            border-top-color: #f6d365;
+        }
+
+        .reflective-wall .wall-item {
+            border-left-color: #f6d365;
+        }
+
+        .empty-message {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 40px 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 25px;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .instructions {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+
+        .instructions h2 {
+            color: var(--dark);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .instructions ol {
+            padding-left: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .instructions ol {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .instructions li {
+            margin-bottom: 15px;
+            color: #555;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .instructions li:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .category-counter {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+            flex: 1;
+            padding: 15px;
+            min-width: 120px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+        }
+
+        .speaking-stat { color: #ff9a9e; }
+        .writing-stat { color: #a1c4fd; }
+        .notes-stat { color: #006644; }
+        .management-stat { color: #f6d365; }
+        .inquirer-stat { color: #c2185b; }
+        .thinker-stat { color: #1565c0; }
+        .communicator-stat { color: #00695c; }
+        .principled-stat { color: #e65100; }
+        .open-minded-stat { color: #33691e; }
+        .caring-stat { color: #880e4f; }
+        .risk-taker-stat { color: #0d47a1; }
+        .balanced-stat { color: #004d40; }
+        .reflective-stat { color: #bf360c; }
+
+        /* Improved Award Ceremony Page Styles */
+        .awards-page {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 40px 20px;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .awards-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .awards-header {
+            color: white;
+            margin-bottom: 50px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .awards-header h1 {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .awards-header p {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+
+        .awards-categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .award-category {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            border-top: 6px solid;
+        }
+
+        .award-category:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .award-category h2 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .award-students {
+            list-style: none;
+            text-align: left;
+        }
+
+        .award-student {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            animation: slideIn 0.5s ease;
+            transition: all 0.3s ease;
+        }
+
+        .award-student:hover {
+            transform: translateX(5px);
+            background: #e9ecef;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .award-student-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .award-student-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+
+        .award-student-id {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .back-button {
+            background: white;
+            color: var(--primary);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .back-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .confetti {
+            position: fixed;
+            width: 15px;
+            height: 15px;
+            background: #fff;
+            opacity: 0.8;
+            border-radius: 0;
+            animation: confetti-fall 5s linear infinite;
+            z-index: 1001;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+
+        .trophy-icon {
+            color: gold;
+            font-size: 2.5rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Color coding for award categories */
+        .award-speaking {
+            border-top-color: #ff9a9e;
+        }
+
+        .award-speaking h2 {
+            color: #d63031;
+        }
+
+        .award-writing {
+            border-top-color: #a1c4fd;
+        }
+
+        .award-writing h2 {
+            color: #0984e3;
+        }
+
+        .award-notes {
+            border-top-color: #006644;
+        }
+
+        .award-notes h2 {
+            color: #006644;
+        }
+
+        .award-management {
+            border-top-color: #f6d365;
+        }
+
+        .award-management h2 {
+            color: #e17055;
+        }
+
+        .award-inquirer {
+            border-top-color: #ff9a9e;
+        }
+
+        .award-inquirer h2 {
+            color: #c2185b;
+        }
+
+        .award-thinker {
+            border-top-color: #a1c4fd;
+        }
+
+        .award-thinker h2 {
+            color: #1565c0;
+        }
+
+        .award-communicator {
+            border-top-color: #84fab0;
+        }
+
+        .award-communicator h2 {
+            color: #00695c;
+        }
+
+        .award-principled {
+            border-top-color: #f6d365;
+        }
+
+        .award-principled h2 {
+            color: #e65100;
+        }
+
+        .award-open-minded {
+            border-top-color: #d4fc79;
+        }
+
+        .award-open-minded h2 {
+            color: #33691e;
+        }
+
+        .award-caring {
+            border-top-color: #ff9a9e;
+        }
+
+        .award-caring h2 {
+            color: #880e4f;
+        }
+
+        .award-risk-taker {
+            border-top-color: #a1c4fd;
+        }
+
+        .award-risk-taker h2 {
+            color: #0d47a1;
+        }
+
+        .award-balanced {
+            border-top-color: #84fab0;
+        }
+
+        .award-balanced h2 {
+            color: #004d40;
+        }
+
+        .award-reflective {
+            border-top-color: #f6d365;
+        }
+
+        .award-reflective h2 {
+            color: #bf360c;
+        }
+        
+        .sound-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        .sound-toggle:hover {
+            transform: scale(1.1);
+        }
+        
+        .sound-toggle.muted {
+            background: #f8f9fa;
+            color: #7f8c8d;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* NEW EXPORT BUTTON STYLES */
+        .export-button {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 30px;
+            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-left: 20px;
+        }
+
+        .export-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 184, 148, 0.5);
+        }
+
+        .awards-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 30px;
+            gap: 20px;
+        }
+
+        .export-options {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            margin-top: 20px;
+            text-align: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .export-options.show {
+            display: block;
+        }
+
+        .export-option-btn {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin: 0 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .export-option-btn:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .export-csv {
+            color: #0984e3;
+            border-color: #0984e3;
+        }
+
+        .export-excel {
+            color: #00b894;
+            border-color: #00b894;
+        }
+    </style>
+</head>
+<body>
+    <div class="sound-toggle" id="soundToggle">
+        <i class="fas fa-volume-up" id="soundIcon"></i>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="container">
+        <header>
+            <h1>Student Talent Dashboard</h1>
+            <p class="subtitle">Upload your student list and recognize their unique strengths and talents</p>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value speaking-stat" id="speakingCount">0</div>
+                <div class="stat-label">Speaking Stars</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value writing-stat" id="writingCount">0</div>
+                <div class="stat-label">Writing Masters</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value notes-stat" id="notesCount">0</div>
+                <div class="stat-label">Note-takers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value management-stat" id="managementCount">0</div>
+                <div class="stat-label">Managers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value inquirer-stat" id="inquirerCount">0</div>
+                <div class="stat-label">Inquirers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value thinker-stat" id="thinkerCount">0</div>
+                <div class="stat-label">Thinkers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value communicator-stat" id="communicatorCount">0</div>
+                <div class="stat-label">Communicators</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value principled-stat" id="principledCount">0</div>
+                <div class="stat-label">Principled</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value open-minded-stat" id="openMindedCount">0</div>
+                <div class="stat-label">Open-minded</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value caring-stat" id="caringCount">0</div>
+                <div class="stat-label">Caring</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value risk-taker-stat" id="riskTakerCount">0</div>
+                <div class="stat-label">Risk-takers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value balanced-stat" id="balancedCount">0</div>
+                <div class="stat-label">Balanced</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value reflective-stat" id="reflectiveCount">0</div>
+                <div class="stat-label">Reflective</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h2>Upload Student List</h2>
+                <p>Upload a CSV file or paste your student list to get started</p>
+                
+                <div class="input-methods">
+                    <div class="file-upload-wrapper">
+                        <label for="fileInput" class="file-upload-label">
+                            <i class="fas fa-file-upload"></i> Choose CSV File
+                        </label>
+                        <input type="file" id="fileInput" accept=".csv">
+                    </div>
+
+                    <div class="paste-section">
+                        <h3>Or paste student names:</h3>
+                        <textarea class="paste-textarea" id="pasteInput" placeholder="Paste student names, one per line&#10;Example:&#10;Alex Johnson&#10;Maria Garcia&#10;James Smith"></textarea>
+                        <button class="paste-button" id="pasteBtn">
+                            <i class="fas fa-paste"></i> Process Pasted Names
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="file-requirements">
+                    <h3>File Requirements:</h3>
+                    <ul>
+                        <li>CSV format with columns: ID, Name</li>
+                        <li>First row should be headers</li>
+                        <li>Example format:</li>
+                    </ul>
+                    <pre style="margin-top: 10px; background: #e9ecef; padding: 10px; border-radius: 5px;">
+ID,Name
+1,Alex Johnson
+2,Maria Garcia
+3,James Smith</pre>
+                </div>
+            </div>
+
+            <div class="student-list-container" id="studentListContainer">
+                <div class="student-list-header">
+                    <h2><i class="fas fa-user-graduate"></i> Student List</h2>
+                    <div class="student-controls">
+                        <button class="control-btn" id="saveBtn" title="Save to browser storage">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button class="control-btn" id="loadBtn" title="Load from browser storage">
+                            <i class="fas fa-folder-open"></i> Load
+                        </button>
+                        <button class="control-btn" id="clearBtn" title="Clear all data">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" class="search-input" id="searchInput" placeholder="Search students by name...">
+                </div>
+                
+                <ul class="student-list" id="studentList">
+                    <!-- Student list will be populated by JavaScript -->
+                </ul>
+                
+                <div class="action-buttons" id="actionButtons">
+                    <button class="btn btn-speaking" id="speakingBtn">
+                        <i class="fas fa-microphone-alt"></i> Speaking Star
+                    </button>
+                    <button class="btn btn-writing" id="writingBtn">
+                        <i class="fas fa-pen-fancy"></i> Writing Master
+                    </button>
+                    <button class="btn btn-notes" id="notesBtn">
+                        <i class="fas fa-sticky-note"></i> Terrific Note-taker
+                    </button>
+                    <button class="btn btn-management" id="managementBtn">
+                        <i class="fas fa-tasks"></i> Masterful Manager
+                    </button>
+                    <button class="btn btn-inquirer" id="inquirerBtn">
+                        <i class="fas fa-question"></i> Inquirer
+                    </button>
+                    <button class="btn btn-thinker" id="thinkerBtn">
+                        <i class="fas fa-brain"></i> Thinker
+                    </button>
+                    <button class="btn btn-communicator" id="communicatorBtn">
+                        <i class="fas fa-comments"></i> Communicator
+                    </button>
+                    <button class="btn btn-principled" id="principledBtn">
+                        <i class="fas fa-balance-scale"></i> Principled
+                    </button>
+                    <button class="btn btn-open-minded" id="openMindedBtn">
+                        <i class="fas fa-globe"></i> Open-minded
+                    </button>
+                    <button class="btn btn-caring" id="caringBtn">
+                        <i class="fas fa-heart"></i> Caring
+                    </button>
+                    <button class="btn btn-risk-taker" id="riskTakerBtn">
+                        <i class="fas fa-rocket"></i> Risk-taker
+                    </button>
+                    <button class="btn btn-balanced" id="balancedBtn">
+                        <i class="fas fa-balance-scale"></i> Balanced
+                    </button>
+                    <button class="btn btn-reflective" id="reflectiveBtn">
+                        <i class="fas fa-mirror"></i> Reflective
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h2><i class="fas fa-info-circle"></i> How to Use This Dashboard</h2>
+            <ol>
+                <li>Upload a CSV file or paste your student list using the upload panel</li>
+                <li>Your progress is automatically saved to your browser</li>
+                <li>Select a student from the list by clicking on them</li>
+                <li>Use the search bar to quickly find students by name</li>
+                <li>Choose one of the thirteen talent categories that best fits the student</li>
+                <li>Continue until all students have been categorized</li>
+                <li>Track progress using the statistics bar at the top</li>
+                <li>Click PUBLISH to create a beautiful awards ceremony page</li>
+                <li>Use the Save/Load buttons to manage your data</li>
+            </ol>
+        </div>
+
+        <div class="walls-container">
+            <!-- Original 4 categories -->
+            <div class="wall speaking-wall">
+                <h2>
+                    <i class="fas fa-microphone-alt wall-icon"></i>
+                    Speaking Stars
+                    <span class="category-counter" id="speakingCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="speakingList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall writing-wall">
+                <h2>
+                    <i class="fas fa-pen-fancy wall-icon"></i>
+                    Writing Masters
+                    <span class="category-counter" id="writingCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="writingList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall notes-wall">
+                <h2>
+                    <i class="fas fa-sticky-note wall-icon"></i>
+                    Terrific Note-takers
+                    <span class="category-counter" id="notesCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="notesList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall management-wall">
+                <h2>
+                    <i class="fas fa-tasks wall-icon"></i>
+                    Masterful Managers
+                    <span class="category-counter" id="managementCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="managementList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <!-- New 9 categories -->
+            <div class="wall inquirer-wall">
+                <h2>
+                    <i class="fas fa-question wall-icon"></i>
+                    Inquirers
+                    <span class="category-counter" id="inquirerCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="inquirerList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall thinker-wall">
+                <h2>
+                    <i class="fas fa-brain wall-icon"></i>
+                    Thinkers
+                    <span class="category-counter" id="thinkerCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="thinkerList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall communicator-wall">
+                <h2>
+                    <i class="fas fa-comments wall-icon"></i>
+                    Communicators
+                    <span class="category-counter" id="communicatorCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="communicatorList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall principled-wall">
+                <h2>
+                    <i class="fas fa-balance-scale wall-icon"></i>
+                    Principled
+                    <span class="category-counter" id="principledCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="principledList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall open-minded-wall">
+                <h2>
+                    <i class="fas fa-globe wall-icon"></i>
+                    Open-minded
+                    <span class="category-counter" id="openMindedCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="openMindedList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall caring-wall">
+                <h2>
+                    <i class="fas fa-heart wall-icon"></i>
+                    Caring
+                    <span class="category-counter" id="caringCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="caringList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall risk-taker-wall">
+                <h2>
+                    <i class="fas fa-rocket wall-icon"></i>
+                    Risk-takers
+                    <span class="category-counter" id="riskTakerCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="riskTakerList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall balanced-wall">
+                <h2>
+                    <i class="fas fa-balance-scale wall-icon"></i>
+                    Balanced
+                    <span class="category-counter" id="balancedCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="balancedList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+            
+            <div class="wall reflective-wall">
+                <h2>
+                    <i class="fas fa-mirror wall-icon"></i>
+                    Reflective
+                    <span class="category-counter" id="reflectiveCounter">0</span>
+                </h2>
+                <ul class="wall-list" id="reflectiveList">
+                    <li class="empty-message">No students assigned yet</li>
+                </ul>
+            </div>
+        </div>
+
+        <button class="btn btn-publish" id="publishBtn">
+            <i class="fas fa-trophy"></i> PUBLISH AWARDS
+        </button>
+
+        <footer>
+            <p>Student Talent Dashboard &copy; 2023 | Your progress is automatically saved to your browser</p>
+        </footer>
+    </div>
+
+    <!-- Awards Ceremony Page -->
+    <div class="awards-page" id="awardsPage">
+        <div class="awards-container">
+            <div class="awards-header">
+                <h1><i class="fas fa-trophy trophy-icon"></i> Student Awards Ceremony</h1>
+                <p>Celebrating our talented students and their unique strengths</p>
+                
+                <!-- NEW EXPORT BUTTON -->
+                <div class="awards-actions">
+                    <button class="export-button" id="exportButton">
+                        <i class="fas fa-file-export"></i> Export Awards
+                    </button>
+                    <button class="back-button" id="backButton">
+                        <i class="fas fa-arrow-left"></i> Back to Dashboard
+                    </button>
+                </div>
+                
+                <!-- EXPORT OPTIONS -->
+                <div class="export-options" id="exportOptions">
+                    <h3>Export Awards List As:</h3>
+                    <div style="margin-top: 15px;">
+                        <button class="export-option-btn export-csv" id="exportCsv">
+                            <i class="fas fa-file-csv"></i> CSV File
+                        </button>
+                        <button class="export-option-btn export-excel" id="exportExcel">
+                            <i class="fas fa-file-excel"></i> Excel File
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="awards-categories" id="awardsCategories">
+                <!-- Categories will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const studentListContainer = document.getElementById('studentListContainer');
+        const studentList = document.getElementById('studentList');
+        const searchInput = document.getElementById('searchInput');
+        const actionButtons = document.getElementById('actionButtons');
+        const publishBtn = document.getElementById('publishBtn');
+        const soundToggle = document.getElementById('soundToggle');
+        const soundIcon = document.getElementById('soundIcon');
+        const pasteInput = document.getElementById('pasteInput');
+        const pasteBtn = document.getElementById('pasteBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const toast = document.getElementById('toast');
+        
+        // NEW EXPORT ELEMENTS
+        const exportButton = document.getElementById('exportButton');
+        const exportOptions = document.getElementById('exportOptions');
+        const exportCsv = document.getElementById('exportCsv');
+        const exportExcel = document.getElementById('exportExcel');
+        
+        // Category buttons
+        const categoryButtons = [
+            { id: 'speakingBtn', category: 'speaking' },
+            { id: 'writingBtn', category: 'writing' },
+            { id: 'notesBtn', category: 'notes' },
+            { id: 'managementBtn', category: 'management' },
+            { id: 'inquirerBtn', category: 'inquirer' },
+            { id: 'thinkerBtn', category: 'thinker' },
+            { id: 'communicatorBtn', category: 'communicator' },
+            { id: 'principledBtn', category: 'principled' },
+            { id: 'openMindedBtn', category: 'openMinded' },
+            { id: 'caringBtn', category: 'caring' },
+            { id: 'riskTakerBtn', category: 'riskTaker' },
+            { id: 'balancedBtn', category: 'balanced' },
+            { id: 'reflectiveBtn', category: 'reflective' }
+        ];
+        
+        // Wall lists
+        const wallLists = {};
+        categoryButtons.forEach(button => {
+            wallLists[button.category] = document.getElementById(`${button.category}List`);
+        });
+        
+        // Counters
+        const counters = {};
+        categoryButtons.forEach(button => {
+            counters[button.category] = document.getElementById(`${button.category}Counter`);
+        });
+        
+        // Stats
+        const stats = {};
+        categoryButtons.forEach(button => {
+            stats[button.category] = document.getElementById(`${button.category}Count`);
+        });
+
+        // Awards page elements
+        const awardsPage = document.getElementById('awardsPage');
+        const awardsCategories = document.getElementById('awardsCategories');
+        const backButton = document.getElementById('backButton');
+
+        // State variables
+        let students = [];
+        let selectedStudent = null;
+        let filteredStudents = [];
+        let soundsEnabled = true;
+
+        // Show toast message
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Sound functions using Web Audio API for better compatibility
+        function playSound(frequency, duration, type = 'sine') {
+            if (!soundsEnabled) return;
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = frequency;
+                oscillator.type = type;
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + duration);
+            } catch (e) {
+                console.log("Web Audio API not supported:", e);
+            }
+        }
+
+        // Category-specific sounds
+        const categorySounds = {
+            speaking: () => playSound(523.25, 0.3, 'sine'),     // C5 - bright
+            writing: () => playSound(392.00, 0.4, 'square'),    // G4 - typewriter-like
+            notes: () => playSound(659.25, 0.2, 'sine'),       // E5 - quick
+            management: () => playSound(261.63, 0.5, 'sine'),  // C4 - authoritative
+            inquirer: () => {
+                playSound(349.23, 0.1, 'sine'); // F4
+                setTimeout(() => playSound(392.00, 0.1, 'sine'), 100); // G4
+                setTimeout(() => playSound(440.00, 0.2, 'sine'), 200); // A4
+            },
+            thinker: () => playSound(220.00, 0.8, 'sawtooth'), // A3 - deep
+            communicator: () => {
+                playSound(523.25, 0.1, 'sine'); // C5
+                setTimeout(() => playSound(659.25, 0.1, 'sine'), 100); // E5
+                setTimeout(() => playSound(783.99, 0.2, 'sine'), 200); // G5
+            },
+            principled: () => playSound(293.66, 0.6, 'sine'),  // D4 - stable
+            openMinded: () => {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => playSound(300 + i*50, 0.1, 'sine'), i*80);
+                }
+            },
+            caring: () => playSound(329.63, 0.7, 'sine'),      // E4 - warm
+            riskTaker: () => {
+                playSound(200, 0.1, 'sawtooth');
+                setTimeout(() => playSound(600, 0.3, 'sawtooth'), 150);
+            },
+            balanced: () => {
+                playSound(261.63, 0.2, 'sine'); // C4
+                setTimeout(() => playSound(329.63, 0.2, 'sine'), 200); // E4
+                setTimeout(() => playSound(392.00, 0.2, 'sine'), 400); // G4
+            },
+            reflective: () => playSound(196.00, 1.0, 'triangle') // G3 - mellow
+        };
+
+        // Save data to localStorage
+        function saveToLocalStorage() {
+            try {
+                // Save student list
+                localStorage.setItem('studentDashboard_students', JSON.stringify(students));
+                
+                // Save categorized students
+                const categorized = {};
+                categoryButtons.forEach(button => {
+                    const category = button.category;
+                    const wallList = wallLists[category];
+                    const studentItems = Array.from(wallList.querySelectorAll('.wall-item'));
+                    
+                    categorized[category] = studentItems.map(item => {
+                        const avatar = item.querySelector('.student-avatar').textContent;
+                        const name = item.querySelector('.student-name').textContent;
+                        const id = item.querySelector('.student-id').textContent.replace('ID: ', '');
+                        return { id, name, avatar };
+                    });
+                });
+                
+                localStorage.setItem('studentDashboard_categorized', JSON.stringify(categorized));
+                showToast('Progress saved successfully!');
+            } catch (e) {
+                console.error('Error saving to localStorage:', e);
+                showToast('Error saving data');
+            }
+        }
+
+        // Load data from localStorage
+        function loadFromLocalStorage() {
+            try {
+                const savedStudents = localStorage.getItem('studentDashboard_students');
+                const savedCategorized = localStorage.getItem('studentDashboard_categorized');
+                
+                if (savedStudents) {
+                    students = JSON.parse(savedStudents);
+                    filteredStudents = [...students];
+                    initializeStudentList();
+                    uploadSection.style.display = 'none';
+                    studentListContainer.classList.add('show');
+                    
+                    // Load categorized students if available
+                    if (savedCategorized) {
+                        const categorized = JSON.parse(savedCategorized);
+                        
+                        // Clear all walls first
+                        categoryButtons.forEach(button => {
+                            const wallList = wallLists[button.category];
+                            wallList.innerHTML = '<li class="empty-message">No students assigned yet</li>';
+                            counters[button.category].textContent = '0';
+                            stats[button.category].textContent = '0';
+                        });
+                        
+                        // Add categorized students to walls
+                        for (const category in categorized) {
+                            const studentsInCategory = categorized[category];
+                            
+                            if (studentsInCategory.length > 0) {
+                                // Remove empty message
+                                wallLists[category].innerHTML = '';
+                                
+                                // Add each student to the wall
+                                studentsInCategory.forEach(student => {
+                                    const listItem = createWallItem(student);
+                                    wallLists[category].appendChild(listItem);
+                                    
+                                    // Update counters
+                                    const count = parseInt(counters[category].textContent) + 1;
+                                    counters[category].textContent = count;
+                                    stats[category].textContent = count;
+                                    
+                                    // Remove from main student list
+                                    students = students.filter(s => s.id !== student.id);
+                                });
+                            }
+                        }
+                        
+                        // Update filtered students and re-render
+                        filteredStudents = [...students];
+                        renderStudentList();
+                    }
+                    
+                    showToast('Data loaded successfully!');
+                } else {
+                    showToast('No saved data found');
+                }
+            } catch (e) {
+                console.error('Error loading from localStorage:', e);
+                showToast('Error loading data');
+            }
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('Are you sure you want to clear all data? This cannot be undone.')) {
+                students = [];
+                filteredStudents = [];
+                selectedStudent = null;
+                
+                // Clear all walls
+                categoryButtons.forEach(button => {
+                    const wallList = wallLists[button.category];
+                    wallList.innerHTML = '<li class="empty-message">No students assigned yet</li>';
+                    counters[button.category].textContent = '0';
+                    stats[button.category].textContent = '0';
+                });
+                
+                // Clear student list
+                studentList.innerHTML = '';
+                
+                // Show upload section
+                uploadSection.style.display = 'flex';
+                studentListContainer.classList.remove('show');
+                
+                // Clear localStorage
+                localStorage.removeItem('studentDashboard_students');
+                localStorage.removeItem('studentDashboard_categorized');
+                
+                showToast('All data cleared');
+            }
+        }
+
+        // Handle file upload
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                parseCSV(content);
+            };
+            reader.readAsText(file);
+        });
+
+        // Handle paste button click
+        pasteBtn.addEventListener('click', function() {
+            const pasteText = pasteInput.value.trim();
+            if (!pasteText) {
+                showToast('Please paste some student names first');
+                return;
+            }
+            
+            processPastedNames(pasteText);
+        });
+
+        // Process pasted names
+        function processPastedNames(pasteText) {
+            const lines = pasteText.split('\n');
+            let newStudents = [];
+            let nextId = students.length > 0 ? Math.max(...students.map(s => parseInt(s.id))) + 1 : 1;
+            
+            lines.forEach(line => {
+                line = line.trim();
+                if (line) {
+                    // Check if line has comma (ID, Name format)
+                    let parts = line.split(',');
+                    let id, name;
+                    
+                    if (parts.length >= 2) {
+                        // Assume format: ID, Name
+                        id = parts[0].trim();
+                        name = parts.slice(1).join(',').trim(); // in case name has commas
+                    } else {
+                        // Just a name, generate ID
+                        id = nextId++;
+                        name = line;
+                    }
+                    
+                    const avatar = name.split(' ').map(n => n[0]).join('').toUpperCase();
+                    newStudents.push({ id: id.toString(), name, avatar });
+                }
+            });
+            
+            if (newStudents.length > 0) {
+                students = newStudents;
+                filteredStudents = [...students];
+                initializeStudentList();
+                uploadSection.style.display = 'none';
+                studentListContainer.classList.add('show');
+                pasteInput.value = ''; // Clear the textarea
+                saveToLocalStorage(); // Auto-save
+                showToast(`${newStudents.length} students added successfully!`);
+            } else {
+                showToast('No valid student names found');
+            }
+        }
+
+        // Parse CSV content
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n');
+            students = [];
+            
+            // Skip header row and process each line
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const parts = line.split(',');
+                if (parts.length >= 2) {
+                    const id = parts[0].trim();
+                    const name = parts[1].trim();
+                    const avatar = name.split(' ').map(n => n[0]).join('').toUpperCase();
+                    
+                    if (id && name) {
+                        students.push({
+                            id: id,
+                            name: name,
+                            avatar: avatar
+                        });
+                    }
+                }
+            }
+            
+            if (students.length > 0) {
+                filteredStudents = [...students];
+                initializeStudentList();
+                uploadSection.style.display = 'none';
+                studentListContainer.classList.add('show');
+                saveToLocalStorage(); // Auto-save
+                showToast(`${students.length} students loaded from CSV!`);
+            } else {
+                showToast('No valid student data found in the CSV file');
+            }
+        }
+
+        // Initialize the student list
+        function initializeStudentList() {
+            renderStudentList();
+        }
+
+        // Render the student list based on current filter
+        function renderStudentList() {
+            studentList.innerHTML = '';
+            
+            if (filteredStudents.length === 0) {
+                const emptyItem = document.createElement('li');
+                emptyItem.className = 'student-item';
+                emptyItem.innerHTML = `
+                    <div class="student-info" style="text-align: center; width: 100%;">
+                        <div class="student-name">No students found</div>
+                    </div>
+                `;
+                studentList.appendChild(emptyItem);
+                return;
+            }
+            
+            filteredStudents.forEach(student => {
+                const listItem = document.createElement('li');
+                listItem.className = 'student-item';
+                listItem.dataset.id = student.id;
+                
+                listItem.innerHTML = `
+                    <div class="student-avatar">${student.avatar}</div>
+                    <div class="student-info">
+                        <div class="student-name">${student.name}</div>
+                        <div class="student-id">ID: ${student.id}</div>
+                    </div>
+                `;
+                
+                listItem.addEventListener('click', () => selectStudent(student, listItem));
+                studentList.appendChild(listItem);
+            });
+        }
+
+        // Search functionality
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (searchTerm === '') {
+                filteredStudents = [...students];
+            } else {
+                filteredStudents = students.filter(student => 
+                    student.name.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            renderStudentList();
+        });
+
+        // Select a student
+        function selectStudent(student, element) {
+            // Remove selection from all students
+            document.querySelectorAll('.student-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Select the clicked student
+            element.classList.add('selected');
+            selectedStudent = student;
+            
+            // Show action buttons
+            actionButtons.classList.add('show');
+        }
+
+        // Add student to category
+        function addToCategory(category) {
+            if (!selectedStudent) return;
+            
+            // Play sound for the category
+            if (categorySounds[category]) {
+                categorySounds[category]();
+            }
+            
+            // Remove empty message if present
+            if (wallLists[category].querySelector('.empty-message')) {
+                wallLists[category].innerHTML = '';
+            }
+            
+            // Create new list item
+            const listItem = createWallItem(selectedStudent);
+            wallLists[category].appendChild(listItem);
+            
+            // Update counter
+            const count = parseInt(counters[category].textContent) + 1;
+            counters[category].textContent = count;
+            stats[category].textContent = count;
+            
+            // Remove student from main list
+            removeStudentFromList(selectedStudent.id);
+            
+            // Reset selection
+            resetSelection();
+            
+            // Auto-save to localStorage
+            saveToLocalStorage();
+        }
+
+        // Create a wall list item
+        function createWallItem(student) {
+            const listItem = document.createElement('li');
+            listItem.className = 'wall-item';
+            
+            listItem.innerHTML = `
+                <div class="student-avatar">${student.avatar}</div>
+                <div class="student-info">
+                    <div class="student-name">${student.name}</div>
+                    <div class="student-id">ID: ${student.id}</div>
+                </div>
+            `;
+            
+            return listItem;
+        }
+
+        // Remove student from the main list
+        function removeStudentFromList(studentId) {
+            // Remove from students array
+            students = students.filter(student => student.id !== studentId);
+            
+            // Update filtered students
+            const searchTerm = searchInput.value.toLowerCase();
+            if (searchTerm === '') {
+                filteredStudents = [...students];
+            } else {
+                filteredStudents = students.filter(student => 
+                    student.name.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Re-render student list
+            renderStudentList();
+            
+            // If no students left, show upload section again
+            if (students.length === 0) {
+                studentListContainer.classList.remove('show');
+                uploadSection.style.display = 'flex';
+                
+                // Reset file input
+                fileInput.value = '';
+            }
+        }
+
+        // Reset selection state
+        function resetSelection() {
+            selectedStudent = null;
+            actionButtons.classList.remove('show');
+        }
+
+        // Publish awards ceremony
+        function publishAwards() {
+            // Check if there are any categorized students
+            let hasStudents = false;
+            for (const category in wallLists) {
+                if (wallLists[category].querySelectorAll('.wall-item').length > 0) {
+                    hasStudents = true;
+                    break;
+                }
+            }
+            
+            if (!hasStudents) {
+                showToast('Please categorize at least one student before publishing');
+                return;
+            }
+            
+            // Show awards page
+            awardsPage.style.display = 'block';
+            
+            // Generate awards content
+            generateAwardsContent();
+            
+            // Create confetti effect
+            createConfetti();
+        }
+
+        // Generate awards content
+        function generateAwardsContent() {
+            awardsCategories.innerHTML = '';
+            
+            // Create award categories for each wall that has students
+            categoryButtons.forEach(button => {
+                const category = button.category;
+                const wallList = wallLists[category];
+                
+                if (wallList.querySelectorAll('.wall-item').length > 0) {
+                    const categoryDiv = createAwardCategory(
+                        getCategoryDisplayName(category), 
+                        getCategoryIcon(category), 
+                        `award-${category}`,
+                        wallList
+                    );
+                    awardsCategories.appendChild(categoryDiv);
+                }
+            });
+        }
+
+        // Get display name for category
+        function getCategoryDisplayName(category) {
+            const names = {
+                speaking: 'Speaking Stars',
+                writing: 'Writing Masters',
+                notes: 'Terrific Note-takers',
+                management: 'Masterful Managers',
+                inquirer: 'Inquirers',
+                thinker: 'Thinkers',
+                communicator: 'Communicators',
+                principled: 'Principled',
+                openMinded: 'Open-minded',
+                caring: 'Caring',
+                riskTaker: 'Risk-takers',
+                balanced: 'Balanced',
+                reflective: 'Reflective'
+            };
+            return names[category] || category;
+        }
+
+        // Get icon for category
+        function getCategoryIcon(category) {
+            const icons = {
+                speaking: 'fas fa-microphone-alt',
+                writing: 'fas fa-pen-fancy',
+                notes: 'fas fa-sticky-note',
+                management: 'fas fa-tasks',
+                inquirer: 'fas fa-question',
+                thinker: 'fas fa-brain',
+                communicator: 'fas fa-comments',
+                principled: 'fas fa-balance-scale',
+                openMinded: 'fas fa-globe',
+                caring: 'fas fa-heart',
+                riskTaker: 'fas fa-rocket',
+                balanced: 'fas fa-balance-scale',
+                reflective: 'fas fa-mirror'
+            };
+            return icons[category] || 'fas fa-user';
+        }
+
+        // Create award category element
+        function createAwardCategory(title, icon, className, list) {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = `award-category ${className}`;
+            
+            const students = Array.from(list.querySelectorAll('.wall-item')).map(item => {
+                const avatar = item.querySelector('.student-avatar').textContent;
+                const name = item.querySelector('.student-name').textContent;
+                const id = item.querySelector('.student-id').textContent;
+                return { avatar, name, id };
+            });
+            
+            let studentsHTML = '';
+            students.forEach(student => {
+                studentsHTML += `
+                    <li class="award-student">
+                        <div class="award-student-avatar">${student.avatar}</div>
+                        <div class="student-info">
+                            <div class="award-student-name">${student.name}</div>
+                            <div class="award-student-id">${student.id}</div>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            categoryDiv.innerHTML = `
+                <h2>
+                    <i class="${icon}"></i> ${title}
+                </h2>
+                <ul class="award-students">
+                    ${studentsHTML}
+                </ul>
+            `;
+            
+            return categoryDiv;
+        }
+
+        // Create confetti effect
+        function createConfetti() {
+            const colors = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6'];
+            const confettiCount = 150;
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDelay = Math.random() * 5 + 's';
+                confetti.style.width = Math.random() * 10 + 5 + 'px';
+                confetti.style.height = Math.random() * 10 + 5 + 'px';
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                
+                awardsPage.appendChild(confetti);
+                
+                // Remove confetti after animation completes
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        // NEW EXPORT FUNCTIONALITY
+        // Toggle export options
+        exportButton.addEventListener('click', function() {
+            exportOptions.classList.toggle('show');
+        });
+
+        // Export to CSV
+        exportCsv.addEventListener('click', function() {
+            exportAwardsData('csv');
+            exportOptions.classList.remove('show');
+        });
+
+        // Export to Excel
+        exportExcel.addEventListener('click', function() {
+            exportAwardsData('excel');
+            exportOptions.classList.remove('show');
+        });
+
+        // Function to export awards data
+        function exportAwardsData(format) {
+            // Collect all award data
+            const awardData = [];
+            
+            // Get all award categories
+            const awardCategories = document.querySelectorAll('.award-category');
+            
+            awardCategories.forEach(category => {
+                const categoryName = category.querySelector('h2').textContent;
+                const students = category.querySelectorAll('.award-student');
+                
+                students.forEach(student => {
+                    const studentName = student.querySelector('.award-student-name').textContent;
+                    const studentId = student.querySelector('.award-student-id').textContent;
+                    
+                    awardData.push({
+                        category: categoryName,
+                        name: studentName,
+                        id: studentId
+                    });
+                });
+            });
+            
+            if (awardData.length === 0) {
+                showToast('No award data to export');
+                return;
+            }
+            
+            // Create CSV content
+            let csvContent = 'Category,Student Name,Student ID\n';
+            awardData.forEach(item => {
+                csvContent += `"${item.category}","${item.name}","${item.id}"\n`;
+            });
+            
+            if (format === 'csv') {
+                // Download as CSV
+                downloadFile(csvContent, 'student_awards.csv', 'text/csv');
+                showToast('Awards exported as CSV successfully!');
+            } else if (format === 'excel') {
+                // For Excel, we'll create an HTML table that Excel can open
+                let excelContent = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Student Awards</title>
+                        <!--[if gte mso 9]>
+                        <xml>
+                            <x:ExcelWorkbook>
+                                <x:ExcelWorksheets>
+                                    <x:ExcelWorksheet>
+                                        <x:Name>Student Awards</x:Name>
+                                        <x:WorksheetOptions>
+                                            <x:DisplayGridlines/>
+                                        </x:WorksheetOptions>
+                                    </x:ExcelWorksheet>
+                                </x:ExcelWorksheets>
+                            </x:ExcelWorkbook>
+                        </xml>
+                        <![endif]-->
+                    </head>
+                    <body>
+                        <table border="1">
+                            <tr>
+                                <th>Category</th>
+                                <th>Student Name</th>
+                                <th>Student ID</th>
+                            </tr>
+                `;
+                
+                awardData.forEach(item => {
+                    excelContent += `
+                        <tr>
+                            <td>${item.category}</td>
+                            <td>${item.name}</td>
+                            <td>${item.id}</td>
+                        </tr>
+                    `;
+                });
+                
+                excelContent += `
+                        </table>
+                    </body>
+                    </html>
+                `;
+                
+                // Download as Excel
+                downloadFile(excelContent, 'student_awards.xls', 'application/vnd.ms-excel');
+                showToast('Awards exported as Excel successfully!');
+            }
+        }
+
+        // Helper function to download files
+        function downloadFile(content, fileName, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Close export options when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!exportButton.contains(event.target) && !exportOptions.contains(event.target)) {
+                exportOptions.classList.remove('show');
+            }
+        });
+
+        // Toggle sound on/off
+        soundToggle.addEventListener('click', function() {
+            soundsEnabled = !soundsEnabled;
+            if (soundsEnabled) {
+                soundToggle.classList.remove('muted');
+                soundIcon.className = 'fas fa-volume-up';
+                // Play a test sound
+                playSound(523.25, 0.2, 'sine');
+            } else {
+                soundToggle.classList.add('muted');
+                soundIcon.className = 'fas fa-volume-mute';
+            }
+        });
+
+        // Event listeners for category buttons
+        categoryButtons.forEach(button => {
+            document.getElementById(button.id).addEventListener('click', () => {
+                addToCategory(button.category);
+            });
+        });
+
+        // Event listeners for control buttons
+        saveBtn.addEventListener('click', saveToLocalStorage);
+        loadBtn.addEventListener('click', loadFromLocalStorage);
+        clearBtn.addEventListener('click', clearAllData);
+
+        // Event listeners for publish and back buttons
+        publishBtn.addEventListener('click', publishAwards);
+        backButton.addEventListener('click', () => {
+            awardsPage.style.display = 'none';
+        });
+
+        // Auto-load data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if there's saved data
+            const savedStudents = localStorage.getItem('studentDashboard_students');
+            if (savedStudents) {
+                // Ask user if they want to load saved data
+                if (confirm('Found saved data. Would you like to load it?')) {
+                    loadFromLocalStorage();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

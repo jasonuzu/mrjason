@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English 2 Class Timers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        h1 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            font-size: 3rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.5rem;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            background-color: #1a2a6c;
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .start-sequence-btn {
+            background-color: #4CAF50;
+        }
+
+        .save-btn {
+            background-color: #2196F3;
+        }
+
+        .load-btn {
+            background-color: #FF9800;
+        }
+
+        .total-class-time {
+            background: linear-gradient(to right, #1a2a6c, #b21f1f);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(26, 42, 108, 0.4);
+        }
+
+        .total-class-time h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .total-timer-display {
+            font-size: 4rem;
+            font-weight: 800;
+            font-family: 'Courier New', monospace;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .time-allocation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            font-size: 1.2rem;
+        }
+
+        .allocated-time {
+            color: #ffcc00;
+        }
+
+        .remaining-time {
+            color: #4CAF50;
+        }
+
+        .total-time-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .total-time-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+        }
+
+        .set-total-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .set-total-btn:hover {
+            background-color: #45a049;
+        }
+
+        .reset-total-btn {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .reset-total-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .total-time-inputs {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .total-time-input {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            width: 120px;
+        }
+
+        .total-time-input:focus {
+            outline: none;
+            border-color: #1a2a6c;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            font-size: 1.3rem;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.5s ease;
+            max-width: 300px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            color: #1a2a6c;
+            text-align: center;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: #1a2a6c;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+        }
+
+        .confirm-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .confirm-btn:hover {
+            background-color: #45a049;
+        }
+
+        .cancel-btn {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .saved-sequences {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .sequence-item {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .sequence-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .sequence-item:last-child {
+            border-bottom: none;
+        }
+
+        .sequence-name {
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+        }
+
+        .sequence-details {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .delete-sequence {
+            float: right;
+            color: #f44336;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .add-timer-btn {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(to right, #1a2a6c, #b21f1f);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(26, 42, 108, 0.4);
+        }
+
+        .add-timer-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(26, 42, 108, 0.5);
+        }
+
+        .add-timer-btn:active {
+            transform: translateY(0);
+        }
+
+        .timers-container {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .timer-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            border-left: 8px solid #1a2a6c;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .timer-card.current {
+            border-left-color: #FF9800;
+            box-shadow: 0 0 0 3px #FF9800;
+        }
+
+        .timer-card.complete {
+            border-left-color: #4CAF50;
+            background-color: #f8fff8;
+        }
+
+        .timer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .timer-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #1a2a6c;
+            padding: 10px;
+            border: 2px dashed transparent;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            width: 70%;
+        }
+
+        .timer-title:focus {
+            outline: none;
+            border-color: #1a2a6c;
+            background-color: #f0f4ff;
+        }
+
+        .timer-card.complete .timer-title {
+            color: #4CAF50;
+        }
+
+        .timer-status {
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1.5rem;
+        }
+
+        .timer-status.running {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .timer-status.complete {
+            background-color: #e8f5e9;
+            color: #4CAF50;
+        }
+
+        .timer-description {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            min-height: 80px;
+            font-size: 1.8rem;
+            transition: all 0.2s ease;
+            background-color: #f9f9f9;
+        }
+
+        .timer-description:focus {
+            outline: none;
+            border-color: #1a2a6c;
+            box-shadow: 0 0 0 3px rgba(26, 42, 108, 0.2);
+            background-color: white;
+        }
+
+        .timer-inputs {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .time-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            max-width: 180px;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: #1a2a6c;
+        }
+
+        .timer-display {
+            font-size: 4.5rem;
+            font-weight: 800;
+            text-align: center;
+            color: #1a2a6c;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .timer-card.complete .timer-display {
+            color: #4CAF50;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .timer-btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 1.5rem;
+            transition: all 0.2s ease;
+            flex: 1;
+        }
+
+        .start-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .start-btn:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .pause-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .pause-btn:hover {
+            background-color: #e68900;
+            transform: translateY(-2px);
+        }
+
+        .reset-btn {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background-color: #d32f2f;
+            transform: translateY(-2px);
+        }
+
+        .delete-btn {
+            background-color: #9e9e9e;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background-color: #757575;
+            transform: translateY(-2px);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+        }
+
+        .empty-state p {
+            font-size: 1.8rem;
+        }
+
+        .input-label {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+            text-align: center;
+            color: #555;
+        }
+
+        .time-warning {
+            color: #f44336;
+            font-weight: bold;
+            margin-top: 10px;
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .timer-controls {
+                flex-wrap: wrap;
+            }
+            
+            .timer-btn {
+                flex: 1;
+                min-width: 120px;
+            }
+            
+            .timer-inputs {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .time-input {
+                max-width: 100%;
+            }
+            
+            .timer-header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .timer-title {
+                width: 100%;
+                text-align: center;
+            }
+            
+            .total-time-inputs {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .total-time-input {
+                width: 100%;
+                max-width: 200px;
+            }
+            
+            .control-panel {
+                flex-direction: column;
+            }
+            
+            .modal-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>English 2 Class Timers</h1>
+            <p class="subtitle">Activity timers for classroom use</p>
+        </header>
+        
+        <div class="control-panel">
+            <button class="control-btn start-sequence-btn">Start Sequence</button>
+            <button class="control-btn save-btn">Save Sequence</button>
+            <button class="control-btn load-btn">Load Sequence</button>
+        </div>
+        
+        <div class="total-class-time">
+            <h2>Total Class Time</h2>
+            <div class="total-timer-display">50:00</div>
+            <div class="time-allocation">
+                <div class="allocated-time">Allocated: <span id="allocatedTime">00:00</span></div>
+                <div class="remaining-time">Remaining: <span id="remainingTime">50:00</span></div>
+            </div>
+            <div class="total-time-inputs">
+                <input type="number" class="total-time-input hours" placeholder="Hours" min="0" value="0">
+                <input type="number" class="total-time-input minutes" placeholder="Minutes" min="0" value="50">
+                <input type="number" class="total-time-input seconds" placeholder="Seconds" min="0" value="0">
+            </div>
+            <div class="total-time-controls">
+                <button class="total-time-btn set-total-btn">Set Total Time</button>
+                <button class="total-time-btn reset-total-btn">Reset Total Time</button>
+            </div>
+            <div id="timeWarning" class="time-warning"></div>
+        </div>
+        
+        <button id="addTimerBtn" class="add-timer-btn">+ Add New Activity Timer</button>
+        
+        <div id="timersContainer" class="timers-container">
+            <!-- Timers will be added here dynamically -->
+            <div class="empty-state">
+                <h3>No timers yet</h3>
+                <p>Click "Add New Activity Timer" to create your first timer</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        Next timer starting: <span id="nextTimerName"></span>
+    </div>
+
+    <!-- Save Sequence Modal -->
+    <div id="saveModal" class="modal">
+        <div class="modal-content">
+            <h3>Save Timer Sequence</h3>
+            <input type="text" id="sequenceName" class="modal-input" placeholder="Enter sequence name">
+            <div class="modal-buttons">
+                <button id="confirmSave" class="modal-btn confirm-btn">Save</button>
+                <button id="cancelSave" class="modal-btn cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Sequence Modal -->
+    <div id="loadModal" class="modal">
+        <div class="modal-content">
+            <h3>Load Timer Sequence</h3>
+            <div id="savedSequences" class="saved-sequences">
+                <!-- Saved sequences will be listed here -->
+            </div>
+            <div class="modal-buttons">
+                <button id="cancelLoad" class="modal-btn cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addTimerBtn = document.getElementById('addTimerBtn');
+            const timersContainer = document.getElementById('timersContainer');
+            const totalTimerDisplay = document.querySelector('.total-timer-display');
+            const allocatedTimeDisplay = document.getElementById('allocatedTime');
+            const remainingTimeDisplay = document.getElementById('remainingTime');
+            const totalHoursInput = document.querySelector('.total-time-input.hours');
+            const totalMinutesInput = document.querySelector('.total-time-input.minutes');
+            const totalSecondsInput = document.querySelector('.total-time-input.seconds');
+            const setTotalBtn = document.querySelector('.set-total-btn');
+            const resetTotalBtn = document.querySelector('.reset-total-btn');
+            const timeWarning = document.getElementById('timeWarning');
+            const startSequenceBtn = document.querySelector('.start-sequence-btn');
+            const saveBtn = document.querySelector('.save-btn');
+            const loadBtn = document.querySelector('.load-btn');
+            const notification = document.getElementById('notification');
+            const nextTimerName = document.getElementById('nextTimerName');
+            
+            // Modal elements
+            const saveModal = document.getElementById('saveModal');
+            const loadModal = document.getElementById('loadModal');
+            const sequenceNameInput = document.getElementById('sequenceName');
+            const confirmSaveBtn = document.getElementById('confirmSave');
+            const cancelSaveBtn = document.getElementById('cancelSave');
+            const cancelLoadBtn = document.getElementById('cancelLoad');
+            const savedSequencesContainer = document.getElementById('savedSequences');
+            
+            let timerCount = 0;
+            let totalClassSeconds = 3000; // Default 50 minutes
+            let allocatedSeconds = 0;
+            let totalTimerInterval = null;
+            let runningTimers = [];
+            let isSequenceRunning = false;
+            let currentTimerIndex = -1;
+
+            // Show notification
+            function showNotification(message) {
+                nextTimerName.textContent = message;
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            // Show modal
+            function showModal(modal) {
+                modal.classList.add('show');
+            }
+
+            // Hide modal
+            function hideModal(modal) {
+                modal.classList.remove('show');
+            }
+
+            // Update total timer display
+            function updateTotalDisplay() {
+                const hours = Math.floor(totalClassSeconds / 3600);
+                const minutes = Math.floor((totalClassSeconds % 3600) / 60);
+                const seconds = totalClassSeconds % 60;
+                
+                if (hours > 0) {
+                    totalTimerDisplay.textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                } else {
+                    totalTimerDisplay.textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                // Update allocated and remaining time displays
+                const allocHours = Math.floor(allocatedSeconds / 3600);
+                const allocMinutes = Math.floor((allocatedSeconds % 3600) / 60);
+                
+                if (allocHours > 0) {
+                    allocatedTimeDisplay.textContent = 
+                        `${allocHours.toString().padStart(2, '0')}:${allocMinutes.toString().padStart(2, '0')}`;
+                } else {
+                    allocatedTimeDisplay.textContent = 
+                        `${allocMinutes.toString().padStart(2, '0')}:00`;
+                }
+                
+                const remainingSeconds = totalClassSeconds - allocatedSeconds;
+                const remHours = Math.floor(remainingSeconds / 3600);
+                const remMinutes = Math.floor((remainingSeconds % 3600) / 60);
+                
+                if (remHours > 0) {
+                    remainingTimeDisplay.textContent = 
+                        `${remHours.toString().padStart(2, '0')}:${remMinutes.toString().padStart(2, '0')}`;
+                } else {
+                    remainingTimeDisplay.textContent = 
+                        `${remMinutes.toString().padStart(2, '0')}:00`;
+                }
+                
+                // Show warning if allocated time exceeds total time
+                if (allocatedSeconds > totalClassSeconds) {
+                    timeWarning.textContent = "Warning: Allocated time exceeds total class time!";
+                } else {
+                    timeWarning.textContent = "";
+                }
+                
+                // Change color when time is running low
+                if (remainingSeconds < 300) { // Less than 5 minutes
+                    remainingTimeDisplay.style.color = '#f44336';
+                } else {
+                    remainingTimeDisplay.style.color = '#4CAF50';
+                }
+            }
+
+            // Set total class time
+            function setTotalTime() {
+                const hours = parseInt(totalHoursInput.value) || 0;
+                const minutes = parseInt(totalMinutesInput.value) || 0;
+                const seconds = parseInt(totalSecondsInput.value) || 0;
+                
+                totalClassSeconds = hours * 3600 + minutes * 60 + seconds;
+                updateTotalDisplay();
+            }
+
+            // Reset total class time
+            function resetTotalTime() {
+                totalClassSeconds = 3000; // Reset to 50 minutes
+                allocatedSeconds = 0;
+                totalHoursInput.value = 0;
+                totalMinutesInput.value = 50;
+                totalSecondsInput.value = 0;
+                updateTotalDisplay();
+                
+                // Stop the total timer if running
+                if (totalTimerInterval) {
+                    clearInterval(totalTimerInterval);
+                    totalTimerInterval = null;
+                }
+                
+                // Reset all timers
+                document.querySelectorAll('.timer-card').forEach(timer => {
+                    timer.remove();
+                });
+                
+                // Show empty state
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.innerHTML = `
+                    <h3>No timers yet</h3>
+                    <p>Click "Add New Activity Timer" to create your first timer</p>
+                `;
+                timersContainer.appendChild(emptyState);
+                
+                timerCount = 0;
+                isSequenceRunning = false;
+                currentTimerIndex = -1;
+            }
+
+            // Start total class timer
+            function startTotalTimer() {
+                if (!totalTimerInterval && runningTimers.length > 0) {
+                    totalTimerInterval = setInterval(function() {
+                        if (totalClassSeconds <= 0) {
+                            clearInterval(totalTimerInterval);
+                            totalTimerInterval = null;
+                            return;
+                        }
+                        
+                        totalClassSeconds--;
+                        updateTotalDisplay();
+                    }, 1000);
+                }
+            }
+
+            // Stop total class timer
+            function stopTotalTimer() {
+                if (totalTimerInterval && runningTimers.length === 0) {
+                    clearInterval(totalTimerInterval);
+                    totalTimerInterval = null;
+                }
+            }
+
+            // Start the sequence of timers
+            function startSequence() {
+                if (isSequenceRunning) return;
+                
+                const timers = Array.from(timersContainer.querySelectorAll('.timer-card'));
+                if (timers.length === 0) return;
+                
+                isSequenceRunning = true;
+                currentTimerIndex = 0;
+                
+                // Start the first timer
+                const firstTimer = timers[0];
+                firstTimer.classList.add('current');
+                const startBtn = firstTimer.querySelector('.start-btn');
+                startBtn.click();
+                
+                showNotification(firstTimer.querySelector('.timer-title').textContent);
+            }
+
+            // Save timers to localStorage with a name
+            function saveSequence(name) {
+                const timers = Array.from(timersContainer.querySelectorAll('.timer-card'));
+                const timerData = timers.map(timer => {
+                    return {
+                        title: timer.querySelector('.timer-title').textContent,
+                        description: timer.querySelector('.timer-description').textContent,
+                        hours: timer.querySelector('.hours').value,
+                        minutes: timer.querySelector('.minutes').value,
+                        seconds: timer.querySelector('.seconds').value,
+                        isComplete: timer.classList.contains('complete')
+                    };
+                });
+                
+                const totalTimeData = {
+                    totalHours: totalHoursInput.value,
+                    totalMinutes: totalMinutesInput.value,
+                    totalSeconds: totalSecondsInput.value
+                };
+                
+                const saveData = {
+                    name: name,
+                    timers: timerData,
+                    totalTime: totalTimeData,
+                    date: new Date().toISOString()
+                };
+                
+                // Get existing sequences or create empty object
+                let sequences = JSON.parse(localStorage.getItem('englishClassSequences')) || {};
+                
+                // Add or update the sequence
+                sequences[name] = saveData;
+                
+                // Save back to localStorage
+                localStorage.setItem('englishClassSequences', JSON.stringify(sequences));
+                
+                showNotification(`Sequence "${name}" saved successfully!`);
+            }
+
+            // Load a sequence from localStorage
+            function loadSequence(name) {
+                const sequences = JSON.parse(localStorage.getItem('englishClassSequences')) || {};
+                const sequence = sequences[name];
+                
+                if (!sequence) {
+                    showNotification('Sequence not found');
+                    return;
+                }
+                
+                // Clear existing timers
+                document.querySelectorAll('.timer-card').forEach(timer => timer.remove());
+                
+                // Reset counters
+                timerCount = 0;
+                allocatedSeconds = 0;
+                
+                // Load total time
+                totalHoursInput.value = sequence.totalTime.totalHours;
+                totalMinutesInput.value = sequence.totalTime.totalMinutes;
+                totalSecondsInput.value = sequence.totalTime.totalSeconds;
+                setTotalTime();
+                
+                // Load timers
+                sequence.timers.forEach(timerData => {
+                    timerCount++;
+                    createTimerFromData(timerData);
+                });
+                
+                // Remove empty state if timers were loaded
+                const emptyState = timersContainer.querySelector('.empty-state');
+                if (emptyState && sequence.timers.length > 0) {
+                    emptyState.remove();
+                }
+                
+                showNotification(`Sequence "${name}" loaded successfully!`);
+            }
+
+            // Delete a sequence from localStorage
+            function deleteSequence(name) {
+                const sequences = JSON.parse(localStorage.getItem('englishClassSequences')) || {};
+                
+                if (sequences[name]) {
+                    delete sequences[name];
+                    localStorage.setItem('englishClassSequences', JSON.stringify(sequences));
+                    showNotification(`Sequence "${name}" deleted`);
+                    populateSavedSequences();
+                }
+            }
+
+            // Populate the saved sequences list
+            function populateSavedSequences() {
+                const sequences = JSON.parse(localStorage.getItem('englishClassSequences')) || {};
+                savedSequencesContainer.innerHTML = '';
+                
+                if (Object.keys(sequences).length === 0) {
+                    savedSequencesContainer.innerHTML = '<div class="sequence-item">No saved sequences found</div>';
+                    return;
+                }
+                
+                Object.values(sequences).forEach(sequence => {
+                    const sequenceItem = document.createElement('div');
+                    sequenceItem.className = 'sequence-item';
+                    
+                    const date = new Date(sequence.date);
+                    const timerCount = sequence.timers.length;
+                    
+                    sequenceItem.innerHTML = `
+                        <div class="sequence-name">${sequence.name}</div>
+                        <div class="sequence-details">${timerCount} timer(s) • Saved ${date.toLocaleDateString()}</div>
+                        <div class="delete-sequence" data-name="${sequence.name}">×</div>
+                    `;
+                    
+                    sequenceItem.addEventListener('click', function(e) {
+                        if (!e.target.classList.contains('delete-sequence')) {
+                            loadSequence(sequence.name);
+                            hideModal(loadModal);
+                        }
+                    });
+                    
+                    savedSequencesContainer.appendChild(sequenceItem);
+                });
+                
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-sequence').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const sequenceName = this.getAttribute('data-name');
+                        if (confirm(`Are you sure you want to delete the sequence "${sequenceName}"?`)) {
+                            deleteSequence(sequenceName);
+                        }
+                    });
+                });
+            }
+
+            // Add a new timer
+            addTimerBtn.addEventListener('click', function() {
+                timerCount++;
+                createTimer(`Activity ${timerCount}`);
+                
+                // Remove empty state if it exists
+                const emptyState = timersContainer.querySelector('.empty-state');
+                if (emptyState) {
+                    emptyState.remove();
+                }
+            });
+
+            // Set up total time controls
+            setTotalBtn.addEventListener('click', setTotalTime);
+            resetTotalBtn.addEventListener('click', resetTotalTime);
+            
+            // Set up control panel buttons
+            startSequenceBtn.addEventListener('click', startSequence);
+            
+            saveBtn.addEventListener('click', function() {
+                sequenceNameInput.value = '';
+                showModal(saveModal);
+            });
+            
+            loadBtn.addEventListener('click', function() {
+                populateSavedSequences();
+                showModal(loadModal);
+            });
+            
+            // Set up modal buttons
+            confirmSaveBtn.addEventListener('click', function() {
+                const name = sequenceNameInput.value.trim();
+                if (name) {
+                    saveSequence(name);
+                    hideModal(saveModal);
+                } else {
+                    alert('Please enter a sequence name');
+                }
+            });
+            
+            cancelSaveBtn.addEventListener('click', function() {
+                hideModal(saveModal);
+            });
+            
+            cancelLoadBtn.addEventListener('click', function() {
+                hideModal(loadModal);
+            });
+
+            // Create a new timer element from saved data
+            function createTimerFromData(timerData) {
+                const timerCard = document.createElement('div');
+                timerCard.className = 'timer-card';
+                if (timerData.isComplete) {
+                    timerCard.classList.add('complete');
+                }
+                
+                timerCard.innerHTML = `
+                    <div class="timer-header">
+                        <div class="timer-title" contenteditable="true">${timerData.title}</div>
+                        <div class="timer-status">${timerData.isComplete ? 'COMPLETE' : 'READY'}</div>
+                    </div>
+                    <div class="timer-description" contenteditable="true">${timerData.description}</div>
+                    <div class="timer-inputs">
+                        <div class="time-input-group">
+                            <span class="input-label">Hours</span>
+                            <input type="number" class="time-input hours" placeholder="0" min="0" value="${timerData.hours}">
+                        </div>
+                        <div class="time-input-group">
+                            <span class="input-label">Minutes</span>
+                            <input type="number" class="time-input minutes" placeholder="0" min="0" max="59" value="${timerData.minutes}">
+                        </div>
+                        <div class="time-input-group">
+                            <span class="input-label">Seconds</span>
+                            <input type="number" class="time-input seconds" placeholder="0" min="0" max="59" value="${timerData.seconds}">
+                        </div>
+                    </div>
+                    <div class="timer-display">${formatTimeDisplay(timerData.hours, timerData.minutes, timerData.seconds)}</div>
+                    <div class="timer-controls">
+                        <button class="timer-btn start-btn">Start</button>
+                        <button class="timer-btn pause-btn">Pause</button>
+                        <button class="timer-btn reset-btn">Reset</button>
+                        <button class="timer-btn delete-btn">Delete</button>
+                    </div>
+                `;
+
+                timersContainer.appendChild(timerCard);
+
+                // Set up timer functionality
+                setupTimer(timerCard);
+                
+                // Add this timer's time to allocated time
+                const hours = parseInt(timerData.hours) || 0;
+                const minutes = parseInt(timerData.minutes) || 0;
+                const seconds = parseInt(timerData.seconds) || 0;
+                
+                const timerSeconds = hours * 3600 + minutes * 60 + seconds;
+                allocatedSeconds += timerSeconds;
+                updateTotalDisplay();
+            }
+
+            // Format time for display
+            function formatTimeDisplay(hours, minutes, seconds) {
+                hours = parseInt(hours) || 0;
+                minutes = parseInt(minutes) || 0;
+                seconds = parseInt(seconds) || 0;
+                
+                if (hours > 0) {
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                } else {
+                    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+
+            // Create a new timer element
+            function createTimer(title) {
+                const timerCard = document.createElement('div');
+                timerCard.className = 'timer-card';
+                timerCard.innerHTML = `
+                    <div class="timer-header">
+                        <div class="timer-title" contenteditable="true">${title}</div>
+                        <div class="timer-status">READY</div>
+                    </div>
+                    <div class="timer-description" contenteditable="true">Enter activity description here...</div>
+                    <div class="timer-inputs">
+                        <div class="time-input-group">
+                            <span class="input-label">Hours</span>
+                            <input type="number" class="time-input hours" placeholder="0" min="0" value="0">
+                        </div>
+                        <div class="time-input-group">
+                            <span class="input-label">Minutes</span>
+                            <input type="number" class="time-input minutes" placeholder="0" min="0" max="59" value="5">
+                        </div>
+                        <div class="time-input-group">
+                            <span class="input-label">Seconds</span>
+                            <input type="number" class="time-input seconds" placeholder="0" min="0" max="59" value="0">
+                        </div>
+                    </div>
+                    <div class="timer-display">05:00</div>
+                    <div class="timer-controls">
+                        <button class="timer-btn start-btn">Start</button>
+                        <button class="timer-btn pause-btn">Pause</button>
+                        <button class="timer-btn reset-btn">Reset</button>
+                        <button class="timer-btn delete-btn">Delete</button>
+                    </div>
+                `;
+
+                timersContainer.appendChild(timerCard);
+
+                // Set up timer functionality
+                setupTimer(timerCard);
+                
+                // Add this timer's time to allocated time
+                const hours = parseInt(timerCard.querySelector('.hours').value) || 0;
+                const minutes = parseInt(timerCard.querySelector('.minutes').value) || 0;
+                const seconds = parseInt(timerCard.querySelector('.seconds').value) || 0;
+                
+                const timerSeconds = hours * 3600 + minutes * 60 + seconds;
+                allocatedSeconds += timerSeconds;
+                updateTotalDisplay();
+            }
+
+            // Set up timer functionality for a timer card
+            function setupTimer(timerCard) {
+                const hoursInput = timerCard.querySelector('.hours');
+                const minutesInput = timerCard.querySelector('.minutes');
+                const secondsInput = timerCard.querySelector('.seconds');
+                const timerDisplay = timerCard.querySelector('.timer-display');
+                const startBtn = timerCard.querySelector('.start-btn');
+                const pauseBtn = timerCard.querySelector('.pause-btn');
+                const resetBtn = timerCard.querySelector('.reset-btn');
+                const deleteBtn = timerCard.querySelector('.delete-btn');
+                const timerStatus = timerCard.querySelector('.timer-status');
+
+                let totalSeconds = 300; // Default 5 minutes
+                let timerInterval = null;
+                let isRunning = false;
+
+                // Update timer display
+                function updateDisplay() {
+                    const hours = Math.floor(totalSeconds / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = totalSeconds % 60;
+                    
+                    if (hours > 0) {
+                        timerDisplay.textContent = 
+                            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    } else {
+                        timerDisplay.textContent = 
+                            `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    }
+                }
+
+                // Update total seconds based on inputs
+                function updateTotalSeconds() {
+                    const hours = parseInt(hoursInput.value) || 0;
+                    const minutes = parseInt(minutesInput.value) || 0;
+                    const seconds = parseInt(secondsInput.value) || 0;
+                    
+                    // Remove old allocation
+                    allocatedSeconds -= totalSeconds;
+                    
+                    totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                    
+                    // Add new allocation
+                    allocatedSeconds += totalSeconds;
+                    
+                    updateDisplay();
+                    updateTotalDisplay();
+                }
+
+                // Start the timer
+                function startTimer() {
+                    if (totalSeconds <= 0) return;
+                    
+                    if (!isRunning) {
+                        isRunning = true;
+                        timerStatus.textContent = 'RUNNING';
+                        timerStatus.className = 'timer-status running';
+                        
+                        // Add to running timers
+                        runningTimers.push(timerCard);
+                        startTotalTimer();
+                        
+                        timerInterval = setInterval(function() {
+                            if (totalSeconds <= 0) {
+                                clearInterval(timerInterval);
+                                timerCard.classList.add('complete');
+                                timerStatus.textContent = 'COMPLETE';
+                                timerStatus.className = 'timer-status complete';
+                                isRunning = false;
+                                
+                                // Remove from running timers
+                                const index = runningTimers.indexOf(timerCard);
+                                if (index > -1) {
+                                    runningTimers.splice(index, 1);
+                                }
+                                stopTotalTimer();
+                                
+                                // If sequence is running, start next timer
+                                if (isSequenceRunning) {
+                                    const timers = Array.from(timersContainer.querySelectorAll('.timer-card'));
+                                    const currentIndex = timers.indexOf(timerCard);
+                                    
+                                    if (currentIndex < timers.length - 1) {
+                                        // Remove current indicator
+                                        timerCard.classList.remove('current');
+                                        
+                                        // Start next timer
+                                        const nextTimer = timers[currentIndex + 1];
+                                        nextTimer.classList.add('current');
+                                        const nextStartBtn = nextTimer.querySelector('.start-btn');
+                                        nextStartBtn.click();
+                                        
+                                        // Show notification
+                                        showNotification(nextTimer.querySelector('.timer-title').textContent);
+                                    } else {
+                                        // Sequence complete
+                                        isSequenceRunning = false;
+                                        timerCard.classList.remove('current');
+                                    }
+                                }
+                                
+                                // Play completion sound
+                                const audio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+                                audio.play().catch(e => console.log("Audio play failed:", e));
+                                return;
+                            }
+                            
+                            totalSeconds--;
+                            updateDisplay();
+                            
+                            // Also decrement total class time
+                            if (totalClassSeconds > 0) {
+                                totalClassSeconds--;
+                                updateTotalDisplay();
+                            }
+                        }, 1000);
+                    }
+                }
+
+                // Pause the timer
+                function pauseTimer() {
+                    if (isRunning) {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        timerStatus.textContent = 'PAUSED';
+                        timerStatus.className = 'timer-status';
+                        
+                        // Remove from running timers
+                        const index = runningTimers.indexOf(timerCard);
+                        if (index > -1) {
+                            runningTimers.splice(index, 1);
+                        }
+                        stopTotalTimer();
+                        
+                        // If sequence is running, pause the sequence
+                        if (isSequenceRunning) {
+                            isSequenceRunning = false;
+                            timerCard.classList.remove('current');
+                        }
+                    }
+                }
+
+                // Reset the timer
+                function resetTimer() {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                    updateTotalSeconds();
+                    timerCard.classList.remove('complete');
+                    timerStatus.textContent = 'READY';
+                    timerStatus.className = 'timer-status';
+                    
+                    // Remove from running timers
+                    const index = runningTimers.indexOf(timerCard);
+                    if (index > -1) {
+                        runningTimers.splice(index, 1);
+                    }
+                    stopTotalTimer();
+                    
+                    // If sequence is running, reset the sequence
+                    if (isSequenceRunning) {
+                        isSequenceRunning = false;
+                        timerCard.classList.remove('current');
+                    }
+                }
+
+                // Delete the timer
+                function deleteTimer() {
+                    clearInterval(timerInterval);
+                    
+                    // Remove this timer's allocation
+                    allocatedSeconds -= totalSeconds;
+                    updateTotalDisplay();
+                    
+                    // Remove from running timers
+                    const index = runningTimers.indexOf(timerCard);
+                    if (index > -1) {
+                        runningTimers.splice(index, 1);
+                    }
+                    stopTotalTimer();
+                    
+                    timerCard.remove();
+                    
+                    // Show empty state if no timers left
+                    if (timersContainer.children.length === 0) {
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'empty-state';
+                        emptyState.innerHTML = `
+                            <h3>No timers yet</h3>
+                            <p>Click "Add New Activity Timer" to create your first timer</p>
+                        `;
+                        timersContainer.appendChild(emptyState);
+                    }
+                    
+                    // If sequence is running, stop it
+                    if (isSequenceRunning) {
+                        isSequenceRunning = false;
+                    }
+                }
+
+                // Event listeners
+                hoursInput.addEventListener('change', updateTotalSeconds);
+                minutesInput.addEventListener('change', function() {
+                    if (this.value > 59) this.value = 59;
+                    if (this.value < 0) this.value = 0;
+                    updateTotalSeconds();
+                });
+                secondsInput.addEventListener('change', function() {
+                    if (this.value > 59) this.value = 59;
+                    if (this.value < 0) this.value = 0;
+                    updateTotalSeconds();
+                });
+                
+                startBtn.addEventListener('click', startTimer);
+                pauseBtn.addEventListener('click', pauseTimer);
+                resetBtn.addEventListener('click', resetTimer);
+                deleteBtn.addEventListener('click', deleteTimer);
+
+                // Initialize display
+                updateDisplay();
+            }
+
+            // Initialize total timer display
+            updateTotalDisplay();
+        });
+    </script>
+</body>
+</html>

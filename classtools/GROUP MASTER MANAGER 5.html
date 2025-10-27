@@ -1,0 +1,2168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroupGenius - Student Group Maker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        :root {
+            --primary: #6a11cb;
+            --primary-light: #8a2be2;
+            --secondary: #ff6b6b;
+            --accent: #4ecdc4;
+            --light: #f7f9fc;
+            --dark: #2d3748;
+            --success: #51cf66;
+            --warning: #ffd43b;
+            --danger: #ff6b6b;
+            --text: #2d3748;
+        }
+
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: var(--light);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 25px;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        h1 {
+            font-size: 3.2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to right, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            margin-right: 15px;
+            color: var(--secondary);
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--secondary);
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .upload-area {
+            width: 100%;
+            max-width: 600px;
+            height: 220px;
+            border: 3px dashed rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .upload-area:hover {
+            border-color: var(--success);
+            background: rgba(81, 207, 102, 0.1);
+        }
+
+        .upload-area i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: var(--success);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: var(--primary-light);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: var(--dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn-accent {
+            background: var(--accent);
+        }
+
+        .btn-export {
+            background: #9c27b0;
+        }
+
+        .student-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .student-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .student-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--accent);
+        }
+
+        .student-card:hover {
+            transform: translateY(-8px) scale(1.03);
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .student-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 1.8rem;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 25px;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+
+        .group-selector {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px 20px;
+            border-radius: 50px;
+        }
+
+        .group-selector select {
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark);
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .groups-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .group-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            animation: slideUp 0.5s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .group-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: var(--secondary);
+        }
+
+        .group-card:nth-child(2n)::before {
+            background: var(--accent);
+        }
+
+        .group-card:nth-child(3n)::before {
+            background: var(--success);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .group-name {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--secondary);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .group-name-input {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid var(--accent);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            width: 180px;
+        }
+
+        .group-name-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        .group-name-edit {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .group-name-edit:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+
+        .points-display {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--warning);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .group-members {
+            margin: 20px 0;
+        }
+
+        .member {
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .member:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .member-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 1rem;
+            color: white;
+        }
+
+        .member-info {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .member-points {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-left: 10px;
+            font-weight: 600;
+            color: var(--warning);
+        }
+
+        .member-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .member-action {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .member-action:hover {
+            opacity: 1;
+            transform: scale(1.2);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .group-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .group-actions .btn {
+            flex: 1;
+            justify-content: center;
+            padding: 10px 15px;
+            font-size: 0.95rem;
+        }
+
+        .praise-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            font-style: italic;
+            min-height: 60px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .student-praise {
+            font-size: 0.9rem;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid var(--success);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: rgba(40, 40, 70, 0.95);
+            border-radius: 20px;
+            padding: 35px;
+            width: 90%;
+            max-width: 550px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            animation: modalAppear 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .modal-title {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: var(--secondary);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .close-modal:hover {
+            transform: scale(1.2);
+            color: var(--accent);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        textarea.form-control {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            background-color: var(--accent);
+            opacity: 0;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .sound-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: white;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .sound-toggle:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Context Menu Styles */
+        .context-menu {
+            position: fixed;
+            background: rgba(50, 50, 80, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            min-width: 180px;
+            padding: 8px 0;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .context-menu-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 5px 0;
+        }
+
+        .context-submenu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: rgba(50, 50, 80, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            min-width: 180px;
+            padding: 8px 0;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .context-menu-item.has-submenu {
+            position: relative;
+        }
+
+        .context-menu-item.has-submenu::after {
+            content: "▶";
+            margin-left: auto;
+            font-size: 0.8rem;
+        }
+
+        /* Selection Mode Styles */
+        .selection-mode-indicator {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .selection-mode-indicator.active {
+            background: rgba(81, 207, 102, 0.3);
+            box-shadow: 0 0 15px rgba(81, 207, 102, 0.4);
+        }
+
+        .student-card.selected {
+            background: rgba(81, 207, 102, 0.3);
+            box-shadow: 0 0 15px rgba(81, 207, 102, 0.4);
+        }
+
+        .student-card.selected::before {
+            background: var(--success);
+        }
+
+        .student-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .student-card.selected .student-checkbox {
+            background: var(--success);
+        }
+
+        .student-card.selected .student-checkbox::after {
+            content: "✓";
+            color: white;
+            font-weight: bold;
+        }
+
+        .paste-input-container {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 20px;
+        }
+
+        .paste-input-container textarea {
+            width: 100%;
+            height: 150px;
+            border-radius: 12px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+        }
+
+        .paste-input-container textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .paste-instructions {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        .multi-select-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes modalAppear {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .bounce {
+            animation: bounce 0.5s ease infinite;
+        }
+
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .groups-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .student-list {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            }
+        }
+
+        .group-badge {
+            display: inline-block;
+            background: var(--secondary);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        .trophy {
+            color: var(--warning);
+            margin-right: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            opacity: 0.7;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+
+        .instruction-text {
+            text-align: center;
+            margin-top: 15px;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .export-section {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <button class="sound-toggle" id="soundToggle">
+        <i class="fas fa-volume-up"></i>
+    </button>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item has-submenu" id="addToGroupItem">
+            <i class="fas fa-user-plus"></i> Add to Group
+            <div class="context-submenu" id="groupSubmenu">
+                <!-- Group options will be populated here -->
+            </div>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item has-submenu" id="moveToGroupItem">
+            <i class="fas fa-exchange-alt"></i> Move to Group
+            <div class="context-submenu" id="moveGroupSubmenu">
+                <!-- Group options will be populated here -->
+            </div>
+        </div>
+        <div class="context-menu-item" id="removeFromGroupItem">
+            <i class="fas fa-user-minus"></i> Remove from Group
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-users logo"></i>GroupGenius</h1>
+            <p class="subtitle">Create dynamic student groups and track their progress with our interactive points system and sound effects!</p>
+        </header>
+
+        <div class="card upload-section">
+            <h2 class="card-title"><i class="fas fa-file-upload"></i>Upload Student List</h2>
+            <div class="upload-area" id="uploadArea">
+                <i class="fas fa-file-csv floating"></i>
+                <h3>Upload Your CSV File</h3>
+                <p>Click to upload or drag and drop your CSV file here</p>
+                <p class="subtitle">File should have one student name per line</p>
+            </div>
+            <input type="file" id="fileInput" class="file-input" accept=".csv">
+            
+            <div class="paste-input-container">
+                <h3 style="text-align: center; margin-bottom: 15px;">Or Paste Student Names</h3>
+                <textarea id="pasteInput" placeholder="Paste student names here, one per line&#10;Example:&#10;John Smith&#10;Jane Doe&#10;Michael Johnson"></textarea>
+                <p class="paste-instructions">Enter one student name per line, then click the button below to import</p>
+                <div style="text-align: center; margin-top: 15px;">
+                    <button class="btn btn-accent" id="pasteImportBtn">
+                        <i class="fas fa-paste"></i> Import Pasted Names
+                    </button>
+                </div>
+            </div>
+            
+            <button class="btn btn-accent" id="sampleDataBtn">
+                <i class="fas fa-magic"></i> Use Sample Data
+            </button>
+        </div>
+
+        <div class="card" id="studentListCard" style="display: none;">
+            <h2 class="card-title"><i class="fas fa-user-graduate"></i>Student List</h2>
+            
+            <div class="selection-mode-indicator" id="selectionIndicator" style="display: none;">
+                <i class="fas fa-mouse-pointer"></i>
+                <span id="selectedCount">0 students selected</span>
+                <button class="btn btn-success" id="addSelectedToGroupBtn" style="padding: 8px 16px; font-size: 0.9rem;">
+                    <i class="fas fa-user-plus"></i> Add Selected to Group
+                </button>
+                <button class="btn btn-danger" id="clearSelectionBtn" style="padding: 8px 16px; font-size: 0.9rem;">
+                    <i class="fas fa-times"></i> Clear Selection
+                </button>
+            </div>
+            
+            <div class="multi-select-actions">
+                <button class="btn btn-accent" id="toggleSelectionModeBtn">
+                    <i class="fas fa-mouse-pointer"></i> Toggle Selection Mode
+                </button>
+                <button class="btn btn-warning" id="selectAllBtn" style="display: none;">
+                    <i class="fas fa-check-square"></i> Select All
+                </button>
+                <button class="btn btn-warning" id="deselectAllBtn" style="display: none;">
+                    <i class="fas fa-times-circle"></i> Deselect All
+                </button>
+            </div>
+            
+            <div class="student-list" id="studentList">
+                <!-- Student cards will be generated here -->
+            </div>
+
+            <div class="controls">
+                <div class="group-selector">
+                    <label for="groupCount"><i class="fas fa-layer-group"></i> Number of Groups:</label>
+                    <select id="groupCount">
+                        <option value="1">1 Group</option>
+                        <option value="2">2 Groups</option>
+                        <option value="3">3 Groups</option>
+                        <option value="4" selected>4 Groups</option>
+                        <option value="5">5 Groups</option>
+                        <option value="6">6 Groups</option>
+                        <option value="7">7 Groups</option>
+                        <option value="8">8 Groups</option>
+                        <option value="9">9 Groups</option>
+                        <option value="10">10 Groups</option>
+                    </select>
+                </div>
+                <button class="btn btn-success pulse" id="sortBtn">
+                    <i class="fas fa-random"></i> Auto-Sort Groups
+                </button>
+                <button class="btn btn-accent" id="createGroupsBtn">
+                    <i class="fas fa-plus"></i> Create Empty Groups
+                </button>
+            </div>
+            <p class="instruction-text">Right-click on students to manually add them to groups after creating groups</p>
+        </div>
+
+        <div class="card" id="groupsCard" style="display: none;">
+            <h2 class="card-title"><i class="fas fa-object-group"></i>Student Groups</h2>
+            <div class="groups-container" id="groupsContainer">
+                <!-- Group cards will be generated here -->
+            </div>
+            
+            <!-- Export Section -->
+            <div class="export-section">
+                <button class="btn btn-export" id="exportBtn">
+                    <i class="fas fa-file-export"></i> Export Group Data to Excel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="groupPraiseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="groupPraiseTitle">Give Praise to Group</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="groupPraiseText"><i class="fas fa-heart"></i> Praise Message:</label>
+                <textarea class="form-control" id="groupPraiseText" placeholder="Enter your praise message here..."></textarea>
+            </div>
+            <button class="btn btn-success" id="saveGroupPraise">Save Praise</button>
+        </div>
+    </div>
+
+    <div class="modal" id="studentPraiseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="studentPraiseTitle">Give Praise to Student</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="studentPraiseText"><i class="fas fa-star"></i> Praise Message:</label>
+                <textarea class="form-control" id="studentPraiseText" placeholder="Enter your praise message here..."></textarea>
+            </div>
+            <button class="btn btn-success" id="saveStudentPraise">Save Praise</button>
+        </div>
+    </div>
+
+    <!-- Group Selection Modal for Multiple Students -->
+    <div class="modal" id="groupSelectionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add Selected Students to Group</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="groupSelect"><i class="fas fa-users"></i> Select Group:</label>
+                <select class="form-control" id="groupSelect">
+                    <!-- Groups will be populated here -->
+                </select>
+            </div>
+            <div class="form-group">
+                <p id="selectedStudentsList"></p>
+            </div>
+            <button class="btn btn-success" id="confirmAddToGroup">
+                <i class="fas fa-user-plus"></i> Add Students to Group
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Sample student data (removed - now empty)
+        const sampleStudents = [];
+
+        // Diverse group names (not just E)
+        const groupNames = [
+            "Alpha", "Bravo", "Charlie", "Delta", "Echo",
+            "Falcon", "Galaxy", "Horizon", "Infinity", "Jupiter"
+        ];
+
+        // DOM elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const sampleDataBtn = document.getElementById('sampleDataBtn');
+        const studentListCard = document.getElementById('studentListCard');
+        const studentList = document.getElementById('studentList');
+        const groupCount = document.getElementById('groupCount');
+        const sortBtn = document.getElementById('sortBtn');
+        const createGroupsBtn = document.getElementById('createGroupsBtn');
+        const groupsCard = document.getElementById('groupsCard');
+        const groupsContainer = document.getElementById('groupsContainer');
+        const groupPraiseModal = document.getElementById('groupPraiseModal');
+        const studentPraiseModal = document.getElementById('studentPraiseModal');
+        const closeModalButtons = document.querySelectorAll('.close-modal');
+        const saveGroupPraise = document.getElementById('saveGroupPraise');
+        const saveStudentPraise = document.getElementById('saveStudentPraise');
+        const soundToggle = document.getElementById('soundToggle');
+        const contextMenu = document.getElementById('contextMenu');
+        const groupSubmenu = document.getElementById('groupSubmenu');
+        const moveGroupSubmenu = document.getElementById('moveGroupSubmenu');
+        const addToGroupItem = document.getElementById('addToGroupItem');
+        const moveToGroupItem = document.getElementById('moveToGroupItem');
+        const removeFromGroupItem = document.getElementById('removeFromGroupItem');
+        const exportBtn = document.getElementById('exportBtn');
+        const pasteInput = document.getElementById('pasteInput');
+        const pasteImportBtn = document.getElementById('pasteImportBtn');
+        const toggleSelectionModeBtn = document.getElementById('toggleSelectionModeBtn');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const deselectAllBtn = document.getElementById('deselectAllBtn');
+        const selectionIndicator = document.getElementById('selectionIndicator');
+        const selectedCount = document.getElementById('selectedCount');
+        const addSelectedToGroupBtn = document.getElementById('addSelectedToGroupBtn');
+        const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+        const groupSelectionModal = document.getElementById('groupSelectionModal');
+        const groupSelect = document.getElementById('groupSelect');
+        const selectedStudentsList = document.getElementById('selectedStudentsList');
+        const confirmAddToGroup = document.getElementById('confirmAddToGroup');
+
+        // State
+        let students = [];
+        let groups = [];
+        let currentGroupForPraise = null;
+        let currentStudentForPraise = null;
+        let soundEnabled = true;
+        let selectedStudent = null;
+        let selectedStudentOrigin = null; // 'studentList' or group index
+        let selectionMode = false;
+        let selectedStudents = new Set();
+        let editingGroupIndex = -1;
+
+        // Sound effects
+        const sounds = {
+            click: null,
+            success: null,
+            error: null,
+            cheer: null,
+            points: null
+        };
+
+        // Initialize sound effects with simple tones
+        function initSounds() {
+            // Click sound (short beep)
+            sounds.click = createBeep(800, 0.1);
+            
+            // Success sound (rising tone)
+            sounds.success = createBeep(600, 0.3);
+            
+            // Error sound (falling tone)
+            sounds.error = createBeep(400, 0.3);
+            
+            // Cheer sound (multiple tones)
+            sounds.cheer = createCheerSound();
+            
+            // Points sound (coin-like)
+            sounds.points = createPointsSound();
+        }
+
+        // Create a simple beep sound using Web Audio API
+        function createBeep(frequency, duration) {
+            return { 
+                play: () => {
+                    if (!soundEnabled) return;
+                    
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.value = frequency;
+                        oscillator.type = 'sine';
+                        
+                        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                        gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.01);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + duration);
+                    } catch (e) {
+                        console.log("Audio context not supported");
+                    }
+                }
+            };
+        }
+
+        // Create a cheer sound with multiple tones
+        function createCheerSound() {
+            return {
+                play: () => {
+                    if (!soundEnabled) return;
+                    createBeep(523, 0.1).play();
+                    setTimeout(() => createBeep(659, 0.1).play(), 100);
+                    setTimeout(() => createBeep(784, 0.1).play(), 200);
+                    setTimeout(() => createBeep(1047, 0.2).play(), 300);
+                }
+            };
+        }
+
+        // Create a points sound (coin-like)
+        function createPointsSound() {
+            return {
+                play: () => {
+                    if (!soundEnabled) return;
+                    createBeep(1319, 0.1).play();
+                    setTimeout(() => createBeep(1568, 0.2).play(), 150);
+                }
+            };
+        }
+
+        // Play sound effect
+        function playSound(soundName) {
+            if (sounds[soundName]) {
+                sounds[soundName].play();
+            }
+        }
+
+        // Event listeners
+        uploadArea.addEventListener('click', () => {
+            playSound('click');
+            fileInput.click();
+        });
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'var(--success)';
+            uploadArea.style.background = 'rgba(81, 207, 102, 0.1)';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            uploadArea.style.background = 'transparent';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            uploadArea.style.background = 'transparent';
+            
+            if (e.dataTransfer.files.length) {
+                playSound('success');
+                processCSVFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                playSound('success');
+                processCSVFile(e.target.files[0]);
+            }
+        });
+
+        sampleDataBtn.addEventListener('click', () => {
+            playSound('click');
+            // Add some sample data when requested
+            students = [
+                "Emma Johnson", "Noah Smith", "Olivia Williams", "Liam Brown", "Ava Jones",
+                "William Garcia", "Sophia Miller", "Mason Davis", "Isabella Rodriguez", "James Martinez",
+                "Mia Hernandez", "Benjamin Lopez", "Charlotte Gonzalez", "Jacob Wilson", "Amelia Anderson"
+            ];
+            displayStudents();
+        });
+
+        pasteImportBtn.addEventListener('click', () => {
+            playSound('click');
+            importPastedNames();
+        });
+
+        toggleSelectionModeBtn.addEventListener('click', () => {
+            playSound('click');
+            toggleSelectionMode();
+        });
+
+        selectAllBtn.addEventListener('click', () => {
+            playSound('click');
+            selectAllStudents();
+        });
+
+        deselectAllBtn.addEventListener('click', () => {
+            playSound('click');
+            deselectAllStudents();
+        });
+
+        addSelectedToGroupBtn.addEventListener('click', () => {
+            playSound('click');
+            openGroupSelectionModal();
+        });
+
+        clearSelectionBtn.addEventListener('click', () => {
+            playSound('click');
+            clearSelection();
+        });
+
+        confirmAddToGroup.addEventListener('click', () => {
+            playSound('success');
+            addSelectedStudentsToGroup();
+        });
+
+        sortBtn.addEventListener('click', () => {
+            playSound('click');
+            sortStudentsIntoGroups();
+        });
+
+        createGroupsBtn.addEventListener('click', () => {
+            playSound('click');
+            createEmptyGroups();
+        });
+
+        closeModalButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                playSound('click');
+                groupPraiseModal.style.display = 'none';
+                studentPraiseModal.style.display = 'none';
+                groupSelectionModal.style.display = 'none';
+            });
+        });
+
+        saveGroupPraise.addEventListener('click', () => {
+            playSound('success');
+            saveGroupPraiseHandler();
+        });
+
+        saveStudentPraise.addEventListener('click', () => {
+            playSound('success');
+            saveStudentPraiseHandler();
+        });
+
+        soundToggle.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            if (soundEnabled) {
+                soundToggle.innerHTML = '<i class="fas fa-volume-up"></i>';
+                playSound('success');
+            } else {
+                soundToggle.innerHTML = '<i class="fas fa-volume-mute"></i>';
+                playSound('click');
+            }
+        });
+
+        exportBtn.addEventListener('click', () => {
+            playSound('success');
+            exportGroupData();
+        });
+
+        // Context menu event listeners
+        document.addEventListener('click', (e) => {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.style.display = 'none';
+                groupSubmenu.style.display = 'none';
+                moveGroupSubmenu.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('contextmenu', (e) => {
+            // Only prevent default for student cards and members
+            if (e.target.closest('.student-card') || e.target.closest('.member')) {
+                e.preventDefault();
+            }
+        });
+
+        // Handle context menu item hover for submenus
+        addToGroupItem.addEventListener('mouseenter', () => {
+            if (contextMenu.style.display === 'block') {
+                groupSubmenu.style.display = 'block';
+                moveGroupSubmenu.style.display = 'none';
+            }
+        });
+
+        moveToGroupItem.addEventListener('mouseenter', () => {
+            if (contextMenu.style.display === 'block') {
+                moveGroupSubmenu.style.display = 'block';
+                groupSubmenu.style.display = 'none';
+            }
+        });
+
+        // Close submenus when mouse leaves context menu
+        contextMenu.addEventListener('mouseleave', () => {
+            setTimeout(() => {
+                if (!contextMenu.matches(':hover')) {
+                    groupSubmenu.style.display = 'none';
+                    moveGroupSubmenu.style.display = 'none';
+                }
+            }, 200);
+        });
+
+        groupSubmenu.addEventListener('mouseleave', () => {
+            setTimeout(() => {
+                if (!groupSubmenu.matches(':hover')) {
+                    groupSubmenu.style.display = 'none';
+                }
+            }, 200);
+        });
+
+        moveGroupSubmenu.addEventListener('mouseleave', () => {
+            setTimeout(() => {
+                if (!moveGroupSubmenu.matches(':hover')) {
+                    moveGroupSubmenu.style.display = 'none';
+                }
+            }, 200);
+        });
+
+        removeFromGroupItem.addEventListener('click', () => {
+            if (selectedStudent && selectedStudentOrigin !== 'studentList') {
+                removeStudentFromGroup(selectedStudent, selectedStudentOrigin);
+                contextMenu.style.display = 'none';
+            }
+        });
+
+        // Functions
+        function processCSVFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                students = content.split('\n')
+                    .map(name => name.trim())
+                    .filter(name => name.length > 0);
+                displayStudents();
+            };
+            reader.readAsText(file);
+        }
+
+        function importPastedNames() {
+            const content = pasteInput.value;
+            if (!content.trim()) {
+                alert("Please paste some student names first.");
+                playSound('error');
+                return;
+            }
+            
+            const newStudents = content.split('\n')
+                .map(name => name.trim())
+                .filter(name => name.length > 0);
+            
+            if (newStudents.length === 0) {
+                alert("No valid student names found. Please enter one name per line.");
+                playSound('error');
+                return;
+            }
+            
+            // Add to existing students or replace?
+            if (students.length === 0) {
+                students = newStudents;
+            } else {
+                if (confirm(`You currently have ${students.length} students. Do you want to add these ${newStudents.length} new students to the list?`)) {
+                    students = [...students, ...newStudents];
+                } else {
+                    students = newStudents;
+                }
+            }
+            
+            displayStudents();
+            playSound('success');
+            createConfetti(10);
+        }
+
+        function toggleSelectionMode() {
+            selectionMode = !selectionMode;
+            
+            if (selectionMode) {
+                selectionIndicator.style.display = 'flex';
+                selectAllBtn.style.display = 'inline-flex';
+                deselectAllBtn.style.display = 'inline-flex';
+                toggleSelectionModeBtn.innerHTML = '<i class="fas fa-mouse-pointer"></i> Exit Selection Mode';
+                toggleSelectionModeBtn.classList.add('btn-warning');
+                updateSelectionIndicator();
+            } else {
+                selectionIndicator.style.display = 'none';
+                selectAllBtn.style.display = 'none';
+                deselectAllBtn.style.display = 'none';
+                toggleSelectionModeBtn.innerHTML = '<i class="fas fa-mouse-pointer"></i> Toggle Selection Mode';
+                toggleSelectionModeBtn.classList.remove('btn-warning');
+                clearSelection();
+            }
+            
+            displayStudents();
+        }
+
+        function selectAllStudents() {
+            students.forEach(student => {
+                selectedStudents.add(student);
+            });
+            updateSelectionIndicator();
+            displayStudents();
+            playSound('success');
+        }
+
+        function deselectAllStudents() {
+            selectedStudents.clear();
+            updateSelectionIndicator();
+            displayStudents();
+            playSound('click');
+        }
+
+        function clearSelection() {
+            selectedStudents.clear();
+            updateSelectionIndicator();
+            displayStudents();
+        }
+
+        function updateSelectionIndicator() {
+            const count = selectedStudents.size;
+            selectedCount.textContent = `${count} student${count !== 1 ? 's' : ''} selected`;
+            
+            if (count > 0) {
+                selectionIndicator.classList.add('active');
+                addSelectedToGroupBtn.disabled = false;
+            } else {
+                selectionIndicator.classList.remove('active');
+                addSelectedToGroupBtn.disabled = true;
+            }
+        }
+
+        function openGroupSelectionModal() {
+            if (groups.length === 0) {
+                alert("Please create groups first before adding students.");
+                playSound('error');
+                return;
+            }
+            
+            // Populate group select dropdown
+            groupSelect.innerHTML = '';
+            groups.forEach((group, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${group.name} (${group.members.length} members)`;
+                groupSelect.appendChild(option);
+            });
+            
+            // Show selected students
+            const studentList = Array.from(selectedStudents).slice(0, 10); // Show first 10
+            let listHTML = `<strong>Selected Students (${selectedStudents.size}):</strong><br>`;
+            listHTML += studentList.map(student => `• ${student}`).join('<br>');
+            
+            if (selectedStudents.size > 10) {
+                listHTML += `<br>... and ${selectedStudents.size - 10} more`;
+            }
+            
+            selectedStudentsList.innerHTML = listHTML;
+            
+            groupSelectionModal.style.display = 'flex';
+        }
+
+        function addSelectedStudentsToGroup() {
+            const groupIndex = parseInt(groupSelect.value);
+            
+            if (isNaN(groupIndex) || groupIndex < 0 || groupIndex >= groups.length) {
+                alert("Please select a valid group.");
+                playSound('error');
+                return;
+            }
+            
+            // Add selected students to the group
+            let addedCount = 0;
+            selectedStudents.forEach(student => {
+                // Check if student is still in the student list
+                const studentIndex = students.indexOf(student);
+                if (studentIndex !== -1) {
+                    // Remove from students array
+                    students.splice(studentIndex, 1);
+                    
+                    // Add to group
+                    groups[groupIndex].members.push({
+                        name: student,
+                        praise: '',
+                        points: 0
+                    });
+                    
+                    addedCount++;
+                }
+            });
+            
+            // Clear selection and update displays
+            clearSelection();
+            displayStudents();
+            displayGroups();
+            
+            groupSelectionModal.style.display = 'none';
+            
+            playSound('success');
+            createConfetti(addedCount * 2);
+            
+            alert(`Successfully added ${addedCount} students to ${groups[groupIndex].name}!`);
+        }
+
+        function displayStudents() {
+            studentList.innerHTML = '';
+            
+            if (students.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.innerHTML = `
+                    <i class="fas fa-user-graduate"></i>
+                    <h3>No Students Yet</h3>
+                    <p>Upload a CSV file, paste names, or use sample data to get started</p>
+                `;
+                studentList.appendChild(emptyState);
+            } else {
+                students.forEach((student, index) => {
+                    const studentCard = document.createElement('div');
+                    studentCard.className = 'student-card';
+                    if (selectedStudents.has(student)) {
+                        studentCard.classList.add('selected');
+                    }
+                    
+                    const firstLetter = student.charAt(0);
+                    studentCard.innerHTML = `
+                        <div class="student-checkbox"></div>
+                        <div class="student-avatar">
+                            ${firstLetter}
+                        </div>
+                        <h3>${student}</h3>
+                    `;
+                    
+                    // Add click event for selection mode
+                    if (selectionMode) {
+                        studentCard.addEventListener('click', (e) => {
+                            if (selectedStudents.has(student)) {
+                                selectedStudents.delete(student);
+                            } else {
+                                selectedStudents.add(student);
+                            }
+                            updateSelectionIndicator();
+                            displayStudents();
+                            playSound('click');
+                        });
+                    } else {
+                        // Add right-click context menu
+                        studentCard.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            selectedStudent = student;
+                            selectedStudentOrigin = 'studentList';
+                            
+                            // Position the context menu at the mouse pointer
+                            showContextMenu(e.clientX, e.clientY);
+                            
+                            // Populate group submenu
+                            populateGroupSubmenu();
+                            
+                            playSound('click');
+                        });
+                    }
+                    
+                    studentList.appendChild(studentCard);
+                });
+            }
+            
+            studentListCard.style.display = 'block';
+            if (students.length > 0) {
+                createConfetti(10);
+                playSound('cheer');
+            }
+        }
+
+        function showContextMenu(x, y) {
+            // First display the menu to calculate its dimensions
+            contextMenu.style.display = 'block';
+            
+            // Get menu dimensions
+            const menuRect = contextMenu.getBoundingClientRect();
+            const menuWidth = menuRect.width;
+            const menuHeight = menuRect.height;
+            
+            // Get viewport dimensions
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            // Adjust position if menu would go off-screen
+            let adjustedX = x;
+            let adjustedY = y;
+            
+            // Check right edge
+            if (x + menuWidth > viewportWidth) {
+                adjustedX = viewportWidth - menuWidth - 10;
+            }
+            
+            // Check bottom edge
+            if (y + menuHeight > viewportHeight) {
+                adjustedY = viewportHeight - menuHeight - 10;
+            }
+            
+            // Check left edge
+            if (adjustedX < 0) {
+                adjustedX = 10;
+            }
+            
+            // Check top edge
+            if (adjustedY < 0) {
+                adjustedY = 10;
+            }
+            
+            // Position the menu
+            contextMenu.style.left = `${adjustedX}px`;
+            contextMenu.style.top = `${adjustedY}px`;
+        }
+
+        function createEmptyGroups() {
+            const numGroups = parseInt(groupCount.value);
+            groups = Array.from({ length: numGroups }, (_, index) => ({
+                name: groupNames[index],
+                members: [],
+                points: 0,
+                praise: ''
+            }));
+            
+            displayGroups();
+            groupsCard.style.display = 'block';
+            playSound('success');
+            createConfetti(10);
+        }
+
+        function populateGroupSubmenu() {
+            groupSubmenu.innerHTML = '';
+            moveGroupSubmenu.innerHTML = '';
+            
+            if (groups.length === 0) {
+                const noGroupsItem = document.createElement('div');
+                noGroupsItem.className = 'context-menu-item';
+                noGroupsItem.innerHTML = `<i class="fas fa-exclamation-circle"></i> No Groups Created`;
+                noGroupsItem.style.opacity = '0.6';
+                groupSubmenu.appendChild(noGroupsItem);
+                
+                const noGroupsItem2 = document.createElement('div');
+                noGroupsItem2.className = 'context-menu-item';
+                noGroupsItem2.innerHTML = `<i class="fas fa-exclamation-circle"></i> No Groups Created`;
+                noGroupsItem2.style.opacity = '0.6';
+                moveGroupSubmenu.appendChild(noGroupsItem2);
+            } else {
+                groups.forEach((group, index) => {
+                    // For adding to groups
+                    const groupItem = document.createElement('div');
+                    groupItem.className = 'context-menu-item';
+                    groupItem.innerHTML = `<i class="fas fa-users"></i> ${group.name}`;
+                    groupItem.addEventListener('click', () => {
+                        addStudentToGroup(selectedStudent, index);
+                    });
+                    groupSubmenu.appendChild(groupItem);
+                    
+                    // For moving between groups (only show if student is already in a group)
+                    if (selectedStudentOrigin !== 'studentList') {
+                        const moveGroupItem = document.createElement('div');
+                        moveGroupItem.className = 'context-menu-item';
+                        moveGroupItem.innerHTML = `<i class="fas fa-users"></i> ${group.name}`;
+                        moveGroupItem.addEventListener('click', () => {
+                            // Don't allow moving to the same group
+                            if (index !== selectedStudentOrigin) {
+                                moveStudentToGroup(selectedStudent, selectedStudentOrigin, index);
+                            }
+                        });
+                        moveGroupSubmenu.appendChild(moveGroupItem);
+                    }
+                });
+            }
+            
+            // Show/hide menu items based on context
+            if (selectedStudentOrigin === 'studentList') {
+                addToGroupItem.style.display = 'flex';
+                moveToGroupItem.style.display = 'none';
+                removeFromGroupItem.style.display = 'none';
+            } else {
+                addToGroupItem.style.display = 'none';
+                moveToGroupItem.style.display = 'flex';
+                removeFromGroupItem.style.display = 'flex';
+            }
+        }
+
+        function addStudentToGroup(student, groupIndex) {
+            // Remove from students array
+            const studentIndex = students.indexOf(student);
+            if (studentIndex !== -1) {
+                students.splice(studentIndex, 1);
+                
+                // Add to group with individual points initialized to 0
+                groups[groupIndex].members.push({
+                    name: student,
+                    praise: '',
+                    points: 0
+                });
+                
+                // Update displays
+                displayStudents();
+                displayGroups();
+                
+                playSound('success');
+                createConfetti(5);
+            }
+            contextMenu.style.display = 'none';
+        }
+
+        function moveStudentToGroup(student, fromGroupIndex, toGroupIndex) {
+            // Find student in source group
+            const studentIndex = groups[fromGroupIndex].members.findIndex(m => m.name === student);
+            if (studentIndex !== -1) {
+                // Remove from source group
+                const [studentData] = groups[fromGroupIndex].members.splice(studentIndex, 1);
+                
+                // Add to target group
+                groups[toGroupIndex].members.push(studentData);
+                
+                // Update displays
+                displayGroups();
+                
+                playSound('success');
+                createConfetti(5);
+            }
+            contextMenu.style.display = 'none';
+        }
+
+        function removeStudentFromGroup(student, groupIndex) {
+            // Find student in group
+            const studentIndex = groups[groupIndex].members.findIndex(m => m.name === student);
+            if (studentIndex !== -1) {
+                // Remove from group
+                const [studentData] = groups[groupIndex].members.splice(studentIndex, 1);
+                
+                // Add back to students array (without individual points)
+                students.push(studentData.name);
+                
+                // Update displays
+                displayStudents();
+                displayGroups();
+                
+                playSound('success');
+                createConfetti(5);
+            }
+            contextMenu.style.display = 'none';
+        }
+
+        function sortStudentsIntoGroups() {
+            if (students.length === 0) {
+                alert("Please add students first before sorting into groups.");
+                playSound('error');
+                return;
+            }
+            
+            const numGroups = parseInt(groupCount.value);
+            groups = Array.from({ length: numGroups }, (_, index) => ({
+                name: groupNames[index],
+                members: [],
+                points: 0,
+                praise: ''
+            }));
+            
+            // Shuffle students
+            const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
+            
+            // Distribute students evenly
+            for (let i = 0; i < shuffledStudents.length; i++) {
+                const groupIndex = i % numGroups;
+                groups[groupIndex].members.push({
+                    name: shuffledStudents[i],
+                    praise: '',
+                    points: 0
+                });
+            }
+            
+            // Clear the student list as all students are now in groups
+            students = [];
+            
+            displayGroups();
+            displayStudents(); // This will now show an empty list
+            groupsCard.style.display = 'block';
+            createConfetti(30);
+            playSound('cheer');
+        }
+
+        function displayGroups() {
+            groupsContainer.innerHTML = '';
+            
+            if (groups.length === 0 || groups.every(group => group.members.length === 0)) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.innerHTML = `
+                    <i class="fas fa-users"></i>
+                    <h3>No Groups Yet</h3>
+                    <p>Sort students into groups or create empty groups to get started</p>
+                `;
+                groupsContainer.appendChild(emptyState);
+                return;
+            }
+            
+            groups.forEach((group, index) => {
+                const groupCard = document.createElement('div');
+                groupCard.className = 'group-card';
+                
+                // Check if we're currently editing this group
+                const isEditing = editingGroupIndex === index;
+                
+                groupCard.innerHTML = `
+                    <div class="group-header">
+                        <div class="group-name">
+                            ${isEditing ? 
+                                `<input type="text" class="group-name-input" value="${group.name}" id="groupNameInput-${index}">` : 
+                                `<span>${group.name}</span>`
+                            }
+                            <button class="group-name-edit" data-group="${index}" title="Edit Group Name">
+                                <i class="fas ${isEditing ? 'fa-check' : 'fa-edit'}"></i>
+                            </button>
+                        </div>
+                        <div class="points-display"><i class="fas fa-trophy trophy"></i>${group.points}</div>
+                    </div>
+                    <div class="group-members">
+                        ${group.members.length > 0 ? 
+                            group.members.map(member => `
+                                <div class="member" data-student="${member.name}">
+                                    <div class="member-info">
+                                        <div class="member-avatar">${member.name.charAt(0)}</div>
+                                        <span>${member.name}</span>
+                                        <div class="member-points">
+                                            <i class="fas fa-star"></i>${member.points}
+                                        </div>
+                                    </div>
+                                    <div class="member-actions">
+                                        <button class="member-action add-student-point" title="Add Point to Student">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                        <button class="member-action remove-student-point" title="Remove Point from Student">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
+                                        <button class="member-action praise-student" title="Praise Student">
+                                            <i class="fas fa-star"></i>
+                                        </button>
+                                    </div>
+                                    ${member.praise ? `<div class="student-praise">"${member.praise}"</div>` : ''}
+                                </div>
+                            `).join('') : 
+                            `<div class="empty-state" style="padding: 20px;">
+                                <i class="fas fa-user-plus"></i>
+                                <p>No members yet</p>
+                            </div>`
+                        }
+                    </div>
+                    <div class="praise-display">${group.praise || 'No group praise yet...'}</div>
+                    <div class="group-actions">
+                        <button class="btn btn-success add-points" data-group="${index}">
+                            <i class="fas fa-plus"></i> Add Group Point
+                        </button>
+                        <button class="btn btn-warning remove-points" data-group="${index}">
+                            <i class="fas fa-minus"></i> Remove Group Point
+                        </button>
+                        <button class="btn btn-danger praise-group" data-group="${index}">
+                            <i class="fas fa-heart"></i> Praise Group
+                        </button>
+                    </div>
+                `;
+                
+                groupsContainer.appendChild(groupCard);
+            });
+            
+            // Add event listeners to group name edit buttons
+            document.querySelectorAll('.group-name-edit').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const groupIndex = parseInt(e.target.closest('.group-name-edit').dataset.group);
+                    handleGroupNameEdit(groupIndex);
+                });
+            });
+            
+            // Add event listeners to group action buttons
+            document.querySelectorAll('.add-points').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('points');
+                    const groupIndex = parseInt(e.target.closest('.add-points').dataset.group);
+                    groups[groupIndex].points += 1;
+                    displayGroups();
+                    createConfetti(5);
+                });
+            });
+            
+            document.querySelectorAll('.remove-points').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('click');
+                    const groupIndex = parseInt(e.target.closest('.remove-points').dataset.group);
+                    if (groups[groupIndex].points > 0) {
+                        groups[groupIndex].points -= 1;
+                        displayGroups();
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.praise-group').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('click');
+                    const groupIndex = parseInt(e.target.closest('.praise-group').dataset.group);
+                    currentGroupForPraise = groupIndex;
+                    document.getElementById('groupPraiseTitle').textContent = `Give Praise to ${groups[groupIndex].name}`;
+                    document.getElementById('groupPraiseText').value = groups[groupIndex].praise;
+                    groupPraiseModal.style.display = 'flex';
+                });
+            });
+            
+            // Add event listeners to student action buttons
+            document.querySelectorAll('.add-student-point').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('points');
+                    const studentName = e.target.closest('.member').dataset.student;
+                    
+                    // Find which group and student we're updating
+                    for (let i = 0; i < groups.length; i++) {
+                        const studentIdx = groups[i].members.findIndex(m => m.name === studentName);
+                        if (studentIdx !== -1) {
+                            groups[i].members[studentIdx].points += 1;
+                            break;
+                        }
+                    }
+                    
+                    displayGroups();
+                    createConfetti(3);
+                });
+            });
+            
+            document.querySelectorAll('.remove-student-point').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('click');
+                    const studentName = e.target.closest('.member').dataset.student;
+                    
+                    // Find which group and student we're updating
+                    for (let i = 0; i < groups.length; i++) {
+                        const studentIdx = groups[i].members.findIndex(m => m.name === studentName);
+                        if (studentIdx !== -1 && groups[i].members[studentIdx].points > 0) {
+                            groups[i].members[studentIdx].points -= 1;
+                            break;
+                        }
+                    }
+                    
+                    displayGroups();
+                });
+            });
+            
+            document.querySelectorAll('.praise-student').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    playSound('click');
+                    const studentName = e.target.closest('.member').dataset.student;
+                    currentStudentForPraise = studentName;
+                    
+                    // Find which group and student we're praising
+                    let groupIndex = -1;
+                    let studentIndex = -1;
+                    
+                    for (let i = 0; i < groups.length; i++) {
+                        const studentIdx = groups[i].members.findIndex(m => m.name === studentName);
+                        if (studentIdx !== -1) {
+                            groupIndex = i;
+                            studentIndex = studentIdx;
+                            break;
+                        }
+                    }
+                    
+                    if (groupIndex !== -1 && studentIndex !== -1) {
+                        document.getElementById('studentPraiseTitle').textContent = `Give Praise to ${studentName}`;
+                        document.getElementById('studentPraiseText').value = groups[groupIndex].members[studentIndex].praise;
+                        studentPraiseModal.style.display = 'flex';
+                    }
+                });
+            });
+            
+            // Add right-click context menu to group members
+            document.querySelectorAll('.member').forEach(member => {
+                member.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    const studentName = e.target.closest('.member').dataset.student;
+                    selectedStudent = studentName;
+                    
+                    // Find which group this student is in
+                    for (let i = 0; i < groups.length; i++) {
+                        const studentIdx = groups[i].members.findIndex(m => m.name === studentName);
+                        if (studentIdx !== -1) {
+                            selectedStudentOrigin = i;
+                            break;
+                        }
+                    }
+                    
+                    // Position the context menu at the mouse pointer
+                    showContextMenu(e.clientX, e.clientY);
+                    
+                    // Populate group submenu
+                    populateGroupSubmenu();
+                    
+                    playSound('click');
+                });
+            });
+        }
+
+        function handleGroupNameEdit(groupIndex) {
+            if (editingGroupIndex === groupIndex) {
+                // Save the new group name
+                const input = document.getElementById(`groupNameInput-${groupIndex}`);
+                if (input) {
+                    const newName = input.value.trim();
+                    if (newName && newName !== groups[groupIndex].name) {
+                        groups[groupIndex].name = newName;
+                        playSound('success');
+                        createConfetti(5);
+                    }
+                }
+                editingGroupIndex = -1;
+            } else {
+                // Start editing this group
+                editingGroupIndex = groupIndex;
+                playSound('click');
+            }
+            
+            displayGroups();
+        }
+
+        function saveGroupPraiseHandler() {
+            if (currentGroupForPraise !== null) {
+                groups[currentGroupForPraise].praise = document.getElementById('groupPraiseText').value;
+                displayGroups();
+                groupPraiseModal.style.display = 'none';
+                createConfetti(10);
+                playSound('cheer');
+            }
+        }
+
+        function saveStudentPraiseHandler() {
+            if (currentStudentForPraise !== null) {
+                // Find which group and student we're praising
+                for (let i = 0; i < groups.length; i++) {
+                    const studentIdx = groups[i].members.findIndex(m => m.name === currentStudentForPraise);
+                    if (studentIdx !== -1) {
+                        groups[i].members[studentIdx].praise = document.getElementById('studentPraiseText').value;
+                        break;
+                    }
+                }
+                
+                displayGroups();
+                studentPraiseModal.style.display = 'none';
+                createConfetti(5);
+                playSound('success');
+            }
+        }
+
+        function exportGroupData() {
+            if (groups.length === 0) {
+                alert("No groups to export. Please create groups first.");
+                playSound('error');
+                return;
+            }
+
+            // Create CSV content
+            let csvContent = "Group,Student,Group Points,Student Points,Student Praise,Group Praise\n";
+            
+            groups.forEach(group => {
+                if (group.members.length > 0) {
+                    group.members.forEach(member => {
+                        const row = [
+                            `"${group.name}"`,
+                            `"${member.name}"`,
+                            group.points,
+                            member.points,
+                            `"${member.praise || ''}"`,
+                            `"${group.praise || ''}"`
+                        ].join(',');
+                        csvContent += row + '\n';
+                    });
+                } else {
+                    // Include empty groups
+                    const row = [
+                        `"${group.name}"`,
+                        '""',
+                        group.points,
+                        '0',
+                        '""',
+                        `"${group.praise || ''}"`
+                    ].join(',');
+                    csvContent += row + '\n';
+                }
+            });
+
+            // Create and download the file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute("href", url);
+            link.setAttribute("download", `student_groups_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            playSound('success');
+            createConfetti(15);
+        }
+
+        function createConfetti(count) {
+            for (let i = 0; i < count; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = getRandomColor();
+                confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        function getRandomColor() {
+            const colors = ['#6a11cb', '#8a2be2', '#ff6b6b', '#4ecdc4', '#51cf66'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        // Initialize the application
+        window.addEventListener('DOMContentLoaded', () => {
+            initSounds();
+            // Start with empty student list
+            displayStudents();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Name Selector</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #ff7e5f, #feb47b);
+            color: white;
+            text-align: center;
+            padding: 25px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .header-decoration {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.2" d="M0,96L48,112C96,128,192,160,288,186.7C384,213,480,235,576,213.3C672,192,768,128,864,128C960,128,1056,192,1152,192C1248,192,1344,128,1392,96L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+            background-size: cover;
+            opacity: 0.3;
+        }
+
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .student-list-container {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #2575fc;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .student-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .student-card {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            color: white;
+            padding: 15px 10px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .student-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .student-card.selected {
+            background: linear-gradient(135deg, #fd79a8, #e84393);
+            transform: scale(1.05);
+        }
+
+        .student-card.disabled {
+            opacity: 0.5;
+            background: linear-gradient(135deg, #b2bec3, #636e72);
+            transform: scale(0.95);
+        }
+
+        .student-card.disabled::after {
+            content: "✕";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .picker-container {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .picker-display {
+            width: 100%;
+            min-height: 200px;
+            background: white;
+            border-radius: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #2575fc;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+            position: relative;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .winner-name {
+            margin: 10px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #ffeaa7, #fab1a0);
+            border-radius: 10px;
+            animation: pulse 1s infinite;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .pick-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .pick-btn {
+            background: linear-gradient(135deg, #6c5ce7, #5f27cd);
+            color: white;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .pick-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 7px 14px rgba(0, 0, 0, 0.2);
+        }
+
+        .pick-btn:active {
+            transform: translateY(1px);
+        }
+
+        .action-btn {
+            background: white;
+            color: #6c5ce7;
+            border: 2px solid #6c5ce7;
+        }
+
+        .action-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .selection-info {
+            text-align: center;
+            color: #2575fc;
+            font-size: 1.1rem;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+
+        /* New styles for copy/paste functionality */
+        .copy-paste-container {
+            margin-top: 25px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .copy-paste-title {
+            font-size: 1.2rem;
+            color: #2575fc;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .copy-paste-area {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .copy-paste-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .copy-paste-textarea:focus {
+            outline: none;
+            border-color: #6c5ce7;
+        }
+
+        .copy-paste-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .copy-btn {
+            background: linear-gradient(135deg, #00b894, #00a085);
+            color: white;
+            flex: 1;
+        }
+
+        .paste-btn {
+            background: linear-gradient(135deg, #fd79a8, #e84393);
+            color: white;
+            flex: 1;
+        }
+
+        .copy-paste-hint {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .copy-feedback {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00b894;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #2d3436, #636e72);
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes confetti {
+            0% { transform: translateY(0) rotate(0); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+
+        .pulse {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        .winner-animation {
+            background: linear-gradient(135deg, #ffeaa7, #fab1a0) !important;
+            color: #2d3436 !important;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #fd79a8;
+            opacity: 0;
+        }
+
+        .sound-control {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sound-control:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .student-list {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .picker-display {
+                font-size: 1.8rem;
+            }
+            
+            .copy-paste-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-decoration"></div>
+            <h1>Student Name Selector</h1>
+            <p class="subtitle">Click to select/deselect students. Unselected students won't be picked.</p>
+            <div class="sound-control" id="soundControl">
+                <i class="fas fa-volume-up"></i>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div class="student-list-container">
+                <h2 class="section-title">Student List</h2>
+                <div class="student-list" id="studentList">
+                    <!-- Student cards will be generated here -->
+                </div>
+                
+                <!-- New copy/paste section -->
+                <div class="copy-paste-container">
+                    <h3 class="copy-paste-title">
+                        <i class="fas fa-clipboard"></i> Copy/Paste Student Names
+                    </h3>
+                    <div class="copy-paste-area">
+                        <textarea class="copy-paste-textarea" id="studentNamesText" placeholder="Paste student names here (one per line) or copy selected names for use elsewhere"></textarea>
+                        <div class="copy-paste-buttons">
+                            <button class="copy-btn" id="copyNamesBtn">
+                                <i class="fas fa-copy"></i> Copy Selected Names
+                            </button>
+                            <button class="paste-btn" id="pasteNamesBtn">
+                                <i class="fas fa-paste"></i> Update from Text
+                            </button>
+                        </div>
+                        <p class="copy-paste-hint">
+                            Tip: Copy selected names to use in other applications, or paste a new list of names to update the student list.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="picker-container">
+                <div class="picker-display" id="pickerDisplay">
+                    Click a button to pick students
+                </div>
+                
+                <div class="controls">
+                    <div class="pick-buttons">
+                        <button class="pick-btn" id="pick1Btn">
+                            <i class="fas fa-user"></i> Pick 1 Student
+                        </button>
+                        <button class="pick-btn" id="pick2Btn">
+                            <i class="fas fa-user-friends"></i> Pick 2 Students
+                        </button>
+                        <button class="pick-btn" id="pick3Btn">
+                            <i class="fas fa-users"></i> Pick 3 Students
+                        </button>
+                        <button class="pick-btn" id="pick4Btn">
+                            <i class="fas fa-users"></i> Pick 4 Students
+                        </button>
+                        <button class="pick-btn" id="pick5Btn">
+                            <i class="fas fa-users"></i> Pick 5 Students
+                        </button>
+                    </div>
+                    
+                    <button class="action-btn" id="selectAllBtn">
+                        <i class="fas fa-check-circle"></i> Select All
+                    </button>
+                    <button class="action-btn" id="deselectAllBtn">
+                        <i class="fas fa-times-circle"></i> Deselect All
+                    </button>
+                </div>
+                
+                <div class="selection-info" id="selectionInfo">
+                    20 students, 20 enabled
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            Created by Mr. Jason
+        </footer>
+    </div>
+
+    <!-- Copy feedback element -->
+    <div class="copy-feedback" id="copyFeedback">
+        <i class="fas fa-check-circle"></i> Names copied to clipboard!
+    </div>
+
+    <!-- Hidden audio elements for sound effects -->
+    <audio id="shuffleSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
+    </audio>
+    <audio id="winnerSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
+    </audio>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const students = [
+                "Andy C", "Robert", "Francis", "Ariel", "Fiona C",
+                "Belinda", "Jayden H", "Lucy", "Fiona D", "Jaden L",
+                "Rex", "Nicole", "Yoyo", "Angela He", "Jasper",
+                "Wincy", "Ronald", "Eelin", "Thompson", "Aiden"
+            ];
+
+            const studentList = document.getElementById('studentList');
+            const pickerDisplay = document.getElementById('pickerDisplay');
+            const pick1Btn = document.getElementById('pick1Btn');
+            const pick2Btn = document.getElementById('pick2Btn');
+            const pick3Btn = document.getElementById('pick3Btn');
+            const pick4Btn = document.getElementById('pick4Btn');
+            const pick5Btn = document.getElementById('pick5Btn');
+            const selectAllBtn = document.getElementById('selectAllBtn');
+            const deselectAllBtn = document.getElementById('deselectAllBtn');
+            const selectionInfo = document.getElementById('selectionInfo');
+            const soundControl = document.getElementById('soundControl');
+            const shuffleSound = document.getElementById('shuffleSound');
+            const winnerSound = document.getElementById('winnerSound');
+            
+            // New elements for copy/paste functionality
+            const studentNamesText = document.getElementById('studentNamesText');
+            const copyNamesBtn = document.getElementById('copyNamesBtn');
+            const pasteNamesBtn = document.getElementById('pasteNamesBtn');
+            const copyFeedback = document.getElementById('copyFeedback');
+
+            let enabledStudents = [...students];
+            let isPicking = false;
+            let soundEnabled = true;
+
+            // Initialize student cards
+            function initializeStudents() {
+                studentList.innerHTML = '';
+                students.forEach(student => {
+                    const card = document.createElement('div');
+                    card.className = 'student-card';
+                    card.textContent = student;
+                    card.dataset.name = student;
+                    
+                    card.addEventListener('click', () => {
+                        toggleStudent(card);
+                    });
+                    
+                    studentList.appendChild(card);
+                });
+                updateSelectionInfo();
+                updateTextArea();
+            }
+
+            // Toggle student selection
+            function toggleStudent(card) {
+                card.classList.toggle('disabled');
+                
+                const studentName = card.dataset.name;
+                if (card.classList.contains('disabled')) {
+                    // Remove from enabled students
+                    enabledStudents = enabledStudents.filter(name => name !== studentName);
+                } else {
+                    // Add to enabled students if not already there
+                    if (!enabledStudents.includes(studentName)) {
+                        enabledStudents.push(studentName);
+                    }
+                }
+                
+                updateSelectionInfo();
+                updateTextArea();
+            }
+
+            // Update selection info text
+            function updateSelectionInfo() {
+                selectionInfo.textContent = `${students.length} students, ${enabledStudents.length} enabled`;
+            }
+
+            // Update text area with selected student names
+            function updateTextArea() {
+                studentNamesText.value = enabledStudents.join('\n');
+            }
+
+            // Copy selected student names to clipboard
+            function copySelectedNames() {
+                const selectedNames = enabledStudents.join('\n');
+                
+                // Use the Clipboard API if available
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(selectedNames)
+                        .then(() => {
+                            showCopyFeedback();
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy: ', err);
+                            fallbackCopy(selectedNames);
+                        });
+                } else {
+                    fallbackCopy(selectedNames);
+                }
+            }
+
+            // Fallback method for copying to clipboard
+            function fallbackCopy(text) {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyFeedback();
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+
+            // Show copy feedback message
+            function showCopyFeedback() {
+                copyFeedback.style.display = 'block';
+                setTimeout(() => {
+                    copyFeedback.style.display = 'none';
+                }, 2000);
+            }
+
+            // Update student list from text area
+            function updateFromTextArea() {
+                const text = studentNamesText.value.trim();
+                if (!text) return;
+                
+                // Split text by new lines and filter out empty lines
+                const newStudents = text.split('\n')
+                    .map(name => name.trim())
+                    .filter(name => name !== '');
+                
+                if (newStudents.length === 0) return;
+                
+                // Update the students array
+                students.length = 0;
+                students.push(...newStudents);
+                
+                // Reset enabled students
+                enabledStudents = [...students];
+                
+                // Reinitialize the student list
+                initializeStudents();
+            }
+
+            // Play shuffle sound effect
+            function playShuffleSound() {
+                if (!soundEnabled) return;
+                
+                try {
+                    // Create a beeping sound for shuffling
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 300 + Math.random() * 200;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                } catch (e) {
+                    console.log("Audio context not supported");
+                }
+            }
+
+            // Play winner sound effect
+            function playWinnerSound() {
+                if (!soundEnabled) return;
+                
+                try {
+                    // Create a fanfare-like sound for winners
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Play multiple tones for a fanfare effect
+                    const frequencies = [523.25, 659.25, 783.99, 1046.50]; // C, E, G, C (high)
+                    const duration = 0.2;
+                    
+                    frequencies.forEach((freq, index) => {
+                        setTimeout(() => {
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = freq;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + duration);
+                        }, index * 150);
+                    });
+                } catch (e) {
+                    console.log("Audio context not supported");
+                }
+            }
+
+            // Toggle sound on/off
+            function toggleSound() {
+                soundEnabled = !soundEnabled;
+                const icon = soundControl.querySelector('i');
+                if (soundEnabled) {
+                    icon.className = 'fas fa-volume-up';
+                    soundControl.style.background = 'rgba(255, 255, 255, 0.2)';
+                } else {
+                    icon.className = 'fas fa-volume-mute';
+                    soundControl.style.background = 'rgba(255, 0, 0, 0.2)';
+                }
+            }
+
+            // Pick random students
+            function pickRandomStudents(count) {
+                if (isPicking) return;
+                
+                if (enabledStudents.length === 0) {
+                    pickerDisplay.textContent = "No students enabled!";
+                    pickerDisplay.classList.remove('winner-animation');
+                    return;
+                }
+                
+                if (count > enabledStudents.length) {
+                    pickerDisplay.textContent = `Only ${enabledStudents.length} enabled students!`;
+                    pickerDisplay.classList.remove('winner-animation');
+                    return;
+                }
+                
+                isPicking = true;
+                pick1Btn.disabled = true;
+                pick2Btn.disabled = true;
+                pick3Btn.disabled = true;
+                pick4Btn.disabled = true;
+                pick5Btn.disabled = true;
+                
+                // Clear previous winner animation
+                pickerDisplay.classList.remove('winner-animation');
+                pickerDisplay.innerHTML = '';
+                
+                // Shuffle animation
+                let shuffleCount = 0;
+                const maxShuffles = 20;
+                const shuffleInterval = setInterval(() => {
+                    // Play shuffle sound
+                    playShuffleSound();
+                    
+                    // Clear display
+                    pickerDisplay.innerHTML = '';
+                    
+                    // Show random students during shuffle
+                    const tempStudents = [...enabledStudents];
+                    for (let i = 0; i < count; i++) {
+                        if (tempStudents.length === 0) break;
+                        const randomIndex = Math.floor(Math.random() * tempStudents.length);
+                        const nameElement = document.createElement('div');
+                        nameElement.className = 'winner-name';
+                        nameElement.textContent = tempStudents[randomIndex];
+                        pickerDisplay.appendChild(nameElement);
+                        tempStudents.splice(randomIndex, 1);
+                    }
+                    
+                    pickerDisplay.classList.add('pulse');
+                    
+                    setTimeout(() => {
+                        pickerDisplay.classList.remove('pulse');
+                    }, 200);
+                    
+                    shuffleCount++;
+                    
+                    if (shuffleCount >= maxShuffles) {
+                        clearInterval(shuffleInterval);
+                        
+                        // Select final students
+                        const finalStudents = [];
+                        const tempEnabled = [...enabledStudents];
+                        
+                        for (let i = 0; i < count; i++) {
+                            if (tempEnabled.length === 0) break;
+                            const randomIndex = Math.floor(Math.random() * tempEnabled.length);
+                            finalStudents.push(tempEnabled[randomIndex]);
+                            tempEnabled.splice(randomIndex, 1);
+                        }
+                        
+                        // Play winner sound
+                        playWinnerSound();
+                        
+                        // Display final selection
+                        pickerDisplay.innerHTML = '';
+                        finalStudents.forEach(student => {
+                            const nameElement = document.createElement('div');
+                            nameElement.className = 'winner-name';
+                            nameElement.textContent = student;
+                            pickerDisplay.appendChild(nameElement);
+                        });
+                        
+                        pickerDisplay.classList.add('winner-animation');
+                        
+                        // Highlight the winners in the student list
+                        const studentCards = document.querySelectorAll('.student-card');
+                        studentCards.forEach(card => {
+                            card.classList.remove('selected');
+                            if (finalStudents.includes(card.dataset.name)) {
+                                card.classList.add('selected');
+                                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        });
+                        
+                        createConfetti();
+                        
+                        isPicking = false;
+                        pick1Btn.disabled = false;
+                        pick2Btn.disabled = false;
+                        pick3Btn.disabled = false;
+                        pick4Btn.disabled = false;
+                        pick5Btn.disabled = false;
+                    }
+                }, 100);
+            }
+
+            // Create confetti effect
+            function createConfetti() {
+                const colors = ['#fd79a8', '#74b9ff', '#55efc4', '#ffeaa7', '#a29bfe'];
+                
+                for (let i = 0; i < 50; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.top = '-10px';
+                    confetti.style.width = Math.random() * 10 + 5 + 'px';
+                    confetti.style.height = Math.random() * 10 + 5 + 'px';
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    
+                    document.body.appendChild(confetti);
+                    
+                    const animationDuration = Math.random() * 3 + 2;
+                    confetti.style.animation = `confetti ${animationDuration}s linear forwards`;
+                    
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, animationDuration * 1000);
+                }
+            }
+
+            // Select all students
+            function selectAll() {
+                const studentCards = document.querySelectorAll('.student-card');
+                studentCards.forEach(card => {
+                    card.classList.remove('disabled');
+                });
+                enabledStudents = [...students];
+                updateSelectionInfo();
+                updateTextArea();
+            }
+
+            // Deselect all students
+            function deselectAll() {
+                const studentCards = document.querySelectorAll('.student-card');
+                studentCards.forEach(card => {
+                    card.classList.add('disabled');
+                });
+                enabledStudents = [];
+                updateSelectionInfo();
+                updateTextArea();
+            }
+
+            // Event listeners for existing buttons
+            pick1Btn.addEventListener('click', () => pickRandomStudents(1));
+            pick2Btn.addEventListener('click', () => pickRandomStudents(2));
+            pick3Btn.addEventListener('click', () => pickRandomStudents(3));
+            pick4Btn.addEventListener('click', () => pickRandomStudents(4));
+            pick5Btn.addEventListener('click', () => pickRandomStudents(5));
+            selectAllBtn.addEventListener('click', selectAll);
+            deselectAllBtn.addEventListener('click', deselectAll);
+            soundControl.addEventListener('click', toggleSound);
+            
+            // New event listeners for copy/paste functionality
+            copyNamesBtn.addEventListener('click', copySelectedNames);
+            pasteNamesBtn.addEventListener('click', updateFromTextArea);
+
+            // Initialize the app
+            initializeStudents();
+        });
+    </script>
+</body>
+</html>
