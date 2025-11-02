@@ -388,26 +388,6 @@
             flex-wrap: wrap;
         }
 
-        .stat-item {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 3.5rem;
-            font-weight: 900;
-            background: linear-gradient(to right, var(--primary), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: block;
-            line-height: 1;
-        }
-
-        .stat-label {
-            font-size: 1.2rem;
-            color: var(--text-light);
-            margin-top: 10px;
-        }
-
         @media (max-width: 768px) {
             h1 {
                 font-size: 3rem;
@@ -436,10 +416,6 @@
 
             .stats-counter {
                 gap: 30px;
-            }
-
-            .stat-number {
-                font-size: 2.5rem;
             }
         }
 
@@ -534,11 +510,9 @@
                 <h1>Jason's Class Tools</h1>
                 <p class="subtitle">Your all-in-one classroom management toolkit</p>
                 
+                <!-- Keeping the stats section space but without the counter -->
                 <div class="stats-counter">
-                    <div class="stat-item">
-                        <span class="stat-number" id="pageLoadsCount">0</span>
-                        <div class="stat-label">Page Views</div>
-                    </div>
+                    <!-- Empty space preserved for layout consistency -->
                 </div>
             </div>
         </header>
@@ -555,7 +529,7 @@
                 </div>
                 <h2 class="tool-title">GroupGenius</h2>
                 <p class="tool-description">Create dynamic student groups with our interactive group maker. Track points, give praise, and manage classroom collaboration.</p>
-                <a href="GROUP MASTER MANAGER 6.html" target="_blank" class="tool-btn">
+                <a href="GROUP MASTER MANAGER 5.html" target="_blank" class="tool-btn">
                     <i class="fas fa-rocket"></i> Launch Tool
                 </a>
             </div>
@@ -622,7 +596,6 @@
                             initThreeJS();
                             initParticles();
                             initAnimations();
-                            initPageLoadCounter();
                         }, 1000);
                     }, 500);
                 }
@@ -747,45 +720,13 @@
                 );
             });
 
-            // Animate stats counter
-            gsap.from('.stat-item', {
+            // Animate stats counter area (keeping the space)
+            gsap.from('.stats-counter', {
                 duration: 1,
-                y: 50,
                 opacity: 0,
                 delay: 1,
-                ease: 'back.out(1.7)'
+                ease: 'power2.out'
             });
-        }
-
-        // Page Load Counter
-        function initPageLoadCounter() {
-            const pageLoadsCount = document.getElementById('pageLoadsCount');
-            
-            // Get current count from localStorage or initialize to 0
-            let count = parseInt(localStorage.getItem('pageLoadsCount')) || 0;
-            
-            // Increment count
-            count++;
-            
-            // Save updated count to localStorage
-            localStorage.setItem('pageLoadsCount', count.toString());
-            
-            // Animate the counter
-            animateValue(pageLoadsCount, 0, count, 2000);
-            
-            function animateValue(element, start, end, duration) {
-                let startTimestamp = null;
-                const step = (timestamp) => {
-                    if (!startTimestamp) startTimestamp = timestamp;
-                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                    const value = Math.floor(progress * (end - start) + start);
-                    element.innerHTML = value.toLocaleString();
-                    if (progress < 1) {
-                        window.requestAnimationFrame(step);
-                    }
-                };
-                window.requestAnimationFrame(step);
-            }
         }
 
         // Sound effects
