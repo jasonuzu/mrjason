@@ -809,6 +809,24 @@
             transition: all 0.3s ease;
         }
 
+        /* Random selection indicator */
+        .random-selection-info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .random-selection-info.active {
+            background: rgba(81, 207, 102, 0.3);
+            box-shadow: 0 0 15px rgba(81, 207, 102, 0.4);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -1036,6 +1054,15 @@
         <div class="card" id="groupsCard" style="display: none;">
             <h2 class="card-title"><i class="fas fa-object-group"></i>Student Groups</h2>
             
+            <!-- NEW: Random selection tracking info -->
+            <div class="random-selection-info" id="randomSelectionInfo" style="display: none;">
+                <i class="fas fa-random"></i>
+                <span id="randomSelectionStatus">0 of 0 students selected</span>
+                <button class="btn btn-warning" id="resetRandomSelectionBtn" style="padding: 8px 16px; font-size: 0.9rem;">
+                    <i class="fas fa-sync-alt"></i> Reset Selection
+                </button>
+            </div>
+            
             <div class="search-controls">
                 <div class="search-input-container">
                     <i class="fas fa-search"></i>
@@ -1182,11 +1209,16 @@
         const loadFromStorageBtn = document.getElementById('loadFromStorageBtn');
         const clearStorageBtn = document.getElementById('clearStorageBtn');
         
-        // NEW: Search and random select elements
+        // Search and random select elements
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
         const randomSelectBtn = document.getElementById('randomSelectBtn');
+        
+        // NEW: Random selection tracking elements
+        const randomSelectionInfo = document.getElementById('randomSelectionInfo');
+        const randomSelectionStatus = document.getElementById('randomSelectionStatus');
+        const resetRandomSelectionBtn = document.getElementById('resetRandomSelectionBtn');
 
         // State
         let students = [];
@@ -1199,8 +1231,11 @@
         let selectionMode = false;
         let selectedStudents = new Set();
         let editingGroupIndex = -1;
-        let currentSearchResults = []; // NEW: Store search results
-        let currentSearchIndex = -1; // NEW: Current highlighted search result
+        let currentSearchResults = []; // Store search results
+        let currentSearchIndex = -1; // Current highlighted search result
+        
+        // NEW: Track which students have been randomly selected
+        let randomlySelectedStudents = new Set();
 
         // Sound effects
         const sounds = {
@@ -1296,6 +1331,7 @@
                 const dataToSave = {
                     students: students,
                     groups: groups,
+                    randomlySelectedStudents: Array.from(randomlySelectedStudents), // NEW: Save random selection state
                     timestamp: new Date().toISOString()
                 };
                 localStorage.setItem('groupGeniusData', JSON.stringify(dataToSave));
@@ -1316,9 +1352,15 @@
                     students = parsedData.students || [];
                     groups = parsedData.groups || [];
                     
+                    // NEW: Load random selection state
+                    if (parsedData.randomlySelectedStudents) {
+                        randomlySelectedStudents = new Set(parsedData.randomlySelectedStudents);
+                    }
+                    
                     // Update displays
                     displayStudents();
                     displayGroups();
+                    updateRandomSelectionStatus(); // NEW: Update status display
                     
                     // Show appropriate cards based on loaded data
                     if (students.length > 0) {
@@ -1449,7 +1491,7 @@
             createEmptyGroups();
         });
 
-        // NEW: Search and random select event listeners
+        // Search and random select event listeners
         searchBtn.addEventListener('click', () => {
             playSound('click');
             searchStudents();
@@ -1470,6 +1512,12 @@
         randomSelectBtn.addEventListener('click', () => {
             playSound('click');
             randomSelectStudent();
+        });
+
+        // NEW: Reset random selection event listener
+        resetRandomSelectionBtn.addEventListener('click', () => {
+            playSound('click');
+            resetRandomSelection();
         });
 
         // Storage control event listeners
@@ -2061,6 +2109,9 @@
             // Clear the student list as all students are now in groups
             students = [];
             
+            // NEW: Reset random selection when groups are sorted
+            resetRandomSelection();
+            
             displayGroups();
             displayStudents(); // This will now show an empty list
             groupsCard.style.display = 'block';
@@ -2342,7 +2393,7 @@
             }
         }
 
-        // NEW: Search function to find students in groups
+        // Search function to find students in groups
         function searchStudents() {
             const searchTerm = searchInput.value.trim().toLowerCase();
             
@@ -2386,7 +2437,7 @@
             playSound('success');
         }
 
-        // NEW: Clear search results
+        // Clear search results
         function clearSearch() {
             clearSearchHighlights();
             searchInput.value = '';
@@ -2395,7 +2446,7 @@
             clearSearchBtn.style.display = 'none';
         }
 
-        // NEW: Clear search highlights
+        // Clear search highlights
         function clearSearchHighlights() {
             // Remove highlights from all members
             document.querySelectorAll('.member').forEach(member => {
@@ -2408,7 +2459,7 @@
             });
         }
 
-        // NEW: Highlight a specific search result
+        // Highlight a specific search result
         function highlightSearchResult(index) {
             if (index < 0 || index >= currentSearchResults.length) return;
             
@@ -2446,7 +2497,34 @@
             searchInput.value = `${result.studentName} (${index + 1}/${currentSearchResults.length})`;
         }
 
-        // NEW: Randomly select a student from all groups
+        // NEW: Update random selection status display
+        function updateRandomSelectionStatus() {
+            const totalStudents = groups.reduce((total, group) => total + group.members.length, 0);
+            const selectedCount = randomlySelectedStudents.size;
+            
+            randomSelectionStatus.textContent = `${selectedCount} of ${totalStudents} students selected`;
+            
+            if (selectedCount > 0) {
+                randomSelectionInfo.style.display = 'flex';
+                if (selectedCount === totalStudents) {
+                    randomSelectionInfo.classList.add('active');
+                } else {
+                    randomSelectionInfo.classList.remove('active');
+                }
+            } else {
+                randomSelectionInfo.style.display = 'none';
+            }
+        }
+
+        // NEW: Reset random selection tracking
+        function resetRandomSelection() {
+            randomlySelectedStudents.clear();
+            updateRandomSelectionStatus();
+            playSound('success');
+            alert("Random selection has been reset. All students are now available for selection.");
+        }
+
+        // NEW: Randomly select a student from all groups (non-repeating)
         function randomSelectStudent() {
             if (groups.length === 0) {
                 alert("Please create groups first before using random selection.");
@@ -2454,27 +2532,43 @@
                 return;
             }
             
-            // Collect all students from all groups
-            const allStudents = [];
+            // Collect all students from all groups that haven't been selected yet
+            const availableStudents = [];
             groups.forEach((group, groupIndex) => {
                 group.members.forEach((member, memberIndex) => {
-                    allStudents.push({
-                        groupIndex: groupIndex,
-                        memberIndex: memberIndex,
-                        studentName: member.name
-                    });
+                    if (!randomlySelectedStudents.has(member.name)) {
+                        availableStudents.push({
+                            groupIndex: groupIndex,
+                            memberIndex: memberIndex,
+                            studentName: member.name
+                        });
+                    }
                 });
             });
             
-            if (allStudents.length === 0) {
-                alert("No students in groups to select from.");
-                playSound('error');
+            if (availableStudents.length === 0) {
+                const totalStudents = groups.reduce((total, group) => total + group.members.length, 0);
+                
+                if (totalStudents === 0) {
+                    alert("No students in groups to select from.");
+                    playSound('error');
+                    return;
+                }
+                
+                // All students have been selected, ask if user wants to reset
+                if (confirm(`All ${totalStudents} students have been randomly selected. Would you like to reset the selection and start over?`)) {
+                    resetRandomSelection();
+                    randomSelectStudent(); // Try again after reset
+                }
                 return;
             }
             
-            // Randomly select a student
-            const randomIndex = Math.floor(Math.random() * allStudents.length);
-            const selected = allStudents[randomIndex];
+            // Randomly select a student from available ones
+            const randomIndex = Math.floor(Math.random() * availableStudents.length);
+            const selected = availableStudents[randomIndex];
+            
+            // Add to selected set
+            randomlySelectedStudents.add(selected.studentName);
             
             // Clear any existing search
             clearSearch();
@@ -2486,8 +2580,12 @@
             // Highlight the selected student
             highlightSearchResult(currentSearchIndex);
             
+            // Update the random selection status
+            updateRandomSelectionStatus();
+            
             playSound('success');
             createConfetti(10);
+            autoSave();
         }
 
         function exportGroupData() {
