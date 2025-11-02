@@ -6,6 +6,7 @@
     <title>GroupGenius - Student Group Maker</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* Previous CSS styles remain the same */
         * {
             margin: 0;
             padding: 0;
@@ -755,6 +756,59 @@
             animation: pulse 2s infinite;
         }
 
+        /* Search Controls */
+        .search-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .search-input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px 20px;
+            border-radius: 50px;
+        }
+
+        .search-input {
+            padding: 10px 15px;
+            border-radius: 50px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            font-size: 1rem;
+            color: var(--dark);
+            width: 250px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        /* Highlight styles for search results */
+        .student-highlight {
+            background-color: rgba(255, 255, 0, 0.3);
+            border: 2px solid yellow;
+            animation: pulse 1s infinite;
+        }
+
+        .member-highlight {
+            background-color: rgba(255, 255, 0, 0.3);
+            border: 2px solid yellow;
+            animation: pulse 1s infinite;
+        }
+
+        .group-highlight {
+            box-shadow: 0 0 15px rgba(255, 255, 0, 0.7);
+            transform: translateY(-5px);
+            transition: all 0.3s ease;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -814,6 +868,10 @@
             
             .student-list {
                 grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            }
+            
+            .search-input {
+                width: 180px;
             }
         }
 
@@ -978,6 +1036,22 @@
         <div class="card" id="groupsCard" style="display: none;">
             <h2 class="card-title"><i class="fas fa-object-group"></i>Student Groups</h2>
             
+            <div class="search-controls">
+                <div class="search-input-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search for a student...">
+                </div>
+                <button class="btn btn-accent" id="searchBtn">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <button class="btn btn-warning" id="clearSearchBtn" style="display:none;">
+                    <i class="fas fa-times"></i> Clear Search
+                </button>
+                <button class="btn btn-accent" id="randomSelectBtn">
+                    <i class="fas fa-random"></i> Random Select
+                </button>
+            </div>
+            
             <div class="storage-controls">
                 <div class="auto-save-indicator">
                     <i class="fas fa-save"></i> Auto-save enabled
@@ -1107,6 +1181,12 @@
         const saveToStorageBtn = document.getElementById('saveToStorageBtn');
         const loadFromStorageBtn = document.getElementById('loadFromStorageBtn');
         const clearStorageBtn = document.getElementById('clearStorageBtn');
+        
+        // NEW: Search and random select elements
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const randomSelectBtn = document.getElementById('randomSelectBtn');
 
         // State
         let students = [];
@@ -1119,6 +1199,8 @@
         let selectionMode = false;
         let selectedStudents = new Set();
         let editingGroupIndex = -1;
+        let currentSearchResults = []; // NEW: Store search results
+        let currentSearchIndex = -1; // NEW: Current highlighted search result
 
         // Sound effects
         const sounds = {
@@ -1365,6 +1447,29 @@
         createGroupsBtn.addEventListener('click', () => {
             playSound('click');
             createEmptyGroups();
+        });
+
+        // NEW: Search and random select event listeners
+        searchBtn.addEventListener('click', () => {
+            playSound('click');
+            searchStudents();
+        });
+
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                playSound('click');
+                searchStudents();
+            }
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            playSound('click');
+            clearSearch();
+        });
+
+        randomSelectBtn.addEventListener('click', () => {
+            playSound('click');
+            randomSelectStudent();
         });
 
         // Storage control event listeners
@@ -2002,7 +2107,7 @@
                     <div class="group-members">
                         ${group.members.length > 0 ? 
                             group.members.map(member => `
-                                <div class="member" data-student="${member.name}">
+                                <div class="member" data-student="${member.name}" data-group="${index}">
                                     <div class="member-info">
                                         <div class="member-avatar">${member.name.charAt(0)}</div>
                                         <span>${member.name}</span>
@@ -2235,6 +2340,154 @@
                 playSound('success');
                 autoSave();
             }
+        }
+
+        // NEW: Search function to find students in groups
+        function searchStudents() {
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            
+            if (!searchTerm) {
+                alert("Please enter a student name to search for.");
+                playSound('error');
+                return;
+            }
+            
+            // Clear previous search highlights
+            clearSearchHighlights();
+            
+            // Find all students matching the search term
+            currentSearchResults = [];
+            
+            groups.forEach((group, groupIndex) => {
+                group.members.forEach((member, memberIndex) => {
+                    if (member.name.toLowerCase().includes(searchTerm)) {
+                        currentSearchResults.push({
+                            groupIndex: groupIndex,
+                            memberIndex: memberIndex,
+                            studentName: member.name
+                        });
+                    }
+                });
+            });
+            
+            if (currentSearchResults.length === 0) {
+                alert(`No students found matching "${searchTerm}"`);
+                playSound('error');
+                return;
+            }
+            
+            // Show clear search button
+            clearSearchBtn.style.display = 'inline-flex';
+            
+            // Highlight the first result
+            currentSearchIndex = 0;
+            highlightSearchResult(currentSearchIndex);
+            
+            playSound('success');
+        }
+
+        // NEW: Clear search results
+        function clearSearch() {
+            clearSearchHighlights();
+            searchInput.value = '';
+            currentSearchResults = [];
+            currentSearchIndex = -1;
+            clearSearchBtn.style.display = 'none';
+        }
+
+        // NEW: Clear search highlights
+        function clearSearchHighlights() {
+            // Remove highlights from all members
+            document.querySelectorAll('.member').forEach(member => {
+                member.classList.remove('member-highlight');
+            });
+            
+            // Remove highlights from all group cards
+            document.querySelectorAll('.group-card').forEach(card => {
+                card.classList.remove('group-highlight');
+            });
+        }
+
+        // NEW: Highlight a specific search result
+        function highlightSearchResult(index) {
+            if (index < 0 || index >= currentSearchResults.length) return;
+            
+            const result = currentSearchResults[index];
+            
+            // Clear previous highlights
+            clearSearchHighlights();
+            
+            // Highlight the member
+            const memberElement = document.querySelector(`.member[data-student="${result.studentName}"][data-group="${result.groupIndex}"]`);
+            if (memberElement) {
+                memberElement.classList.add('member-highlight');
+                
+                // Highlight the group card
+                const groupCard = memberElement.closest('.group-card');
+                if (groupCard) {
+                    groupCard.classList.add('group-highlight');
+                    
+                    // Scroll the group card into view
+                    groupCard.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center'
+                    });
+                }
+                
+                // Scroll the member into view within the group card
+                memberElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center',
+                    inline: 'center'
+                });
+            }
+            
+            // Update search input to show current result
+            searchInput.value = `${result.studentName} (${index + 1}/${currentSearchResults.length})`;
+        }
+
+        // NEW: Randomly select a student from all groups
+        function randomSelectStudent() {
+            if (groups.length === 0) {
+                alert("Please create groups first before using random selection.");
+                playSound('error');
+                return;
+            }
+            
+            // Collect all students from all groups
+            const allStudents = [];
+            groups.forEach((group, groupIndex) => {
+                group.members.forEach((member, memberIndex) => {
+                    allStudents.push({
+                        groupIndex: groupIndex,
+                        memberIndex: memberIndex,
+                        studentName: member.name
+                    });
+                });
+            });
+            
+            if (allStudents.length === 0) {
+                alert("No students in groups to select from.");
+                playSound('error');
+                return;
+            }
+            
+            // Randomly select a student
+            const randomIndex = Math.floor(Math.random() * allStudents.length);
+            const selected = allStudents[randomIndex];
+            
+            // Clear any existing search
+            clearSearch();
+            
+            // Set as current search result for highlighting
+            currentSearchResults = [selected];
+            currentSearchIndex = 0;
+            
+            // Highlight the selected student
+            highlightSearchResult(currentSearchIndex);
+            
+            playSound('success');
+            createConfetti(10);
         }
 
         function exportGroupData() {
