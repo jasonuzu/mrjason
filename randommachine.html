@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Randomizing Machine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .description {
+            text-align: center;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        .input-area {
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #4a90e2;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+        }
+        
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #4a90e2;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #randomizeBtn {
+            background: linear-gradient(to right, #ff5e62, #ff9966);
+        }
+        
+        #resetBtn {
+            background: linear-gradient(to right, #667eea, #764ba2);
+        }
+        
+        .animation-area {
+            min-height: 200px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .name-tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            opacity: 0;
+            position: absolute;
+        }
+        
+        .flashing {
+            animation: flash 0.5s ease-in-out;
+        }
+        
+        @keyframes flash {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0; transform: scale(0.8); }
+        }
+        
+        .result-area {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .copy-btn {
+            background: linear-gradient(to right, #00b09b, #96c93d);
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+        
+        #resultList {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .result-item {
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .result-number {
+            background: #4a90e2;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .sound-control {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .notification.show {
+            opacity: 1;
+        }
+        
+        .verification {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            text-align: center;
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            button {
+                padding: 10px 20px;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎲 Name Randomizer 🎲</h1>
+        <p class="description">Paste your list of names, randomize them with a fun animation, and get a shuffled list!</p>
+        
+        <div class="input-area">
+            <textarea id="nameInput" placeholder="Enter names, one per line..."></textarea>
+            <div class="buttons">
+                <button id="randomizeBtn">Randomize Names</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </div>
+        
+        <div class="animation-area" id="animationArea">
+            <div class="sound-control" id="soundControl">🔊</div>
+            <!-- Names will appear here during animation -->
+        </div>
+        
+        <div class="result-area hidden" id="resultArea">
+            <div class="result-header">
+                <h2>Randomized List</h2>
+                <button class="copy-btn" id="copyBtn">Copy List</button>
+            </div>
+            <div id="resultList">
+                <!-- Results will appear here -->
+            </div>
+            <div class="verification" id="verification"></div>
+        </div>
+    </div>
+    
+    <div class="notification" id="notification">List copied to clipboard!</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
+            const nameInput = document.getElementById('nameInput');
+            const randomizeBtn = document.getElementById('randomizeBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const animationArea = document.getElementById('animationArea');
+            const resultArea = document.getElementById('resultArea');
+            const resultList = document.getElementById('resultList');
+            const copyBtn = document.getElementById('copyBtn');
+            const soundControl = document.getElementById('soundControl');
+            const notification = document.getElementById('notification');
+            const verification = document.getElementById('verification');
+            
+            // Store original order for verification
+            let originalNames = [];
+            
+            // Audio context for sound
+            let audioContext;
+            let isSoundOn = true;
+            let beepInterval;
+            
+            // Colors for flashing names
+            const flashColors = [
+                '#FF5733', '#33FF57', '#3357FF', '#F333FF', 
+                '#FF33A1', '#33FFF6', '#FFD733', '#8D33FF'
+            ];
+            
+            // 8-note octave frequencies (C4 to C5)
+            const octaveNotes = [
+                261.63,  // C4
+                293.66,  // D4
+                329.63,  // E4
+                349.23,  // F4
+                392.00,  // G4
+                440.00,  // A4
+                493.88,  // B4
+                523.25   // C5
+            ];
+            
+            // Initialize audio
+            function initAudio() {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.log("Web Audio API is not supported in this browser");
+                    isSoundOn = false;
+                    soundControl.textContent = "🔇";
+                }
+            }
+            
+            // Play beep sound with customizable parameters
+            function playBeep(frequency, duration, type = 'sine', volume = 0.3) {
+                if (!isSoundOn || !audioContext) return;
+                
+                try {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.type = type;
+                    oscillator.frequency.value = frequency;
+                    
+                    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + duration);
+                } catch (e) {
+                    console.log("Error playing sound:", e);
+                }
+            }
+            
+            // Start quick beeping during flashing phase with random pitch
+            function startQuickBeeping() {
+                if (!isSoundOn) return;
+                
+                // Play initial beep with random frequency
+                const initialFreq = 600 + Math.random() * 400; // 600-1000 Hz
+                playBeep(initialFreq, 0.1);
+                
+                // Continue beeping every 200ms with varying frequencies
+                beepInterval = setInterval(() => {
+                    const freq = 600 + Math.random() * 400; // 600-1000 Hz
+                    const waveType = Math.random() > 0.7 ? 'square' : 'sine';
+                    playBeep(freq, 0.1, waveType);
+                }, 200);
+            }
+            
+            // Stop quick beeping
+            function stopQuickBeeping() {
+                if (beepInterval) {
+                    clearInterval(beepInterval);
+                    beepInterval = null;
+                }
+            }
+            
+            // Play random note from 8-note octave for name appearance
+            function playNameBeep() {
+                // Select a random note from the octave
+                const randomNoteIndex = Math.floor(Math.random() * octaveNotes.length);
+                const frequency = octaveNotes[randomNoteIndex];
+                
+                // Vary wave type and duration slightly for more interest
+                const waveTypes = ['sine', 'square', 'triangle'];
+                const waveType = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+                const duration = 0.2 + Math.random() * 0.2; // 0.2-0.4 seconds
+                
+                playBeep(frequency, duration, waveType, 0.4);
+            }
+            
+            // Toggle sound
+            soundControl.addEventListener('click', function() {
+                isSoundOn = !isSoundOn;
+                soundControl.textContent = isSoundOn ? "🔊" : "🔇";
+                
+                if (!isSoundOn) {
+                    stopQuickBeeping();
+                }
+            });
+            
+            // Enhanced Fisher-Yates shuffle with better randomness
+            function shuffleArray(array) {
+                const newArray = [...array];
+                
+                // Use crypto.getRandomValues for better randomness if available
+                let randomValues;
+                try {
+                    randomValues = new Uint32Array(newArray.length);
+                    crypto.getRandomValues(randomValues);
+                } catch (e) {
+                    console.log("Crypto API not available, using Math.random");
+                }
+                
+                for (let i = newArray.length - 1; i > 0; i--) {
+                    // Use crypto-based random if available, otherwise fall back to Math.random
+                    const j = randomValues ? 
+                        Math.floor(randomValues[i] / (0xFFFFFFFF + 1) * (i + 1)) :
+                        Math.floor(Math.random() * (i + 1));
+                    
+                    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+                }
+                return newArray;
+            }
+            
+            // Verify shuffle quality
+            function verifyShuffle(original, shuffled) {
+                // Check if arrays are different
+                if (original.length !== shuffled.length) return false;
+                
+                let isDifferent = false;
+                for (let i = 0; i < original.length; i++) {
+                    if (original[i] !== shuffled[i]) {
+                        isDifferent = true;
+                        break;
+                    }
+                }
+                
+                if (!isDifferent) {
+                    verification.textContent = "⚠️ Names appear to be in the same order. Try again!";
+                    return false;
+                }
+                
+                // Calculate how many items changed position
+                let positionChanges = 0;
+                for (let i = 0; i < original.length; i++) {
+                    if (original[i] !== shuffled[i]) {
+                        positionChanges++;
+                    }
+                }
+                
+                const changePercent = Math.round((positionChanges / original.length) * 100);
+                verification.textContent = `✅ Shuffle verified: ${changePercent}% of names changed position`;
+                return true;
+            }
+            
+            // Show notification
+            function showNotification(message) {
+                notification.textContent = message;
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 2000);
+            }
+            
+            // Create random flashing animation
+            function createFlashingAnimation(names) {
+                // Clear animation area
+                animationArea.innerHTML = '<div class="sound-control" id="soundControl">🔊</div>';
+                
+                // Reattach sound control event listener
+                document.getElementById('soundControl').addEventListener('click', function() {
+                    isSoundOn = !isSoundOn;
+                    this.textContent = isSoundOn ? "🔊" : "🔇";
+                });
+                
+                // Create name tags but don't show them yet
+                names.forEach((name, index) => {
+                    const nameTag = document.createElement('div');
+                    nameTag.className = 'name-tag';
+                    nameTag.textContent = name;
+                    nameTag.dataset.index = index;
+                    animationArea.appendChild(nameTag);
+                });
+                
+                // Start random flashing
+                const nameTags = document.querySelectorAll('.name-tag');
+                const flashInterval = setInterval(() => {
+                    // Pick a random name tag
+                    const randomIndex = Math.floor(Math.random() * nameTags.length);
+                    const randomTag = nameTags[randomIndex];
+                    
+                    // Set random position
+                    const maxX = animationArea.offsetWidth - randomTag.offsetWidth - 40;
+                    const maxY = animationArea.offsetHeight - randomTag.offsetHeight - 40;
+                    const randomX = Math.max(20, Math.floor(Math.random() * maxX));
+                    const randomY = Math.max(20, Math.floor(Math.random() * maxY));
+                    
+                    // Set random color
+                    const randomColor = flashColors[Math.floor(Math.random() * flashColors.length)];
+                    
+                    // Apply styles and animation
+                    randomTag.style.left = `${randomX}px`;
+                    randomTag.style.top = `${randomY}px`;
+                    randomTag.style.backgroundColor = randomColor;
+                    randomTag.style.color = '#FFFFFF';
+                    randomTag.classList.add('flashing');
+                    
+                    // Remove animation class after animation completes
+                    setTimeout(() => {
+                        randomTag.classList.remove('flashing');
+                        randomTag.style.opacity = '0';
+                    }, 500);
+                }, 100);
+                
+                return flashInterval;
+            }
+            
+            // Randomize names with animation
+            randomizeBtn.addEventListener('click', function() {
+                const names = nameInput.value
+                    .split('\n')
+                    .map(name => name.trim())
+                    .filter(name => name !== '');
+                
+                if (names.length === 0) {
+                    showNotification('Please enter at least one name');
+                    return;
+                }
+                
+                // Store original order for verification
+                originalNames = [...names];
+                
+                // Disable buttons during animation
+                randomizeBtn.disabled = true;
+                resetBtn.disabled = true;
+                
+                // Clear previous results
+                resultArea.classList.add('hidden');
+                verification.textContent = '';
+                
+                // Start quick beeping
+                startQuickBeeping();
+                
+                // Create flashing animation
+                const flashInterval = createFlashingAnimation(names);
+                
+                // Shuffle the names multiple times for better randomness
+                let shuffledNames = [...names];
+                for (let i = 0; i < 3; i++) {
+                    shuffledNames = shuffleArray(shuffledNames);
+                }
+                
+                // Animation: after 2 seconds of flashing, reveal names one by one
+                setTimeout(() => {
+                    // Stop quick beeping and flashing
+                    stopQuickBeeping();
+                    clearInterval(flashInterval);
+                    
+                    // Clear animation area
+                    animationArea.innerHTML = '<div class="sound-control" id="soundControl">🔊</div>';
+                    
+                    // Reattach sound control event listener
+                    document.getElementById('soundControl').addEventListener('click', function() {
+                        isSoundOn = !isSoundOn;
+                        this.textContent = isSoundOn ? "🔊" : "🔇";
+                    });
+                    
+                    // Reveal names one by one
+                    let index = 0;
+                    const revealInterval = setInterval(() => {
+                        if (index < shuffledNames.length) {
+                            const nameTag = document.createElement('div');
+                            nameTag.className = 'name-tag';
+                            nameTag.textContent = shuffledNames[index];
+                            nameTag.style.position = 'static';
+                            nameTag.style.opacity = '0';
+                            nameTag.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            nameTag.style.color = 'white';
+                            nameTag.style.transition = 'all 0.5s';
+                            animationArea.appendChild(nameTag);
+                            
+                            // Play random note from octave for each name
+                            playNameBeep();
+                            
+                            // Fade in effect
+                            setTimeout(() => {
+                                nameTag.style.opacity = '1';
+                            }, 10);
+                            
+                            index++;
+                        } else {
+                            clearInterval(revealInterval);
+                            
+                            // Show final result
+                            showResult(shuffledNames);
+                            
+                            // Re-enable buttons
+                            randomizeBtn.disabled = false;
+                            resetBtn.disabled = false;
+                        }
+                    }, 800);
+                }, 2000);
+            });
+            
+            // Show final result
+            function showResult(shuffledNames) {
+                resultList.innerHTML = '';
+                
+                shuffledNames.forEach((name, index) => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item';
+                    
+                    const number = document.createElement('div');
+                    number.className = 'result-number';
+                    number.textContent = index + 1;
+                    
+                    const nameElement = document.createElement('div');
+                    nameElement.textContent = name;
+                    
+                    resultItem.appendChild(number);
+                    resultItem.appendChild(nameElement);
+                    resultList.appendChild(resultItem);
+                });
+                
+                // Verify the shuffle
+                verifyShuffle(originalNames, shuffledNames);
+                
+                resultArea.classList.remove('hidden');
+            }
+            
+            // Copy result to clipboard
+            copyBtn.addEventListener('click', function() {
+                const names = Array.from(document.querySelectorAll('.result-item'))
+                    .map(item => item.querySelector('div:last-child').textContent)
+                    .join('\n');
+                
+                navigator.clipboard.writeText(names)
+                    .then(() => {
+                        showNotification('List copied to clipboard!');
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy: ', err);
+                        showNotification('Failed to copy list');
+                    });
+            });
+            
+            // Reset everything
+            resetBtn.addEventListener('click', function() {
+                nameInput.value = '';
+                animationArea.innerHTML = '<div class="sound-control" id="soundControl">🔊</div>';
+                resultArea.classList.add('hidden');
+                verification.textContent = '';
+                stopQuickBeeping();
+                
+                // Reattach sound control event listener
+                document.getElementById('soundControl').addEventListener('click', function() {
+                    isSoundOn = !isSoundOn;
+                    this.textContent = isSoundOn ? "🔊" : "🔇";
+                });
+            });
+            
+            // Initialize audio when user interacts with the page
+            document.body.addEventListener('click', function() {
+                if (!audioContext) {
+                    initAudio();
+                }
+            }, { once: true });
+        });
+    </script>
+</body>
+</html>
