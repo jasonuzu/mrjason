@@ -1,50 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Cursed Item Generator</title>
+<meta charset="UTF-8">
+<title>Realistic Cursed Item NFT Generator</title>
 <style>
-  body {
-    background:#0c0c10;
-    color:#eaeaf0;
-    font-family: system-ui, sans-serif;
-    padding:20px;
-  }
-  button {
-    background:#1e1e2b;
-    color:white;
-    border:1px solid #444;
-    padding:10px 14px;
-    cursor:pointer;
-    margin-right:10px;
-  }
-  #itemBox {
-    margin-top:20px;
-    display:flex;
-    gap:20px;
-    align-items:flex-start;
-  }
-  #visual {
-    width:180px;
-    height:180px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:#0f0f14;
-    border:1px solid #333;
-  }
-  pre {
-    background:#0f0f14;
-    padding:10px;
-    max-width:600px;
-    overflow:auto;
-    font-size:12px;
-  }
+body {
+  background:#0c0c10;
+  color:#eaeaf0;
+  font-family: system-ui, sans-serif;
+  padding:20px;
+}
+button {
+  background:#1e1e2b;
+  color:white;
+  border:1px solid #444;
+  padding:10px 14px;
+  cursor:pointer;
+  margin-right:10px;
+}
+#itemBox {
+  margin-top:20px;
+  display:flex;
+  gap:20px;
+  align-items:flex-start;
+}
+#visual {
+  width:250px;
+  height:250px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#0f0f14;
+  border:1px solid #333;
+}
+pre {
+  background:#0f0f14;
+  padding:10px;
+  max-width:600px;
+  overflow:auto;
+  font-size:12px;
+}
 </style>
 </head>
 <body>
 
-<h1>Cursed Item Generator</h1>
+<h1>Realistic Cursed Item NFT Generator</h1>
 <p>Total World Catalogue: <span id="worldCount">0</span></p>
 
 <button onclick="generateItem()">Generate Item</button>
@@ -57,29 +57,12 @@
 
 <script>
 /* ================= CORE DATA ================= */
+let WORLD_COUNT=0;
+let LAST_ITEM=null;
 
-let WORLD_COUNT = 0;
-let LAST_ITEM = null;
-
-const BASE_OBJECTS = [
-  "Bottle","Shoe","Key","Plate","Ring","Trash Can","Coin","Mug","Knife","Helmet"
-];
-
-const MATERIALS = [
-  "Iron","Glass","Bone","Plastic","Stone","Wood","Cloth"
-];
-
-const MATERIAL_COLORS = {
-  Iron:"#aaa",
-  Glass:"#88d",
-  Bone:"#eee",
-  Plastic:"#f4f4f4",
-  Stone:"#999",
-  Wood:"#a0522d",
-  Cloth:"#ccc"
-};
-
-const CURSE_TIERS = [
+const BASE_OBJECTS=["Bottle","Mug","Knife","Ring","Shoe","Coin","Trash Can","Helmet","Plate"];
+const MATERIALS=["Iron","Glass","Bone","Plastic","Stone","Wood","Cloth"];
+const CURSE_TIERS=[
   {tier:"Minor Anomaly", category:1, weight:40},
   {tier:"Unpredictable Utility", category:2, weight:30},
   {tier:"Dual-Effect Artifact", category:3, weight:15},
@@ -89,163 +72,155 @@ const CURSE_TIERS = [
   {tier:"Cataclysmic Curse", category:7, weight:1}
 ];
 
-const EFFECTS = {
+const EFFECTS={
   Somatic:["Enhancement","Restoration","Alteration"],
   Cognitive:["Clarity","Emotion","Perception"],
   Environmental:["Elemental Manipulation","Spatial Alteration","Temporal Influence"],
   Metaphysical:["Summoning","Binding","Divination"]
 };
 
+const EFFECT_DESCRIPTIONS={
+  Enhancement:["boosts strength","increases speed","enhances endurance"],
+  Restoration:["heals minor injuries","restores vitality","removes fatigue"],
+  Alteration:["changes appearance","modifies size","alters form"],
+  Clarity:["improves focus","enhances memory","sharpens intelligence"],
+  Emotion:["induces calm","provokes fear","generates joy"],
+  Perception:["enhances vision","detects hidden objects","improves hearing"],
+  "Elemental Manipulation":["controls fire","manipulates water","summons wind"],
+  "Spatial Alteration":["creates barriers","teleports short distances","alters nearby space"],
+  "Temporal Influence":["slows local time","speeds up time","freezes brief moments"],
+  Summoning:["calls forth a creature","summons a construct","materializes object"],
+  Binding:["restricts movement","controls a being","immobilizes target"],
+  Divination:["reveals hidden knowledge","forecasts events","detects magic"]
+};
+
+const NEGATIVE_DESCRIPTIONS={
+  Enhancement:["may cause fatigue afterwards","can injure user if overused","sometimes backfires"],
+  Restoration:["heals imperfectly","may remove something important","can cause nausea"],
+  Alteration:["may distort unintentionally","effects may be temporary","can be uncomfortable"],
+  Clarity:["can induce headache","may overfocus","sometimes causes dizziness"],
+  Emotion:["may confuse feelings","sometimes backfires","can cause distress"],
+  Perception:["may overload senses","temporary blindness risk","can mislead"],
+  "Elemental Manipulation":["may ignite nearby objects","sometimes backfires","can harm user"],
+  "Spatial Alteration":["may misplace objects","can disorient user","effects are unstable"],
+  "Temporal Influence":["time may reverse briefly","can age user","may distort surroundings"],
+  Summoning:["may summon hostile creature","can be uncontrollable","sometimes fails"],
+  Binding:["may trap user too","effects are inconsistent","may break unexpectedly"],
+  Divination:["may mislead","can reveal disturbing info","sometimes vague"]
+};
+
 /* ================= UTILITIES ================= */
-
-function hashString(str) {
-  let h = 2166136261;
-  for (let i=0;i<str.length;i++) {
-    h ^= str.charCodeAt(i);
-    h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);
+function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);}return h>>>0;}
+function seededRandom(seed){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}
+function weightedPick(list,r){let total=list.reduce((s,a)=>s+a.weight,0);let x=r*total;for(let i of list){if((x-=i.weight)<=0)return i;}return list[list.length-1];}
+function pickEffects(seed){
+  const cats=Object.keys(EFFECTS);const count=seededRandom(seed)>0.5?2:1;
+  const chosen=[];while(chosen.length<count){const cat=cats[Math.floor(seededRandom(seed+chosen.length)*cats.length)];if(!chosen.includes(cat))chosen.push(cat);}
+  const result={};chosen.forEach((c,i)=>{const e=EFFECTS[c][Math.floor(seededRandom(seed+i+10)*EFFECTS[c].length)];result[c]=e;});return result;
+}
+function generateDescription(effects){
+  const phrases=[];
+  for(let cat in effects){
+    const effect=effects[cat];
+    const pos=EFFECT_DESCRIPTIONS[effect][Math.floor(Math.random()*EFFECT_DESCRIPTIONS[effect].length)];
+    const neg=NEGATIVE_DESCRIPTIONS[effect][Math.floor(Math.random()*NEGATIVE_DESCRIPTIONS[effect].length)];
+    phrases.push(`This item ${pos}, but ${neg}.`);
   }
-  return h >>> 0;
+  return phrases.join(" ");
 }
 
-function seededRandom(seed) {
-  seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
-  return (seed >>> 0) / 4294967296;
-}
+/* ================= REALISTIC SVG GENERATOR ================= */
+function generateSVG(seed, base, material, curseTier){
+  const w=250,h=250;
+  const r=seededRandom(seed);
 
-function weightedPick(list, r) {
-  let total = list.reduce((s,a)=>s+a.weight,0);
-  let x = r * total;
-  for (let i of list) {
-    if ((x -= i.weight) <= 0) return i;
+  const defs=`<defs>
+<linearGradient id="ironGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ccc"/><stop offset="100%" stop-color="#888"/></linearGradient>
+<linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#aaffff" stop-opacity="0.6"/><stop offset="100%" stop-color="#88ddff" stop-opacity="0.3"/></linearGradient>
+<linearGradient id="boneGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#eee"/></linearGradient>
+<linearGradient id="plasticGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ccc"/></linearGradient>
+<linearGradient id="stoneGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#999"/><stop offset="100%" stop-color="#666"/></linearGradient>
+<linearGradient id="woodGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c17a3a"/><stop offset="100%" stop-color="#8b4513"/></linearGradient>
+<linearGradient id="clothGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bbb"/><stop offset="100%" stop-color="#888"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>`;
+
+  let shape=""; 
+  switch(base){
+    case "Bottle": shape=`<rect x="80" y="50" width="90" height="150" rx="15" fill="url(#glassGrad)" stroke="#333" stroke-width="2"/>
+      <circle cx="125" cy="50" r="12" fill="#444"/>
+      <rect x="85" y="100" width="80" height="60" fill="rgba(0,150,255,0.3)"/>`; break;
+    case "Mug": shape=`<rect x="70" y="80" width="100" height="110" rx="12" fill="url(#clayGrad)" stroke="#222" stroke-width="2"/>
+      <path d="M170 100 q20 40 0 60" stroke="#222" stroke-width="6" fill="none"/>`; break;
+    case "Knife": shape=`<rect x="110" y="70" width="15" height="120" fill="url(#ironGrad)" stroke="#222" stroke-width="2"/>
+      <polygon points="105,70 125,70 115,30" fill="#bbb" stroke="#222" stroke-width="2"/>`; break;
+    case "Ring": shape=`<circle cx="125" cy="125" r="50" fill="url(#ironGrad)" stroke="#222" stroke-width="3"/>
+      <circle cx="125" cy="125" r="20" fill="gold"/>`; break;
+    case "Shoe": shape=`<path d="M60 170 q60 -100 140 0 l-20 30 q-50 0 -80 -30z" fill="url(#clothGrad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Coin": shape=`<circle cx="125" cy="125" r="60" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Trash Can": shape=`<rect x="80" y="80" width="90" height="130" rx="10" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>
+      <rect x="75" y="70" width="100" height="15" rx="2" fill="#444"/>`; break;
+    case "Helmet": shape=`<ellipse cx="125" cy="110" rx="70" ry="50" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>
+      <rect x="90" y="110" width="70" height="50" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Plate": shape=`<ellipse cx="125" cy="125" rx="70" ry="25" fill="url(#ceramicGrad)" stroke="#222" stroke-width="2"/>`; break;
+    default: shape=`<rect x="90" y="90" width="70" height="70" fill="url(#plasticGrad)" stroke="#222" stroke-width="2"/>`;
   }
-  return list[list.length-1];
-}
 
-function pickEffects(seed) {
-  let effects = {};
-  for (let cat in EFFECTS) {
-    let r = seededRandom(seed + cat.length);
-    // Each category has a chance to have 1 effect
-    if (r > 0.3) {
-      const eidx = Math.floor(seededRandom(seed+cat.length*10)*EFFECTS[cat].length);
-      effects[cat] = EFFECTS[cat][eidx];
-    }
-  }
-  return effects;
-}
+  const corruptOverlay=(curseTier.category>=4)?`<line x1="0" y1="0" x2="${w}" y2="${h}" stroke="white" stroke-width="1" opacity="0.2"/>
+  <line x1="0" y1="${h}" x2="${w}" y2="0" stroke="white" stroke-width="1" opacity="0.2"/>`:"";
+  const glow=(curseTier.category>=6)?`filter="url(#glow)"`:"";
 
-/* ================= SVG GENERATOR ================= */
-
-function generateSVG(seed, base, material, curseTier) {
-  const w=160, h=160;
-  const r = seededRandom(seed);
-  let shape = "";
-  
-  // Generate SVG shapes based on base object
-  switch(base) {
-    case "Bottle": case "Mug":
-      shape = `<rect x="50" y="30" width="60" height="90" rx="10"/>`; break;
-    case "Ring": case "Coin":
-      shape = `<circle cx="80" cy="80" r="35"/>`; break;
-    case "Key":
-      shape = `<rect x="40" y="70" width="80" height="15" rx="4"/>`; break;
-    case "Plate":
-      shape = `<ellipse cx="80" cy="80" rx="50" ry="20"/>`; break;
-    case "Shoe":
-      shape = `<path d="M40 100 q30 -40 80 0 l-10 20 q-40 0 -60 -20z"/>`; break;
-    case "Trash Can":
-      shape = `<rect x="50" y="40" width="60" height="80" rx="5"/>
-               <rect x="45" y="30" width="70" height="10" rx="2"/>`; break;
-    case "Knife":
-      shape = `<rect x="70" y="40" width="20" height="80"/>
-               <polygon points="60,40 100,40 80,10"/>`; break;
-    case "Helmet":
-      shape = `<ellipse cx="80" cy="70" rx="50" ry="35"/>
-               <rect x="55" y="70" width="50" height="25"/>`; break;
-    default:
-      shape = `<rect x="50" y="50" width="60" height="60"/>`;
-  }
-  
-  // Add corruption overlay for dangerous items
-  const corruptOverlay = (curseTier.category>=4) ?
-    `<line x1="0" y1="0" x2="${w}" y2="${h}" stroke="white" stroke-width="1" opacity="0.3"/>
-     <line x1="0" y1="${h}" x2="${w}" y2="0" stroke="white" stroke-width="1" opacity="0.3"/>`
-    : "";
-  
-  // Glow for cataclysmic / legendary
-  const glow = (curseTier.category>=6) ? `filter="url(#glow)"` : "";
-  
-  return `
-<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-<defs>
-  <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/>
-    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-  </filter>
-</defs>
-<g fill="${MATERIAL_COLORS[material]}" stroke="white" stroke-width="2" ${glow}>
-  ${shape}
-</g>
-${corruptOverlay}
-</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    ${defs}
+    <g ${glow}>
+      ${shape}
+      ${corruptOverlay}
+    </g>
+  </svg>`;
 }
 
 /* ================= MAIN GENERATOR ================= */
-
-function generateItem() {
+function generateItem(){
   WORLD_COUNT++;
-  document.getElementById("worldCount").textContent = WORLD_COUNT;
-  
-  const uid = hashString(WORLD_COUNT + Date.now() + Math.random()).toString(16);
-  const seed = hashString(uid);
-
-  const base = BASE_OBJECTS[Math.floor(seededRandom(seed)*BASE_OBJECTS.length)];
-  const material = MATERIALS[Math.floor(seededRandom(seed+1)*MATERIALS.length)];
-  const curseTier = weightedPick(CURSE_TIERS, seededRandom(seed+2));
-  const effects = pickEffects(seed);
-
-  const svg = generateSVG(seed, base, material, curseTier);
-
-  LAST_ITEM = {
-    uid,
-    base,
-    material,
-    curse: curseTier.tier,
-    curse_category: curseTier.category,
-    effects,
-    svg
-  };
-  
-  document.getElementById("visual").innerHTML = svg;
-  
-  document.getElementById("data").textContent =
+  document.getElementById("worldCount").textContent=WORLD_COUNT;
+  const uid=hashString(WORLD_COUNT+Date.now()+Math.random()).toString(16);
+  const seed=hashString(uid);
+  const base=BASE_OBJECTS[Math.floor(seededRandom(seed)*BASE_OBJECTS.length)];
+  const material=MATERIALS[Math.floor(seededRandom(seed+1)*MATERIALS.length)];
+  const curseTier=weightedPick(CURSE_TIERS, seededRandom(seed+2));
+  const effects=pickEffects(seed);
+  const description=generateDescription(effects);
+  const svg=generateSVG(seed,base,material,curseTier);
+  LAST_ITEM={uid,base,material,curseTier,effects,description,svg};
+  document.getElementById("visual").innerHTML=svg;
+  document.getElementById("data").textContent=
 `UID: ${uid}
 Base Object: ${base}
 Material: ${material}
-Curse Tier: ${curseTier.tier}
-Curse Category: ${curseTier.category}
-Effects: ${JSON.stringify(effects,null,2)}`;
+Curse Tier: ${curseTier.tier} (Category ${curseTier.category})
+Effects: ${JSON.stringify(effects,null,2)}
+Description: ${description}`;
 }
 
 /* ================= METADATA EXPORT ================= */
-
-function downloadMetadata() {
-  if(!LAST_ITEM) return;
-  const svgBase64 = btoa(unescape(encodeURIComponent(LAST_ITEM.svg)));
-  const metadata = {
+function downloadMetadata(){
+  if(!LAST_ITEM)return;
+  const svgBase64=btoa(unescape(encodeURIComponent(LAST_ITEM.svg)));
+  const metadata={
     name:`Untitled Cursed Item #${WORLD_COUNT}`,
-    description:"Procedurally generated cursed item from storyworld.",
+    description:LAST_ITEM.description,
     image:`data:image/svg+xml;base64,${svgBase64}`,
     uid:LAST_ITEM.uid,
     base:LAST_ITEM.base,
     material:LAST_ITEM.material,
-    curse_tier:LAST_ITEM.curse,
-    curse_category:LAST_ITEM.curse_category,
+    curse_tier:LAST_ITEM.curseTier.tier,
+    curse_category:LAST_ITEM.curseTier.category,
     effects:LAST_ITEM.effects,
-    generator_version:"1.0.0"
+    generator_version:"2.0.0"
   };
-  const blob = new Blob([JSON.stringify(metadata,null,2)],{type:"application/json"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const blob=new Blob([JSON.stringify(metadata,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
   a.download=`cursed_item_${LAST_ITEM.uid}.json`;
   a.click();
 }
