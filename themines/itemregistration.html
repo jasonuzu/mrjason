@@ -2,21 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Photorealistic Cursed Item NFT Generator</title>
+<title>Safe Cursed Item Generator</title>
 <style>
 body { background:#0c0c10; color:#eaeaf0; font-family:system-ui,sans-serif; padding:20px; }
 button { background:#1e1e2b; color:white; border:1px solid #444; padding:10px 14px; cursor:pointer; margin-right:10px; }
 #itemBox { margin-top:20px; display:flex; gap:20px; align-items:flex-start; }
-#visual { width:300px; height:300px; display:flex; align-items:center; justify-content:center; background:#0f0f14; border:1px solid #333; }
+#visual { width:250px; height:250px; display:flex; align-items:center; justify-content:center; background:#0f0f14; border:1px solid #333; }
 pre { background:#0f0f14; padding:10px; max-width:650px; overflow:auto; font-size:12px; }
 </style>
 </head>
 <body>
 
-<h1>Photorealistic 3D Cursed Item NFT Generator</h1>
+<h1>Safe 3D Cursed Item Generator</h1>
 <p>Total World Catalogue: <span id="worldCount">0</span></p>
 <button onclick="generateItem()">Generate Item</button>
-<button onclick="downloadMetadata()">Export NFT Metadata</button>
 
 <div id="itemBox">
   <div id="visual"></div>
@@ -25,181 +24,35 @@ pre { background:#0f0f14; padding:10px; max-width:650px; overflow:auto; font-siz
 
 <script>
 let WORLD_COUNT=0;
-let LAST_ITEM=null;
 
-const BASE_OBJECTS=["Bottle","Mug","Knife","Ring","Shoe","Coin","Trash Can","Helmet","Plate"];
-const MATERIALS=["Iron","Glass","Bone","Plastic","Stone","Wood","Cloth"];
-const CURSE_TIERS=[
-  {tier:"Minor Anomaly", category:1, weight:40},
-  {tier:"Unpredictable Utility", category:2, weight:30},
-  {tier:"Dual-Effect Artifact", category:3, weight:15},
-  {tier:"Hazardous Implement", category:4, weight:7},
-  {tier:"Volatile Relic", category:5, weight:4},
-  {tier:"Dangerous Artifact", category:6, weight:3},
-  {tier:"Cataclysmic Curse", category:7, weight:1}
-];
+function randomColor(){ const colors=["#aaffff","#ccc","#fff","#c17a3a","#bbb"]; return colors[Math.floor(Math.random()*colors.length)]; }
+function randomBase(){ const b=["Bottle","Mug","Knife","Ring","Shoe","Coin","Trash Can","Helmet","Plate"]; return b[Math.floor(Math.random()*b.length)]; }
+function randomTier(){ const t=["Minor Anomaly","Unpredictable Utility","Dual-Effect Artifact","Hazardous Implement","Volatile Relic","Dangerous Artifact","Cataclysmic Curse"]; return t[Math.floor(Math.random()*t.length)]; }
+function randomEffect(){ const e=["Enhancement","Restoration","Alteration","Clarity","Emotion","Perception","Elemental","Spatial","Temporal","Summoning","Binding","Divination"]; return e[Math.floor(Math.random()*e.length)]; }
 
-const EFFECTS={
-  Somatic:["Enhancement","Restoration","Alteration"],
-  Cognitive:["Clarity","Emotion","Perception"],
-  Environmental:["Elemental Manipulation","Spatial Alteration","Temporal Influence"],
-  Metaphysical:["Summoning","Binding","Divination"]
-};
-
-const EFFECT_DESCRIPTIONS={
-  Enhancement:["boosts strength","increases speed","enhances endurance"],
-  Restoration:["heals minor injuries","restores vitality","removes fatigue"],
-  Alteration:["changes appearance","modifies size","alters form"],
-  Clarity:["improves focus","enhances memory","sharpens intelligence"],
-  Emotion:["induces calm","provokes fear","generates joy"],
-  Perception:["enhances vision","detects hidden objects","improves hearing"],
-  "Elemental Manipulation":["controls fire","manipulates water","summons wind"],
-  "Spatial Alteration":["creates barriers","teleports short distances","alters nearby space"],
-  "Temporal Influence":["slows local time","speeds up time","freezes brief moments"],
-  Summoning:["calls forth a creature","summons a construct","materializes object"],
-  Binding:["restricts movement","controls a being","immobilizes target"],
-  Divination:["reveals hidden knowledge","forecasts events","detects magic"]
-};
-
-const NEGATIVE_DESCRIPTIONS={
-  Enhancement:["may cause fatigue afterwards","can injure user if overused","sometimes backfires"],
-  Restoration:["heals imperfectly","may remove something important","can cause nausea"],
-  Alteration:["may distort unintentionally","effects may be temporary","can be uncomfortable"],
-  Clarity:["can induce headache","may overfocus","sometimes causes dizziness"],
-  Emotion:["may confuse feelings","sometimes backfires","can cause distress"],
-  Perception:["may overload senses","temporary blindness risk","can mislead"],
-  "Elemental Manipulation":["may ignite nearby objects","sometimes backfires","can harm user"],
-  "Spatial Alteration":["may misplace objects","can disorient user","effects are unstable"],
-  "Temporal Influence":["time may reverse briefly","can age user","may distort surroundings"],
-  Summoning:["may summon hostile creature","can be uncontrollable","sometimes fails"],
-  Binding:["may trap user too","effects are inconsistent","may break unexpectedly"],
-  Divination:["may mislead","can reveal disturbing info","sometimes vague"]
-};
-
-// --- UTILITIES ---
-function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);}return h>>>0;}
-function seededRandom(seed){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}
-function weightedPick(list,r){let total=list.reduce((s,a)=>s+a.weight,0);let x=r*total;for(let i of list){if((x-=i.weight)<=0)return i;}return list[list.length-1];}
-function pickEffects(seed){
-  const cats=Object.keys(EFFECTS);
-  const count=seededRandom(seed)>0.5?2:1;
-  const chosen=[];
-  while(chosen.length<count){
-    const cat=cats[Math.floor(seededRandom(seed+chosen.length)*cats.length)];
-    if(!chosen.includes(cat))chosen.push(cat);
-  }
-  const result={};
-  chosen.forEach((c,i)=>{
-    const e=EFFECTS[c][Math.floor(seededRandom(seed+i+10)*EFFECTS[c].length)];
-    result[c]=e;
-  });
-  return result;
-}
-function generateDescription(effects){
-  const phrases=[];
-  for(let cat in effects){
-    const effect=effects[cat];
-    const pos=EFFECT_DESCRIPTIONS[effect][Math.floor(Math.random()*EFFECT_DESCRIPTIONS[effect].length)];
-    const neg=NEGATIVE_DESCRIPTIONS[effect][Math.floor(Math.random()*NEGATIVE_DESCRIPTIONS[effect].length)];
-    phrases.push(`This item ${pos}, but ${neg}.`);
-  }
-  return phrases.join(" ");
-}
-
-// --- 3D-Like Photorealistic SVG Generator ---
-function generateSVG(seed, base, material, curseTier){
-  const w=300,h=300;
-  // Material colors
-  const matColor=material==="Glass"?"#aaffff":material==="Iron"?"#ccc":material==="Bone"?"#fff":material==="Wood"?"#c17a3a":"#bbb";
-  const matDark=material==="Glass"?"#88ddff":material==="Iron"?"#888":material==="Bone"?"#eee":material==="Wood"?"#8b4513":"#888";
-
-  const defs=`<defs>
-  <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="${matColor}"/>
-    <stop offset="100%" stop-color="${matDark}"/>
-  </linearGradient>
-  <filter id="glow"><feGaussianBlur stdDeviation="4"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  <filter id="shadow"><feDropShadow dx="3" dy="5" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter>
-  </defs>`;
-
-  // Base shape
-  let shape="";
-  switch(base){
-    case "Bottle": shape=`<rect x="90" y="60" width="120" height="160" rx="15" fill="url(#grad)" stroke="#333" stroke-width="2"/>`; break;
-    case "Mug": shape=`<rect x="80" y="90" width="140" height="120" rx="12" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Knife": shape=`<rect x="130" y="80" width="15" height="140" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Ring": shape=`<circle cx="150" cy="150" r="60" fill="url(#grad)" stroke="#222" stroke-width="3"/>`; break;
-    case "Shoe": shape=`<path d="M70 200 q80 -130 160 0 l-25 35 q-60 0 -110 -35z" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Coin": shape=`<circle cx="150" cy="150" r="70" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Trash Can": shape=`<rect x="90" y="90" width="120" height="140" rx="10" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Helmet": shape=`<ellipse cx="150" cy="130" rx="85" ry="60" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Plate": shape=`<ellipse cx="150" cy="150" rx="85" ry="35" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
-    default: shape=`<rect x="100" y="100" width="100" height="100" fill="url(#grad)" stroke="#222" stroke-width="2"/>`;
-  }
-
-  // Highlights for 3D
-  const highlight=`<ellipse cx="150" cy="70" rx="50" ry="18" fill="white" opacity="0.15"/>`;
-  const overlay=(curseTier.category>=4)?`<line x1="0" y1="0" x2="${w}" y2="${h}" stroke="white" stroke-width="1" opacity="0.2"/>
-  <line x1="0" y1="${h}" x2="${w}" y2="0" stroke="white" stroke-width="1" opacity="0.2"/>`:"";
-  const glow=(curseTier.category>=6)?`filter="url(#glow)"`:"";
-  const shadow=`filter="url(#shadow)"`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-    ${defs}
-    <g ${shadow} ${glow}>
-      ${shape}
-      ${highlight}
-      ${overlay}
-    </g>
-  </svg>`;
-}
-
-// --- MAIN GENERATOR ---
 function generateItem(){
   WORLD_COUNT++;
   document.getElementById("worldCount").textContent=WORLD_COUNT;
-  const uid=hashString(WORLD_COUNT+Date.now()+Math.random()).toString(16);
-  const seed=hashString(uid);
-  const base=BASE_OBJECTS[Math.floor(seededRandom(seed)*BASE_OBJECTS.length)];
-  const material=MATERIALS[Math.floor(seededRandom(seed+1)*MATERIALS.length)];
-  const curseTier=weightedPick(CURSE_TIERS, seededRandom(seed+2));
-  const effects=pickEffects(seed);
-  const description=generateDescription(effects);
-  const svg=generateSVG(seed,base,material,curseTier);
-  LAST_ITEM={uid,base,material,curseTier,effects,description,svg};
+
+  const base=randomBase();
+  const material=randomColor();
+  const tier=randomTier();
+  const effect=randomEffect();
+  const description=`This ${base} has the effect: ${effect}. Positive and negative effects apply.`;
+
+  const svg=`<svg width="250" height="250" xmlns="http://www.w3.org/2000/svg">
+    <rect x="50" y="50" width="150" height="150" rx="15" fill="${material}" stroke="#222" stroke-width="2"/>
+    <ellipse cx="125" cy="70" rx="60" ry="20" fill="white" opacity="0.15"/>
+  </svg>`;
+
   document.getElementById("visual").innerHTML=svg;
   document.getElementById("data").textContent=
-`UID: ${uid}
-Base Object: ${base}
+`Base: ${base}
 Material: ${material}
-Curse Tier: ${curseTier.tier} (Category ${curseTier.category})
-Effects: ${JSON.stringify(effects,null,2)}
+Tier: ${tier}
+Effect: ${effect}
 Description: ${description}`;
 }
-
-// --- NFT Export ---
-function downloadMetadata(){
-  if(!LAST_ITEM)return;
-  const svgBase64=btoa(unescape(encodeURIComponent(LAST_ITEM.svg)));
-  const metadata={
-    name:`Untitled Cursed Item #${WORLD_COUNT}`,
-    description:LAST_ITEM.description,
-    image:`data:image/svg+xml;base64,${svgBase64}`,
-    uid:LAST_ITEM.uid,
-    base:LAST_ITEM.base,
-    material:LAST_ITEM.material,
-    curse_tier:LAST_ITEM.curseTier.tier,
-    curse_category:LAST_ITEM.curseTier.category,
-    effects:LAST_ITEM.effects,
-    generator_version:"3.1.0"
-  };
-  const blob=new Blob([JSON.stringify(metadata,null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=`cursed_item_${LAST_ITEM.uid}.json`;
-  a.click();
-}
 </script>
-
 </body>
 </html>
