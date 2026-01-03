@@ -1,175 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
 <title>Cursed Item Generator</title>
 <style>
-body { font-family: Arial, sans-serif; background: #1e1e1e; color: #eee; padding: 20px; }
-h1 { text-align: center; }
-#container { max-width: 700px; margin: auto; background: #2e2e2e; padding: 20px; border-radius: 10px; position: relative; transition: 0.3s; }
-ul { margin: 0; padding-left: 20px; }
-input { width: 100%; padding: 8px; margin-top: 10px; margin-bottom: 10px; border-radius: 5px; border: none; }
-button { padding: 10px 20px; margin-top: 10px; margin-right: 5px; background: #444; color: #eee; border: none; cursor: pointer; border-radius: 5px; }
-button:hover { background: #666; }
-#world-counter, #leaderboard { text-align:center; margin-top:20px; font-weight:bold; }
-.legendary {
-  box-shadow: 0 0 20px 5px gold, 0 0 40px 10px orange;
-  animation: sparkle 1s infinite alternate;
-}
-@keyframes sparkle {
-  0% { box-shadow: 0 0 20px 5px gold, 0 0 40px 10px orange; }
-  100% { box-shadow: 0 0 30px 10px gold, 0 0 60px 20px orange; }
-}
+  body {
+    background:#0e0e11;
+    color:#e6e6eb;
+    font-family: system-ui, sans-serif;
+    padding:20px;
+  }
+  button {
+    background:#1f1f2a;
+    color:white;
+    border:1px solid #444;
+    padding:10px 14px;
+    cursor:pointer;
+  }
+  #itemBox {
+    margin-top:20px;
+    display:flex;
+    gap:20px;
+  }
+  svg {
+    background:#111;
+    border:1px solid #333;
+  }
+  pre {
+    background:#111;
+    padding:10px;
+    overflow:auto;
+    max-height:300px;
+    font-size:12px;
+  }
 </style>
 </head>
 <body>
 
 <h1>Cursed Item Generator</h1>
-<div id="container">
-  <h2 id="item-name">Item #0</h2>
-  <p><strong>Base:</strong> <span id="item-base"></span></p>
-  <p><strong>Material:</strong> <span id="item-material"></span></p>
-  <p><strong>Curse Type:</strong> <span id="item-curse"></span></p>
-  <p><strong>Effects:</strong>
-    <ul id="item-effects"></ul>
-  </p>
-  <p><strong>Side Effects:</strong>
-    <ul id="item-sideeffects"></ul>
-  </p>
-  <input id="rename-input" type="text" placeholder="Rename your item...">
-  <button onclick="copyItem()">Copy Item</button>
-  <button onclick="generateItem()">Generate New Item</button>
+<p>Total World Catalogue: <span id="worldCount">0</span></p>
+
+<button onclick="generateItem()">Generate Item</button>
+<button onclick="downloadMetadata()">Export NFT Metadata</button>
+
+<div id="itemBox">
+  <div id="visual"></div>
+  <pre id="data"></pre>
 </div>
 
-<div id="world-counter">🌍 Total Items Generated Worldwide: <span id="total-items">0</span></div>
-<div id="leaderboard">🏆 Legendary Items Found: <span id="legendary-count">0</span></div>
-
 <script>
+/* ---------------- CORE DATA ---------------- */
 
-// ---------- COMPONENTS ----------
-const BASE_OBJECTS = ["Shoe","Bottle Cap","Trash Can","Rock","Spoon","Hat","Table","Book","Coin","Comb","Cup","Fork","Plate","Glass","Bottle","Candle","Watch","Key","Bag","Wallet","Broom","Chair","Door","Window","Helmet","Glove","Sock","Boot","Scarf","Rope","Brick"];
-const MATERIALS = ["Rusty","Frozen","Sticky","Warped","Glowing","Molten","Hollow","Brittle","Shimmering","Slimy","Torn","Charred","Moldy","Jagged","Polished","Cracked","Transparent","Magnetic","Heavy","Light","Twisted","Wet","Dusty","Slippery","Shattered","Bent","Faded","Viscous","Smooth","Spiky"];
-const CURSE_TYPES = ["Minor Anomaly","Unpredictable Utility","Dual-Effect Artifact","Hazardous Implement","Volatile Relic","Dangerous Artifact","Cataclysmic Curse"];
+let WORLD_COUNT = 0;
+let LAST_ITEM = null;
 
-const MAGICAL_EFFECTS = [
-  {name:"Strength Boost", weight:10},{name:"Speed Boost", weight:10},{name:"Heal Wounds", weight:8},
-  {name:"Grow Limbs", weight:2},{name:"Shrink User", weight:2},{name:"Enhance Senses", weight:5},
-  {name:"Confuse Thoughts", weight:3},{name:"Induce Fear", weight:3},{name:"Induce Euphoria", weight:3},
-  {name:"Heighten Perception", weight:5},{name:"Summon Fire Element", weight:1},{name:"Summon Water Element", weight:1},
-  {name:"Summon Earth Element", weight:1},{name:"Summon Air Element", weight:1},{name:"Teleport Small Items", weight:4},
-  {name:"Slow Time", weight:1},{name:"Accelerate Time", weight:1},{name:"Reverse Gravity", weight:1},
-  {name:"Create Fog", weight:4},{name:"Summon Lightning", weight:1}
+const BASE_OBJECTS = [
+  "Bottle Cap","Shoe","Key","Plate","Ring",
+  "Trash Lid","Coin","Mug","Knife","Helmet"
 ];
 
-const SIDE_EFFECTS = [
-  {name:"Emits faint whispers", weight:10},{name:"Attracts rats randomly", weight:8},{name:"Glows in complete darkness", weight:7},
-  {name:"Slightly poisons the user over time", weight:3},{name:"Teleports small objects nearby randomly", weight:2},
-  {name:"Causes minor hallucinations", weight:2},{name:"Creates unpleasant odor", weight:5},{name:"Becomes heavier over time", weight:4},
-  {name:"Summons tiny annoying creatures", weight:1},{name:"Vibrates unpredictably", weight:1}
+const MATERIALS = [
+  "Iron","Glass","Bone","Plastic","Stone","Wood","Cloth"
 ];
 
-// ---------- UTILITY ----------
-function randomChoice(array){ return array[Math.floor(Math.random()*array.length)]; }
+const CURSES = [
+  { name:"Minor Anomaly", weight:40 },
+  { name:"Unpredictable Utility", weight:30 },
+  { name:"Dual Effect", weight:15 },
+  { name:"Hazardous Implement", weight:10 },
+  { name:"Cataclysmic Curse", weight:5 }
+];
 
-function randomWeightedChoice(array){
-  const totalWeight = array.reduce((sum,e)=>sum+e.weight,0);
-  let r = Math.random()*totalWeight;
-  for(let i=0;i<array.length;i++){
-    if(r < array[i].weight) return array[i].name;
-    r -= array[i].weight;
+const RARITY = [
+  { tier:"Common", weight:60 },
+  { tier:"Uncommon", weight:25 },
+  { tier:"Rare", weight:10 },
+  { tier:"Legendary", weight:5 }
+];
+
+/* ---------------- UTILITIES ---------------- */
+
+function hashString(str) {
+  let h = 2166136261;
+  for (let i=0;i<str.length;i++) {
+    h ^= str.charCodeAt(i);
+    h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);
   }
-  return array[array.length-1].name;
+  return h >>> 0;
 }
 
-function randomSubset(array,min=1,max=1){
-  const count = Math.floor(Math.random()*(max-min+1))+min;
-  const shuffled = array.slice().sort(()=>0.5-Math.random());
-  return shuffled.slice(0,count);
+function seededRandom(seed) {
+  seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5;
+  return (seed >>> 0) / 4294967296;
 }
 
-function randomWeightedSubset(array,min=1,max=1){
-  const count = Math.floor(Math.random()*(max-min+1))+min;
-  let selected=[];
-  const copy = array.slice();
-  for(let i=0;i<count;i++){
-    if(copy.length===0) break;
-    const totalWeight = copy.reduce((sum,e)=>sum+e.weight,0);
-    let r=Math.random()*totalWeight;
-    for(let j=0;j<copy.length;j++){
-      if(r<copy[j].weight){ selected.push(copy[j].name); copy.splice(j,1); break; }
-      r-=copy[j].weight;
-    }
+function weightedPick(list, r) {
+  let total = list.reduce((s,a)=>s+a.weight,0);
+  let x = r * total;
+  for (let i of list) {
+    if ((x -= i.weight) <= 0) return i;
   }
-  return selected;
+  return list[list.length-1];
 }
 
-function checkLegendary(effects,sideEffects){
-  const ultraRareEffects = MAGICAL_EFFECTS.filter(e=>e.weight<=2).map(e=>e.name);
-  const ultraRareSide = SIDE_EFFECTS.filter(e=>e.weight<=2).map(e=>e.name);
-  const hasUltraRareEffect = effects.some(e=>ultraRareEffects.includes(e));
-  const hasUltraRareSide = sideEffects.some(s=>ultraRareSide.includes(s));
-  return hasUltraRareEffect && hasUltraRareSide;
+/* ---------------- SVG GENERATOR ---------------- */
+
+function generateSVG(seed, base) {
+  const r = seededRandom(seed);
+  const w = 120, h = 120;
+  const distort = Math.floor(r * 20);
+  const tilt = (seed % 30) - 15;
+
+  let shape;
+
+  if (base.includes("Bottle") || base.includes("Mug")) {
+    shape = `<rect x="40" y="20" width="40" height="70" rx="${8+distort}" />`;
+  } else if (base.includes("Ring") || base.includes("Coin")) {
+    shape = `<circle cx="60" cy="60" r="${30+distort}" />`;
+  } else if (base.includes("Key")) {
+    shape = `<rect x="30" y="50" width="60" height="15" rx="4" />`;
+  } else {
+    shape = `<rect x="30" y="30" width="${60+distort}" height="${60-distort}" rx="6" />`;
+  }
+
+  return `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">
+  <g transform="rotate(${tilt} 60 60)">
+    <g fill="none" stroke="white" stroke-width="2">
+      ${shape}
+    </g>
+    <g fill="rgba(255,255,255,0.05)">
+      ${shape}
+    </g>
+  </g>
+</svg>`;
 }
 
-// ---------- GENERATION ----------
-let itemCounter=0;
-let worldTotal=0;
-let legendaryCount=0;
+/* ---------------- MAIN GENERATOR ---------------- */
 
-function generateItem(){
-  itemCounter++;
-  worldTotal++;
+function generateItem() {
+  WORLD_COUNT++;
+  document.getElementById("worldCount").textContent = WORLD_COUNT;
 
-  const base=randomChoice(BASE_OBJECTS);
-  const material=randomChoice(MATERIALS);
-  const curse=randomChoice(CURSE_TYPES);
-  const effects=randomSubset(MAGICAL_EFFECTS.map(e=>e.name),1,5).map(e=>randomWeightedChoice(MAGICAL_EFFECTS));
-  const sideEffects=randomWeightedSubset(SIDE_EFFECTS,0,3);
+  const uid = hashString(
+    WORLD_COUNT + Date.now().toString() + Math.random().toString()
+  ).toString(16);
 
-  const legendary=checkLegendary(effects,sideEffects);
-  if(legendary) legendaryCount++;
+  const seed = hashString(uid);
 
-  const container=document.getElementById("container");
-  container.classList.toggle("legendary",legendary);
+  const r1 = seededRandom(seed);
+  const r2 = seededRandom(seed+1);
+  const r3 = seededRandom(seed+2);
 
-  document.getElementById("item-name").innerText=legendary?`🌟 Legendary Item #${itemCounter}`:`Item #${itemCounter}`;
-  document.getElementById("item-base").innerText=base;
-  document.getElementById("item-material").innerText=material;
-  document.getElementById("item-curse").innerText=curse;
+  const base = BASE_OBJECTS[Math.floor(r1 * BASE_OBJECTS.length)];
+  const material = MATERIALS[Math.floor(r2 * MATERIALS.length)];
+  const curse = weightedPick(CURSES, r3);
+  const rarity = weightedPick(RARITY, seededRandom(seed+3));
 
-  const effectsList=document.getElementById("item-effects");
-  effectsList.innerHTML="";
-  effects.forEach(e=>{ let li=document.createElement("li"); li.innerText=e; effectsList.appendChild(li); });
+  const svg = generateSVG(seed, base);
+  document.getElementById("visual").innerHTML = svg;
 
-  const sideList=document.getElementById("item-sideeffects");
-  sideList.innerHTML="";
-  sideEffects.forEach(e=>{ let li=document.createElement("li"); li.innerText=e; sideList.appendChild(li); });
+  LAST_ITEM = {
+    uid,
+    base,
+    material,
+    curse: curse.name,
+    rarity: rarity.tier,
+    distortion: (seed % 1000) / 1000,
+    svg
+  };
 
-  document.getElementById("rename-input").value="Your Item Here";
-  document.getElementById("total-items").innerText=worldTotal.toLocaleString();
-  document.getElementById("legendary-count").innerText=legendaryCount.toLocaleString();
-
-  if(legendary) alert("🌟 Legendary Item has appeared!");
+  document.getElementById("data").textContent =
+`UID: ${uid}
+Base Object: ${base}
+Material: ${material}
+Curse: ${curse.name}
+Rarity: ${rarity.tier}
+Geometry Distortion: ${LAST_ITEM.distortion}`;
 }
 
-// ---------- COPY FUNCTION ----------
-function copyItem(){
-  const name=document.getElementById("rename-input").value;
-  const base=document.getElementById("item-base").innerText;
-  const material=document.getElementById("item-material").innerText;
-  const curse=document.getElementById("item-curse").innerText;
-  const effects=Array.from(document.getElementById("item-effects").children).map(li=>li.innerText);
-  const sideEffects=Array.from(document.getElementById("item-sideeffects").children).map(li=>li.innerText);
+/* ---------------- METADATA EXPORT ---------------- */
 
-  const itemText=`${name}\nBase: ${base}\nMaterial: ${material}\nCurse Type: ${curse}\nEffects: ${effects.join(", ")}\nSide Effects: ${sideEffects.join(", ")}`;
-  navigator.clipboard.writeText(itemText);
-  alert("Item copied!");
+function downloadMetadata() {
+  if (!LAST_ITEM) return;
+
+  const svgBase64 = btoa(unescape(encodeURIComponent(LAST_ITEM.svg)));
+
+  const metadata = {
+    name: `Untitled Cursed Item #${WORLD_COUNT}`,
+    description: "A procedurally generated cursed object from an ever-expanding catalogue.",
+    image: `data:image/svg+xml;base64,${svgBase64}`,
+    attributes: [
+      { trait_type:"Base Object", value:LAST_ITEM.base },
+      { trait_type:"Material", value:LAST_ITEM.material },
+      { trait_type:"Curse", value:LAST_ITEM.curse },
+      { trait_type:"Rarity", value:LAST_ITEM.rarity },
+      { trait_type:"Distortion", value:LAST_ITEM.distortion }
+    ],
+    uid: LAST_ITEM.uid,
+    generator_version: "1.0.0"
+  };
+
+  const blob = new Blob(
+    [JSON.stringify(metadata, null, 2)],
+    { type:"application/json" }
+  );
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `cursed_item_${LAST_ITEM.uid}.json`;
+  a.click();
 }
-
-// ---------- INIT ----------
-generateItem();
-
 </script>
+
 </body>
 </html>
