@@ -2,51 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Realistic Cursed Item NFT Generator</title>
+<title>Photorealistic Cursed Item NFT Generator</title>
 <style>
-body {
-  background:#0c0c10;
-  color:#eaeaf0;
-  font-family: system-ui, sans-serif;
-  padding:20px;
-}
-button {
-  background:#1e1e2b;
-  color:white;
-  border:1px solid #444;
-  padding:10px 14px;
-  cursor:pointer;
-  margin-right:10px;
-}
-#itemBox {
-  margin-top:20px;
-  display:flex;
-  gap:20px;
-  align-items:flex-start;
-}
-#visual {
-  width:250px;
-  height:250px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#0f0f14;
-  border:1px solid #333;
-}
-pre {
-  background:#0f0f14;
-  padding:10px;
-  max-width:600px;
-  overflow:auto;
-  font-size:12px;
-}
+body { background:#0c0c10; color:#eaeaf0; font-family:system-ui,sans-serif; padding:20px; }
+button { background:#1e1e2b; color:white; border:1px solid #444; padding:10px 14px; cursor:pointer; margin-right:10px; }
+#itemBox { margin-top:20px; display:flex; gap:20px; align-items:flex-start; }
+#visual { width:300px; height:300px; display:flex; align-items:center; justify-content:center; background:#0f0f14; border:1px solid #333; }
+pre { background:#0f0f14; padding:10px; max-width:650px; overflow:auto; font-size:12px; }
 </style>
 </head>
 <body>
 
-<h1>Realistic Cursed Item NFT Generator</h1>
+<h1>Photorealistic 3D Cursed Item NFT Generator</h1>
 <p>Total World Catalogue: <span id="worldCount">0</span></p>
-
 <button onclick="generateItem()">Generate Item</button>
 <button onclick="downloadMetadata()">Export NFT Metadata</button>
 
@@ -56,7 +24,6 @@ pre {
 </div>
 
 <script>
-/* ================= CORE DATA ================= */
 let WORLD_COUNT=0;
 let LAST_ITEM=null;
 
@@ -109,14 +76,24 @@ const NEGATIVE_DESCRIPTIONS={
   Divination:["may mislead","can reveal disturbing info","sometimes vague"]
 };
 
-/* ================= UTILITIES ================= */
+// --- UTILITIES ---
 function hashString(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h+=(h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);}return h>>>0;}
 function seededRandom(seed){seed^=seed<<13;seed^=seed>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}
 function weightedPick(list,r){let total=list.reduce((s,a)=>s+a.weight,0);let x=r*total;for(let i of list){if((x-=i.weight)<=0)return i;}return list[list.length-1];}
 function pickEffects(seed){
-  const cats=Object.keys(EFFECTS);const count=seededRandom(seed)>0.5?2:1;
-  const chosen=[];while(chosen.length<count){const cat=cats[Math.floor(seededRandom(seed+chosen.length)*cats.length)];if(!chosen.includes(cat))chosen.push(cat);}
-  const result={};chosen.forEach((c,i)=>{const e=EFFECTS[c][Math.floor(seededRandom(seed+i+10)*EFFECTS[c].length)];result[c]=e;});return result;
+  const cats=Object.keys(EFFECTS);
+  const count=seededRandom(seed)>0.5?2:1;
+  const chosen=[];
+  while(chosen.length<count){
+    const cat=cats[Math.floor(seededRandom(seed+chosen.length)*cats.length)];
+    if(!chosen.includes(cat))chosen.push(cat);
+  }
+  const result={};
+  chosen.forEach((c,i)=>{
+    const e=EFFECTS[c][Math.floor(seededRandom(seed+i+10)*EFFECTS[c].length)];
+    result[c]=e;
+  });
+  return result;
 }
 function generateDescription(effects){
   const phrases=[];
@@ -129,57 +106,55 @@ function generateDescription(effects){
   return phrases.join(" ");
 }
 
-/* ================= REALISTIC SVG GENERATOR ================= */
+// --- 3D-Like Photorealistic SVG Generator ---
 function generateSVG(seed, base, material, curseTier){
-  const w=250,h=250;
-  const r=seededRandom(seed);
+  const w=300,h=300;
+  // Material colors
+  const matColor=material==="Glass"?"#aaffff":material==="Iron"?"#ccc":material==="Bone"?"#fff":material==="Wood"?"#c17a3a":"#bbb";
+  const matDark=material==="Glass"?"#88ddff":material==="Iron"?"#888":material==="Bone"?"#eee":material==="Wood"?"#8b4513":"#888";
 
   const defs=`<defs>
-<linearGradient id="ironGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ccc"/><stop offset="100%" stop-color="#888"/></linearGradient>
-<linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#aaffff" stop-opacity="0.6"/><stop offset="100%" stop-color="#88ddff" stop-opacity="0.3"/></linearGradient>
-<linearGradient id="boneGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#eee"/></linearGradient>
-<linearGradient id="plasticGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ccc"/></linearGradient>
-<linearGradient id="stoneGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#999"/><stop offset="100%" stop-color="#666"/></linearGradient>
-<linearGradient id="woodGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c17a3a"/><stop offset="100%" stop-color="#8b4513"/></linearGradient>
-<linearGradient id="clothGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bbb"/><stop offset="100%" stop-color="#888"/></linearGradient>
-<filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-</defs>`;
+  <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="${matColor}"/>
+    <stop offset="100%" stop-color="${matDark}"/>
+  </linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="4"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="shadow"><feDropShadow dx="3" dy="5" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter>
+  </defs>`;
 
-  let shape=""; 
+  // Base shape
+  let shape="";
   switch(base){
-    case "Bottle": shape=`<rect x="80" y="50" width="90" height="150" rx="15" fill="url(#glassGrad)" stroke="#333" stroke-width="2"/>
-      <circle cx="125" cy="50" r="12" fill="#444"/>
-      <rect x="85" y="100" width="80" height="60" fill="rgba(0,150,255,0.3)"/>`; break;
-    case "Mug": shape=`<rect x="70" y="80" width="100" height="110" rx="12" fill="url(#clayGrad)" stroke="#222" stroke-width="2"/>
-      <path d="M170 100 q20 40 0 60" stroke="#222" stroke-width="6" fill="none"/>`; break;
-    case "Knife": shape=`<rect x="110" y="70" width="15" height="120" fill="url(#ironGrad)" stroke="#222" stroke-width="2"/>
-      <polygon points="105,70 125,70 115,30" fill="#bbb" stroke="#222" stroke-width="2"/>`; break;
-    case "Ring": shape=`<circle cx="125" cy="125" r="50" fill="url(#ironGrad)" stroke="#222" stroke-width="3"/>
-      <circle cx="125" cy="125" r="20" fill="gold"/>`; break;
-    case "Shoe": shape=`<path d="M60 170 q60 -100 140 0 l-20 30 q-50 0 -80 -30z" fill="url(#clothGrad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Coin": shape=`<circle cx="125" cy="125" r="60" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Trash Can": shape=`<rect x="80" y="80" width="90" height="130" rx="10" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>
-      <rect x="75" y="70" width="100" height="15" rx="2" fill="#444"/>`; break;
-    case "Helmet": shape=`<ellipse cx="125" cy="110" rx="70" ry="50" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>
-      <rect x="90" y="110" width="70" height="50" fill="url(#metalGrad)" stroke="#222" stroke-width="2"/>`; break;
-    case "Plate": shape=`<ellipse cx="125" cy="125" rx="70" ry="25" fill="url(#ceramicGrad)" stroke="#222" stroke-width="2"/>`; break;
-    default: shape=`<rect x="90" y="90" width="70" height="70" fill="url(#plasticGrad)" stroke="#222" stroke-width="2"/>`;
+    case "Bottle": shape=`<rect x="90" y="60" width="120" height="160" rx="15" fill="url(#grad)" stroke="#333" stroke-width="2"/>`; break;
+    case "Mug": shape=`<rect x="80" y="90" width="140" height="120" rx="12" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Knife": shape=`<rect x="130" y="80" width="15" height="140" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Ring": shape=`<circle cx="150" cy="150" r="60" fill="url(#grad)" stroke="#222" stroke-width="3"/>`; break;
+    case "Shoe": shape=`<path d="M70 200 q80 -130 160 0 l-25 35 q-60 0 -110 -35z" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Coin": shape=`<circle cx="150" cy="150" r="70" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Trash Can": shape=`<rect x="90" y="90" width="120" height="140" rx="10" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Helmet": shape=`<ellipse cx="150" cy="130" rx="85" ry="60" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    case "Plate": shape=`<ellipse cx="150" cy="150" rx="85" ry="35" fill="url(#grad)" stroke="#222" stroke-width="2"/>`; break;
+    default: shape=`<rect x="100" y="100" width="100" height="100" fill="url(#grad)" stroke="#222" stroke-width="2"/>`;
   }
 
-  const corruptOverlay=(curseTier.category>=4)?`<line x1="0" y1="0" x2="${w}" y2="${h}" stroke="white" stroke-width="1" opacity="0.2"/>
+  // Highlights for 3D
+  const highlight=`<ellipse cx="150" cy="70" rx="50" ry="18" fill="white" opacity="0.15"/>`;
+  const overlay=(curseTier.category>=4)?`<line x1="0" y1="0" x2="${w}" y2="${h}" stroke="white" stroke-width="1" opacity="0.2"/>
   <line x1="0" y1="${h}" x2="${w}" y2="0" stroke="white" stroke-width="1" opacity="0.2"/>`:"";
   const glow=(curseTier.category>=6)?`filter="url(#glow)"`:"";
+  const shadow=`filter="url(#shadow)"`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
     ${defs}
-    <g ${glow}>
+    <g ${shadow} ${glow}>
       ${shape}
-      ${corruptOverlay}
+      ${highlight}
+      ${overlay}
     </g>
   </svg>`;
 }
 
-/* ================= MAIN GENERATOR ================= */
+// --- MAIN GENERATOR ---
 function generateItem(){
   WORLD_COUNT++;
   document.getElementById("worldCount").textContent=WORLD_COUNT;
@@ -202,7 +177,7 @@ Effects: ${JSON.stringify(effects,null,2)}
 Description: ${description}`;
 }
 
-/* ================= METADATA EXPORT ================= */
+// --- NFT Export ---
 function downloadMetadata(){
   if(!LAST_ITEM)return;
   const svgBase64=btoa(unescape(encodeURIComponent(LAST_ITEM.svg)));
@@ -216,7 +191,7 @@ function downloadMetadata(){
     curse_tier:LAST_ITEM.curseTier.tier,
     curse_category:LAST_ITEM.curseTier.category,
     effects:LAST_ITEM.effects,
-    generator_version:"2.0.0"
+    generator_version:"3.1.0"
   };
   const blob=new Blob([JSON.stringify(metadata,null,2)],{type:"application/json"});
   const a=document.createElement("a");
@@ -225,5 +200,6 @@ function downloadMetadata(){
   a.click();
 }
 </script>
+
 </body>
 </html>
