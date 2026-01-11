@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Archivist's Refinery: The Essence Lab</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(circle at top, #111 0%, #000 65%);
+  font-family: 'Courier New', monospace;
+  color: #f8f4e3;
+  overflow: hidden;
+  min-height: 100vh;
+  user-select: none;
+}
+
+/* CRT Scanline Effect */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* TITLE SCREEN */
+#titleScreen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(#090909, #000);
+  z-index: 10000; animation: fadeIn 1s ease-out;
+}
+
+#titleBox {
+  border: 8px double #4a3728; background: #120d07;
+  padding: 50px 60px; text-align: center;
+  box-shadow: 0 0 100px rgba(150, 120, 80, 0.6);
+  position: relative; animation: pulseGlow 4s infinite alternate;
+}
+
+#titleBox h1 {
+  font-family: 'Press Start 2P', cursive; font-size: 28px;
+  color: #e6d8c3; text-shadow: 0 0 10px rgba(180, 150, 120, 0.7);
+  margin-bottom: 10px; line-height: 1.5;
+}
+#pressStart {
+  margin-top: 30px; font-size: 11px; animation: blink 1.2s infinite;
+  color: #e6d8c3; letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+}
+
+/* GAME CONTAINER */
+#gameContainer { display: none; min-height: 100vh; justify-content: center; align-items: center; padding: 20px; animation: fadeIn 0.8s ease-out; }
+#gameWrapper {
+  padding: 20px; border: 8px ridge #4a3728;
+  background: linear-gradient(135deg, #2a241a 0%, #1a140a 100%);
+  box-shadow: 0 0 60px rgba(74, 55, 40, 0.8);
+  position: relative; width: 1000px; height: 700px; display: flex; flex-direction: column;
+}
+
+/* ARCHIVE ROOM */
+#archiveRoom {
+  position: relative; width: 100%; height: 500px;
+  background: linear-gradient(135deg, #3a2e1e 0%, #2a1e0e 100%);
+  border: 6px solid #2a241a; box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+  overflow: hidden; margin-bottom: 20px;
+}
+
+/* OBJECTS */
+#stoneButton {
+  position: absolute; right: 50px; top: 50px; width: 80px; height: 80px;
+  background: radial-gradient(circle at 30% 30%, #6a5a4a 0%, #4a3a2a 100%);
+  border: 8px solid #3a2a1a; border-radius: 50%; cursor: pointer; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  color: #e6d8c3; font-family: 'Press Start 2P', cursive; font-size: 9px; text-align: center; padding: 10px;
+  box-shadow: 0 0 20px rgba(200, 180, 120, 0.3);
+}
+#stoneButton:hover { transform: scale(1.05); }
+
+/* REFINING TABLE */
+#stoneTable {
+  position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%);
+  width: 400px; height: 300px;
+  background: radial-gradient(ellipse at center, #5a4a3a 0%, #4a3a2a 70%, #3a2a1a 100%);
+  border-radius: 50%;
+  border: 15px solid #3a2a1a;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 0 50px rgba(0, 0, 0, 0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 40;
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-15px); }
+}
+
+#stoneTable.activeRefine {
+  animation: float 3s ease-in-out infinite;
+  border-color: #ffd700;
+  box-shadow: 0 0 60px rgba(255, 215, 0, 0.6), inset 0 0 50px rgba(255, 215, 0, 0.2);
+}
+
+/* Particle Canvas */
+#particleCanvas {
+  position: absolute; top:0; left:0; pointer-events: none; z-index: 41;
+}
+
+#tablePlaceholder {
+  text-align: center; color: rgba(180, 150, 120, 0.4);
+  font-family: 'Press Start 2P', cursive; font-size: 12px;
+  pointer-events: none; z-index: 45; text-transform: uppercase;
+}
+
+#stoneTable.highlight { box-shadow: 0 0 50px rgba(255, 215, 0, 0.4), inset 0 0 50px rgba(255, 215, 0, 0.1); border-color: #ffd700; }
+
+/* ITEMS */
+.item-display {
+  position: absolute; width: 80px; height: 80px; cursor: grab;
+  transition: transform 0.1s; z-index: 60; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+}
+.item-display img { width: 100%; height: 100%; object-fit: contain; border: 3px solid #4a3728; border-radius: 50%; background: rgba(30, 25, 20, 0.9); pointer-events: none; }
+.item-display.picked-up { z-index: 150; transform: scale(1.2); pointer-events: none; }
+.item-display.picked-up img { border-color: #ffd700; box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); }
+
+/* UI PANELS */
+#ui { display: flex; gap: 15px; flex-wrap: wrap; }
+.frame { position: relative; min-width: 220px; padding: 15px; background: #3a2e1e; border: 3px solid #4a3728; flex: 1; box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 4px 15px rgba(0, 0, 0, 0.7); }
+.frame h3 { font-family: 'Press Start 2P', cursive; font-size: 11px; color: #e6d8c3; margin-bottom: 10px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+.frame p { font-size: 12px; margin: 5px 0; color: #f8f4e3; line-height: 1.4; }
+
+/* Effect List in UI */
+#currentEffectsList {
+  max-height: 100px; overflow-y: auto; margin-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px;
+}
+.ui-effect-item {
+  display: flex; align-items: center; font-size: 11px; margin-bottom: 5px; padding: 4px;
+  background: rgba(0,0,0,0.3); border-left: 3px solid #fff; transition: opacity 0.3s;
+}
+.ui-effect-item.removed { opacity: 0.3; text-decoration: line-through; border-color: #555; filter: grayscale(1); }
+.ui-effect-color-dot {
+  width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid #fff;
+}
+
+/* BUTTONS */
+button {
+  background: linear-gradient(to bottom, #5a4a2f 0%, #4b3b2f 100%); color: #f8f4e3;
+  border: 2px solid #3b2e1b; padding: 10px 20px; cursor: pointer;
+  font-family: 'Courier New', monospace; margin: 5px; font-size: 12px; font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 3px; transition: all 0.2s;
+}
+button:hover { background: linear-gradient(to bottom, #6a5a3f 0%, #5a4a2f 100%); transform: translateY(-1px); }
+button:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+/* MODALS */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.95); justify-content: center; align-items: center;
+  z-index: 2000; backdrop-filter: blur(5px);
+}
+.modal-content {
+  background: linear-gradient(135deg, #2e2416 0%, #1a140d 100%);
+  border: 8px double #4a3728; padding: 30px;
+  width: 800px; max-width: 95%; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 0 80px rgba(150, 120, 80, 0.6); position: relative; animation: modalAppear 0.3s ease-out; text-align: center;
+}
+
+/* SLIDER GAME UI */
+#sliderGameBoard {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px;
+  width: 400px; height: 400px; background: #000; padding: 5px; border: 4px solid #444;
+  user-select: none; position: relative; margin: 0 auto;
+}
+.block {
+  width: 100%; height: 100%;
+  border-radius: 2px; cursor: pointer; transition: opacity 0.2s;
+  position: relative; z-index: 1;
+}
+.block.focused { box-shadow: inset 0 0 15px #fff; z-index: 10; animation: pulseBlock 1s infinite; border: 2px solid #fff; }
+.block.destroying { animation: destroyBlock 0.4s forwards; }
+/* Destruction Animation */
+@keyframes destroyBlock {
+  0% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.2) rotate(15deg); background: #fff; opacity: 0.8; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes pulseBlock { 0% { opacity: 0.8; } 50% { opacity: 0.4; } 100% { opacity: 0.8; } }
+
+/* SLIDER MECHANIC */
+#sliderInterface {
+  width: 100px; height: 400px; background: #111; border: 2px solid #444; border-radius: 5px;
+  position: relative; margin-left: 20px; display: flex; flex-direction: column; align-items: center; padding-top: 20px;
+}
+.slider-track {
+  width: 20px; height: 300px; background: #333; border-radius: 10px; position: relative; overflow: hidden;
+  margin-bottom: 10px;
+}
+.slider-target-zone {
+  position: absolute; left: 0; width: 100%; 
+  /* IMPORTANT: display set to none by default, turned to block in JS */
+  display: none; 
+  background: rgba(255, 215, 0, 0.7);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.3); /* Debug border to ensure visibility */
+  transition: top 0.2s linear, height 0.2s linear, width 0.2s linear;
+}
+.slider-needle {
+  position: absolute; left: -5px; width: 30px; height: 4px; background: #fff;
+  box-shadow: 0 0 5px #fff;
+  transition: top 0.05s linear; /* Fast update */
+}
+.slider-info {
+  margin-top: 10px; font-size: 10px; text-align: center; color: #888; font-family: 'Courier New';
+}
+.health-bar-container {
+  width: 100%; background: #222; height: 10px; margin-top: 10px; position: relative;
+  border: 1px solid #555;
+}
+.health-bar-fill {
+  height: 100%; background: #00ff00; width: 100%; transition: width 0.2s linear; box-shadow: 0 0 5px #00ff00;
+}
+
+/* ANIMATIONS */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .2; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalAppear { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes pulseGlow { from { box-shadow: 0 0 100px rgba(150, 120, 80, 0.6); } to { box-shadow: 0 0 120px rgba(180, 150, 120, 0.3); } }
+@keyframes essenceRise {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  20% { transform: translateY(0) scale(1); opacity: 1; box-shadow: 0 0 100px #fff; }
+  100% { transform: translateY(-150px) scale(3); opacity: 0; }
+}
+
+/* TOAST & INPUT */
+#toast-container { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 5000; pointer-events: none; }
+.toast { background: rgba(0,0,0,0.9); color: #fff; padding: 10px 20px; margin-bottom: 10px; border: 1px solid #e6d8c3; border-radius: 4px; text-align: center; animation: fadeIn 0.3s; }
+.essence-viz { width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, #fff, #ffd700, transparent); margin: 30px auto; opacity: 0; }
+
+</style>
+</head>
+
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="titleScreen">
+  <div id="titleBox">
+    <h1>Archivist's Refinery<span>The Essence Lab</span></h1>
+    <div id="pressStart">CLICK TO BEGIN</div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATIONS -->
+<div id="toast-container"></div>
+
+<!-- GAME CONTAINER -->
+<div id="gameContainer">
+  <div id="gameWrapper">
+    
+    <!-- ARCHIVE ROOM -->
+    <div id="archiveRoom">
+      <!-- Walls -->
+      <div style="position:absolute; left:0; top:0; bottom:0; width:100px; background:linear-gradient(90deg, #2a1e0e, #3a2e1e);"></div>
+      <div style="position:absolute; right:0; top:0; bottom:0; width:100px; background:linear-gradient(-90deg, #2a1e0e, #3a2e1e);"></div>
+      
+      <div id="stoneButton">GENERATE<br>CURSED<br>ITEM</div>
+      
+      <!-- REFINING TABLE -->
+      <div id="stoneTable">
+        <canvas id="particleCanvas" width="400" height="300"></canvas>
+        <div id="tablePlaceholder">
+          DRAG ITEM HERE<br>TO REFINE
+        </div>
+      </div>
+      
+      <!-- Items Layer -->
+      <div id="itemsLayer"></div>
+    </div>
+    
+    <!-- UI PANELS -->
+    <div id="ui">
+      <div class="frame">
+        <h3>🎮 CONTROLS</h3>
+        <p>1. Generate Item</p>
+        <p>2. Drag to Table</p>
+        <p>3. Click Color</p>
+        <p>4. Hit Gold Zone!</p>
+      </div>
+      
+      <div class="frame">
+        <h3>🔮 CURRENT ITEM</h3>
+        <p id="currentItemName">No Item</p>
+        <p>Status: <span id="itemStatus">-</span></p>
+        <p>Refined By: <span id="itemRefiner">-</span></p>
+        <div id="currentEffectsList"></div>
+        <button id="inspectBtn" disabled style="margin-top:5px; width:100%;">📖 FULL INSPECT</button>
+      </div>
+      
+      <div class="frame">
+        <h3>⚗️ REFINERY</h3>
+        <button id="refineBtn" disabled>⚗️ INITIATE REFINEMENT</button>
+        <button id="collectionBtn">📚 COLLECTION</button>
+      </div>
+      
+      <div class="frame">
+        <h3>📊 STATS</h3>
+        <p>Generated: <span id="itemsGenerated">0</span></p>
+        <p>Refined: <span id="refinements">0</span></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: INSPECT -->
+<div id="inspectModal" class="modal-overlay">
+  <div class="modal-content">
+    <button class="close-btn" onclick="UI.closeAllModals()" style="position:absolute; top:10px; right:10px; background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✖</button>
+    <div id="inspectBody"></div>
+  </div>
+</div>
+
+<!-- MODAL: SLIDER GAME -->
+<div id="sliderModal" class="modal-overlay">
+  <div class="modal-content">
+    <button class="close-btn" onclick="UI.closeAllModals()" style="position:absolute; top:10px; right:10px; background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">✖</button>
+    
+    <h2 id="sliderTitle" style="color:#ffd700; margin-bottom:10px;">ESSENCE RESONANCE</h2>
+    <p id="sliderInstruction" style="color:#aaa; font-size:12px; margin-bottom:20px;">STEP 1: Click a color block to FOCUS on that effect.</p>
+    
+    <div style="display:flex; gap:20px; justify-content:center; align-items:flex-start;">
+      <!-- Grid -->
+      <div id="sliderGameBoard"></div>
+      
+      <!-- Slider Mechanic -->
+      <div style="width: 150px; display:flex; flex-direction:column; align-items:center;">
+        <h3 style="color:#fff; margin-bottom:10px;">RESONATOR</h3>
+        
+        <!-- The Gauge -->
+        <div id="sliderInterface">
+          <div class="slider-track">
+            <!-- The Moving Target Zone -->
+            <div id="sliderTargetZone" class="slider-target-zone"></div>
+            <!-- The Needle/Slider -->
+            <div id="sliderNeedle" class="slider-needle" style="top: 50%;"></div>
+          </div>
+        </div>
+        
+        <div class="slider-info">
+          <p id="statusText">WAITING...</p>
+          <div class="health-bar-container">
+            <div id="healthBarFill" class="health-bar-fill"></div>
+          </div>
+          <p style="margin-top:20px; color:#ffd700; font-weight:bold; font-size:12px;">PRESS [SPACEBAR]</p>
+          <p id="countText" style="margin-top:5px; font-size:10px; color:#aaa;">Target Integrity: 100%</p>
+        </div>
+        
+        <div style="margin-top:20px; font-size:11px; color:#888; border:1px solid #444; padding:10px;">
+          <p>1. Click a Color to Lock.</p>
+          <p>2. Stop needle in GOLD ZONE.</p>
+          <p>3. Zone gets smaller as you win!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SUCCESS -->
+<div id="successModal" class="modal-overlay">
+  <div class="modal-content" style="width: 600px;">
+    <h2 style="color: #ffd700; margin-bottom: 20px;">ESSENCE PURIFIED</h2>
+    <div id="essenceViz" class="essence-viz"></div>
+    <p style="margin-bottom: 20px;">The item has been stabilized.</p>
+    <p>Who refined this item?</p>
+    <p style="font-size:11px; color:#888; margin-bottom:20px;">Your name will be stamped on item.</p>
+    <div style="margin-bottom:20px;">
+      <input type="text" id="refinerNameInput" placeholder="ENTER ARCHIVIST NAME" maxlength="20" style="background:#000; border:2px solid #ffd700; color:#fff; padding:10px; font-size:16px; width:80%; text-align:center; font-family:'Courier New';">
+    </div>
+    <button onclick="SliderGame.finalize()" style="background: #ffd700; color: #000; border-color: #fff;">✨ STAMP & SAVE</button>
+  </div>
+</div>
+
+<script>
+/**
+ * AUDIO
+ */
+const AudioSys = {
+  ctx: null, enabled: true,
+  init() { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} },
+  playTone(f, t, d) {
+    if(!this.enabled || !this.ctx) return;
+    const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+    o.type=t; o.frequency.value=f; g.gain.value=0.1;
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime+d);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(); o.stop(this.ctx.currentTime+d);
+  },
+  play(s) {
+    if(this.ctx && this.ctx.state==='suspended') this.ctx.resume();
+    switch(s) {
+      case 'click': this.playTone(400,'sine',0.1); break;
+      case 'drop': this.playTone(200,'square',0.1); break;
+      case 'resonance': this.playTone(150,'sawtooth',0.4); break;
+      case 'fail': this.playTone(100,'square',0.3); break;
+      case 'magic': 
+        this.playTone(200,'sine',0.5); 
+        setTimeout(()=>this.playTone(400,'sine',0.5),100); 
+        setTimeout(()=>this.playTone(800,'sine',1.0),200); 
+        break;
+    }
+  }
+};
+
+/**
+ * GENERATOR
+ */
+const Generator = {
+  unicode: ["\u16A0","\u16A1","\u2620","\u2622","\u2694","\u{1F700}","\u{1F780}","\u{1F6A0}"],
+  materials: ["Iron", "Bone", "Glass", "Wood", "Stone"],
+  bases: ["Broken Amulet", "Rusty Key", "Cracked Plate", "Bent Spoon", "Old Coin", "Torn Glove"],
+  
+  effects: [
+    { id: "SOM-01", name: "Spectral Vision", cat: "Somatic", color: "#ff4444" }, // Red
+    { id: "COG-01", name: "Mind Link", cat: "Cognitive", color: "#4444ff" }, // Blue
+    { id: "ENV-01", name: "Fire Aura", cat: "Elemental", color: "#ffaa00" }, // Orange
+    { id: "MET-01", name: "Soul Bind", cat: "Metaphysical", color: "#aa00ff" }, // Purple
+    { id: "PHY-01", name: "Iron Skin", cat: "Physical", color: "#00ff00" } // Green
+  ],
+
+  random(s) {
+    let t = s += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  },
+
+  createImage(s, m) {
+    let svg = `<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#111"/>`;
+    const cMap = {"Iron":"#aaa","Bone":"#eed","Glass":"#adf","Wood":"#a52","Stone":"#666"};
+    const c = cMap[m]||"#fff";
+    for(let i=0; i<10; i++) {
+      let x=this.random(s+i)*100, y=this.random(s+i+1)*100, char=this.unicode[Math.floor(this.random(s+i+2)*this.unicode.length)];
+      svg+=`<text x="${x}" y="${y}" font-size="20" fill="${c}" opacity="0.6">${char}</text>`;
+    }
+    svg+=`</svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  },
+
+  generate(manualSeed=null) {
+    const seed = manualSeed || Math.floor(Math.random()*9999999);
+    const base = this.bases[Math.floor(this.random(seed)*this.bases.length)];
+    const mat = this.materials[Math.floor(this.random(seed+1)*this.materials.length)];
+    
+    const effCount = 3 + Math.floor(this.random(seed+2)*3);
+    const pool = [...this.effects];
+    const effs = [];
+    for(let i=0; i<effCount; i++) {
+      let idx = Math.floor(this.random(seed+3+i)*pool.length);
+      effs.push(pool[idx]);
+    }
+
+    return {
+      id: seed.toString(16),
+      seed: seed,
+      name: `${mat} ${base}`,
+      material: mat,
+      status: "Cursed",
+      refinedBy: null,
+      effects: effs,
+      image: this.createImage(seed, mat)
+    };
+  },
+
+  createRefinedItem(old, name) {
+    const nameHash = name.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
+    const newSeed = old.seed + nameHash + Date.now();
+    return {
+      id: newSeed.toString(16).toUpperCase(),
+      seed: newSeed,
+      name: `Refined ${old.name}`,
+      material: old.material,
+      status: "REFINED",
+      refinedBy: name,
+      effects: old.effects, // Pass remaining effects
+      image: this.createImage(newSeed, old.material)
+    };
+  }
+};
+
+/**
+ * GAME STATE
+ */
+const Game = {
+  collection: [],
+  currentItem: null,
+  draggedItem: null,
+  dragOffset: {x:0, y:0},
+  stats: { generated:0, refined:0 }
+};
+
+/**
+ * UI
+ */
+const UI = {
+  els: {},
+  init() {
+    ['gameContainer','titleScreen','stoneButton','itemsLayer','stoneTable',
+     'tablePlaceholder','inspectModal','inspectBody','sliderModal','sliderGameBoard',
+     'sliderTitle','sliderInstruction','sliderTargetZone','sliderNeedle','statusText', 'healthBarFill', 'countText',
+     'successModal','essenceViz',
+     'currentItemName','itemStatus','itemRefiner','currentEffectsList','inspectBtn',
+     'itemsGenerated','refinements','refineBtn','collectionBtn']
+     .forEach(id => this.els[id] = document.getElementById(id));
+
+    this.els.titleScreen.onclick = () => {
+      this.els.titleScreen.style.display='none';
+      this.els.gameContainer.style.display='flex';
+      AudioSys.init();
+    };
+
+    this.els.stoneButton.onclick = () => Logic.generateNewItem();
+    this.els.refineBtn.onclick = () => SliderGame.start();
+    this.els.inspectBtn.onclick = () => Logic.inspectItem();
+    this.els.collectionBtn.onclick = () => Logic.showCollection();
+
+    window.addEventListener('mousemove', e => Logic.onDrag(e));
+    window.addEventListener('mouseup', e => Logic.endDrag(e));
+    this.updateStats();
+  },
+
+  toast(m) {
+    const e=document.createElement('div'); e.className='toast'; e.textContent=m;
+    document.getElementById('toast-container').appendChild(e); setTimeout(()=>e.remove(),3000);
+  },
+
+  updateStats() {
+    this.els.itemsGenerated.textContent = Game.stats.generated;
+    this.els.refinements.textContent = Game.stats.refined;
+
+    if(Game.currentItem) {
+      const i = Game.currentItem.data;
+      this.els.currentItemName.textContent = i.name;
+      this.els.itemStatus.textContent = i.status;
+      this.els.itemStatus.style.color = i.status === "REFINED" ? "#ffd700" : "#fff";
+      this.els.itemRefiner.textContent = i.refinedBy || "None";
+      
+      // Render Effect List
+      this.els.currentEffectsList.innerHTML = i.effects.map(e => `
+        <div class="ui-effect-item" style="border-left-color: ${e.color}">
+          <div class="ui-effect-color-dot" style="background:${e.color}"></div>
+          <span>${e.name}</span>
+        </div>
+      `).join('');
+
+      this.els.refineBtn.disabled = !Game.currentItem.onTable;
+      this.els.inspectBtn.disabled = !Game.currentItem.onTable;
+    } else {
+      this.els.currentItemName.textContent = "No Item";
+      this.els.itemStatus.textContent = "-";
+      this.els.itemRefiner.textContent = "-";
+      this.els.currentEffectsList.innerHTML = "";
+      this.els.refineBtn.disabled = true;
+      this.els.inspectBtn.disabled = true;
+    }
+  },
+
+  closeAllModals() { 
+    document.querySelectorAll('.modal-overlay').forEach(m=>m.style.display='none');
+    Logic.stopParticles();
+  }
+};
+
+/**
+ * LOGIC & DRAG
+ */
+const Logic = {
+  generateNewItem() {
+    if(Game.currentItem) Game.currentItem.el.remove();
+    const data = Generator.generate();
+    Game.stats.generated++;
+    const r = UI.els.stoneButton.getBoundingClientRect();
+    const rr = document.getElementById('archiveRoom').getBoundingClientRect();
+    const x = r.left - rr.left + 10, y = r.top - rr.top + 100;
+    const el = this.createEl(data, x, y);
+    Game.currentItem = { data, el, onTable:false };
+    AudioSys.play('click');
+    UI.toast("New Cursed Item Generated");
+    UI.updateStats();
+  },
+
+  createEl(data, x, y) {
+    const d = document.createElement('div'); d.className='item-display';
+    d.style.left=x+'px'; d.style.top=y+'px';
+    const i = document.createElement('img'); i.src=data.image; d.appendChild(i);
+    d.onmousedown = e => { if(e.button===0) Logic.startDrag(e,d); };
+    UI.els.itemsLayer.appendChild(d);
+    return d;
+  },
+
+  startDrag(e, el) {
+    if(!Game.currentItem || Game.currentItem.el !== el) return;
+    Game.draggedItem = Game.currentItem;
+    const r = el.getBoundingClientRect();
+    Game.dragOffset = { x:e.clientX-r.left, y:e.clientY-r.top };
+    Game.draggedItem.el.classList.add('picked-up');
+    Game.draggedItem.onTable = false;
+    AudioSys.play('click');
+    UI.updateStats();
+  },
+
+  onDrag(e) {
+    if(!Game.draggedItem) return;
+    const rr = document.getElementById('archiveRoom').getBoundingClientRect();
+    let x = e.clientX - rr.left - Game.dragOffset.x;
+    let y = e.clientY - rr.top - Game.dragOffset.y;
+    x=Math.max(0, Math.min(x, rr.width-80)); y=Math.max(0, Math.min(y, rr.height-80));
+    Game.draggedItem.el.style.left=x+'px'; Game.draggedItem.el.style.top=y+'px';
+    const ir = Game.draggedItem.el.getBoundingClientRect();
+    const tr = UI.els.stoneTable.getBoundingClientRect();
+    UI.els.stoneTable.classList.toggle('highlight', ir.left<tr.right && ir.right>tr.left && ir.top<tr.bottom && ir.bottom>tr.top);
+  },
+
+  endDrag(e) {
+    if(!Game.draggedItem) return;
+    const ir = Game.draggedItem.el.getBoundingClientRect();
+    const tr = UI.els.stoneTable.getBoundingClientRect();
+    
+    if(ir.left<tr.right && ir.right>tr.left && ir.top<tr.bottom && ir.bottom>tr.top) {
+      const rr = document.getElementById('archiveRoom').getBoundingClientRect();
+      const cx = (tr.left-rr.left)+(tr.width/2)-40;
+      const cy = (tr.top-rr.top)+(tr.height/2)-40;
+      Game.draggedItem.el.style.left=cx+'px'; Game.draggedItem.el.style.top=cy+'px';
+      Game.draggedItem.onTable = true;
+      UI.els.tablePlaceholder.style.display='none';
+      UI.els.stoneTable.classList.add('activeRefine');
+      AudioSys.play('drop');
+      UI.toast("Item Placed. Refining Ready.");
+    } else {
+      Game.draggedItem.onTable = false;
+      UI.els.tablePlaceholder.style.display='block';
+      UI.els.stoneTable.classList.remove('activeRefine');
+    }
+    
+    Game.draggedItem.el.classList.remove('picked-up');
+    UI.els.stoneTable.classList.remove('highlight');
+    Game.draggedItem = null;
+    UI.updateStats();
+  },
+
+  inspectItem() {
+    const i = Game.currentItem.data;
+    const refined = i.refinedBy ? `<br><br><span style="color:#ffd700">Refined By: ${i.refinedBy}</span>` : "";
+    UI.els.inspectBody.innerHTML = `
+      <div style="text-align:center;"><img src="${i.image}" style="width:150px; border:3px solid ${i.status==='REFINED'?'#ffd700':'#fff'}; border-radius:50%;"></div>
+      <h2 style="color:${i.status==='REFINED'?'#ffd700':'#fff'}">${i.name}</h2>
+      <p>ID: ${i.id}</p>
+      <p style="color:${i.status==='REFINED'?'#ffd700':'#aaa'}">${i.status}${refined}</p>
+      <div style="text-align:left; margin-top:20px;">
+        ${i.effects.map(e=>`<div style="margin:5px 0; padding:5px; border-left:3px solid ${e.color}">${e.name} (${e.cat})</div>`).join('')}
+      </div>
+    `;
+    UI.els.inspectModal.style.display='flex';
+  },
+
+  showCollection() {
+    if(!Game.collection.length) { UI.els.inspectBody.innerHTML="<p>Collection Empty.</p>"; }
+    else {
+      UI.els.inspectBody.innerHTML = `<h2>Collection (${Game.collection.length})</h2>
+        <div style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px;">
+          ${Game.collection.map(i=>`
+            <div onclick='Logic.inspectItemOfCollection(${JSON.stringify(i).replace(/'/g, "&#39;")})' style="cursor:pointer; text-align:center; width:80px;">
+              <img src="${i.image}" style="width:100%; border:1px solid #444;">
+              <div style="font-size:9px; color:${i.status==='REFINED'?'#ffd700':'#fff'}; overflow:hidden;">${i.name}</div>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+    UI.els.inspectModal.style.display='flex';
+  },
+  
+  inspectItemOfCollection(item) {
+    UI.els.inspectBody.innerHTML = `
+      <div style="text-align:center;"><img src="${item.image}" style="width:150px; border:3px solid ${item.status==='REFINED'?'#ffd700':'#fff'}; border-radius:50%;"></div>
+      <h2 style="color:${item.status==='REFINED'?'#ffd700':'#fff'}">${item.name}</h2>
+      <p>ID: ${item.id}</p>
+      <p style="color:${item.status==='REFINED'?'#ffd700':'#aaa'}">${item.status}</p>
+      <div style="text-align:left; margin-top:20px;">
+        ${item.effects.map(e=>`<div style="margin:5px 0; padding:5px; border-left:3px solid ${e.color}">${e.name} (${e.cat})</div>`).join('')}
+      </div>
+    `;
+  },
+
+  startParticles() {
+    this.particleInterval = setInterval(() => {
+      const canvas = document.getElementById('particleCanvas');
+      if(!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(255, 215, 0, 0.5)";
+      for(let i=0; i<5; i++) {
+        ctx.beginPath();
+        ctx.arc(canvas.width/2 + (Math.random()-0.5)*100, canvas.height/2 + (Math.random()-0.5)*100, Math.random()*3, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }, 50);
+  },
+  
+  stopParticles() {
+    if(this.particleInterval) clearInterval(this.particleInterval);
+    const canvas = document.getElementById('particleCanvas');
+    if(canvas) canvas.getContext('2d').clearRect(0,0,400,300);
+  }
+};
+
+/**
+ * SLIDER GAME LOGIC
+ */
+const SliderGame = {
+  cols: 10, rows: 10,
+  grid: [],
+  focusedColor: null,
+  effectToRemove: null,
+  isGameActive: false,  
+  needlePos: 50, // 0-100%
+  needleDirection: 1,
+  currentBlockPercent: 1.0, // 1.0 = 100% blocks left
+  animId: null,
+
+  start() {
+    if(!Game.currentItem || !Game.currentItem.onTable) return;
+    
+    this.focusedColor = null;
+    this.isGameActive = false;
+    this.currentBlockPercent = 1.0;
+    
+    // Generate Grid
+    const colors = Game.currentItem.data.effects.map(e=>e.color);
+    this.grid = [];
+    for(let y=0; y<this.rows; y++) {
+      let row = [];
+      for(let x=0; x<this.cols; x++) {
+        row.push(colors[Math.floor(Math.random()*colors.length)]);
+      }
+      this.grid.push(row);
+    }
+    
+    this.renderGrid();
+    Logic.startParticles();
+    UI.els.sliderModal.style.display='flex';
+    UI.els.sliderInstruction.textContent = "STEP 1: Click a color block to FOCUS on an effect.";
+    UI.els.statusText.textContent = "WAITING FOR FOCUS...";
+    
+    // IMPORTANT: Ensure Zone is hidden initially
+    UI.els.sliderTargetZone.style.display = 'none';
+    UI.els.sliderNeedle.style.display = 'none';
+    UI.els.healthBarFill.style.width = '100%';
+  },
+
+  renderGrid() {
+    const board = UI.els.sliderGameBoard;
+    board.innerHTML = '';
+    this.grid.forEach((row, y) => {
+      row.forEach((color, x) => {
+        if(color) {
+          const el = document.createElement('div');
+          el.className = 'block';
+          el.style.background = color;
+          el.dataset.x = x;
+          el.dataset.y = y;
+          el.onclick = () => this.focusColor(color, x, y);
+          
+          if(this.focusedColor && color === this.focusedColor) {
+            el.classList.add('focused');
+          }
+          
+          board.appendChild(el);
+        }
+      });
+    });
+  },
+
+  focusColor(color, x, y) {
+    if(this.isGameActive) return;
+    
+    // 1. Identify Effect Object
+    const effectObj = Game.currentItem.data.effects.find(e => e.color === color);
+    if(!effectObj) return;
+
+    this.focusedColor = color;
+    this.effectToRemove = effectObj; 
+    
+    this.renderGrid();
+    
+    // 2. Trigger Slider Logic
+    this.startSlider();
+  },
+
+  startSlider() {
+    this.isGameActive = true;
+    UI.els.sliderInstruction.textContent = `FOCUSED: PURIFYING [${this.effectToRemove.name}]`;
+    UI.els.statusText.textContent = "ALIGNING NEEDLE...";
+    
+    // FIX: Explicitly show elements
+    UI.els.sliderTargetZone.style.display = 'block';
+    UI.els.sliderNeedle.style.display = 'block';
+    UI.els.sliderTargetZone.style.background = this.effectToRemove.color; 
+    
+    // Reset Needle
+    this.needlePos = 50;
+    this.needleDirection = 1;
+    
+    // Initial Physics Update
+    this.updateZonePhysics();
+    
+    // Loop
+    if(this.animId) cancelAnimationFrame(this.animId);
+    this.loop();
+  },
+
+  updateZonePhysics() {
+    // Calculate dynamic height based on % left
+    // Height: Base 30% + (Percent * 20%). Max ~50%
+    // Width: Base 80% - (Percent * 40%). Min 20%.
+    
+    const percent = this.currentBlockPercent; // 1.0 to 0.0
+    const h = 30 + (percent * 20); 
+    const w = Math.max(20, 80 - (percent * 40));
+    
+    // Position logic: random within safe bounds
+    const time = Date.now() / 300;
+    const wobble = Math.sin(time) * 5; // Reduced wobble for stability
+    const safeMaxTop = 100 - h;
+    const t = Math.max(0, Math.min(safeMaxTop, 50 + wobble));
+    
+    UI.els.sliderTargetZone.style.height = h + '%';
+    UI.els.sliderTargetZone.style.width = w + '%';
+    UI.els.sliderTargetZone.style.top = t + '%';
+    
+    // Update UI Text
+    const displayPercent = Math.floor(percent * 100);
+    UI.els.countText.textContent = `Target Integrity: ${displayPercent}%`;
+    UI.els.healthBarFill.style.width = displayPercent + '%';
+  },
+
+  loop() {
+    if(!this.isGameActive) return;
+    
+    // Dynamic Speed: Faster as blocks decrease
+    // Speed 1.5 (slow) to 4.0 (fast)
+    const speed = 1.5 + (1 - this.currentBlockPercent) * 2.5;
+    
+    // Move Needle
+    this.needlePos += speed * this.needleDirection;
+    if(this.needlePos >= 100) { this.needlePos = 100; this.needleDirection = -1; }
+    if(this.needlePos <= 0) { this.needlePos = 0; this.needleDirection = 1; }
+    
+    UI.els.sliderNeedle.style.top = this.needlePos + '%';
+    
+    // Wobble Zone logic
+    if(this.isGameActive) {
+      const time = Date.now() / 200; // Faster wobble
+      const wobble = Math.sin(time) * 5; 
+      const currentTop = parseFloat(UI.els.sliderTargetZone.style.top);
+      const h = parseFloat(UI.els.sliderTargetZone.style.height);
+      const maxSafeTop = 100 - h;
+      const safeTop = Math.max(0, Math.min(maxSafeTop, currentTop + wobble));
+      UI.els.sliderTargetZone.style.top = safeTop + '%';
+    }
+    
+    this.animId = requestAnimationFrame(() => this.loop());
+  },
+
+  onSpacebar() {
+    if(!this.isGameActive) return;
+    
+    // Check Hit
+    const needleCenter = this.needlePos + 2; // Offset for 4px needle
+    const targetTop = parseFloat(UI.els.sliderTargetZone.style.top);
+    const targetHeight = parseFloat(UI.els.sliderTargetZone.style.height);
+    
+    const hit = (needleCenter >= targetTop && needleCenter <= (targetTop + targetHeight));
+    
+    if(hit) {
+      this.success();
+    } else {
+      this.fail();
+    }
+  },
+
+  success() {
+    AudioSys.play('resonance');
+    this.isGameActive = false;
+    cancelAnimationFrame(this.animId);
+    
+    UI.els.statusText.textContent = "RESONANCE LOCKED!";
+    UI.els.statusText.style.color = "#00ff00";
+    
+    // Remove Cluster
+    this.removeCluster();
+  },
+
+  fail() {
+    AudioSys.play('fail');
+    UI.els.statusText.textContent = "MISSED!";
+    UI.els.statusText.style.color = "#ff0000";
+    
+    UI.els.sliderNeedle.style.background = "#ff0000";
+    setTimeout(() => {
+      UI.els.sliderNeedle.style.background = "#fff";
+      UI.els.statusText.textContent = "ALIGNING...";
+      UI.els.statusText.style.color = "#888";
+      
+      // Retry
+      this.startSlider();
+    }, 800);
+  },
+
+  removeCluster() {
+    // Find all blocks of focused color
+    let targets = [];
+    this.grid.flat().forEach((c, i) => {
+      if(c === this.focusedColor) targets.push(i);
+    });
+    
+    // Pick random subset (approx 40%)
+    const destroyCount = Math.max(1, Math.floor(targets.length * 0.4));
+    
+    targets.sort(() => Math.random() - 0.5);
+    const toDestroy = targets.slice(0, destroyCount);
+    
+    toDestroy.forEach(idx => {
+      const y = Math.floor(idx / this.cols);
+      const x = idx % this.cols;
+      this.grid[y][x] = null;
+      const el = UI.els.sliderGameBoard.children[idx];
+      if(el) {
+        el.classList.add('destroying');
+        setTimeout(() => el.remove(), 400);
+      }
+    });
+    
+    setTimeout(() => {
+      this.applyGravity();
+      this.renderGrid();
+      this.checkWinCondition();
+    }, 500);
+  },
+
+  applyGravity() {
+    for(let x=0; x<this.cols; x++) {
+      let writeY = this.rows - 1;
+      for(let y=this.rows - 1; y>=0; y--) {
+        if(this.grid[y][x] !== null) {
+          this.grid[writeY][x] = this.grid[y][x];
+          if(writeY !== y) this.grid[y][x] = null;
+          writeY--;
+        }
+      }
+      while(writeY >= 0) {
+        this.grid[writeY][x] = null;
+        writeY--;
+      }
+    }
+  },
+
+  checkWinCondition() {
+    let count = 0;
+    const total = this.cols * this.rows;
+    this.grid.flat().forEach(c => { if(c === this.focusedColor) count++; });
+    
+    // Update Percent
+    this.currentBlockPercent = count / total;
+    const percentDisplay = Math.floor(this.currentBlockPercent * 100);
+    UI.els.countText.textContent = `Target Integrity: ${percentDisplay}%`;
+    UI.els.healthBarFill.style.width = percentDisplay + '%';
+    
+    // Immediately update zone physics based on new percent
+    if(this.isGameActive) {
+      this.updateZonePhysics();
+    }
+    
+    if(count === 0) {
+      this.finishGame();
+    } else {
+      // Continue Loop
+      UI.els.statusText.textContent = "RESONANCE STABILIZED. FIRE AGAIN!";
+      UI.els.statusText.style.color = "#fff";
+      setTimeout(() => {
+        if(!UI.els.sliderModal.style.display === 'none') return;
+        this.startSlider(); // Re-enters loop
+        this.loop();
+      }, 1500);
+    }
+  },
+
+  finishGame() {
+    this.isGameActive = false;
+    cancelAnimationFrame(this.animId);
+    UI.closeAllModals();
+    Logic.stopParticles();
+    
+    UI.els.successModal.style.display='flex';
+    const viz = UI.els.essenceViz;
+    viz.style.animation = 'none';
+    viz.offsetHeight; 
+    viz.style.animation = 'essenceRise 2s ease-out forwards';
+    AudioSys.play('magic');
+  },
+
+  finalize() {
+    const name = document.getElementById('refinerNameInput').value.trim();
+    if(!name) return;
+    
+    const old = Game.currentItem.data;
+    
+    // Remove the specific effect we targeted
+    const idx = old.effects.indexOf(this.effectToRemove);
+    if(idx > -1) {
+      old.effects.splice(idx, 1);
+    }
+
+    const newItem = Generator.createRefinedItem(old, name);
+    
+    Game.collection.push(newItem);
+    Game.stats.refined++;
+    
+    Game.currentItem.data = newItem;
+    const img = Game.currentItem.el.querySelector('img');
+    img.src = newItem.image;
+    img.style.borderColor = "#ffd700";
+    
+    const stamp = document.createElement('div');
+    stamp.textContent = `REFINED\nBY\n${name}`;
+    stamp.style.cssText = "position:absolute; top:10px; left:10px; font-size:8px; color:#ffd700; font-family:'Press Start 2P'; pointer-events:none; text-shadow:0 0 2px #000; opacity:0.8; text-align:center; line-height:1.2; border:1px solid #ffd700; padding:2px; background:rgba(0,0,0,0.7);";
+    Game.currentItem.el.appendChild(stamp);
+    
+    UI.closeAllModals();
+    UI.toast(`${newItem.name} created by ${name}!`);
+    UI.updateStats();
+  }
+};
+
+// Global Spacebar Listener
+document.addEventListener('keydown', (e) => {
+  if(e.code === 'Space') {
+    e.preventDefault();
+    SliderGame.onSpacebar();
+  }
+});
+
+window.onload = () => UI.init();
+
+</script>
+</body>
+</html>
+```
