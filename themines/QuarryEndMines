@@ -1,0 +1,2539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abracadabra: The Quarry's End</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(circle at top, #111 0%, #000 65%);
+  font-family: 'Courier New', monospace;
+  color: #f8f4e3;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+/* CRT Scanline Effect */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* TITLE SCREEN */
+#titleScreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(#090909, #000);
+  z-index: 10000;
+  animation: fadeIn 1s ease-out;
+}
+
+#titleBox {
+  border: 8px double #8b4513;
+  background: #120d07;
+  padding: 50px 60px;
+  text-align: center;
+  box-shadow: 0 0 100px rgba(255, 150, 60, 0.6),
+              inset 0 0 60px rgba(139, 69, 19, 0.3);
+  position: relative;
+  animation: pulseGlow 4s infinite alternate;
+}
+
+#titleBox::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px solid rgba(255, 180, 90, 0.3);
+  pointer-events: none;
+}
+
+#titleBox h1 {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 32px;
+  color: #ffdd99;
+  text-shadow: 0 0 10px rgba(255, 180, 90, 0.7);
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+#titleBox h1 span {
+  display: block;
+  margin-top: 15px;
+  color: #ffb347;
+  font-size: 24px;
+}
+
+#titleBox h2 {
+  margin-top: 20px;
+  font-size: 12px;
+  opacity: .8;
+  letter-spacing: 3px;
+  color: #cd7f32;
+}
+
+#pressStart {
+  margin-top: 30px;
+  font-size: 11px;
+  animation: blink 1.2s infinite;
+  color: #ffdd99;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* GAME CONTAINER */
+#gameContainer {
+  display: none;
+  min-height: 100vh;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  animation: fadeIn 0.8s ease-out;
+}
+
+#gameWrapper {
+  padding: 20px;
+  border: 8px ridge #8b4513;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+  box-shadow: 0 0 60px rgba(139, 69, 19, 0.8),
+              inset 0 0 40px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+
+#gameWrapper::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 2px solid rgba(255, 180, 90, 0.2);
+  pointer-events: none;
+}
+
+/* CANVAS WITH TORCH EFFECT */
+#canvasWrap {
+  position: relative;
+}
+
+canvas {
+  width: 800px;
+  height: 600px;
+  image-rendering: pixelated;
+  border: 6px solid #3b2e1b;
+  background: #000;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+  display: block;
+}
+
+#torchLight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(255, 180, 90, .25),
+    rgba(255, 140, 60, .15) 30%,
+    rgba(0, 0, 0, .8) 60%
+  );
+  animation: flicker 0.15s infinite alternate;
+  mix-blend-mode: overlay;
+}
+
+/* UI PANELS */
+#ui {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+/* SVG FRAME WRAPPER */
+.frame {
+  position: relative;
+  min-width: 220px;
+  padding: 15px;
+  background: #2e2416;
+  border: 3px solid #8b4513;
+  flex: 1;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5),
+              0 4px 15px rgba(0, 0, 0, 0.7);
+}
+
+.frame::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid rgba(255, 215, 0, 0.1);
+  pointer-events: none;
+}
+
+.frame h3 {
+  font-family: 'Press Start 2P', cursive;
+  font-size: 11px;
+  color: #ffdd99;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.frame p {
+  font-size: 12px;
+  margin: 5px 0;
+  color: #f8f4e3;
+  line-height: 1.4;
+}
+
+/* BUTTONS */
+button {
+  background: linear-gradient(to bottom, #5a4a2f 0%, #4b3b2f 100%);
+  color: #f8f4e3;
+  border: 2px solid #3b2e1b;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  margin: 5px;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+}
+
+button:hover { 
+  background: linear-gradient(to bottom, #6a5a3f 0%, #5a4a2f 100%);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+button:active {
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SOUND TOGGLE */
+#soundToggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+#soundToggle button {
+  background: linear-gradient(to bottom, #4a7b1b 0%, #3a6b0b 100%);
+  padding: 8px 15px;
+  font-size: 11px;
+  border: 2px solid #3b6b0b;
+}
+
+/* MODAL - LEDGER STYLE */
+#modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+#modalContent {
+  background: linear-gradient(135deg, #2e2416 0%, #1a140d 100%);
+  border: 8px double #8b4513;
+  padding: 30px;
+  max-width: 750px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 0 80px rgba(255, 150, 60, 0.6),
+              inset 0 0 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  animation: modalAppear 0.3s ease-out;
+}
+
+#modalContent::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(255, 180, 90, 0.2);
+  pointer-events: none;
+}
+
+#modalContent h2 {
+  font-family: 'Press Start 2P', cursive;
+  color: #ffdd99;
+  margin-bottom: 20px;
+  border-bottom: 3px solid #8b4513;
+  padding-bottom: 15px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+#modalContent pre {
+  background: rgba(20, 15, 10, 0.95);
+  padding: 20px;
+  white-space: pre-wrap;
+  font-size: 13px;
+  margin: 15px 0;
+  border: 2px solid #654321;
+  border-radius: 6px;
+  line-height: 1.4;
+  font-family: 'Courier New', monospace;
+}
+
+/* LEDGER STYLES */
+.ledgerEntry {
+  cursor: pointer;
+  margin: 8px 0;
+  padding: 10px 15px;
+  background: rgba(75, 59, 47, 0.3);
+  border-left: 4px solid #8b4513;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.ledgerEntry:hover {
+  background: rgba(90, 74, 47, 0.5);
+  border-left-width: 6px;
+  transform: translateX(5px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.ledgerEntry::before {
+  content: "▸ ";
+  color: #ffb347;
+  margin-right: 8px;
+}
+
+/* INVENTORY ITEMS */
+.inventoryItem {
+  background: linear-gradient(135deg, rgba(75, 59, 47, 0.9) 0%, rgba(65, 49, 37, 0.9) 100%);
+  padding: 15px;
+  margin: 10px 0;
+  border-left: 4px solid #ffdd99;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.3s;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(139, 69, 19, 0.3);
+}
+
+.inventoryItem:hover {
+  background: linear-gradient(135deg, rgba(90, 74, 47, 0.95) 0%, rgba(80, 64, 37, 0.95) 100%);
+  border-left-width: 6px;
+  transform: translateX(5px) scale(1.02);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+}
+
+.sigilItem {
+  background: linear-gradient(135deg, rgba(47, 59, 75, 0.9) 0%, rgba(37, 49, 65, 0.9) 100%);
+  padding: 15px;
+  margin: 10px 0;
+  border-left: 4px solid #87CEEB;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.3s;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sigilItem:hover {
+  background: linear-gradient(135deg, rgba(47, 74, 90, 0.95) 0%, rgba(37, 64, 80, 0.95) 100%);
+  border-left-width: 6px;
+  transform: translateX(5px) scale(1.02);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+}
+
+.item-image {
+  width: 60px;
+  height: 60px;
+  margin-right: 15px;
+  border: 2px solid #654321;
+  border-radius: 4px;
+  background: #222;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.item-details {
+  flex: 1;
+}
+
+.item-details h4 {
+  color: #ffdd99;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.item-details p {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.item-image-large {
+  width: 150px;
+  height: 150px;
+  border: 3px solid #8b4513;
+  border-radius: 8px;
+  background: #111;
+  margin: 0 auto 20px;
+  display: block;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+}
+
+.item-detail-image {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+input[type="text"] {
+  background: rgba(30, 25, 20, 0.95);
+  border: 2px solid #654321;
+  color: #f8f4e3;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  width: 100%;
+  margin: 15px 0;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.closeBtn {
+  background: linear-gradient(to bottom, #a00000 0%, #8b0000 100%);
+  padding: 10px 20px;
+  font-weight: bold;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 10;
+}
+
+/* FOOTER */
+footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 11px;
+  opacity: .6;
+  color: #cd7f32;
+  letter-spacing: 1px;
+  padding: 10px;
+  border-top: 1px solid rgba(139, 69, 19, 0.3);
+}
+
+/* ANIMATIONS */
+@keyframes flicker {
+  from { opacity: .85; }
+  to { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: .2; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalAppear {
+  from { 
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  from { box-shadow: 0 0 100px rgba(255, 150, 60, 0.6); }
+  to { box-shadow: 0 0 100px rgba(255, 180, 90, 0.4); }
+}
+
+/* RESPONSIVE */
+@media (max-width: 900px) {
+  #gameWrapper {
+    transform: scale(0.9);
+  }
+  
+  #titleBox {
+    padding: 30px 40px;
+  }
+  
+  #titleBox h1 {
+    font-size: 24px;
+  }
+  
+  #titleBox h1 span {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  #gameWrapper {
+    transform: scale(0.8);
+  }
+  
+  #ui {
+    justify-content: center;
+  }
+  
+  .frame {
+    min-width: 180px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TITLE SCREEN -->
+<div id="titleScreen">
+  <div id="titleBox">
+    <h1>Abracadabra<span>The Quarry's End</span></h1>
+    <h2>The Mines of Lucan's Rest</h2>
+    <div id="pressStart">PRESS ENTER TO BEGIN</div>
+  </div>
+</div>
+
+<!-- SOUND TOGGLE -->
+<div id="soundToggle">
+  <button id="toggleSoundBtn">
+    🔊 SOUND: ON
+  </button>
+</div>
+
+<!-- GAME CONTAINER -->
+<div id="gameContainer">
+  <div id="gameWrapper">
+    
+    <div id="canvasWrap">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+      <div id="torchLight"></div>
+    </div>
+    
+    <div id="ui">
+      <div class="frame">
+        <h3>🎮 CONTROLS</h3>
+        <p>Arrow Keys or WASD: Move</p>
+        <p>Left Click: Mine Rock</p>
+        <p>E: Interact with Shop/Registry</p>
+        <p>Click Ladder: Next Level</p>
+      </div>
+      
+      <div class="frame">
+        <h3>⛏️ CURRENT PICKAXE</h3>
+        <p id="pickaxeInfo">Copper Pickaxe (100%)</p>
+        <p>Pickaxes Left: <span id="pickaxeCount">1</span></p>
+      </div>
+      
+      <div class="frame">
+        <h3>📊 STATS</h3>
+        <p>Gold: <span id="goldCount">50</span> 💰</p>
+        <p>Items Found: <span id="itemCount">0</span> 📦</p>
+        <p>Level: <span id="levelCount">1</span> 🏆</p>
+      </div>
+      
+      <div class="frame">
+        <button id="inventoryBtn">📦 OPEN INVENTORY</button>
+        <button id="helpBtn">❓ HELP</button>
+        <button id="sigilBtn">📜 SIGIL REGISTRY</button>
+      </div>
+    </div>
+    
+    <footer>
+      Based on the Cursed Relic System from <em>"Abracadabra"</em> by Jason Uzu
+    </footer>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+  <div id="modalContent">
+    <button class="closeBtn" onclick="closeModal()">✖ CLOSE</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+/* ================= SOUND SYSTEM ================= */
+let soundEnabled = true;
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// Sound presets
+const SOUND_PRESETS = {
+  pickaxeHit: {
+    type: 'sawtooth',
+    frequency: 350,
+    duration: 0.2,
+    volume: 0.4,
+    attack: 0.01,
+    decay: 0.06,
+    release: 0.13,
+    harmonics: [
+      { frequency: 1.8, volume: 0.15 },
+      { frequency: 2.5, volume: 0.08 }
+    ]
+  },
+  pickaxeHit2: {
+    type: 'sawtooth',
+    frequency: 500,
+    duration: 0.15,
+    volume: 0.35,
+    attack: 0.005,
+    decay: 0.05,
+    release: 0.1,
+    harmonics: [
+      { frequency: 1.6, volume: 0.12 },
+      { frequency: 2.2, volume: 0.06 }
+    ]
+  },
+  pickaxeHit3: {
+    type: 'sawtooth',
+    frequency: 650,
+    duration: 0.12,
+    volume: 0.3,
+    attack: 0.003,
+    decay: 0.04,
+    release: 0.08,
+    harmonics: [
+      { frequency: 1.4, volume: 0.1 },
+      { frequency: 1.9, volume: 0.05 }
+    ]
+  },
+  pickaxeBreak: {
+    type: 'triangle',
+    frequency: 250,
+    duration: 0.35,
+    volume: 0.5,
+    attack: 0.02,
+    decay: 0.12,
+    release: 0.21,
+    harmonics: [
+      { frequency: 0.7, volume: 0.2 },
+      { frequency: 1.3, volume: 0.12 }
+    ]
+  },
+  itemFound: {
+    type: 'sine',
+    frequency: 900,
+    duration: 0.3,
+    volume: 0.25,
+    attack: 0.01,
+    decay: 0.08,
+    release: 0.21,
+    harmonics: [
+      { frequency: 1.6, volume: 0.15 },
+      { frequency: 2.4, volume: 0.08 }
+    ]
+  },
+  emptyRock: {
+    type: 'square',
+    frequency: 180,
+    duration: 0.25,
+    volume: 0.2,
+    attack: 0.01,
+    decay: 0.1,
+    release: 0.14,
+    harmonics: [
+      { frequency: 1.3, volume: 0.08 }
+    ]
+  },
+  modalOpen: {
+    type: 'sine',
+    frequency: 600,
+    duration: 0.25,
+    volume: 0.2,
+    attack: 0.01,
+    decay: 0.05,
+    release: 0.19,
+    harmonics: [
+      { frequency: 1.5, volume: 0.08 },
+      { frequency: 2.0, volume: 0.04 }
+    ]
+  },
+  modalClose: {
+    type: 'sine',
+    frequency: 400,
+    duration: 0.2,
+    volume: 0.18,
+    attack: 0.01,
+    decay: 0.04,
+    release: 0.15,
+    harmonics: [
+      { frequency: 0.8, volume: 0.06 }
+    ]
+  },
+  ladder: {
+    type: 'sine',
+    frequency: 700,
+    duration: 0.3,
+    volume: 0.25,
+    attack: 0.01,
+    decay: 0.08,
+    release: 0.21,
+    harmonics: [
+      { frequency: 1.3, volume: 0.1 },
+      { frequency: 1.8, volume: 0.05 }
+    ]
+  },
+  purchase: {
+    type: 'sine',
+    frequency: 800,
+    duration: 0.2,
+    volume: 0.3,
+    attack: 0.005,
+    decay: 0.06,
+    release: 0.135,
+    harmonics: [
+      { frequency: 1.2, volume: 0.12 },
+      { frequency: 1.6, volume: 0.06 }
+    ]
+  }
+};
+
+function playSound(presetName) {
+  if (!soundEnabled) return;
+  
+  const preset = SOUND_PRESETS[presetName];
+  if (!preset) return;
+  
+  const now = audioContext.currentTime;
+  const osc = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+  
+  osc.type = preset.type;
+  osc.frequency.setValueAtTime(preset.frequency, now);
+  
+  // Main frequency envelope
+  gainNode.gain.setValueAtTime(0, now);
+  gainNode.gain.linearRampToValueAtTime(preset.volume, now + preset.attack);
+  gainNode.gain.exponentialRampToValueAtTime(preset.volume * 0.5, now + preset.attack + preset.decay);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + preset.attack + preset.decay + preset.release);
+  
+  osc.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+  
+  // Add harmonics if specified
+  if (preset.harmonics) {
+    preset.harmonics.forEach((harmonic, index) => {
+      const harmonicOsc = audioContext.createOscillator();
+      const harmonicGain = audioContext.createGain();
+      
+      harmonicOsc.type = preset.type;
+      harmonicOsc.frequency.setValueAtTime(preset.frequency * harmonic.frequency, now);
+      
+      harmonicGain.gain.setValueAtTime(0, now);
+      harmonicGain.gain.linearRampToValueAtTime(preset.volume * harmonic.volume, now + preset.attack);
+      harmonicGain.gain.exponentialRampToValueAtTime(preset.volume * harmonic.volume * 0.5, now + preset.attack + preset.decay);
+      harmonicGain.gain.exponentialRampToValueAtTime(0.001, now + preset.attack + preset.decay + preset.release);
+      
+      harmonicOsc.connect(harmonicGain);
+      harmonicGain.connect(audioContext.destination);
+      
+      harmonicOsc.start(now);
+      harmonicOsc.stop(now + preset.duration);
+    });
+  }
+  
+  osc.start(now);
+  osc.stop(now + preset.duration);
+}
+
+function playPickaxeHit() {
+  // Randomly select one of the pickaxe hit sounds
+  const hits = ['pickaxeHit', 'pickaxeHit2', 'pickaxeHit3'];
+  const randomHit = hits[Math.floor(Math.random() * hits.length)];
+  playSound(randomHit);
+}
+
+// Sound toggle functionality
+document.getElementById('toggleSoundBtn').addEventListener('click', function() {
+  soundEnabled = !soundEnabled;
+  this.textContent = soundEnabled ? '🔊 SOUND: ON' : '🔇 SOUND: OFF';
+  this.style.background = soundEnabled ? 
+    'linear-gradient(to bottom, #4a7b1b 0%, #3a6b0b 100%)' : 
+    'linear-gradient(to bottom, #3b2e1b 0%, #2a1f12 100%)';
+  
+  if (soundEnabled && audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+});
+
+/* ================= IMAGE GENERATOR SYSTEM ================= */
+// Unicode symbols for generating item images
+const RARE_UNICODE = [
+  "\u16A0","\u16A1","\u16B0","\u16B1","\u16C0","\u16C1","\u16C2","\u16C3", // Runic
+  "\u2620","\u2622","\u2623","\u262F","\u2694","\u2695","\u2696","\u2697", // Misc symbols
+  "\u{1F700}","\u{1F701}","\u{1F702}","\u{1F703}","\u{1F704}","\u{1F705}", // Alchemical
+  "\u{1F780}","\u{1F781}","\u{1F782}","\u{1F783}","\u{1F784}","\u{1F785}", // Geometric
+  "\u{1F6A0}","\u{1F6A1}","\u{1F6A2}","\u{1F6A3}","\u{1F6A4}","\u{1F6A5}", // Obscure transport
+  "\u{1F16F}","\u{1F170}","\u{1F171}","\u{1F172}","\u{1F173}","\u{1F174}"  // Obscure blocks
+];
+
+// Material styles for image generation
+const MATERIAL_STYLES = {
+  "Iron": {fill:"#d4d4d4", opacity:0.8, fontSize:35},
+  "Bone": {fill:"#f5f5dc", opacity:0.9, fontSize:30},
+  "Glass": {fill:"#9de0ff", opacity:0.6, fontSize:40},
+  "Wood": {fill:"#a0522d", opacity:0.7, fontSize:35},
+  "Stone": {fill:"#888888", opacity:0.9, fontSize:30},
+  "Cloth": {fill:"#ffb6c1", opacity:0.5, fontSize:40}
+};
+
+// Utility functions for seeded random generation
+function seededRandom(seed) {
+  let x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function getRandomFromSeed(seed, arr) {
+  const index = Math.floor(seededRandom(seed) * arr.length);
+  return arr[index];
+}
+
+function randomBetweenFromSeed(seed, min, max) {
+  return min + seededRandom(seed) * (max - min);
+}
+
+// Generate an SVG image for an item based on its properties
+function generateItemImage(base, material, seed) {
+  const style = MATERIAL_STYLES[material] || MATERIAL_STYLES["Iron"];
+  let svgSymbols = "";
+  
+  // Generate base image hash from seed
+  const baseSeed = hashString(base + material + seed);
+  
+  // Number of symbol layers (200-500)
+  const symbolLayers = 200 + Math.floor(seededRandom(baseSeed) * 300);
+  
+  // Generate random symbols
+  for (let i = 0; i < symbolLayers; i++) {
+    const symSeed = baseSeed + i * 100;
+    const sym = getRandomFromSeed(symSeed, RARE_UNICODE);
+    const x = randomBetweenFromSeed(symSeed, 5, 245);
+    const y = randomBetweenFromSeed(symSeed + 1, 5, 245);
+    const rotation = randomBetweenFromSeed(symSeed + 2, 0, 360);
+    const scale = randomBetweenFromSeed(symSeed + 3, 0.2, 2);
+    const opacity = randomBetweenFromSeed(symSeed + 4, style.opacity * 0.1, style.opacity);
+    
+    svgSymbols += `<text x="${x}" y="${y}" font-size="${style.fontSize * scale}" fill="${style.fill}" opacity="${opacity}" transform="rotate(${rotation} ${x} ${y})">${sym}</text>`;
+  }
+  
+  // Shape-warped layer (symbols forming object outline)
+  const outlineSymbols = 50;
+  for (let i = 0; i < outlineSymbols; i++) {
+    const outlineSeed = baseSeed + i * 1000;
+    const sym = getRandomFromSeed(outlineSeed, RARE_UNICODE);
+    // Use a rough circle outline to simulate object shape
+    const angle = (i / outlineSymbols) * 2 * Math.PI;
+    const radius = 90 + randomBetweenFromSeed(outlineSeed, -10, 10);
+    const x = 125 + radius * Math.cos(angle);
+    const y = 125 + radius * Math.sin(angle);
+    const rotation = randomBetweenFromSeed(outlineSeed + 1, 0, 360);
+    const scale = randomBetweenFromSeed(outlineSeed + 2, 0.5, 1.2);
+    const opacity = randomBetweenFromSeed(outlineSeed + 3, style.opacity * 0.3, style.opacity);
+    
+    svgSymbols += `<text x="${x}" y="${y}" font-size="${style.fontSize * scale}" fill="${style.fill}" opacity="${opacity}" transform="rotate(${rotation} ${x} ${y})">${sym}</text>`;
+  }
+  
+  // Create SVG string
+  const svgString = `
+    <svg width="250" height="250" xmlns="http://www.w3.org/2000/svg">
+      ${svgSymbols}
+      <text x="125" y="240" font-size="14" fill="#fff" text-anchor="middle">${base} (${material})</text>
+    </svg>
+  `;
+  
+  // Convert to data URL for easy display
+  const svgData = encodeURIComponent(svgString);
+  return `data:image/svg+xml;charset=utf-8,${svgData}`;
+}
+
+/* ================= CURSED ITEM GENERATOR ================= */
+// Expanded Base Objects (210 items total)
+const BASE_OBJECTS = [
+  // Original 10 items
+  "Broken Glasses", "Rusty Key", "Cracked Plate", "Bent Spoon", "Bottle Cap", 
+  "Old Coin", "Torn Glove", "Candle Stub", "Warped Ring", "Shattered Mirror",
+  
+  // 200 New Items
+  // Original 10 items
+    "Broken Glasses", "Rusty Key", "Cracked Plate", "Bent Spoon", "Bottle Cap",
+    "Old Coin", "Torn Glove", "Candle Stub", "Warped Ring", "Shattered Mirror",
+
+    // === JEWELRY & ADORNMENTS (30 items) ===
+    "Tarnished Signet Ring", "Single Mismatched Cufflink", "Clasp-less Bracelet", "Scratched Monocle",
+    "Warped Wire Eyeglass Frame", "Tarnished Tie Clip", "Broken Brooch Pin", "Faded ID Badge",
+    "Cracked Wristwatch Face", "Tarnished Locket", "Single Tarnished Earring", "Bent Anklet",
+    "Leaden Token", "Tarnished Cameo Pin", "Stretched-Out Chain", "Pocket Watch with No Hands",
+    "Glass Witch Ball", "Broken String of Pearls", "Corroded Dog Tag", "Bent Nose Ring",
+    "Shattered Cabochon Stone", "Faded Leather Cord", "Broken Spectacle Lens", "Tarnished Thimble",
+    "Hag Stone with a Hole", "Single Rusty Spur", "Tarnished Button Hook", "Cracked Porcelain Figurine",
+    "Broken Hand Mirror", "Pewter Locket with No Picture", "Warped Hair Comb", "Snapped Garter Clip",
+
+    // === CLOTHING & PERSONAL ITEMS (30 items) ===
+    "Cracked Leather Belt", "Permanently Stained Silk Tie", "Empty Scuffed Wallet", "Brittle Rubber Band",
+    "Tarnished Metal Hair Clip", "Broken Comb", "Chewed Pen Cap", "Empty Lighter",
+    "Tarnished Keychain", "Scratched Cigarette Case", "Dented Flask", "Sole from a Leather Shoe",
+    "Child's Concealed Shoe", "Felted Wool Mitten", "Torn Lace Collar", "Worn-Out Eye Patch",
+    "Cracked Brim of a Hat", "Single Suspenders Clip", "Tarnished Zipper Pull", "Frayed Velvet Ribbon",
+    "Scrap of Embroidered Silk", "Broken Bone Button", "Torn Pocket Watch Fob", "Dented Tin Snuff Box",
+    "Scrap of Quilted Lining", "Worn Leather Thong", "Broken Tortoiseshell Hairpin", "Single Knit Arm Warmer",
+    "Cracked Celluloid Collar Stay", "Faded Embroidered Patch", "Unraveled Macramé Bracelet", "Stiffened Leather Glove Finger",
+
+    // === HOUSEHOLD & KITCHENWARE (30 items) ===
+    "Bent Tarnished Fork", "Warped Wooden Spoon", "Chipped Ceramic Mug", "Rusted Cheese Grater",
+    "Dried-Out Glue Stick", "Dull Pair of Scissors", "Cracked Shot Glass", "Tarnished Thimble",
+    "Dented Whisk", "Chipped Rolling Pin", "Corroded Corkscrew", "Broken Egg Beater",
+    "Leaden Lid", "Dented Tin Cup", "Broken Clay Pipe Stem", "Chipped Chamber Pot Handle",
+    "Cracked Salt Cellar", "Worn-Out Broom Straws", "Rusted Lemon Reamer", "Bent Sardine Key",
+    "Broken Hearth Tinderbox", "Shattered Mason Jar Lid", "Warped Pie Funnel", "Dull Butter Knife",
+    "Cracked Pilgrim Bottle", "Pewter Spoon with Bite Marks", "Broken Oil Lamp Wick Adjuster", "Chipped Soapstone Crucible",
+    "Rusted Coffee Percolator Basket", "Cracked Horn Beaker", "Broken Candle Snuffer", "Warped Tin Cookie Cutter",
+
+    // === STATIONERY & PRINTED MATERIALS (30 items) ===
+    "Faded Water-Stained Receipt", "Torn Shipping Label", "Shredded Love Letter", "Dog-Eared Paperback",
+    "Mildewed Instruction Manual", "Tattered Dictionary", "Faded Blueprint", "Illegible Map",
+    "Torn Postcard", "Unsent Greeting Card", "Used Stamp", "Sheet of Faded Music",
+    "Waterlogged Notebook", "Roll of Yellowed Adhesive Tape", "Crumbling Newsprint",
+    "Curse Tablet Fragment", "Torn Page from a Ledger", "Faded Theater Ticket", "Shredded Banknote",
+    "Illegible Shipping Manifest", "Disintegrating Telegrams", "Ripped Wanted Poster", "Faded Cartes de Visite",
+    "Torn Seed Packet", "Wax-Sealed Letter (Broken)", "Damp Matchbook Cover", "Faded Candy Wrapper",
+    "Torn Calendar Page", "Brittle Papyrus Scrap", "Faded Daguerreotype Sleeve", "Ripped Paper Doll",
+
+    // === MATERIALS, SCRAPS & FASTENERS (30 items) ===
+    "Scrap of Peeling Wallpaper", "Shard of Green Aquarium Glass", "Bent Rusted Hinge",
+    "Single Chipped Ceramic Tile", "Bundle of Unlabeled Keys", "Scrap of Faded Quilt Fabric",
+    "Piece of Corroded Copper Pipe", "Twisted Paperclip", "Rusted Padlock",
+    "Jar of Assorted Rusty Bolts", "Crushed Aluminum Can", "Soggy Cardboard Scrap",
+    "Scrap of Burlap", "Piece of Warped Linoleum", "Scrap of Leaded Stained Glass",
+    "Scrap of Tar Paper", "Shard of Donyatt Ware", "Piece of Oyster Shell", "Lump of Slag",
+    "Scrap of Felt", "Piece of Blown Glass", "Fragment of a Wax Seal", "Twisted Lead Stripping",
+    "Scrap of Emery Cloth", "Piece of Blistered Linoleum", "Shard of Milk Glass", "Twisted Fuse Wire",
+    "Scrap of Oilcloth", "Piece of Blistering Paint", "Shard of Transferware", "Twisted Baling Wire",
+
+    // === TOOLS & HARDWARE (30 items) ===
+    "Rusted Claw Hammer", "Seized Adjustable Wrench", "Snapped Tape Measure", "Piece of Used Sandpaper",
+    "Dull Wood Chisel", "Rusted Screwdriver", "Jawless Pliers", "Dull Utility Knife",
+    "Splintered Wooden Mallet", "Bent Awl", "Rusted Spring Clamp", "Broken Spirit Level",
+    "Broken Draw Knife", "Rusted Hand Drill Bit", "Blunt Draw Shave", "Cracked Honing Stone",
+    "Bent Farrier's Nail", "Seized Bolt Cutter", "Worn-Out Strop", "Broken Gimlet",
+    "Rusted Caliper Jaw", "Dull Adze Blade", "Split Hammer Handle", "Fused Electrical Fuse",
+    "Broken Plumb Bob", "Rusted Saw Set", "Cracked Grindstone", "Bent Soldering Iron Tip",
+    "Seized Pipe Tap", "Broken Glass Cutter Wheel", "Worn-Out Sanding Block", "Dull Hedge Shear Blade",
+
+    // === ELECTRONICS & COMPONENTS (18 items) ===
+    "Shattered Smartphone Screen", "Nest of Tangled Cables", "Remote with Missing Battery Cover",
+    "Sticky Game Controller Button", "Warped Vinyl Record", "Dead Laptop Battery",
+    "Broken Remote Control Button", "Charred Electrical Plug", "Cracked Landline Phone Casing",
+    "Warped Keyboard Key", "Broken Zipper Pull", "Single Cracked VR Lens",
+    "Fused Vacuum Tube", "Tangle of Copper Wire", "Burned-Out Solenoid", "Cracked Rotary Dial",
+    "Corroded Circuit Board", "Melted Switch Toggle",
+
+    // === RECREATION, HOBBY & TOYS (18 items) ===
+    "Single Warped Puzzle Piece", "Snapped Guitar String", "Single Playing Card",
+    "Chipped Chess Piece", "Dried-Up Paint Tube", "Bent Knitting Needle",
+    "Tarnished Guitar Pick", "Chipped Drumstick", "Cracked Marble",
+    "Deflated Soccer Ball", "Torn Kite String", "Broken Yo-yo",
+    "Chipped Bakelite Dice", "Broken Harmonica Reed", "Faded Tarot Card", "Cracked Croquet Ball",
+    "Bent Fishing Lure", "Torn Joker Card"
+];
+
+const MATERIALS = ["Iron","Bone","Glass","Wood","Stone","Cloth"];
+const RARITY = [
+  { tier: "Common", weight: 60 },
+  { tier: "Uncommon", weight: 25 },
+  { tier: "Rare", weight: 10 },
+  { tier: "Legendary", weight: 4 },
+  { tier: "Ultra Legendary", weight: 1 }
+];
+
+// New Expanded Effects System
+const EFFECTS_DATA = {
+  "somatic": {
+    "category": "Somatic (Body)",
+    "total_positive": 31,
+    "total_negative": 31,
+    "rarity_weight_curve": [0.05,0.1,0.15,0.2,0.25,0.15,0.1],
+    "positive_effects": [
+      {"id":"S-SOM-001","name":"Spectral Vision","description":"See magical residue and auras"},
+      {"id":"S-SOM-002","name":"Temporal Afterimage","description":"See recent past visuals"},
+      {"id":"S-SOM-003","name":"Visual Distortion","description":"Reality appears warped"},
+      {"id":"S-SOM-004","name":"Whisper Audition","description":"Hear magical intent"},
+      {"id":"S-SOM-005","name":"Sound Nullification","description":"Immune to sound"},
+      {"id":"S-SOM-006","name":"Essence Scent","description":"Smell emotions or magic"},
+      {"id":"S-SOM-007","name":"Truth Taste","description":"Detect lies by taste"},
+      {"id":"S-SOM-008","name":"Sensory Amplification","description":"Heightened tactile input"},
+      {"id":"S-SOM-009","name":"Reflex Acceleration","description":"Faster motor response"},
+      {"id":"S-SOM-010","name":"Pain Conversion","description":"Pain generates energy"},
+      {"id":"S-SOM-011","name":"Neural Disruption","description":"Random nerve misfires"},
+      {"id":"S-SOM-012","name":"Spinal Command","description":"Commands body instantly"},
+      {"id":"S-SOM-013","name":"Beat-Synced Power","description":"Effects trigger with heartbeat"},
+      {"id":"S-SOM-014","name":"Life Exchange","description":"Health traded for power"},
+      {"id":"S-SOM-015","name":"Blood Reactivity","description":"Blood responds to magic"},
+      {"id":"S-SOM-016","name":"Blood Loss Scaling","description":"Power increases as blood is lost"},
+      {"id":"S-SOM-017","name":"Vein Manifestation","description":"Visible energy flow"},
+      {"id":"S-SOM-018","name":"Burst Strength","description":"Short strength spikes"},
+      {"id":"S-SOM-019","name":"Bone Resonance","description":"Bones vibrate with force"},
+      {"id":"S-SOM-020","name":"Joint Locking","description":"Movement can be halted"},
+      {"id":"S-SOM-021","name":"Elastic Extension","description":"Limbs stretch unnaturally"},
+      {"id":"S-SOM-022","name":"Corruption Filtration","description":"Filters magical toxins"},
+      {"id":"S-SOM-023","name":"Non-Matter Digestion","description":"Consume intangible things"},
+      {"id":"S-SOM-024","name":"Essence Purge","description":"Remove magic from body"},
+      {"id":"S-SOM-025","name":"Emotion Storage","description":"Emotions stored physically"},
+      {"id":"S-SOM-026","name":"Age Distortion","description":"Alters aging rate"},
+      {"id":"S-SOM-027","name":"Imperfect Regeneration","description":"Healing leaves changes"},
+      {"id":"S-SOM-028","name":"Pain Suppression","description":"Pain disabled"},
+      {"id":"S-SOM-029","name":"Delayed Death","description":"Death postponed temporarily"},
+      {"id":"S-SOM-030","name":"Organ Overdrive","description":"Organs perform at extreme capacity"},
+      {"id":"S-SOM-031","name":"Limb Hyperflex","description":"Extreme limb flexibility"}
+    ],
+    "negative_effects": [
+      {"id":"N-SOM-001","name":"Spectral Blindness","description":"Cannot see magical auras, blinds to mystical energies"},
+      {"id":"N-SOM-002","name":"Temporal Confusion","description":"Past visuals overlay current vision randomly"},
+      {"id":"N-SOM-003","name":"Visual Chaos","description":"Vision constantly warped and unstable"},
+      {"id":"N-SOM-004","name":"Auditory Overload","description":"Hear magical intent as unbearable noise"},
+      {"id":"N-SOM-005","name":"Sound Deafness","description":"Cannot hear normal or magical sounds"},
+      {"id":"N-SOM-006","name":"Aroma Numbness","description":"Unable to smell magical or emotional essence"},
+      {"id":"N-SOM-007","name":"Taste Deception","description":"Cannot detect lies or magical properties via taste"},
+      {"id":"N-SOM-008","name":"Numb Skin","description":"Tactile sensations greatly diminished"},
+      {"id":"N-SOM-009","name":"Sluggish Reflexes","description":"Motor response is slowed"},
+      {"id":"N-SOM-010","name":"Pain Overload","description":"Pain triggers extreme reactions instead of energy"},
+      {"id":"N-SOM-011","name":"Neural Misfire","description":"Random nerve misfires cause involuntary movements"},
+      {"id":"N-SOM-012","name":"Spinal Stiffness","description":"Body responds slowly to commands"},
+      {"id":"N-SOM-013","name":"Irregular Heartbeat","description":"Heartbeat disrupts power timing"},
+      {"id":"N-SOM-014","name":"Life Drain","description":"Health deteriorates unpredictably when using abilities"},
+      {"id":"N-SOM-015","name":"Blood Weakness","description":"Blood reacts unpredictably to magic, causing illness"},
+      {"id":"N-SOM-016","name":"Vein Obscurity","description":"Cannot perceive energy flow in veins"},
+      {"id":"N-SOM-017","name":"Muscle Fatigue","description":"Strength surges backfire, causing exhaustion"},
+      {"id":"N-SOM-018","name":"Bone Fragility","description":"Bone vibrations cause microfractures"},
+      {"id":"N-SOM-019","name":"Joint Rigidity","description":"Movement sometimes halts unexpectedly"},
+      {"id":"N-SOM-020","name":"Tendon Tear","description":"Limbs overstretch and cause injury"},
+      {"id":"N-SOM-021","name":"Organ Corruption","description":"Magical toxins bypass filtration"},
+      {"id":"N-SOM-022","name":"Digestive Null","description":"Unable to process intangible substances"},
+      {"id":"N-SOM-023","name":"Essence Saturation","description":"Magic accumulates uncontrollably in the body"},
+      {"id":"N-SOM-024","name":"Emotion Leakage","description":"Stored emotions escape violently"},
+      {"id":"N-SOM-025","name":"Rapid Aging","description":"Biological state accelerates uncontrollably"},
+      {"id":"N-SOM-026","name":"Unstable Regeneration","description":"Healing causes deformities"},
+      {"id":"N-SOM-027","name":"Pain Overload","description":"Cannot suppress pain; constant agony"},
+      {"id":"N-SOM-028","name":"Premature Death","description":"Mortality triggered prematurely"},
+      {"id":"N-SOM-029","name":"Organ Displacement","description":"Organs shift dangerously"},
+      {"id":"N-SOM-030","name":"Heartbeat Desync","description":"Heartbeat detached from time causes dizziness"},
+      {"id":"N-SOM-031","name":"Limb Distortion","description":"Limb elongation/shrinkage is uncontrolled"}
+    ],
+    "delayed_effects": ["SOM_DELAY_01","SOM_DELAY_02","SOM_DELAY_03","SOM_DELAY_04"],
+    "proximity_effects": ["SOM_PROX_01","SOM_PROX_02","SOM_PROX_03","SOM_PROX_04"],
+    "incompatibilities": [
+      ["S-SOM-001","N-SOM-001"],
+      ["S-SOM-002","N-SOM-002"],
+      ["S-SOM-018","N-SOM-018"],
+      ["S-SOM-030","N-SOM-030"]
+    ]
+  },
+  
+  "cognitive": {
+    "category": "Cognitive (Mind)",
+    "total_positive": 23,
+    "total_negative": 23,
+    "rarity_weight_curve": [0.05,0.1,0.15,0.25,0.25,0.15,0.05],
+    "positive_effects": [
+      {"id":"C-COG-001","name":"Parallel Thought","description":"Multiple thoughts at once"},
+      {"id":"C-COG-002","name":"Thought Looping","description":"Repeating thoughts"},
+      {"id":"C-COG-003","name":"Cognitive Delay","description":"Slowed decisions"},
+      {"id":"C-COG-004","name":"Perfect Recall","description":"No forgetting"},
+      {"id":"C-COG-005","name":"Selective Erasure","description":"Specific memories removed"},
+      {"id":"C-COG-006","name":"Ancestral Recall","description":"Inherited memories"},
+      {"id":"C-COG-007","name":"Emotion Suppression","description":"Emotions muted"},
+      {"id":"C-COG-008","name":"Emotion Projection","description":"Force emotion on others"},
+      {"id":"C-COG-009","name":"Emotion Amplification","description":"Feelings intensified"},
+      {"id":"C-COG-010","name":"Time Dilation (Mental)","description":"Time feels slower/faster"},
+      {"id":"C-COG-011","name":"Reality Misalignment","description":"Perceive false patterns"},
+      {"id":"C-COG-012","name":"Lie Blindness","description":"Cannot detect lies"},
+      {"id":"C-COG-013","name":"Ego Dissolution","description":"Loss of self"},
+      {"id":"C-COG-014","name":"Moral Inversion","description":"Ethics reversed"},
+      {"id":"C-COG-015","name":"Mental Fortification","description":"Resist mind control"},
+      {"id":"C-COG-016","name":"Will Drain","description":"Steal resolve"},
+      {"id":"C-COG-017","name":"Binding Speech","description":"Words enforce rules"},
+      {"id":"C-COG-018","name":"Thought Sharing","description":"Minds linked"},
+      {"id":"C-COG-019","name":"Forced Silence","description":"Cannot speak"},
+      {"id":"C-COG-020","name":"Rapid Analysis","description":"Instant evaluation of information"},
+      {"id":"C-COG-021","name":"Creative Surge","description":"Idea generation accelerated"},
+      {"id":"C-COG-022","name":"Mental Clarity","description":"Confusion eliminated temporarily"},
+      {"id":"C-COG-023","name":"Focused Obsession","description":"Hyper-focus on chosen task"}
+    ],
+    "negative_effects": [
+      {"id":"N-COG-001","name":"Thought Fragmentation","description":"Cannot focus, thoughts scatter"},
+      {"id":"N-COG-002","name":"Memory Loss","description":"Forget important information randomly"},
+      {"id":"N-COG-003","name":"Memory Corruption","description":"Memories altered or replaced"},
+      {"id":"N-COG-004","name":"Emotional Volatility","description":"Cannot control emotions"},
+      {"id":"N-COG-005","name":"Emotional Drain","description":"Others drain your feelings"},
+      {"id":"N-COG-006","name":"Emotion Flatline","description":"Cannot feel any emotion"},
+      {"id":"N-COG-007","name":"Temporal Confusion","description":"Time perception constantly shifts"},
+      {"id":"N-COG-008","name":"Reality Collapse","description":"Cannot trust perceptions"},
+      {"id":"N-COG-009","name":"Lie Susceptibility","description":"Always deceived by falsehoods"},
+      {"id":"N-COG-010","name":"Identity Fragmentation","description":"Loss of self-awareness"},
+      {"id":"N-COG-011","name":"Moral Paralysis","description":"Unable to make ethical choices"},
+      {"id":"N-COG-012","name":"Mind Vulnerability","description":"Easy to manipulate mentally"},
+      {"id":"N-COG-013","name":"Speech Block","description":"Cannot form coherent words"},
+      {"id":"N-COG-014","name":"Mental Lag","description":"Thoughts delayed, processing slow"},
+      {"id":"N-COG-015","name":"Focus Break","description":"Cannot sustain attention"},
+      {"id":"N-COG-016","name":"Compulsive Repetition","description":"Cannot stop repeating actions or thoughts"},
+      {"id":"N-COG-017","name":"Mind Noise","description":"Random thoughts interfere with tasks"},
+      {"id":"N-COG-018","name":"Creative Drain","description":"Ideas vanish before completion"},
+      {"id":"N-COG-019","name":"Memory Overload","description":"Cannot store new memories"},
+      {"id":"N-COG-020","name":"Confusion Spiral","description":"Mental chaos grows over time"},
+      {"id":"N-COG-021","name":"Obsession Trap","description":"Fixates on harmful thought patterns"},
+      {"id":"N-COG-022","name":"Cognitive Paralysis","description":"Cannot make decisions under pressure"},
+      {"id":"N-COG-023","name":"Thought Distortion","description":"Perceived events never match reality"}
+    ],
+    "delayed_effects": ["COG_DELAY_01","COG_DELAY_02","COG_DELAY_03","COG_DELAY_04"],
+    "proximity_effects": ["COG_PROX_01","COG_PROX_02","COG_PROX_03","COG_PROX_04"],
+    "incompatibilities": [
+      ["C-COG-001","N-COG-001"],
+      ["C-COG-004","N-COG-002"],
+      ["C-COG-010","N-COG-007"]
+    ]
+  },
+  
+  "environmental": {
+    "category": "Environmental (Surroundings)",
+    "total_positive": 44,
+    "total_negative": 44,
+    "rarity_weight_curve": [0.05,0.1,0.15,0.2,0.25,0.15,0.1],
+    "positive_effects": [
+      {"id":"E-ENV-001","name":"Fire Manipulation","description":"Control flame"},
+      {"id":"E-ENV-002","name":"Water Manipulation","description":"Control liquid water"},
+      {"id":"E-ENV-003","name":"Earth Manipulation","description":"Control soil/stone"},
+      {"id":"E-ENV-004","name":"Air Manipulation","description":"Control gases"},
+      {"id":"E-ENV-005","name":"Lightning Channel","description":"Direct electricity"},
+      {"id":"E-ENV-006","name":"Ice Formation","description":"Freeze moisture"},
+      {"id":"E-ENV-007","name":"Ash Control","description":"Manipulate residue"},
+      {"id":"E-ENV-008","name":"Ground Warping","description":"Alter land shape"},
+      {"id":"E-ENV-009","name":"Endless Roads","description":"Paths loop"},
+      {"id":"E-ENV-010","name":"Selective Doors","description":"Doors choose users"},
+      {"id":"E-ENV-011","name":"Memory Walls","description":"Walls store events"},
+      {"id":"E-ENV-012","name":"Gravity Shift","description":"Alter gravity"},
+      {"id":"E-ENV-013","name":"Pressure Control","description":"Compress air"},
+      {"id":"E-ENV-014","name":"Light Solidification","description":"Light becomes tangible"},
+      {"id":"E-ENV-015","name":"Shadow Animation","description":"Shadows move"},
+      {"id":"E-ENV-016","name":"Distance Compression","description":"Space shortened"},
+      {"id":"E-ENV-017","name":"Folding Space","description":"Impossible interiors"},
+      {"id":"E-ENV-018","name":"Time Loop (Local)","description":"Repeating interval"},
+      {"id":"E-ENV-019","name":"Time Halt Zone","description":"Area frozen"},
+      {"id":"E-ENV-020","name":"Accelerated Growth","description":"Plants grow rapidly"},
+      {"id":"E-ENV-021","name":"Blight Spread","description":"Decay propagation"},
+      {"id":"E-ENV-022","name":"Fauna Control","description":"Animal obedience"},
+      {"id":"E-ENV-023","name":"Mutation Field","description":"Creatures altered"},
+      {"id":"E-ENV-024","name":"Magical Fog","description":"Obscures area magically"},
+      {"id":"E-ENV-025","name":"Acid Rain","description":"Corrodes objects"},
+      {"id":"E-ENV-026","name":"Wind Barrier","description":"Blocks projectiles"},
+      {"id":"E-ENV-027","name":"Flood Pulse","description":"Water surges unpredictably"},
+      {"id":"E-ENV-028","name":"Earthquake Tremor","description":"Ground shakes locally"},
+      {"id":"E-ENV-029","name":"Firestorm","description":"Flames explode spontaneously"},
+      {"id":"E-ENV-030","name":"Ice Spike","description":"Sharp ice emerges from ground"},
+      {"id":"E-ENV-031","name":"Electric Surge","description":"Random lightning arcs"},
+      {"id":"E-ENV-032","name":"Shadow Cloak","description":"Shadows conceal objects"},
+      {"id":"E-ENV-033","name":"Portal Gate","description":"Temporary portals appear"},
+      {"id":"E-ENV-034","name":"Volcanic Eruption","description":"Lava flows unpredictably"},
+      {"id":"E-ENV-035","name":"Mirror Reflection","description":"Space reflects duplicates"},
+      {"id":"E-ENV-036","name":"Magnetic Flux","description":"Metal objects attract/repel"},
+      {"id":"E-ENV-037","name":"Temporal Bloom","description":"Time briefly accelerates locally"},
+      {"id":"E-ENV-038","name":"Reverse Flow","description":"Water/air flows backward"},
+      {"id":"E-ENV-039","name":"Light Prism","description":"Light splits into illusions"},
+      {"id":"E-ENV-040","name":"Dark Zone","description":"Shadows dominate visibility"},
+      {"id":"E-ENV-041","name":"Plant Growth Surge","description":"Vegetation expands rapidly"},
+      {"id":"E-ENV-042","name":"Acidic Soil","description":"Ground becomes corrosive"},
+      {"id":"E-ENV-043","name":"Sandstorm","description":"Wind carries sand and debris"},
+      {"id":"E-ENV-044","name":"Echoing Sound","description":"Noises repeat unpredictably"}
+    ],
+    "negative_effects": [
+      {"id":"N-ENV-001","name":"Fireback","description":"Flames burn user randomly"},
+      {"id":"N-ENV-002","name":"Drowning Aura","description":"Water surges trap user"},
+      {"id":"N-ENV-003","name":"Quicksand","description":"Ground collapses beneath user"},
+      {"id":"N-ENV-004","name":"Air Vacuum","description":"Air pressure collapses nearby"},
+      {"id":"N-ENV-005","name":"Lightning Feedback","description":"Electricity shocks user"},
+      {"id":"N-ENV-006","name":"Freezing Chill","description":"Ice harms user unpredictably"},
+      {"id":"N-ENV-007","name":"Ash Suffocation","description":"Ash clouds choke"},
+      {"id":"N-ENV-008","name":"Land Collapse","description":"Ground caves in"},
+      {"id":"N-ENV-009","name":"Loop Trap","description":"Roads trap travelers"},
+      {"id":"N-ENV-010","name":"Door Lock","description":"Cannot pass doors"},
+      {"id":"N-ENV-011","name":"Wall Collapse","description":"Memory walls collapse"},
+      {"id":"N-ENV-012","name":"Gravity Crush","description":"Gravity crushes objects randomly"},
+      {"id":"N-ENV-013","name":"Pressure Spike","description":"Air pressure injures"},
+      {"id":"N-ENV-014","name":"Blinding Light","description":"Light blinds"},
+      {"id":"N-ENV-015","name":"Shadow Grab","description":"Shadows immobilize"},
+      {"id":"N-ENV-016","name":"Space Stretch","description":"Space distorts unpredictably"},
+      {"id":"N-ENV-017","name":"Space Fold Trap","description":"Traps inside folded spaces"},
+      {"id":"N-ENV-018","name":"Time Loop Trap","description":"Cannot escape loop"},
+      {"id":"N-ENV-019","name":"Frozen Zone","description":"Time freezes user"},
+      {"id":"N-ENV-020","name":"Rapid Decay","description":"Plants rot quickly"},
+      {"id":"N-ENV-021","name":"Blight Contagion","description":"Decay spreads uncontrollably"},
+      {"id":"N-ENV-022","name":"Wild Fauna","description":"Animals attack randomly"},
+      {"id":"N-ENV-023","name":"Mutation Madness","description":"Creatures mutate violently"},
+      {"id":"N-ENV-024","name":"Dense Fog","description":"Obscures everything"},
+      {"id":"N-ENV-025","name":"Acid Storm","description":"Corrosive rain falls"},
+      {"id":"N-ENV-026","name":"Wind Slash","description":"Strong winds cut"},
+      {"id":"N-ENV-027","name":"Flooding","description":"Water overwhelms terrain"},
+      {"id":"N-ENV-028","name":"Tremor","description":"Ground shakes violently"},
+      {"id":"N-ENV-029","name":"Inferno","description":"Fire spreads uncontrollably"},
+      {"id":"N-ENV-030","name":"Ice Cage","description":"User trapped in ice"},
+      {"id":"N-ENV-031","name":"Electric Feedback","description":"User shocked"},
+      {"id":"N-ENV-032","name":"Shadow Snare","description":"Shadows entrap"},
+      {"id":"N-ENV-033","name":"Portal Misfire","description":"Portals appear incorrectly"},
+      {"id":"N-ENV-034","name":"Lava Flow","description":"Lava damages user"},
+      {"id":"N-ENV-035","name":"Mirror Trap","description":"Reflections harm user"},
+      {"id":"N-ENV-036","name":"Magnetic Pull","description":"Metal pulls dangerously"},
+      {"id":"N-ENV-037","name":"Temporal Surge","description":"Time accelerates uncontrollably"},
+      {"id":"N-ENV-038","name":"Reverse Flow Trap","description":"Air/water flows back"},
+      {"id":"N-ENV-039","name":"Light Distortion","description":"Illusions overwhelm vision"},
+      {"id":"N-ENV-040","name":"Dark Dominance","description":"Shadows obscure all"},
+      {"id":"N-ENV-041","name":"Overgrowth Trap","description":"Plants entangle"},
+      {"id":"N-ENV-042","name":"Acidic Earth","description":"Ground burns skin"},
+      {"id":"N-ENV-043","name":"Sand Barrage","description":"Sand injures and blinds"},
+      {"id":"N-ENV-044","name":"Echo Confusion","description":"Repeating sounds disorient"}
+    ],
+    "delayed_effects": ["ENV_DELAY_01","ENV_DELAY_02","ENV_DELAY_03","ENV_DELAY_04"],
+    "proximity_effects": ["ENV_PROX_01","ENV_PROX_02","ENV_PROX_03","ENV_PROX_04"],
+    "incompatibilities": [
+      ["E-ENV-001","N-ENV-001"],
+      ["E-ENV-002","N-ENV-002"],
+      ["E-ENV-016","N-ENV-016"]
+    ]
+  },
+
+  "metaphysical": {
+    "category": "Metaphysical (Beyond)",
+    "total_positive": 44,
+    "total_negative": 44,
+    "rarity_weight_curve": [0.05,0.1,0.15,0.2,0.25,0.15,0.1],
+    "positive_effects": [
+      {"id":"M-MET-001","name":"Soul Binding","description":"Souls bound to objects"},
+      {"id":"M-MET-002","name":"Soul Drain","description":"Steal soul fragments"},
+      {"id":"M-MET-003","name":"Soul Echo","description":"Post-death actions"},
+      {"id":"M-MET-004","name":"Probability Skew","description":"Alter odds"},
+      {"id":"M-MET-005","name":"Destiny Lock","description":"Outcome fixed"},
+      {"id":"M-MET-006","name":"Luck Debt","description":"Future misfortune"},
+      {"id":"M-MET-007","name":"Partial Erasure","description":"Removed from memory"},
+      {"id":"M-MET-008","name":"Anchored Existence","description":"Cannot die"},
+      {"id":"M-MET-009","name":"Narrative Resistance","description":"Resists story logic"},
+      {"id":"M-MET-010","name":"True Name Control","description":"Dominance via names"},
+      {"id":"M-MET-011","name":"Name Decay","description":"Loss of power when forgotten"},
+      {"id":"M-MET-012","name":"Symbol Realization","description":"Metaphors become real"},
+      {"id":"M-MET-013","name":"Object Genesis","description":"Create artifacts"},
+      {"id":"M-MET-014","name":"Intent Conversion","description":"Matter → intent"},
+      {"id":"M-MET-015","name":"Apotheosis Seed","description":"Potential ascension"},
+      {"id":"M-MET-016","name":"Source Shift","description":"Become magic source"},
+      {"id":"M-MET-017","name":"Fate Sway","description":"Probability shifts to benefit user"},
+      {"id":"M-MET-018","name":"Existence Imprint","description":"Leave lasting mark on reality"},
+      {"id":"M-MET-019","name":"Soul Fusion","description":"Combine two souls temporarily"},
+      {"id":"M-MET-020","name":"Temporal Blessing","description":"Time favors user briefly"},
+      {"id":"M-MET-021","name":"Luck Surge","description":"Chance events favor user"},
+      {"id":"M-MET-022","name":"Reality Anchor","description":"Stabilize chaotic environment"},
+      {"id":"M-MET-023","name":"Metaphysical Shield","description":"Protect against supernatural effects"},
+      {"id":"M-MET-024","name":"Divine Intervention","description":"Rarely alter outcomes drastically"},
+      {"id":"M-MET-025","name":"Intent Amplification","description":"Enhances willpower magic"},
+      {"id":"M-MET-026","name":"Ethereal Cloak","description":"Blend into metaphysical planes"},
+      {"id":"M-MET-027","name":"Karmic Reversal","description":"Redirect consequences"},
+      {"id":"M-MET-028","name":"Spirit Call","description":"Summon friendly spirits"},
+      {"id":"M-MET-029","name":"Existence Shield","description":"Prevent erasure temporarily"},
+      {"id":"M-MET-030","name":"Destiny Shift","description":"Alter small fate events"},
+      {"id":"M-MET-031","name":"Probability Bubble","description":"Local area chance manipulation"},
+      {"id":"M-MET-032","name":"Apportation","description":"Move objects instantly"},
+      {"id":"M-MET-033","name":"Metaphysical Insight","description":"Gain knowledge beyond senses"},
+      {"id":"M-MET-034","name":"Curse Conversion","description":"Reverse negative effects"},
+      {"id":"M-MET-035","name":"Temporal Echo","description":"Repeat past actions briefly"},
+      {"id":"M-MET-036","name":"Soul Resonance","description":"Amplify spirit energy"},
+      {"id":"M-MET-037","name":"Astral Merge","description":"Merge with astral projection"},
+      {"id":"M-MET-038","name":"Existential Shift","description":"Change metaphysical state"},
+      {"id":"M-MET-039","name":"Legendary Imprint","description":"Leave story-impacting trace"},
+      {"id":"M-MET-040","name":"Fate Resonance","description":"Nearby events influenced by fate"},
+      {"id":"M-MET-041","name":"Reality Veil","description":"Obscure events from perception"},
+      {"id":"M-MET-042","name":"Soul Amplification","description":"Boost spiritual potency"},
+      {"id":"M-MET-043","name":"Divine Guidance","description":"Receive insight from beyond"},
+      {"id":"M-MET-044","name":"Ultimate Transcendence","description":"Temporary extreme power"}
+    ],
+    "negative_effects": [
+      {"id":"N-MET-001","name":"Soul Severance","description":"Soul partially lost or fragmented"},
+      {"id":"N-MET-002","name":"Soul Drainback","description":"User suffers consequences from draining"},
+      {"id":"N-MET-003","name":"Echo Backfire","description":"Post-death actions harm allies"},
+      {"id":"N-MET-004","name":"Probability Reversal","description":"Chance works against user"},
+      {"id":"N-MET-005","name":"Fate Lock","description":"Cannot change outcomes"},
+      {"id":"N-MET-006","name":"Bad Luck Spiral","description":"Future misfortune accelerates"},
+      {"id":"N-MET-007","name":"Erasure Backlash","description":"Memory removal affects self"},
+      {"id":"N-MET-008","name":"Anchored Vulnerability","description":"Cannot die but suffers consequences"},
+      {"id":"N-MET-009","name":"Narrative Trap","description":"Resists story logic but suffers chaos"},
+      {"id":"N-MET-010","name":"True Name Weakness","description":"Names manipulated by others"},
+      {"id":"N-MET-011","name":"Name Decay Backfire","description":"Power fades unexpectedly"},
+      {"id":"N-MET-012","name":"Symbol Misfire","description":"Metaphors cause harm instead of effect"},
+      {"id":"N-MET-013","name":"Artifact Instability","description":"Created objects fail unpredictably"},
+      {"id":"N-MET-014","name":"Intent Reversal","description":"Matter converted unpredictably"},
+      {"id":"N-MET-015","name":"Apotheosis Trap","description":"Ascension attempt harms user"},
+      {"id":"N-MET-016","name":"Source Drain","description":"Becoming magic source backfires"},
+      {"id":"N-MET-017","name":"Fate Twist","description":"Probability shift harms user"},
+      {"id":"N-MET-018","name":"Existence Loss","description":"Reality imprint fails"},
+      {"id":"N-MET-019","name":"Soul Fracture","description":"Fusion damages soul"},
+      {"id":"N-MET-020","name":"Temporal Curse","description":"Time manipulation harms user"},
+      {"id":"N-MET-021","name":"Luck Loss","description":"Chance events turn disastrous"},
+      {"id":"N-MET-022","name":"Reality Destabilization","description":"Stabilizing reality causes collapse elsewhere"},
+      {"id":"N-MET-023","name":"Metaphysical Weakness","description":"Exposed to supernatural vulnerabilities"},
+      {"id":"N-MET-024","name":"Divine Interference","description":"Outside forces disrupt user"},
+      {"id":"N-MET-025","name":"Intent Backlash","description":"Amplifying willpower harms self"},
+      {"id":"N-MET-026","name":"Ethereal Trap","description":"Blending plane traps user"},
+      {"id":"N-MET-027","name":"Karmic Punishment","description":"Redirection backfires"},
+      {"id":"N-MET-028","name":"Spirit Corruption","description":"Summoned spirits attack user"},
+      {"id":"N-MET-029","name":"Existence Fracture","description":"Prevents self-consistency"},
+      {"id":"N-MET-030","name":"Destiny Crash","description":"Fate change harms allies"},
+      {"id":"N-MET-031","name":"Probability Collapse","description":"Chance backfires locally"},
+      {"id":"N-MET-032","name":"Apportation Failure","description":"Objects move uncontrollably"},
+      {"id":"N-MET-033","name":"Insight Overload","description":"Knowledge overwhelms mind"},
+      {"id":"N-MET-034","name":"Curse Amplification","description":"Negative effects worsen"},
+      {"id":"N-MET-035","name":"Temporal Echo Backlash","description":"Repeats harmful past events"},
+      {"id":"N-MET-036","name":"Soul Feedback","description":"Amplified soul energy harms self"},
+      {"id":"N-MET-037","name":"Astral Trap","description":"Astral merge traps user"},
+      {"id":"N-MET-038","name":"Existential Dissonance","description":"Metaphysical state unstable"},
+      {"id":"N-MET-039","name":"Legendary Trap","description":"Story-impacting trace backfires"},
+      {"id":"N-MET-040","name":"Fate Feedback","description":"Nearby events cause harm"},
+      {"id":"N-MET-041","name":"Reality Collapse","description":"Obscuring events breaks perception"},
+      {"id":"N-MET-042","name":"Soul Drain Overload","description":"Amplification harms user"},
+      {"id":"N-MET-043","name":"Divine Misguidance","description":"Insight misleads"},
+      {"id":"N-MET-044","name":"Transcendence Collapse","description":"Extreme power destabilizes user"}
+    ],
+    "delayed_effects": ["MET_DELAY_01","MET_DELAY_02","MET_DELAY_03","MET_DELAY_04"],
+    "proximity_effects": ["MET_PROX_01","MET_PROX_02","MET_PROX_03","MET_PROX_04"],
+    "incompatibilities": [
+      ["M-MET-001","N-MET-001"],
+      ["M-MET-004","N-MET-004"],
+      ["M-MET-016","N-MET-016"]
+    ]
+  }
+};
+
+let WORLD_COUNT = 0;
+
+function hashString(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return h >>> 0;
+}
+
+function seededRandom(seed) {
+  seed |= 0;
+  seed = (seed + 0x6D2B79F5) | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+
+function weightedPick(list, r) {
+  let total = list.reduce((s, a) => s + a.weight, 0);
+  let x = r * total;
+  for (let i of list) {
+    if ((x -= i.weight) <= 0) return i;
+  }
+  return list[list.length - 1];
+}
+
+// Helper function to get a random effect from a category
+function getRandomEffect(category, type = 'positive') {
+  const effects = EFFECTS_DATA[category][`${type}_effects`];
+  return effects[Math.floor(seededRandom(Date.now() + Math.random()) * effects.length)];
+}
+
+// New effect generation system
+function generateEffect(category, seed) {
+  const catData = EFFECTS_DATA[category];
+  const positive = getRandomEffect(category, 'positive');
+  const negative = getRandomEffect(category, 'negative');
+  
+  // Check for incompatibilities
+  const incompatible = catData.incompatibilities.find(pair => 
+    pair[0] === positive.id || pair[1] === negative.id
+  );
+  
+  // If incompatible, get new negative effect
+  let finalNegative = negative;
+  if (incompatible) {
+    const alternatives = catData.negative_effects.filter(effect => 
+      effect.id !== negative.id && !catData.incompatibilities.some(pair => 
+        pair[0] === positive.id && pair[1] === effect.id
+      )
+    );
+    if (alternatives.length > 0) {
+      finalNegative = alternatives[Math.floor(seededRandom(seed + 100) * alternatives.length)];
+    }
+  }
+  
+  // Add potential for delayed or proximity effects (rare)
+  let extra = '';
+  if (seededRandom(seed + 50) < 0.1) { // 10% chance for extra effect
+    const extraType = seededRandom(seed + 60) < 0.5 ? 'delayed' : 'proximity';
+    const extraEffects = catData[`${extraType}_effects`];
+    if (extraEffects && extraEffects.length > 0) {
+      const extraEffect = extraEffects[Math.floor(seededRandom(seed + 70) * extraEffects.length)];
+      extra = `\n${extraType.toUpperCase()}: ${extraEffect}`;
+    }
+  }
+  
+  return {
+    category: catData.category,
+    positive: positive,
+    negative: finalNegative,
+    extra: extra
+  };
+}
+
+function generateItem(manualSeed = null) {
+  WORLD_COUNT++;
+  const uid = manualSeed ? manualSeed.toString() : hashString(Date.now() + ':' + WORLD_COUNT + ':' + Math.random()).toString(16);
+  const seed = manualSeed ? manualSeed : hashString(uid);
+  
+  // Generate item properties
+  const base = BASE_OBJECTS[Math.floor(seededRandom(seed) * BASE_OBJECTS.length)];
+  const material = MATERIALS[Math.floor(seededRandom(seed + 1) * MATERIALS.length)];
+  const rarity = weightedPick(RARITY, seededRandom(seed + 2)).tier;
+  const unrefined = seededRandom(seed + 3) < 0.15;
+  const effectCount = unrefined ? Math.floor(seededRandom(seed + 4) * 2) + 3 : Math.floor(seededRandom(seed + 5) * 2) + 1;
+
+  // Generate item image
+  const image = generateItemImage(base, material, seed);
+
+  let output = `This relic is entered in the Third Black Ledger under Sigil: ${seed}\n\n`;
+  output += `UID: ${seed.toString(16)}\n`;
+  output += `Base Object: ${base}\n`;
+  output += `Material: ${material}\n`;
+  output += `Rarity: ${rarity}\n`;
+  output += `Category: ${unrefined ? 'Unrefined (High-Risk)' : 'Focused (Controlled)'}`;
+  
+  if (unrefined) output += `\n\n⚠️ HIGHLY DANGEROUS - UNSTABLE ENCHANTMENTS ⚠️`;
+
+  // Choose which effect categories to include
+  const categories = Object.keys(EFFECTS_DATA);
+  const shuffledCategories = [...categories];
+  
+  // Shuffle categories
+  for (let i = shuffledCategories.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom(seed + 10 + i) * (i + 1));
+    [shuffledCategories[i], shuffledCategories[j]] = [shuffledCategories[j], shuffledCategories[i]];
+  }
+
+  // Take only the number we need
+  const chosenCategories = shuffledCategories.slice(0, Math.min(effectCount, categories.length));
+  
+  // Generate effects for chosen categories
+  const effects = [];
+  for (let i = 0; i < chosenCategories.length; i++) {
+    const category = chosenCategories[i];
+    effects.push(generateEffect(category, seed + 20 + i));
+  }
+
+  // Add effects to output
+  for (const effect of effects) {
+    output += `\n\n${effect.category.toUpperCase()}`;
+    output += `\nPositive: ${effect.positive.name} - ${effect.positive.description}`;
+    output += `\nNegative: ${effect.negative.name} - ${effect.negative.description}`;
+    if (effect.extra) {
+      output += effect.extra;
+    }
+  }
+
+  // Add special notes for rare items
+  if (rarity === 'Legendary' || rarity === 'Ultra Legendary') {
+    output += `\n\n✨ SPECIAL PROPERTIES:`;
+    if (rarity === 'Ultra Legendary') {
+      output += `\n• Reality-warping capabilities`;
+      output += `\n• Can alter fundamental laws`;
+      output += `\n• May attract otherworldly attention`;
+    } else {
+      output += `\n• Exceptional magical potency`;
+      output += `\n• Historical significance`;
+      output += `\n• Collector's item`;
+    }
+  }
+
+  return { 
+    description: output, 
+    name: `${material} ${base}`, 
+    rarity: rarity, 
+    seed: seed,
+    image: image,
+    effects: effects.map(e => ({
+      category: e.category,
+      positive: e.positive.name,
+      negative: e.negative.name
+    }))
+  };
+}
+
+/* ================= GAME CODE ================= */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const game = {
+  player: { x: 400, y: 300, size: 32, speed: 3 },
+  rocks: [
+    { x: 150, y: 120 },
+    { x: 650, y: 120 },
+    { x: 150, y: 350 },
+    { x: 650, y: 350 },
+    { x: 400, y: 250 }
+  ],
+  shop: { x: 50, y: 480, width: 120, height: 100 },
+  registry: { x: 630, y: 480, width: 120, height: 100 },
+  ladder: { x: 30, y: 30, width: 40, height: 100 },
+  pickaxes: [{ type: 'Copper', durability: 100, maxDurability: 100, dropChance: 0.3 }],
+  currentPickaxe: 0,
+  inventory: [],
+  gold: 50,
+  keys: {},
+  items: [],
+  animFrame: 0,
+  emptyRockChance: 0.3,
+  knownSigils: [],
+  level: 1,
+  minePattern: [],
+  torchFlicker: 0
+};
+
+// Initialize mine ground pattern
+function initMinePattern() {
+  game.minePattern = [];
+  for (let y = 0; y < canvas.height; y += 40) {
+    for (let x = 0; x < canvas.width; x += 40) {
+      game.minePattern.push({
+        x: x,
+        y: y,
+        type: Math.floor(Math.random() * 3),
+        offset: Math.random() * Math.PI * 2
+      });
+    }
+  }
+}
+
+// Update torch light to follow player
+function updateTorchLight() {
+  const torchLight = document.getElementById('torchLight');
+  if (torchLight) {
+    // Convert player position to percentage of canvas
+    const xPercent = (game.player.x / canvas.width) * 100;
+    const yPercent = (game.player.y / canvas.height) * 100;
+    
+    // Add slight flicker variation around player position
+    const flickerX = xPercent + (Math.sin(game.torchFlicker) * 2);
+    const flickerY = yPercent + (Math.cos(game.torchFlicker * 1.3) * 2);
+    const size = 25 + Math.sin(game.torchFlicker * 2) * 5;
+    
+    torchLight.style.background = 
+      `radial-gradient(circle at ${flickerX}% ${flickerY}%, 
+       rgba(255, 180, 90, .25), 
+       rgba(255, 140, 60, .15) ${size}%, 
+       rgba(0, 0, 0, .8) 60%)`;
+  }
+}
+
+function updatePickaxeCount() {
+  document.getElementById('pickaxeCount').textContent = game.pickaxes.length;
+}
+
+function updateLevelDisplay() {
+  document.getElementById('levelCount').textContent = game.level;
+}
+
+function drawGround() {
+  const time = game.animFrame * 0.01;
+  
+  // Darker ground for the new theme
+  ctx.fillStyle = '#1A1A1A';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  game.minePattern.forEach(tile => {
+    const x = tile.x;
+    const y = tile.y;
+    const pulse = Math.sin(time + tile.offset) * 0.05 + 0.95;
+    
+    // Darker tile colors
+    switch(tile.type) {
+      case 0:
+        ctx.fillStyle = `rgba(40, 40, 40, ${0.6 * pulse})`;
+        break;
+      case 1:
+        ctx.fillStyle = `rgba(60, 60, 60, ${0.7 * pulse})`;
+        break;
+      case 2:
+        ctx.fillStyle = `rgba(80, 80, 80, ${0.8 * pulse})`;
+        break;
+    }
+    
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y);
+    ctx.lineTo(x + 30, y + 5);
+    ctx.lineTo(x + 35, y + 25);
+    ctx.lineTo(x + 25, y + 35);
+    ctx.lineTo(x + 5, y + 30);
+    ctx.lineTo(x, y + 10);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.strokeStyle = `rgba(30, 30, 30, ${0.3 * pulse})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + 15, y + 5);
+    ctx.lineTo(x + 25, y + 25);
+    ctx.moveTo(x + 5, y + 15);
+    ctx.lineTo(x + 20, y + 30);
+    ctx.stroke();
+  });
+  
+  // Darker borders
+  ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
+  ctx.fillRect(0, 0, canvas.width, 20);
+  ctx.fillRect(0, 0, 20, canvas.height);
+  ctx.fillRect(canvas.width - 20, 0, 20, canvas.height);
+  ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+  
+  ctx.strokeStyle = 'rgba(40, 40, 40, 0.6)';
+  ctx.lineWidth = 2;
+  for (let i = 10; i < canvas.width; i += 30) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 20);
+    ctx.stroke();
+  }
+  for (let i = 10; i < canvas.height; i += 30) {
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(20, i);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(canvas.width - 20, i);
+    ctx.lineTo(canvas.width, i);
+    ctx.stroke();
+  }
+}
+
+function drawLadder() {
+  const x = game.ladder.x;
+  const y = game.ladder.y;
+  const w = game.ladder.width;
+  const h = game.ladder.height;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x + 2, y + 2, w, h);
+  
+  ctx.fillStyle = '#8B4513';
+  ctx.fillRect(x, y, w, h);
+  
+  ctx.fillStyle = '#654321';
+  ctx.fillRect(x + 5, y, 6, h);
+  ctx.fillRect(x + w - 11, y, 6, h);
+  
+  ctx.fillStyle = '#A0522D';
+  for (let i = 0; i < 6; i++) {
+    const rungY = y + 15 + (i * 14);
+    ctx.fillRect(x + 8, rungY, w - 16, 4);
+    
+    ctx.fillStyle = '#DEB887';
+    ctx.fillRect(x + 8, rungY, w - 16, 1);
+    ctx.fillStyle = '#A0522D';
+  }
+  
+  ctx.fillStyle = '#DEB887';
+  ctx.fillRect(x, y, w, 2);
+  ctx.fillRect(x, y, 2, h);
+  ctx.fillRect(x + w - 2, y, 2, h);
+  
+  const glow = Math.sin(game.animFrame * 0.05) * 0.3 + 0.7;
+  ctx.strokeStyle = `rgba(255, 215, 0, ${glow * 0.3})`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+  
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 12px Courier New';
+  ctx.fillText('⬆ LADDER ⬆', x - 5, y - 5);
+}
+
+function drawItem(item, index) {
+  ctx.save();
+  ctx.translate(item.x, item.y);
+  
+  const scale = 1 + Math.sin(item.floatOffset * 2) * 0.15;
+  ctx.scale(scale, scale);
+  
+  let color1, color2;
+  switch (item.data.rarity) {
+    case 'Common': color1 = '#8B8B8B'; color2 = '#6B6B6B'; break;
+    case 'Uncommon': color1 = '#00FF00'; color2 = '#00CC00'; break;
+    case 'Rare': color1 = '#0088FF'; color2 = '#0066CC'; break;
+    case 'Legendary': color1 = '#FF00FF'; color2 = '#CC00CC'; break;
+    case 'Ultra Legendary': color1 = '#FFAA00'; color2 = '#FF8800'; break;
+    default: color1 = '#FFFFFF'; color2 = '#DDDDDD';
+  }
+  
+  const gradient = ctx.createRadialGradient(0, 0, 5, 0, 0, 15);
+  gradient.addColorStop(0, color1);
+  gradient.addColorStop(1, color2);
+  
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(item.floatOffset) * 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('❓', 0, 0);
+  
+  if (item.flash > 0) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${item.flash / 15})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+function drawPlayer() {
+  const x = game.player.x;
+  const y = game.player.y;
+  const s = game.player.size;
+  const walkCycle = Math.floor(game.animFrame / 8) % 2;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + s/2 + 3, s/2.3, s/5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  const bodyGradient = ctx.createLinearGradient(x - s/4, y - s/4, x - s/4, y + s);
+  bodyGradient.addColorStop(0, '#3E6FB0');
+  bodyGradient.addColorStop(1, '#2E5090');
+  ctx.fillStyle = bodyGradient;
+  ctx.fillRect(x - s/4, y - s/4, s/2, s/1.5);
+  
+  const headGradient = ctx.createRadialGradient(x, y - s/3, 0, x, y - s/3, s/4);
+  headGradient.addColorStop(0, '#FFE4B5');
+  headGradient.addColorStop(1, '#E6C9A0');
+  ctx.fillStyle = headGradient;
+  ctx.beginPath();
+  ctx.arc(x, y - s/3, s/4, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.arc(x - s/12, y - s/2.8, s/20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + s/16, y - s/2.8, s/20, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#FFF';
+  ctx.beginPath();
+  ctx.arc(x - s/14, y - s/2.9, s/40, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x + s/14, y - s/2.9, s/40, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#FFD4A3';
+  const armOffset = walkCycle ? 6 : -6;
+  ctx.fillRect(x - s/2.2, y - s/8 + armOffset/2, s/5, s/2.5);
+  ctx.fillRect(x + s/3.5, y - s/8 - armOffset/2, s/5, s/2.5);
+  
+  const legGradient = ctx.createLinearGradient(x - s/6, y + s/6, x - s/6, y + s);
+  legGradient.addColorStop(0, '#2A4070');
+  legGradient.addColorStop(1, '#1A3060');
+  ctx.fillStyle = legGradient;
+  ctx.fillRect(x - s/5, y + s/6 + armOffset, s/4.5, s/2.5);
+  ctx.fillRect(x + s/12, y + s/6 - armOffset, s/4.5, s/2.5);
+  
+  if (game.pickaxes.length > 0) {
+    ctx.save();
+    ctx.translate(x + s/3, y - s/8);
+    ctx.rotate(Math.sin(game.animFrame * 0.1) * 0.1);
+    
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(-s/3, -s/20, s/1.5, s/10);
+    
+    const pickColor = game.pickaxes[game.currentPickaxe].type === 'Copper' ? '#B87333' : 
+                     game.pickaxes[game.currentPickaxe].type === 'Iron' ? '#C0C0C0' : '#E8E8E8';
+    ctx.fillStyle = pickColor;
+    ctx.beginPath();
+    ctx.moveTo(s/1.2, -s/20);
+    ctx.lineTo(s/1.2 + s/3, -s/4);
+    ctx.lineTo(s/1.2 + s/3, s/4);
+    ctx.lineTo(s/1.2, s/20);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+  }
+}
+
+function drawRock(x, y) {
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(x + 5, y + 5, 35, 30, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  const rockGradient = ctx.createRadialGradient(x - 15, y - 15, 5, x, y, 40);
+  rockGradient.addColorStop(0, '#6A6A6A');
+  rockGradient.addColorStop(1, '#4A4A4A');
+  ctx.fillStyle = rockGradient;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 35, 30, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#5A5A5A';
+  ctx.beginPath();
+  ctx.ellipse(x - 8, y - 8, 12, 10, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#7A7A7A';
+  ctx.beginPath();
+  ctx.ellipse(x + 10, y + 5, 10, 8, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#4169E1';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x - 15, y - 5);
+  ctx.lineTo(x, y + 10);
+  ctx.stroke();
+  
+  ctx.strokeStyle = '#8B4513';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y - 10);
+  ctx.lineTo(x + 15, y + 8);
+  ctx.stroke();
+  
+  ctx.strokeStyle = '#2A2A2A';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 10, y - 5);
+  ctx.lineTo(x + 5, y + 5);
+  ctx.moveTo(x - 5, y + 8);
+  ctx.lineTo(x + 10, y - 3);
+  ctx.stroke();
+  
+  const glitter = Math.sin(game.animFrame * 0.1) * 0.5 + 0.5;
+  ctx.fillStyle = `rgba(100, 149, 237, ${glitter})`;
+  ctx.fillRect(x - 5, y - 3, 3, 3);
+  ctx.fillStyle = `rgba(184, 115, 51, ${glitter})`;
+  ctx.fillRect(x + 8, y + 8, 2, 2);
+}
+
+function drawShop() {
+  const x = game.shop.x;
+  const y = game.shop.y;
+  const w = game.shop.width;
+  const h = game.shop.height;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x + 5, y + 5, w, h);
+  
+  const shopGradient = ctx.createLinearGradient(x, y, x, y + h);
+  shopGradient.addColorStop(0, '#A0522D');
+  shopGradient.addColorStop(1, '#8B4513');
+  ctx.fillStyle = shopGradient;
+  ctx.fillRect(x, y, w, h);
+  
+  ctx.fillStyle = '#654321';
+  ctx.beginPath();
+  ctx.moveTo(x - 10, y);
+  ctx.lineTo(x + w/2, y - 40);
+  ctx.lineTo(x + w + 10, y);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.strokeStyle = '#DEB887';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y - 40);
+  ctx.lineTo(x - 5, y);
+  ctx.moveTo(x + w/2, y - 40);
+  ctx.lineTo(x + w + 5, y);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#3B2F1F';
+  ctx.fillRect(x + w/2 - 15, y + h - 40, 30, 40);
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(x + w/2 - 12, y + h - 37, 24, 34);
+  
+  ctx.fillStyle = '#FFD700';
+  ctx.beginPath();
+  ctx.arc(x + w/2 + 8, y + h - 20, 3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#87CEEB';
+  ctx.fillRect(x + 15, y + 25, 25, 25);
+  ctx.strokeStyle = '#3B2F1F';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x + 15, y + 25, 25, 25);
+  ctx.beginPath();
+  ctx.moveTo(x + 27.5, y + 25);
+  ctx.lineTo(x + 27.5, y + 50);
+  ctx.moveTo(x + 15, y + 37.5);
+  ctx.lineTo(x + 40, y + 37.5);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#DEB887';
+  ctx.fillRect(x + 5, y - 25, 110, 25);
+  ctx.shadowColor = '#FFD700';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#3B2F1F';
+  ctx.font = 'bold 16px Courier New';
+  ctx.fillText('🏪 SHOP', x + 25, y - 5);
+  ctx.shadowBlur = 0;
+  
+  const shopGlow = Math.sin(game.animFrame * 0.05) * 0.2 + 0.8;
+  ctx.strokeStyle = `rgba(255, 215, 0, ${shopGlow * 0.4})`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+}
+
+function drawRegistry() {
+  const x = game.registry.x;
+  const y = game.registry.y;
+  const w = game.registry.width;
+  const h = game.registry.height;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(x + 5, y + 5, w, h);
+  
+  const regGradient = ctx.createLinearGradient(x, y, x, y + h);
+  regGradient.addColorStop(0, '#7C4D2D');
+  regGradient.addColorStop(1, '#654321');
+  ctx.fillStyle = regGradient;
+  ctx.fillRect(x, y, w, h);
+  
+  ctx.fillStyle = '#4A3621';
+  ctx.beginPath();
+  ctx.moveTo(x - 10, y);
+  ctx.lineTo(x + w/2, y - 40);
+  ctx.lineTo(x + w + 10, y);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.fillStyle = '#2B1F1F';
+  ctx.fillRect(x + w/2 - 15, y + h - 40, 30, 40);
+  ctx.fillStyle = '#6B5355';
+  ctx.fillRect(x + w/2 - 12, y + h - 37, 24, 34);
+  
+  ctx.fillStyle = '#C0C0C0';
+  ctx.beginPath();
+  ctx.arc(x + w/2 + 8, y + h - 20, 3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#696969';
+  ctx.fillRect(x + w - 40, y + 25, 25, 25);
+  ctx.strokeStyle = '#2B1F1F';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x + w - 40, y + 25, 25, 25);
+  ctx.beginPath();
+  ctx.moveTo(x + w - 27.5, y + 25);
+  ctx.lineTo(x + w - 27.5, y + 50);
+  ctx.moveTo(x + w - 40, y + 37.5);
+  ctx.lineTo(x + w - 15, y + 37.5);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(x + 5, y - 25, 110, 25);
+  ctx.shadowColor = '#87CEEB';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#2B1F1F';
+  ctx.font = 'bold 14px Courier New';
+  ctx.fillText('📜 REGISTRY', x + 20, y - 5);
+  ctx.shadowBlur = 0;
+  
+  const regGlow = Math.sin(game.animFrame * 0.05 + 1) * 0.2 + 0.8;
+  ctx.strokeStyle = `rgba(135, 206, 235, ${regGlow * 0.4})`;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x - 5, y - 5, w + 10, h + 10);
+}
+
+// Event Listeners
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  game.keys[key] = true;
+  if (key === 'e') checkInteraction();
+});
+
+document.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  game.keys[key] = false;
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  if (mouseX >= game.ladder.x && mouseX <= game.ladder.x + game.ladder.width &&
+      mouseY >= game.ladder.y && mouseY <= game.ladder.y + game.ladder.height) {
+    playSound('ladder');
+    game.level++;
+    updateLevelDisplay();
+    showMessage(`Descending to Level ${game.level}! Mines are deeper...`);
+    return;
+  }
+  
+  game.rocks.forEach((rock) => {
+    const dist = Math.hypot(rock.x - game.player.x, rock.y - game.player.y);
+    if (dist < 80) mineRock(rock);
+  });
+  
+  game.items.forEach((item, index) => {
+    const dist = Math.hypot(item.x - game.player.x, item.y - game.player.y);
+    if (dist < 50) collectItem(index);
+  });
+  
+  const shopDist = Math.hypot(game.shop.x + 60 - game.player.x, game.shop.y + 50 - game.player.y);
+  if (shopDist < 100) {
+    openShop();
+  }
+  
+  const regDist = Math.hypot(game.registry.x + 60 - game.player.x, game.registry.y + 50 - game.player.y);
+  if (regDist < 100) {
+    openRegistry();
+  }
+});
+
+// Help button
+document.getElementById('helpBtn').addEventListener('click', () => {
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <h2>❓ Cursed Mine RPG Guide</h2>
+    <div style="margin: 20px 0;">
+      <h3 style="color: #ffdd99;">🎮 Controls:</h3>
+      <p>• WASD or Arrow Keys: Move character</p>
+      <p>• Click Rocks: Mine with pickaxe</p>
+      <p>• E Key: Interact with nearby buildings</p>
+      <p>• Click Buildings: Open shop/registry directly</p>
+      <p>• Click Ladder: Descend to next level</p>
+    </div>
+    <div style="margin: 20px 0;">
+      <h3 style="color: #ffdd99;">⛏️ Gameplay:</h3>
+      <p>• Mine rocks to find cursed items</p>
+      <p>• Buy better pickaxes at the shop</p>
+      <p>• Research items in the registry</p>
+      <p>• Collect gold to upgrade equipment</p>
+      <p>• Descend deeper for greater rewards</p>
+    </div>
+    <div style="margin: 20px 0;">
+      <h3 style="color: #ffdd99;">📊 Item Rarities:</h3>
+      <p><span style="color: #8B8B8B;">• Common (Gray)</span> - 60% chance</p>
+      <p><span style="color: #00FF00;">• Uncommon (Green)</span> - 25% chance</p>
+      <p><span style="color: #0088FF;">• Rare (Blue)</span> - 10% chance</p>
+      <p><span style="color: #FF00FF;">• Legendary (Purple)</span> - 4% chance</p>
+      <p><span style="color: #FFAA00;">• Ultra Legendary (Gold)</span> - 1% chance</p>
+    </div>
+    <div style="margin: 20px 0;">
+      <h3 style="color: #ffdd99;">✨ New Content:</h3>
+      <p>• <strong>210</strong> unique base objects</p>
+      <p>• <strong>142</strong> magical effects across 4 categories</p>
+      <p>• Somatic (Body), Cognitive (Mind), Environmental, Metaphysical</p>
+      <p>• Each effect has positive and negative aspects</p>
+      <p>• Rare delayed and proximity effects</p>
+      <p>• <strong>Generated visual images</strong> for each item</p>
+    </div>
+    <button onclick="closeModal()" style="margin-top: 20px;">Got it!</button>
+  `;
+  document.getElementById('modal').style.display = 'flex';
+  playSound('modalOpen');
+});
+
+function mineRock(rock) {
+  if (game.pickaxes.length === 0) {
+    showMessage("You don't have any pickaxes!");
+    return;
+  }
+  
+  const pickaxe = game.pickaxes[game.currentPickaxe];
+  pickaxe.durability -= 10;
+  updatePickaxeInfo();
+  updatePickaxeCount();
+  
+  playPickaxeHit();
+  
+  if (Math.random() < game.emptyRockChance) {
+    showMessage("The rock was empty!");
+    playSound('emptyRock');
+  } else if (Math.random() < pickaxe.dropChance * (1 + game.level * 0.1)) {
+    const item = generateItem();
+    game.items.push({
+      x: rock.x + (Math.random() - 0.5) * 40,
+      y: rock.y + (Math.random() - 0.5) * 40,
+      data: item,
+      flash: 15,
+      floatOffset: Math.random() * Math.PI * 2
+    });
+    showMessage(`Found: ${item.name}!`);
+    playSound('itemFound');
+    
+    if (!game.knownSigils.includes(item.seed)) {
+      game.knownSigils.push(item.seed);
+    }
+  } else {
+    showMessage("Mined the rock but found nothing...");
+  }
+  
+  if (pickaxe.durability <= 0) {
+    game.pickaxes.splice(game.currentPickaxe, 1);
+    if (game.pickaxes.length > 0) game.currentPickaxe = 0;
+    updatePickaxeInfo();
+    updatePickaxeCount();
+    playSound('pickaxeBreak');
+    if (game.pickaxes.length === 0) {
+      showMessage("Your pickaxe broke! Buy a new one at the shop.");
+    }
+  }
+}
+
+function collectItem(itemIndex) {
+  const item = game.items[itemIndex];
+  game.inventory.push(item.data);
+  game.items.splice(itemIndex, 1);
+  document.getElementById('itemCount').textContent = game.inventory.length;
+  showMessage(`Collected: ${item.data.name}!`);
+}
+
+function checkInteraction() {
+  const dist = Math.hypot(game.shop.x + 60 - game.player.x, game.shop.y + 50 - game.player.y);
+  if (dist < 100) {
+    openShop();
+    return;
+  }
+  
+  const distReg = Math.hypot(game.registry.x + 60 - game.player.x, game.registry.y + 50 - game.player.y);
+  if (distReg < 100) {
+    openRegistry();
+  }
+}
+
+function openShop() {
+  playSound('modalOpen');
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <h2>🏪 Pickaxe Shop</h2>
+    <p style="margin-bottom: 15px; color: #ffdd99; font-size: 14px;">💰 Gold: ${game.gold}</p>
+    <p style="margin-bottom: 15px; color: #ffdd99; font-size: 14px;">⛏️ Current Pickaxes: ${game.pickaxes.length}</p>
+    <div>
+      <h3 style="color: #ffdd99; margin: 10px 0;">Available Pickaxes:</h3>
+      <div style="margin: 10px 0; padding: 15px; background: rgba(75,59,47,0.9); border-left: 4px solid #b87333; border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.3);">
+        <strong style="color: #cd7f32;">⛏️ Copper Pickaxe</strong> - 20 Gold<br>
+        <small>Durability: 100 | Drop Chance: 30%</small><br>
+        <button onclick="buyPickaxe('Copper', 20, 100, 0.3)" ${game.gold < 20 ? 'disabled' : ''} style="margin-top: 10px;">Buy</button>
+      </div>
+      <div style="margin: 10px 0; padding: 15px; background: rgba(75,59,47,0.9); border-left: 4px solid #a8a8a8; border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.3);">
+        <strong style="color: #c0c0c0;">⛏️ Iron Pickaxe</strong> - 50 Gold<br>
+        <small>Durability: 200 | Drop Chance: 50%</small><br>
+        <button onclick="buyPickaxe('Iron', 50, 200, 0.5)" ${game.gold < 50 ? 'disabled' : ''} style="margin-top: 10px;">Buy</button>
+      </div>
+      <div style="margin: 10px 0; padding: 15px; background: rgba(75,59,47,0.9); border-left: 4px solid #878787; border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.3);">
+        <strong style="color: #e8e8e8;">⛏️ Titanium Pickaxe</strong> - 120 Gold<br>
+        <small>Durability: 400 | Drop Chance: 70%</small><br>
+        <button onclick="buyPickaxe('Titanium', 120, 400, 0.7)" ${game.gold < 120 ? 'disabled' : ''} style="margin-top: 10px;">Buy</button>
+      </div>
+      <div style="margin: 20px 0; padding: 15px; background: rgba(75,59,47,0.9); border-left: 4px solid #ffdd99; border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.3);">
+        <h4 style="color: #ffdd99; margin-bottom: 8px;">🔧 Repair Pickaxes</h4>
+        <p style="font-size: 12px; margin-bottom: 10px;">Repair all pickaxes to full durability.</p>
+        <button onclick="repairAllPickaxes()" style="margin-top: 8px;">Repair All (15 Gold)</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function openRegistry() {
+  playSound('modalOpen');
+  const modalBody = document.getElementById('modalBody');
+  modalBody.innerHTML = `
+    <h2>📜 Registry of Cursed Items</h2>
+    <p style="margin-bottom: 15px; color: #ffdd99; font-size: 14px;">Research and catalog discovered relics.</p>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #ffdd99; margin: 10px 0;">🔍 Lookup Sigil</h3>
+      <p>Enter a sigil number to generate or view an item:</p>
+      <input type="text" id="sigilInput" placeholder="Enter sigil (e.g., 1234567890)" style="width: 100%; padding: 12px; margin: 10px 0; background: rgba(30,25,20,0.95); color: #f8f4e3; border: 2px solid #654321; border-radius: 6px;">
+      <button onclick="lookupSigil()" style="margin-top: 8px;">Lookup Sigil</button>
+      <div id="sigilResult" style="margin-top: 15px;"></div>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #ffdd99; margin: 10px 0;">📚 Your Known Sigils</h3>
+      <p>Sigils from items you've found: ${game.knownSigils.length}</p>
+      <div id="sigilList">
+        ${game.knownSigils.length > 0 ? 
+          game.knownSigils.map(sigil => 
+            `<div class="sigilItem" onclick="lookupSpecificSigil(${sigil})">📄 Sigil: ${sigil}</div>`
+          ).join('') : 
+          '<p style="opacity: 0.7; margin: 15px 0;">No sigils recorded yet. Mine rocks to discover items!</p>'
+        }
+      </div>
+    </div>
+    
+    <div>
+      <h3 style="color: #ffdd99; margin: 10px 0;">📦 Your Collected Items</h3>
+      <p>Items in your inventory: ${game.inventory.length}</p>
+      <div id="registryItemsList">
+        ${game.inventory.length > 0 ? 
+          game.inventory.map((item, i) => `
+            <div class="inventoryItem" onclick="showItemDetail(${i})">
+              <img src="${item.image}" class="item-image">
+              <div class="item-details">
+                <h4>${item.name}</h4>
+                <p><strong>Rarity:</strong> <span style="color: ${getRarityColor(item.rarity)}">${item.rarity}</span></p>
+                <p><strong>Sigil:</strong> ${item.seed}</p>
+              </div>
+            </div>
+          `).join('') : 
+          '<p style="opacity: 0.7; margin: 15px 0;">No items yet. Mine rocks to find cursed relics!</p>'
+        }
+      </div>
+    </div>
+  `;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function getRarityColor(rarity) {
+  switch (rarity) {
+    case 'Common': return '#8B8B8B';
+    case 'Uncommon': return '#00FF00';
+    case 'Rare': return '#0088FF';
+    case 'Legendary': return '#FF00FF';
+    case 'Ultra Legendary': return '#FFAA00';
+    default: return '#FFFFFF';
+  }
+}
+
+function lookupSigil() {
+  const input = document.getElementById('sigilInput');
+  const sigilResult = document.getElementById('sigilResult');
+  
+  if (!input.value.trim()) {
+    sigilResult.innerHTML = '<p style="color: #ff4444;">Please enter a sigil number.</p>';
+    return;
+  }
+  
+  const sigil = parseInt(input.value.trim());
+  if (isNaN(sigil)) {
+    sigilResult.innerHTML = '<p style="color: #ff4444;">Please enter a valid number.</p>';
+    return;
+  }
+  
+  const existingItem = game.inventory.find(item => item.seed === sigil);
+  
+  if (existingItem) {
+    let rarityColor = getRarityColor(existingItem.rarity);
+    
+    sigilResult.innerHTML = `
+      <h4 style="color: ${rarityColor}">📦 Item Found in Your Collection!</h4>
+      <div class="item-detail-image">
+        <img src="${existingItem.image}" class="item-image-large">
+      </div>
+      <p><strong>Name:</strong> ${existingItem.name}</p>
+      <p><strong>Rarity:</strong> <span style="color: ${rarityColor}">${existingItem.rarity}</span></p>
+      <pre>${existingItem.description}</pre>
+      <button onclick="openRegistry()" style="margin-top: 10px;">Back to Registry</button>
+    `;
+  } else {
+    const item = generateItem(sigil);
+    let rarityColor = getRarityColor(item.rarity);
+    
+    sigilResult.innerHTML = `
+      <h4 style="color: ${rarityColor}">✨ Generated Item from Sigil: ${sigil}</h4>
+      <div class="item-detail-image">
+        <img src="${item.image}" class="item-image-large">
+      </div>
+      <p><strong>Name:</strong> ${item.name}</p>
+      <p><strong>Rarity:</strong> <span style="color: ${rarityColor}">${item.rarity}</span></p>
+      <pre>${item.description}</pre>
+      <p><em>Note: This item was generated from the sigil but is not in your collection.</em></p>
+      <button onclick="addToCollection(${sigil})" style="margin-top: 10px;">Add to Collection (5 Gold)</button>
+      <button onclick="openRegistry()" style="margin-top: 10px; margin-left: 10px;">Back to Registry</button>
+    `;
+  }
+}
+
+function lookupSpecificSigil(sigil) {
+  playSound('modalOpen');
+  const modalBody = document.getElementById('modalBody');
+  
+  const existingItem = game.inventory.find(item => item.seed === sigil);
+  
+  if (existingItem) {
+    let rarityColor = getRarityColor(existingItem.rarity);
+    
+    modalBody.innerHTML = `
+      <h2 style="color: ${rarityColor}">${existingItem.name}</h2>
+      <div class="item-detail-image">
+        <img src="${existingItem.image}" class="item-image-large">
+      </div>
+      <p><strong>📄 Sigil:</strong> ${existingItem.seed}</p>
+      <p><strong>⭐ Rarity:</strong> <span style="color: ${rarityColor}">${existingItem.rarity}</span></p>
+      <pre>${existingItem.description}</pre>
+      <button onclick="openRegistry()" style="margin-top: 15px;">Back to Registry</button>
+    `;
+  } else {
+    const item = generateItem(sigil);
+    let rarityColor = getRarityColor(item.rarity);
+    
+    modalBody.innerHTML = `
+      <h2 style="color: ${rarityColor}">✨ Generated Item</h2>
+      <div class="item-detail-image">
+        <img src="${item.image}" class="item-image-large">
+      </div>
+      <p><strong>📄 Sigil:</strong> ${sigil}</p>
+      <p><strong>📛 Name:</strong> ${item.name}</p>
+      <p><strong>⭐ Rarity:</strong> <span style="color: ${rarityColor}">${item.rarity}</span></p>
+      <pre>${item.description}</pre>
+      <p><em>Note: This item was generated from the sigil but is not in your collection.</em></p>
+      <button onclick="addToCollection(${sigil})" style="margin-top: 10px;">Add to Collection (5 Gold)</button>
+      <button onclick="openRegistry()" style="margin-top: 10px; margin-left: 10px;">Back to Registry</button>
+    `;
+  }
+}
+
+function addToCollection(sigil) {
+  if (game.gold >= 5) {
+    game.gold -= 5;
+    document.getElementById('goldCount').textContent = game.gold;
+    
+    const item = generateItem(sigil);
+    game.inventory.push(item);
+    document.getElementById('itemCount').textContent = game.inventory.length;
+    
+    if (!game.knownSigils.includes(sigil)) {
+      game.knownSigils.push(sigil);
+    }
+    
+    showMessage(`Added ${item.name} to your collection!`);
+    playSound('purchase');
+    openRegistry();
+  } else {
+    showMessage("Not enough gold to add item to collection!");
+  }
+}
+
+function buyPickaxe(type, cost, durability, dropChance) {
+  if (game.gold >= cost) {
+    game.gold -= cost;
+    game.pickaxes.push({ type, durability, maxDurability: durability, dropChance });
+    document.getElementById('goldCount').textContent = game.gold;
+    updatePickaxeInfo();
+    updatePickaxeCount();
+    showMessage(`Purchased ${type} Pickaxe!`);
+    playSound('purchase');
+    closeModal();
+  } else {
+    showMessage("Not enough gold!");
+  }
+}
+
+function repairAllPickaxes() {
+  const repairCost = 15;
+  if (game.gold >= repairCost) {
+    game.gold -= repairCost;
+    game.pickaxes.forEach(pickaxe => {
+      pickaxe.durability = pickaxe.maxDurability;
+    });
+    document.getElementById('goldCount').textContent = game.gold;
+    updatePickaxeInfo();
+    showMessage("All pickaxes repaired!");
+    playSound('purchase');
+    closeModal();
+  } else {
+    showMessage("Not enough gold to repair!");
+  }
+}
+
+function updatePickaxeInfo() {
+  const info = document.getElementById('pickaxeInfo');
+  if (game.pickaxes.length === 0) {
+    info.textContent = 'No Pickaxe';
+    info.style.color = '#ff4444';
+  } else {
+    const p = game.pickaxes[game.currentPickaxe];
+    const percent = Math.round((p.durability / p.maxDurability) * 100);
+    info.textContent = `${p.type} Pickaxe (${percent}%)`;
+    info.style.color = percent > 50 ? '#90EE90' : percent > 20 ? '#ffdd99' : '#ff4444';
+  }
+}
+
+function showMessage(msg) {
+  const temp = document.createElement('div');
+  temp.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#3b2e1b,#2a1f12);border:3px solid #8b0000;padding:15px 25px;z-index:2000;color:#f8f4e3;box-shadow:0 4px 20px rgba(0,0,0,0.8);border-radius:6px;font-size:14px;font-weight:bold;text-shadow:0 2px 4px rgba(0,0,0,0.8);';
+  temp.textContent = msg;
+  document.body.appendChild(temp);
+  setTimeout(() => temp.remove(), 2000);
+}
+
+function closeModal() {
+  playSound('modalClose');
+  document.getElementById('modal').style.display = 'none';
+}
+
+document.getElementById('inventoryBtn').addEventListener('click', () => {
+  playSound('modalOpen');
+  const modalBody = document.getElementById('modalBody');
+  let html = '<h2>📦 Inventory</h2>';
+  html += `<p>⛏️ Pickaxes: ${game.pickaxes.length}</p>`;
+  game.pickaxes.forEach((p, i) => {
+    const percent = Math.round((p.durability / p.maxDurability) * 100);
+    html += `<p style="margin: 5px 0; padding: 8px; background: rgba(50,40,30,0.7); border-radius: 5px; border-left: 3px solid #b87333;">${i + 1}. ${p.type} Pickaxe (${percent}%)</p>`;
+  });
+  
+  html += `<h3 style="color: #ffdd99; margin-top: 20px; border-top: 2px solid #8b0000; padding-top: 15px;">📦 Cursed Items: ${game.inventory.length}</h3>`;
+  game.inventory.forEach((item, i) => {
+    html += `
+      <div class="inventoryItem" onclick="showItemDetail(${i})">
+        <img src="${item.image}" class="item-image">
+        <div class="item-details">
+          <h4>${item.name}</h4>
+          <p><strong>Rarity:</strong> <span style="color: ${getRarityColor(item.rarity)}">${item.rarity}</span></p>
+          <p><strong>Sigil:</strong> ${item.seed}</p>
+        </div>
+      </div>
+    `;
+  });
+  
+  if (game.inventory.length === 0) {
+    html += '<p style="opacity: 0.7; margin: 15px 0;">No items yet. Mine rocks to find cursed relics!</p>';
+  }
+  
+  modalBody.innerHTML = html;
+  document.getElementById('modal').style.display = 'flex';
+});
+
+function showItemDetail(index) {
+  playSound('modalOpen');
+  const item = game.inventory[index];
+  const modalBody = document.getElementById('modalBody');
+  
+  let rarityColor = getRarityColor(item.rarity);
+  
+  modalBody.innerHTML = `
+    <h2 style="color: ${rarityColor}">${item.name}</h2>
+    <div class="item-detail-image">
+      <img src="${item.image}" class="item-image-large">
+    </div>
+    <p><strong>📄 Sigil:</strong> ${item.seed}</p>
+    <p><strong>⭐ Rarity:</strong> <span style="color: ${rarityColor}">${item.rarity}</span></p>
+    <pre>${item.description}</pre>
+    <button onclick="openInventory()" style="margin-top: 15px;">Back to Inventory</button>
+  `;
+}
+
+function openInventory() {
+  document.getElementById('inventoryBtn').click();
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  drawGround();
+  
+  if (game.keys['arrowleft'] || game.keys['a']) game.player.x -= game.player.speed;
+  if (game.keys['arrowright'] || game.keys['d']) game.player.x += game.player.speed;
+  if (game.keys['arrowup'] || game.keys['w']) game.player.y -= game.player.speed;
+  if (game.keys['arrowdown'] || game.keys['s']) game.player.y += game.player.speed;
+  
+  game.player.x = Math.max(game.player.size/2, Math.min(canvas.width - game.player.size/2, game.player.x));
+  game.player.y = Math.max(game.player.size/2, Math.min(canvas.height - game.player.size/2, game.player.y));
+  
+  // Update torch light to follow player
+  game.torchFlicker += 0.1;
+  updateTorchLight();
+  
+  drawLadder();
+  drawShop();
+  drawRegistry();
+  game.rocks.forEach(rock => drawRock(rock.x, rock.y));
+  game.items.forEach((item, index) => {
+    item.floatOffset += 0.05;
+    item.y += Math.sin(item.floatOffset) * 0.5;
+    item.flash = Math.max(0, item.flash - 1);
+    drawItem(item, index);
+  });
+  drawPlayer();
+  
+  game.animFrame++;
+  requestAnimationFrame(gameLoop);
+}
+
+// Title Screen Handler
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && titleScreen.style.display !== "none") {
+    titleScreen.style.display = "none";
+    gameContainer.style.display = "flex";
+    // Resume audio context if needed
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().then(() => {
+        console.log("Audio context resumed");
+      });
+    }
+  }
+});
+
+// Optional: Click to start
+titleScreen.addEventListener("click", function() {
+  titleScreen.style.display = "none";
+  gameContainer.style.display = "flex";
+});
+
+// Add Sigil Registry button
+document.getElementById('sigilBtn').addEventListener('click', openRegistry);
+
+// Initialize game
+initMinePattern();
+updatePickaxeCount();
+updateLevelDisplay();
+
+// Start the game loop
+gameLoop();
+</script>
+</body>
+</html>
