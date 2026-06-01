@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3 Minute Speech Tracker - Student Progress</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1a1a2e;
+            --text-secondary: #555;
+            --border: #e8ecf1;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.10), 0 4px 12px rgba(0, 0, 0, 0.05);
+            --accent-1: #6366f1;
+            --accent-1-light: #eef2ff;
+            --accent-2: #10b981;
+            --accent-2-light: #ecfdf5;
+            --accent-3: #8b5cf6;
+            --accent-3-light: #f5f3ff;
+            --accent-4: #f59e0b;
+            --accent-4-light: #fffbeb;
+            --glow-color: #fbbf24;
+            --glow-color-strong: #f59e0b;
+            --glow-inner: #fef3c7;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f0f2f5 0%, #e4e8f0 30%, #f0f2f5 60%, #e8ecf2 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text);
+            padding: 24px 16px 60px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Subtle animated background orbs */
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            z-index: 0;
+            pointer-events: none;
+        }
+        body::before {
+            width: 500px;
+            height: 500px;
+            background: #6366f1;
+            top: -150px;
+            right: -100px;
+            animation: orbFloat1 18s ease-in-out infinite;
+        }
+        body::after {
+            width: 400px;
+            height: 400px;
+            background: #f59e0b;
+            bottom: -120px;
+            left: -80px;
+            animation: orbFloat2 22s ease-in-out infinite;
+        }
+
+        @keyframes orbFloat1 {
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+            25% {
+                transform: translate(-60px, 40px) scale(1.1);
+            }
+            50% {
+                transform: translate(-20px, -30px) scale(0.9);
+            }
+            75% {
+                transform: translate(50px, -20px) scale(1.05);
+            }
+        }
+        @keyframes orbFloat2 {
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+            33% {
+                transform: translate(50px, -50px) scale(1.15);
+            }
+            66% {
+                transform: translate(-40px, 30px) scale(0.85);
+            }
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+        .header .icon-row {
+            font-size: 44px;
+            margin-bottom: 8px;
+            animation: gentleBounce 2.5s ease-in-out infinite;
+        }
+        @keyframes gentleBounce {
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #1a1a2e 0%, #3b3b5c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+        .header .subtitle {
+            font-size: 0.95rem;
+            color: #6b7280;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            font-size: 0.85rem;
+            color: #555;
+            font-weight: 500;
+        }
+        .legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: white;
+            padding: 8px 14px;
+            border-radius: 20px;
+            box-shadow: var(--shadow-sm);
+            font-weight: 500;
+        }
+        .legend .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .legend .dot.speech {
+            background: #6366f1;
+        }
+        .legend .dot.written {
+            background: #10b981;
+        }
+        .legend .dot.both {
+            background: #fbbf24;
+            box-shadow: 0 0 10px #fbbf24, 0 0 20px #f59e0b;
+            animation: legendGlow 1.5s ease-in-out infinite;
+        }
+        @keyframes legendGlow {
+            0%,
+            100% {
+                box-shadow: 0 0 8px #fbbf24, 0 0 16px #f59e0b;
+            }
+            50% {
+                box-shadow: 0 0 16px #fbbf24, 0 0 28px #f59e0b;
+            }
+        }
+
+        /* Grid */
+        .groups-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+        @media (max-width: 800px) {
+            .groups-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .header h1 {
+                font-size: 1.6rem;
+            }
+            .student-row {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .student-name-area {
+                min-width: 100px;
+            }
+        }
+
+        /* Card */
+        .group-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 0;
+            box-shadow: var(--shadow-md);
+            transition: box-shadow var(--transition), transform var(--transition);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+        .group-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        .card-header {
+            padding: 18px 22px;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .card-header .group-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.9rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .card-header .group-date {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.95rem;
+        }
+        .card-1 .card-header .group-number {
+            background: var(--accent-1);
+        }
+        .card-1 .card-header {
+            background: var(--accent-1-light);
+        }
+        .card-2 .card-header .group-number {
+            background: var(--accent-2);
+        }
+        .card-2 .card-header {
+            background: var(--accent-2-light);
+        }
+        .card-3 .card-header .group-number {
+            background: var(--accent-3);
+        }
+        .card-3 .card-header {
+            background: var(--accent-3-light);
+        }
+        .card-4 .card-header .group-number {
+            background: var(--accent-4);
+        }
+        .card-4 .card-header {
+            background: var(--accent-4-light);
+        }
+
+        .card-body {
+            padding: 12px 16px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        /* Student Row */
+        .student-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition);
+            position: relative;
+            background: transparent;
+            flex-wrap: wrap;
+        }
+        .student-row:hover {
+            background: #f9fafb;
+        }
+        .student-row.glowing {
+            background: #fffef5;
+            border-radius: var(--radius-sm);
+            z-index: 2;
+            animation: rowGlowPulse 2s ease-in-out infinite;
+        }
+        @keyframes rowGlowPulse {
+            0%,
+            100% {
+                background: #fffef5;
+                box-shadow: 0 0 0px rgba(251, 191, 36, 0);
+            }
+            50% {
+                background: #fffef0;
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), 0 0 40px rgba(245, 158, 11, 0.12);
+            }
+        }
+
+        /* Name area */
+        .student-name-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 120px;
+            position: relative;
+        }
+        .student-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #1f2937;
+            transition: all var(--transition);
+            white-space: nowrap;
+            letter-spacing: 0.01em;
+        }
+        .student-row.glowing .student-name {
+            color: #b45309;
+            text-shadow: 0 0 12px #fbbf24, 0 0 28px #f59e0b, 0 0 44px #fbbf24;
+            animation: nameGlow 2s ease-in-out infinite;
+            font-weight: 700;
+        }
+        @keyframes nameGlow {
+            0%,
+            100% {
+                text-shadow: 0 0 10px #fbbf24, 0 0 22px #f59e0b, 0 0 36px #fbbf24;
+            }
+            50% {
+                text-shadow: 0 0 18px #fbbf24, 0 0 34px #f59e0b, 0 0 52px #fbbf24, 0 0 64px #f59e0b;
+            }
+        }
+
+        /* Indicators */
+        .indicators {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+        .indicator-dot.speech-dot {
+            background: #6366f1;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .indicator-dot.speech-dot.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .indicator-dot.written-dot {
+            background: #10b981;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .indicator-dot.written-dot.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Floating badge */
+        .floating-badge {
+            position: absolute;
+            left: 0;
+            top: -28px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #7c2d12;
+            font-weight: 700;
+            font-size: 0.7rem;
+            padding: 5px 12px;
+            border-radius: 20px;
+            white-space: nowrap;
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.45), 0 0 30px rgba(251, 191, 36, 0.35);
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(8px) scale(0.85);
+            transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+            letter-spacing: 0.02em;
+            animation: none;
+        }
+        .floating-badge.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: floatBadge 2.5s ease-in-out infinite;
+        }
+        @keyframes floatBadge {
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-6px);
+            }
+        }
+        .student-name-area {
+            position: relative;
+        }
+
+        /* Checkboxes */
+        .checkboxes {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #6b7280;
+            user-select: none;
+            white-space: nowrap;
+            transition: color var(--transition);
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #f9fafb;
+            border: 1px solid transparent;
+            transition: all var(--transition);
+        }
+        .checkbox-label:hover {
+            background: #f3f4f6;
+            border-color: #e5e7eb;
+        }
+        .checkbox-label:has(input:checked) {
+            color: #374151;
+            font-weight: 600;
+        }
+        .checkbox-label.speech-label:has(input:checked) {
+            background: #eef2ff;
+            border-color: #c7d2fe;
+            color: #4338ca;
+        }
+        .checkbox-label.written-label:has(input:checked) {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+            color: #065f46;
+        }
+        .custom-checkbox {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #d1d5db;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all var(--transition);
+            flex-shrink: 0;
+            position: relative;
+            background: #fff;
+        }
+        .custom-checkbox:hover {
+            border-color: #9ca3af;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.06);
+        }
+        .custom-checkbox:checked {
+            border-color: #6366f1;
+            background: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+        .custom-checkbox:checked::after {
+            content: '';
+            position: absolute;
+            left: 4.5px;
+            top: 1.5px;
+            width: 6px;
+            height: 10px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .written-label .custom-checkbox:checked {
+            border-color: #10b981;
+            background: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        /* Reset button */
+        .reset-area {
+            text-align: center;
+            margin-top: 32px;
+        }
+        .reset-btn {
+            background: #fff;
+            border: 2px solid #e5e7eb;
+            padding: 10px 22px;
+            border-radius: 25px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all var(--transition);
+            font-family: inherit;
+            letter-spacing: 0.01em;
+        }
+        .reset-btn:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+            background: #fef2f2;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.06);
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .stat-pill {
+            background: #fff;
+            padding: 10px 18px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 0.82rem;
+            color: #374151;
+            box-shadow: var(--shadow-sm);
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stat-pill .count {
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #6366f1;
+        }
+        .stat-pill.both-complete .count {
+            color: #f59e0b;
+        }
+
+        /* Footer note */
+        .footer-note {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            letter-spacing: 0.02em;
+        }
+
+        /* Print-friendly */
+        @media print {
+            body {
+                background: #fff;
+            }
+            body::before,
+            body::after {
+                display: none;
+            }
+            .group-card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                break-inside: avoid;
+            }
+            .reset-area,
+            .footer-note {
+                display: none;
+            }
+            .floating-badge {
+                box-shadow: none;
+                border: 1px solid #f59e0b;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="icon-row">🎙️</div>
+            <h1>Speech Tracker</h1>
+            <p class="subtitle">Track student progress for 3‑Minute Speeches &amp; Written Submissions</p>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend">
+            <span><span class="dot speech"></span> 3 Min Speech ✓</span>
+            <span><span class="dot written"></span> Written Speech ✓</span>
+            <span><span class="dot both"></span> Both Complete — Glowing!</span>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-pill">👥 Total Students: <span class="count" id="totalCount">0</span></div>
+            <div class="stat-pill">🎤 Speech Done: <span class="count" id="speechCount">0</span></div>
+            <div class="stat-pill">📝 Written Done: <span class="count" id="writtenCount">0</span></div>
+            <div class="stat-pill both-complete">⭐ Both Complete: <span class="count" id="bothCount">0</span></div>
+        </div>
+
+        <!-- Groups Grid -->
+        <div class="groups-grid" id="groupsGrid"></div>
+
+        <!-- Reset -->
+        <div class="reset-area">
+            <button class="reset-btn" id="resetBtn" title="Clear all progress">🔄 Reset All Progress</button>
+        </div>
+        <p class="footer-note">All progress is saved automatically in your browser. No data is sent anywhere.</p>
+    </div>
+
+    <script>
+        (function() {
+            // ─────────────────────────────────────
+            // DATA
+            // ─────────────────────────────────────
+            const groupsData = [{
+                id: 1,
+                date: 'May 6th',
+                students: ['Elizabeth', 'Andy Z', 'Flora', 'Palin', 'Michael', 'Ariel', 'Emma',
+                'Sissi']
+            }, {
+                id: 2,
+                date: 'May 13th',
+                students: ['Eelin', 'Wincy', 'Robert', 'Lucy', 'Andy C', 'Rex', 'Belinda', 'Ronald']
+            }, {
+                id: 3,
+                date: 'May 20th',
+                students: ['Fiona D', 'Aiden', 'Nicole', 'Francis', 'Jaden L', 'Yoyo', 'Thompson',
+                'Jasper']
+            }, {
+                id: 4,
+                date: 'May 27th',
+                students: ['Fiona C', 'Jayden H', 'Angela He']
+            }];
+
+            // ─────────────────────────────────────
+            // STATE MANAGEMENT
+            // ─────────────────────────────────────
+            const STORAGE_KEY = 'speechTrackerProgress_v2';
+
+            // Structure: { "groupId-studentName": { speech: bool, written: bool } }
+            let progressState = {};
+
+            function getKey(groupId, studentName) {
+                return `${groupId}-${studentName}`;
+            }
+
+            function loadState() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (raw) {
+                        progressState = JSON.parse(raw);
+                    } else {
+                        progressState = {};
+                    }
+                } catch (e) {
+                    progressState = {};
+                }
+            }
+
+            function saveState() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(progressState));
+                } catch (e) {
+                    // Storage full or unavailable
+                }
+            }
+
+            function getProgress(groupId, studentName) {
+                const key = getKey(groupId, studentName);
+                return progressState[key] || { speech: false, written: false };
+            }
+
+            function setProgress(groupId, studentName, field, value) {
+                const key = getKey(groupId, studentName);
+                if (!progressState[key]) {
+                    progressState[key] = { speech: false, written: false };
+                }
+                progressState[key][field] = value;
+                // Clean up if both false (optional, keeps storage lean)
+                if (!progressState[key].speech && !progressState[key].written) {
+                    delete progressState[key];
+                }
+                saveState();
+            }
+
+            function resetAll() {
+                progressState = {};
+                saveState();
+                renderAll();
+                updateStats();
+            }
+
+            // ─────────────────────────────────────
+            // RENDER
+            // ─────────────────────────────────────
+            const groupsGrid = document.getElementById('groupsGrid');
+
+            function renderAll() {
+                groupsGrid.innerHTML = '';
+                groupsData.forEach((group, gIndex) => {
+                    const card = document.createElement('div');
+                    card.className = `group-card card-${group.id}`;
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <div class="group-number">${group.id}</div>
+                            <span class="group-date">📅 ${group.date}</span>
+                        </div>
+                        <div class="card-body">
+                            ${group.students.map(name => renderStudentRow(group.id, name)).join('')}
+                        </div>
+                    `;
+                    groupsGrid.appendChild(card);
+                });
+
+                // Attach event listeners
+                attachCheckboxListeners();
+                updateStats();
+            }
+
+            function renderStudentRow(groupId, studentName) {
+                const progress = getProgress(groupId, studentName);
+                const speechDone = progress.speech;
+                const writtenDone = progress.written;
+                const bothDone = speechDone && writtenDone;
+                const glowingClass = bothDone ? 'glowing' : '';
+                const badgeVisibleClass = bothDone ? 'visible' : '';
+                const speechDotClass = speechDone ? 'active' : '';
+                const writtenDotClass = writtenDone ? 'active' : '';
+                const speechChecked = speechDone ? 'checked' : '';
+                const writtenChecked = writtenDone ? 'checked' : '';
+                const uniqueId = `${groupId}-${studentName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}`;
+
+                return `
+                    <div class="student-row ${glowingClass}" data-group="${groupId}" data-student="${escapeHtml(studentName)}">
+                        <div class="student-name-area">
+                            <span class="student-name">${escapeHtml(studentName)}</span>
+                            <span class="indicators">
+                                <span class="indicator-dot speech-dot ${speechDotClass}" title="3 Minute Speech Completed"></span>
+                                <span class="indicator-dot written-dot ${writtenDotClass}" title="Written Speech Turned In"></span>
+                            </span>
+                            <span class="floating-badge ${badgeVisibleClass}">✨ 3 Minute Speech Completed</span>
+                        </div>
+                        <div class="checkboxes">
+                            <label class="checkbox-label speech-label" for="speech-${uniqueId}">
+                                <input type="checkbox" class="custom-checkbox speech-checkbox" id="speech-${uniqueId}"
+                                    data-group="${groupId}" data-student="${escapeHtml(studentName)}"
+                                    data-field="speech" ${speechChecked}>
+                                🎤 3 Min Speech
+                            </label>
+                            <label class="checkbox-label written-label" for="written-${uniqueId}">
+                                <input type="checkbox" class="custom-checkbox written-checkbox" id="written-${uniqueId}"
+                                    data-group="${groupId}" data-student="${escapeHtml(studentName)}"
+                                    data-field="written" ${writtenChecked}>
+                                📝 Written Speech
+                            </label>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ─────────────────────────────────────
+            // EVENT HANDLERS
+            // ─────────────────────────────────────
+            function attachCheckboxListeners() {
+                const allCheckboxes = groupsGrid.querySelectorAll('.custom-checkbox');
+                allCheckboxes.forEach(cb => {
+                    // Remove old listeners by cloning (safest for re-renders)
+                    const newCb = cb.cloneNode(true);
+                    cb.parentNode.replaceChild(newCb, cb);
+                    newCb.addEventListener('change', handleCheckboxChange);
+                });
+            }
+
+            function handleCheckboxChange(e) {
+                const checkbox = e.target;
+                const groupId = parseInt(checkbox.dataset.group);
+                const studentName = checkbox.dataset.student;
+                const field = checkbox.dataset.field;
+                const value = checkbox.checked;
+
+                setProgress(groupId, studentName, field, value);
+
+                // Re-render just the affected row for efficiency
+                updateSingleRow(groupId, studentName);
+                updateStats();
+            }
+
+            function updateSingleRow(groupId, studentName) {
+                const row = groupsGrid.querySelector(
+                    `.student-row[data-group="${groupId}"][data-student="${escapeHtml(studentName)}"]`
+                );
+                if (!row) return;
+
+                const progress = getProgress(groupId, studentName);
+                const speechDone = progress.speech;
+                const writtenDone = progress.written;
+                const bothDone = speechDone && writtenDone;
+
+                // Update glowing class
+                if (bothDone) {
+                    row.classList.add('glowing');
+                } else {
+                    row.classList.remove('glowing');
+                }
+
+                // Update indicator dots
+                const speechDot = row.querySelector('.speech-dot');
+                const writtenDot = row.querySelector('.written-dot');
+                if (speechDot) {
+                    speechDot.classList.toggle('active', speechDone);
+                }
+                if (writtenDot) {
+                    writtenDot.classList.toggle('active', writtenDone);
+                }
+
+                // Update floating badge
+                const floatingBadge = row.querySelector('.floating-badge');
+                if (floatingBadge) {
+                    floatingBadge.classList.toggle('visible', bothDone);
+                }
+
+                // Update checkbox states (in case of external changes)
+                const speechCb = row.querySelector('.speech-checkbox');
+                const writtenCb = row.querySelector('.written-checkbox');
+                if (speechCb && speechCb.checked !== speechDone) {
+                    speechCb.checked = speechDone;
+                }
+                if (writtenCb && writtenCb.checked !== writtenDone) {
+                    writtenCb.checked = writtenDone;
+                }
+
+                // Update label styles by toggling checked state on the hidden input
+                // The CSS :has() selector handles the visual styling automatically
+            }
+
+            function updateStats() {
+                let totalStudents = 0;
+                let speechCount = 0;
+                let writtenCount = 0;
+                let bothCount = 0;
+
+                groupsData.forEach(group => {
+                    group.students.forEach(name => {
+                        totalStudents++;
+                        const progress = getProgress(group.id, name);
+                        if (progress.speech) speechCount++;
+                        if (progress.written) writtenCount++;
+                        if (progress.speech && progress.written) bothCount++;
+                    });
+                });
+
+                document.getElementById('totalCount').textContent = totalStudents;
+                document.getElementById('speechCount').textContent = speechCount;
+                document.getElementById('writtenCount').textContent = writtenCount;
+                document.getElementById('bothCount').textContent = bothCount;
+            }
+
+            // ─────────────────────────────────────
+            // RESET
+            // ─────────────────────────────────────
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                if (confirm(
+                        'Are you sure you want to reset ALL progress for every student? This cannot be undone.'
+                        )) {
+                    resetAll();
+                }
+            });
+
+            // ─────────────────────────────────────
+            // INIT
+            // ─────────────────────────────────────
+            function init() {
+                loadState();
+                renderAll();
+                updateStats();
+            }
+
+            // ─────────────────────────────────────
+            // Handle storage events (for multi-tab sync)
+            // ─────────────────────────────────────
+            window.addEventListener('storage', (e) => {
+                if (e.key === STORAGE_KEY) {
+                    loadState();
+                    renderAll();
+                    updateStats();
+                }
+            });
+
+            // Start the app
+            init();
+
+            console.log('🎙️ Speech Tracker ready! All progress is saved in your browser.');
+            console.log(`   ${groupsData.reduce((sum, g) => sum + g.students.length, 0)} students across ${groupsData.length} groups`);
+        })();
+    </script>
+</body>
+</html>
