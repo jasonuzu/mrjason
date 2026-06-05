@@ -279,6 +279,55 @@
   @media (max-width: 520px) {
     .item-card { padding-right: 22px; padding-top: 150px; }
     .item-sprite-frame { top: 44px; right: auto; left: 50%; transform: translateX(-50%); }
+    .entity-portrait-frame { top: 168px; right: auto; left: 50%; transform: translateX(-50%); }
+  }
+
+  /* Entity portrait frame — appears below item sprite on bound cards only */
+  .entity-portrait-frame {
+    position: absolute;
+    top: 174px;
+    right: 14px;
+    width: 112px;
+    height: 112px;
+    background: radial-gradient(circle at 35% 30%, #0c1a10 0%, #040a06 70%, #020604 100%);
+    border: 1px solid rgba(60, 140, 80, 0.5);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 18px rgba(0,0,0,0.6),
+      0 0 12px rgba(80, 200, 120, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    pointer-events: none;
+    gap: 2px;
+  }
+  .entity-portrait-frame::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(80, 200, 120, 0.12);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+  .entity-portrait {
+    width: 88px;
+    height: 88px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
+  }
+  .entity-portrait-label {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+    color: rgba(140, 220, 160, 0.6);
+    font-family: 'Fira Mono', 'Courier New', monospace;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 104px;
   }
 
   /* Rarity tiers affect card styling */
@@ -2231,6 +2280,1336 @@ window.SPRITE_PIXEL = PIXEL;
 })();
 
 // ========================
+// ENTITY PORTRAIT GENERATOR (background — paints bound entity portraits)
+// ========================
+(function() {
+/* ================================================================
+   CORE ENGINE (shared with item generator — grid, RNG, shading)
+   ================================================================ */
+const SIZE = 32, PIXEL = 8;
+
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  return function() {
+    let t = (seed += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+let _rng = Math.random;
+function seedRng(s) { _rng = mulberry32(hashStr(s) || 1); }
+function rng(a, b) { return Math.floor(_rng() * (b - a + 1)) + a; }
+function pick(arr) { return arr[Math.floor(_rng() * arr.length)]; }
+function chance(p) { return _rng() < p; }
+function shuffle(arr) { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(_rng()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+function newGrid() { return Array.from({length:SIZE}, ()=>new Array(SIZE).fill(0)); }
+function gSet(g,x,y,v) { if(x>=0&&y>=0&&x<SIZE&&y<SIZE) g[y][x]=v; }
+function gGet(g,x,y) { return (x>=0&&y>=0&&x<SIZE&&y<SIZE)?g[y][x]:0; }
+function gRect(g,x,y,w,h,v) { for(let j=0;j<h;j++) for(let i=0;i<w;i++) gSet(g,x+i,y+j,v); }
+function gCircle(g,cx,cy,r,v) { for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++) if(x*x+y*y<=r*r) gSet(g,cx+x,cy+y,v); }
+function gEllipse(g,cx,cy,rx,ry,v) { for(let y=-ry;y<=ry;y++) for(let x=-rx;x<=rx;x++) if((x*x)/(rx*rx)+(y*y)/(ry*ry)<=1) gSet(g,cx+x,cy+y,v); }
+function gLine(g,x0,y0,x1,y1,v) {
+  const dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1;
+  let err=dx-dy;
+  while(true){ gSet(g,x0,y0,v); if(x0===x1&&y0===y1)break; const e2=2*err; if(e2>-dy){err-=dy;x0+=sx;} if(e2<dx){err+=dx;y0+=sy;} }
+}
+
+/* auto-outline + shade: 0=empty, 1=outline, 2=shadow, 3=mid, 4=light, 5=hi, 6-9=accents */
+function autoShade(g) {
+  const o = newGrid();
+  for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) o[y][x]=g[y][x];
+  for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++){
+    if(g[y][x]===0){ if(gGet(g,x+1,y)>1||gGet(g,x-1,y)>1||gGet(g,x,y+1)>1||gGet(g,x,y-1)>1) o[y][x]=1; }
+  }
+  for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++){
+    if(o[y][x]===3){
+      if(gGet(o,x+1,y)===1||gGet(o,x,y+1)===1) o[y][x]=2;
+      else if(gGet(o,x-1,y)===1||gGet(o,x,y-1)===1) o[y][x]=4;
+    }
+  }
+  for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++){
+    if(o[y][x]===4 && gGet(o,x-1,y)===1 && gGet(o,x,y-1)===1) o[y][x]=5;
+  }
+  return o;
+}
+
+function paintGrid(g, pal, tctx, ps) {
+  tctx.clearRect(0,0,SIZE*ps,SIZE*ps);
+  for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++){
+    const v=g[y][x]; if(v===0) continue;
+    tctx.fillStyle = pal[v] || pal[3] || '#ff00ff';
+    tctx.fillRect(x*ps, y*ps, ps, ps);
+  }
+}
+
+/* ================================================================
+   UID SYSTEM
+   ================================================================ */
+const UID_REG = {};
+function mintUID() {
+  return Math.random().toString(36).slice(2,6) + Math.random().toString(36).slice(2,6) + Date.now().toString(36).slice(-2);
+}
+
+/* ================================================================
+   FAE BOUND — 8 courts × 125 = 1,000 unique entities
+   ================================================================ */
+const FAE_COURTS = {
+  seelie: {
+    label: "Seelie (Summer)", count: 125,
+    skin: ["#e8c898","#d4a870","#c09058"], hair: ["#f0d860","#e0a830","#90c048","#68a038"],
+    eyes: ["#f0d040","#c8a020","#a0e060"], pal1: "#f0d860", pal2: "#488028",
+    crowns: ["flower","leaf","vine","none","sun"],
+    markings: ["none","dots","swirl","rays"]
+  },
+  unseelie: {
+    label: "Unseelie (Winter)", count: 125,
+    skin: ["#c8d8f0","#a0b8d8","#8098c0"], hair: ["#e8f0ff","#b0c8e8","#8090b0","#607098"],
+    eyes: ["#e0f0ff","#80c0f0","#4080c0"], pal1: "#80c0f0", pal2: "#304870",
+    crowns: ["ice","crystal","none","tiara","frost"],
+    markings: ["none","frost","lines","shards"]
+  },
+  twilight: {
+    label: "Twilight (Dusk)", count: 125,
+    skin: ["#c8a0d0","#a880b0","#886898"], hair: ["#4030a0","#6040c0","#8060d0","#a080e0"],
+    eyes: ["#d080f0","#a060d0","#f0a0e0"], pal1: "#a060d0", pal2: "#402060",
+    crowns: ["stars","moth","crescent","none","veil"],
+    markings: ["none","stars","dots","crescents"]
+  },
+  thorn: {
+    label: "Thorn (Wild)", count: 125,
+    skin: ["#6a8048","#506030","#384820"], hair: ["#2a1808","#402810","#583818","#705028"],
+    eyes: ["#f0a020","#e06020","#c04020"], pal1: "#80a040", pal2: "#2a1808",
+    crowns: ["thorns","antler","bark","none","moss"],
+    markings: ["none","bark","thorns","veins"]
+  },
+  ember: {
+    label: "Ember (Fire)", count: 125,
+    skin: ["#5a3020","#7a3828","#483018"], hair: ["#f06020","#e04010","#f09030","#f0c048"],
+    eyes: ["#f0e040","#f0a020","#ff6010"], pal1: "#f06020", pal2: "#401008",
+    crowns: ["flame","cinder","none","coal","spark"],
+    markings: ["none","ember","cracks","glow"]
+  },
+  tide: {
+    label: "Tide (Sea)", count: 125,
+    skin: ["#60a8a0","#48888a","#387078"], hair: ["#2060a0","#3080c0","#50a0d0","#80c8e0"],
+    eyes: ["#60e0d0","#40c0b0","#80f0e0"], pal1: "#40b0c0", pal2: "#183848",
+    crowns: ["coral","shell","kelp","none","pearl"],
+    markings: ["none","scales","wave","bubbles"]
+  },
+  hollow: {
+    label: "Hollow (Shadow)", count: 125,
+    skin: ["#b0b0b8","#909098","#707078"], hair: ["#404048","#585860","#303038","#686870"],
+    eyes: ["#1a1a20","#080810","#303038"], pal1: "#606068", pal2: "#1a1a20",
+    crowns: ["none","void","wisp","none","halo"],
+    markings: ["none","hollow","cracks","fade"]
+  },
+  wyld: {
+    label: "Wyld (Chaos)", count: 125,
+    skin: ["#c8a0c0","#a0c090","#c0b868"], hair: ["#e040a0","#40e080","#e0e040","#4080f0"],
+    eyes: ["#f020a0","#20f080","#f0f020"], pal1: "#e040a0", pal2: "#40a070",
+    crowns: ["mushroom","antler","feather","none","crystal"],
+    markings: ["none","spores","spots","stripes"]
+  }
+};
+
+function drawFae(g, court, index) {
+  const c = FAE_COURTS[court];
+  const skin = c.skin[index % c.skin.length];
+  const hairCol = c.hair[index % c.hair.length];
+  const eyeCol = c.eyes[index % c.eyes.length];
+  const crownType = c.crowns[index % c.crowns.length];
+  const markType = c.markings[(index * 7) % c.markings.length];
+  const hairStyle = rng(0, 7);
+  const earLen = rng(0, 2); // 0=long, 1=medium, 2=short
+  const faceWidth = rng(0, 2); // 0=narrow, 1=normal, 2=wide
+
+  // Return palette — skin is 3 (mid body), hair colors mapped to 6-8, eyes to 9
+  const skinDark = darken(skin, 0.7);
+  const skinLight = lighten(skin, 1.25);
+  const skinHi = lighten(skin, 1.45);
+  const pal = {
+    1: darken(skin, 0.35),  // outline
+    2: skinDark,             // shadow
+    3: skin,                 // mid (skin)
+    4: skinLight,            // light
+    5: skinHi,               // highlight
+    6: darken(hairCol, 0.6), // hair dark
+    7: hairCol,              // hair mid
+    8: lighten(hairCol,1.3), // hair light
+    9: eyeCol,               // eyes
+    10: c.pal1,              // accent 1 (crown/marking)
+    11: c.pal2,              // accent 2
+    12: "#ffffff",           // eye white/sparkle
+    13: darken(eyeCol, 0.4), // pupil
+  };
+
+  const cx = 16;
+
+  // --- HAIR (top) ---
+  const hw = faceWidth === 0 ? 6 : faceWidth === 1 ? 7 : 8;
+  if (hairStyle < 6) { // has hair on top
+    for (let y = 1; y < 7; y++) {
+      const w = hw + (y < 3 ? -1 : 0);
+      gRect(g, cx - w, y, w * 2, 1, 7);
+    }
+  }
+  // side hair
+  if (hairStyle === 0 || hairStyle === 2 || hairStyle === 5) { // long flowing
+    for (let y = 5; y < 22; y++) {
+      gSet(g, cx - hw - 1, y, 7); gSet(g, cx - hw, y, 6);
+      gSet(g, cx + hw, y, 6); gSet(g, cx + hw + 1, y, 7);
+    }
+  }
+  if (hairStyle === 1 || hairStyle === 3) { // short sides
+    for (let y = 3; y < 10; y++) {
+      gSet(g, cx - hw, y, 7);
+      gSet(g, cx + hw - 1, y, 7);
+    }
+  }
+  if (hairStyle === 4) { // bangs
+    gRect(g, cx - hw + 1, 6, hw * 2 - 2, 2, 7);
+  }
+  if (hairStyle === 6) { // bald — no hair, just crown area
+  }
+  if (hairStyle === 7) { // curly — dots
+    for (let y = 1; y < 7; y++) {
+      for (let x = cx - hw; x < cx + hw; x++) {
+        if ((x + y) % 2 === 0) gSet(g, x, y, 7);
+        else gSet(g, x, y, 8);
+      }
+    }
+  }
+
+  // --- FACE (head) ---
+  const fw = faceWidth === 0 ? 5 : faceWidth === 1 ? 6 : 7;
+  // head ellipse
+  gEllipse(g, cx, 10, fw, 7, 3);
+  // slight jaw taper
+  for (let y = 14; y < 17; y++) {
+    const shrink = y - 13;
+    gSet(g, cx - fw + shrink - 1, y, 0);
+    gSet(g, cx + fw - shrink + 1, y, 0);
+  }
+
+  // --- EARS (pointed) ---
+  const earY = 8;
+  const eLen = earLen === 0 ? 4 : earLen === 1 ? 3 : 2;
+  for (let i = 0; i < eLen; i++) {
+    gSet(g, cx - fw - 1 - i, earY - i, 3);
+    gSet(g, cx + fw + 1 + i, earY - i, 3);
+  }
+  // ear tip
+  gSet(g, cx - fw - 1 - eLen, earY - eLen, 4);
+  gSet(g, cx + fw + 1 + eLen, earY - eLen, 4);
+
+  // --- EYES ---
+  const eyeY = 9;
+  const eyeSpread = faceWidth === 0 ? 2 : 3;
+  // eye whites
+  gRect(g, cx - eyeSpread - 1, eyeY, 3, 2, 12);
+  gRect(g, cx + eyeSpread - 1, eyeY, 3, 2, 12);
+  // iris
+  gSet(g, cx - eyeSpread, eyeY, 9); gSet(g, cx - eyeSpread, eyeY + 1, 9);
+  gSet(g, cx + eyeSpread, eyeY, 9); gSet(g, cx + eyeSpread, eyeY + 1, 9);
+  // pupil
+  gSet(g, cx - eyeSpread, eyeY + 1, 13);
+  gSet(g, cx + eyeSpread, eyeY + 1, 13);
+
+  // --- NOSE ---
+  gSet(g, cx, 12, 2); gSet(g, cx, 13, 2);
+
+  // --- MOUTH ---
+  gRect(g, cx - 1, 14, 3, 1, 2);
+
+  // --- NECK + SHOULDERS ---
+  gRect(g, cx - 1, 17, 3, 2, 3);
+  // shoulders
+  for (let y = 19; y < 24; y++) {
+    const sw = 5 + Math.min(4, y - 19);
+    gRect(g, cx - sw, y, sw * 2, 1, 3);
+  }
+  // clothing hint on shoulders (accent color)
+  for (let y = 20; y < 24; y++) {
+    const sw = 5 + Math.min(4, y - 19);
+    gRect(g, cx - sw, y, sw * 2, 1, 10);
+  }
+  // collar
+  gRect(g, cx - 2, 19, 5, 1, 11);
+
+  // --- CROWN / HEADPIECE ---
+  if (crownType === "flower" || crownType === "sun") {
+    for (let i = -2; i <= 2; i++) gSet(g, cx + i * 2, 1, 10);
+    gSet(g, cx, 0, 10);
+  }
+  if (crownType === "ice" || crownType === "crystal") {
+    gSet(g, cx, 0, 10); gSet(g, cx - 2, 1, 10); gSet(g, cx + 2, 1, 10);
+    gSet(g, cx - 1, 0, 10); gSet(g, cx + 1, 0, 10);
+  }
+  if (crownType === "thorns" || crownType === "antler") {
+    for (let i = 0; i < 3; i++) {
+      gSet(g, cx - 4 - i, 3 - i, 10);
+      gSet(g, cx + 4 + i, 3 - i, 10);
+    }
+  }
+  if (crownType === "mushroom") {
+    gEllipse(g, cx, 1, 4, 2, 10);
+  }
+  if (crownType === "stars" || crownType === "crescent") {
+    gSet(g, cx - 3, 0, 10); gSet(g, cx + 3, 0, 10); gSet(g, cx, -1 + 1, 10);
+  }
+  if (crownType === "flame" || crownType === "spark") {
+    for (let i = -3; i <= 3; i++) gSet(g, cx + i, rng(0, 1), 10);
+  }
+  if (crownType === "coral" || crownType === "shell") {
+    gSet(g, cx - 2, 1, 10); gSet(g, cx, 0, 10); gSet(g, cx + 2, 1, 10);
+    gSet(g, cx - 1, 1, 10); gSet(g, cx + 1, 1, 10);
+  }
+  if (crownType === "halo" || crownType === "void") {
+    for (let a = 0; a < 8; a++) {
+      const ang = (a / 8) * Math.PI * 2;
+      gSet(g, cx + Math.round(Math.cos(ang) * 5), 4 + Math.round(Math.sin(ang) * 3), 10);
+    }
+  }
+  if (crownType === "tiara" || crownType === "pearl") {
+    gRect(g, cx - 4, 3, 9, 1, 10);
+    gSet(g, cx, 2, 10);
+  }
+
+  // --- MARKINGS ---
+  if (markType === "dots" || markType === "stars" || markType === "spores" || markType === "bubbles") {
+    gSet(g, cx - 3, 8, 10); gSet(g, cx + 3, 8, 10);
+    gSet(g, cx - 2, 14, 10); gSet(g, cx + 2, 14, 10);
+  }
+  if (markType === "swirl" || markType === "wave" || markType === "crescents") {
+    for (let i = 0; i < 3; i++) { gSet(g, cx - 4, 8 + i, 10); gSet(g, cx + 4, 8 + i, 10); }
+  }
+  if (markType === "lines" || markType === "bark" || markType === "veins" || markType === "cracks") {
+    gLine(g, cx - 4, 7, cx - 3, 12, 10);
+    gLine(g, cx + 4, 7, cx + 3, 12, 10);
+  }
+  if (markType === "frost" || markType === "shards") {
+    gSet(g, cx - 4, 9, 10); gSet(g, cx + 4, 9, 10);
+    gSet(g, cx - 5, 10, 10); gSet(g, cx + 5, 10, 10);
+  }
+  if (markType === "rays" || markType === "glow" || markType === "ember") {
+    for (let i = -2; i <= 2; i++) gSet(g, cx + i, 7, 10);
+  }
+  if (markType === "stripes" || markType === "spots") {
+    for (let y = 8; y < 14; y += 2) { gSet(g, cx - fw + 1, y, 10); gSet(g, cx + fw - 1, y, 10); }
+  }
+  if (markType === "hollow" || markType === "fade") {
+    // replace some skin with shadow
+    for (let y = 8; y < 15; y++) for (let x = cx - fw; x <= cx + fw; x++) {
+      if (g[y][x] === 3 && chance(0.15)) g[y][x] = 2;
+    }
+  }
+
+  return pal;
+}
+
+/* ================================================================
+   LESSER MAGE BOUND — black robes, diverse appearance
+   ================================================================ */
+const MAGE_SKIN = ["#f5deb0","#d4a870","#c09058","#8a6038","#5a3820","#e8c898","#b08060","#3a2010"];
+const MAGE_HAIR = ["#1a1010","#3a2010","#6a4020","#a06828","#c8a048","#d8c088","#808088","#e8e8f0","#383048","#682028","#884030","#c04828"];
+const MAGE_EYES = ["#4060a0","#408040","#805020","#302818","#6040a0","#206060"];
+
+function drawMage(g, index) {
+  const skinIdx = index % MAGE_SKIN.length;
+  const hairIdx = (index * 3) % MAGE_HAIR.length;
+  const eyeIdx = (index * 5) % MAGE_EYES.length;
+  const hairStyle = (index * 7) % 8;
+  const gender = index % 3; // 0=masc, 1=fem, 2=andro
+  const hoodUp = (index % 5) === 0;
+  const facialHair = gender === 0 && (index % 4) < 2;
+  const accessory = (index * 11) % 4; // 0=none, 1=pendant, 2=staff top hint, 3=third eye
+
+  const skin = MAGE_SKIN[skinIdx];
+  const hairCol = MAGE_HAIR[hairIdx];
+  const eyeCol = MAGE_EYES[eyeIdx];
+
+  const pal = {
+    1: "#0a0a10",       // outline (very dark)
+    2: darken(skin, 0.7),
+    3: skin,
+    4: lighten(skin, 1.2),
+    5: lighten(skin, 1.4),
+    6: darken(hairCol, 0.5),
+    7: hairCol,
+    8: lighten(hairCol, 1.3),
+    9: eyeCol,
+    10: "#181820",      // robe dark
+    11: "#282838",      // robe mid
+    12: "#ffffff",      // eye white
+    13: "#0a0a0a",      // pupil
+    14: "#c8a048",      // pendant / accent gold
+  };
+
+  const cx = 16;
+
+  // --- HOOD or HAIR ---
+  if (hoodUp) {
+    for (let y = 1; y < 8; y++) {
+      const w = 7 + (y < 4 ? y : 3);
+      gRect(g, cx - w, y, w * 2, 1, 10);
+    }
+    // hood shadow on face
+    gRect(g, cx - 6, 7, 12, 1, 10);
+  } else {
+    // hair
+    const hw = 7;
+    if (hairStyle < 5) {
+      for (let y = 2; y < 7; y++) gRect(g, cx - hw + 1, y, (hw - 1) * 2, 1, 7);
+    }
+    if (hairStyle === 0 || hairStyle === 2) { // long
+      for (let y = 5; y < 20; y++) { gSet(g, cx - hw, y, 6); gSet(g, cx + hw - 1, y, 6); }
+    }
+    if (hairStyle === 5) { // mohawk
+      for (let y = 0; y < 5; y++) gRect(g, cx - 1, y, 3, 1, 7);
+    }
+    if (hairStyle === 6) { // bald
+    }
+    if (hairStyle === 7) { // short curly
+      for (let y = 2; y < 7; y++) for (let x = cx - hw + 1; x < cx + hw - 1; x++) {
+        gSet(g, x, y, (x + y) % 2 === 0 ? 7 : 8);
+      }
+    }
+    if (hairStyle === 1) { // bangs
+      gRect(g, cx - 5, 6, 10, 2, 7);
+    }
+  }
+
+  // --- FACE ---
+  gEllipse(g, cx, 10, 6, 7, 3);
+  // jaw taper
+  for (let y = 14; y < 17; y++) { gSet(g, cx - 6 + (y-13), y, 0); gSet(g, cx + 6 - (y-13), y, 0); }
+
+  // --- EYES ---
+  gRect(g, cx - 3, 9, 2, 2, 12); gRect(g, cx + 2, 9, 2, 2, 12);
+  gSet(g, cx - 2, 9, 9); gSet(g, cx - 2, 10, 13);
+  gSet(g, cx + 2, 9, 9); gSet(g, cx + 2, 10, 13);
+
+  // eyebrows
+  gRect(g, cx - 3, 8, 3, 1, 6); gRect(g, cx + 1, 8, 3, 1, 6);
+
+  // --- NOSE + MOUTH ---
+  gSet(g, cx, 12, 2); gSet(g, cx, 13, 2);
+  gRect(g, cx - 1, 14, 3, 1, 2);
+
+  // facial hair
+  if (facialHair) {
+    for (let y = 14; y < 17; y++) gRect(g, cx - 2, y, 5, 1, 6);
+  }
+
+  // --- NECK ---
+  gRect(g, cx - 1, 17, 3, 2, 3);
+
+  // --- BLACK ROBE ---
+  for (let y = 19; y < 30; y++) {
+    const sw = Math.min(12, 5 + (y - 19));
+    gRect(g, cx - sw, y, sw * 2, 1, 10);
+  }
+  // robe lighter fold line
+  gLine(g, cx, 20, cx, 28, 11);
+  // collar
+  gRect(g, cx - 3, 19, 7, 1, 11);
+  // shoulders
+  gRect(g, cx - 9, 20, 2, 3, 11); gRect(g, cx + 8, 20, 2, 3, 11);
+
+  // --- ACCESSORIES ---
+  if (accessory === 1) { // pendant
+    gSet(g, cx, 20, 14); gSet(g, cx, 21, 14);
+  }
+  if (accessory === 2) { // staff top hint at edge
+    for (let y = 3; y < 28; y++) gSet(g, 3, y, 11);
+    gRect(g, 2, 2, 3, 2, 14);
+  }
+  if (accessory === 3) { // third eye mark
+    gSet(g, cx, 7, 9);
+  }
+
+  return pal;
+}
+
+/* ================================================================
+   HUMAN BOUND — diverse humans with varied builds/clothing
+   ================================================================ */
+const HUMAN_SKIN = ["#fde7c8","#f5deb0","#d4a870","#c09058","#a07848","#8a6038","#6a4428","#5a3820","#3a2010","#2a1408"];
+const HUMAN_HAIR_COL = ["#1a1010","#2a1808","#3a2010","#5a3818","#7a4820","#a06828","#c88a38","#d8b868","#e8d888","#808088","#e0e0e8","#882020","#c04020","#301828"];
+const HUMAN_EYES_COL = ["#4060a0","#408040","#805020","#302818","#6040a0","#206060","#2080a0","#80a020"];
+const CLOTHING_TYPES = [
+  { name:"Tunic",     col:"#6a5028" },
+  { name:"Armor",     col:"#606870" },
+  { name:"Dress",     col:"#a04060" },
+  { name:"Merchant",  col:"#806030" },
+  { name:"Peasant",   col:"#5a4a30" },
+  { name:"Noble",     col:"#3a2868" },
+  { name:"Cloak",     col:"#384028" },
+  { name:"Vest",      col:"#703020" },
+  { name:"Robe",      col:"#282848" },
+  { name:"Sailor",    col:"#204060" },
+  { name:"Hunter",    col:"#3a5028" },
+  { name:"Scholar",   col:"#3a2020" },
+];
+
+function drawHuman(g, index) {
+  const skinIdx = index % HUMAN_SKIN.length;
+  const hairIdx = (index * 3) % HUMAN_HAIR_COL.length;
+  const eyeIdx = (index * 5) % HUMAN_EYES_COL.length;
+  const hairStyle = (index * 7) % 10;
+  const build = (index * 11) % 5; // 0=thin,1=avg,2=stocky,3=heavy,4=muscular
+  const clothIdx = (index * 13) % CLOTHING_TYPES.length;
+  const gender = index % 3;
+  const hat = (index * 17) % 6; // 0-1=none, 2=hood, 3=cap, 4=wide hat, 5=headband
+
+  const skin = HUMAN_SKIN[skinIdx];
+  const hairCol = HUMAN_HAIR_COL[hairIdx];
+  const eyeCol = HUMAN_EYES_COL[eyeIdx];
+  const cloth = CLOTHING_TYPES[clothIdx];
+
+  const pal = {
+    1: darken(skin, 0.3),
+    2: darken(skin, 0.7),
+    3: skin,
+    4: lighten(skin, 1.2),
+    5: lighten(skin, 1.4),
+    6: darken(hairCol, 0.5),
+    7: hairCol,
+    8: lighten(hairCol, 1.3),
+    9: eyeCol,
+    10: darken(cloth.col, 0.6),
+    11: cloth.col,
+    12: "#ffffff",
+    13: "#0a0a0a",
+    14: lighten(cloth.col, 1.4),
+  };
+
+  const cx = 16;
+  const bodyW = build === 0 ? 4 : build === 1 ? 5 : build === 2 ? 6 : build === 3 ? 8 : 6;
+  const shoulderW = bodyW + 3;
+
+  // --- HAIR ---
+  const hw = 7;
+  if (hat < 2) { // no hat, show hair
+    if (hairStyle < 6) for (let y = 2; y < 7; y++) gRect(g, cx - hw + 1, y, (hw - 1) * 2, 1, 7);
+    if (hairStyle === 0) for (let y = 5; y < 18; y++) { gSet(g, cx - hw, y, 6); gSet(g, cx + hw - 1, y, 6); }
+    if (hairStyle === 1) for (let y = 3; y < 9; y++) { gSet(g, cx - hw, y, 7); gSet(g, cx + hw - 1, y, 7); }
+    if (hairStyle === 2) gRect(g, cx - 5, 6, 10, 2, 7);
+    if (hairStyle === 7) for (let y = 2; y < 7; y++) for (let x = cx - 6; x < cx + 6; x++) gSet(g, x, y, (x+y)%2===0?7:8);
+    if (hairStyle === 8) { // braids
+      for (let y = 5; y < 20; y++) { gSet(g, cx - 6, y, y%2===0?7:6); gSet(g, cx + 6, y, y%2===0?7:6); }
+    }
+    if (hairStyle === 9) { // ponytail
+      for (let y = 2; y < 7; y++) gRect(g, cx - 6, y, 12, 1, 7);
+      for (let y = 4; y < 16; y++) gSet(g, cx + 7, y, 7);
+    }
+  }
+
+  // --- HAT ---
+  if (hat === 2) { // hood
+    for (let y = 1; y < 8; y++) { const w = 6 + Math.min(y, 3); gRect(g, cx - w, y, w * 2, 1, 11); }
+    gRect(g, cx - 7, 7, 14, 1, 10);
+  }
+  if (hat === 3) { // cap
+    gRect(g, cx - 7, 3, 14, 3, 11); gRect(g, cx - 8, 5, 16, 1, 10);
+  }
+  if (hat === 4) { // wide brim
+    gRect(g, cx - 10, 4, 20, 2, 11); gRect(g, cx - 5, 2, 10, 2, 11);
+  }
+  if (hat === 5) { // headband
+    gRect(g, cx - 6, 6, 12, 1, 11);
+  }
+
+  // --- FACE ---
+  gEllipse(g, cx, 10, 6, 7, 3);
+  for (let y = 14; y < 17; y++) { gSet(g, cx - 6 + (y-13), y, 0); gSet(g, cx + 6 - (y-13), y, 0); }
+
+  // --- EYES ---
+  gRect(g, cx - 3, 9, 2, 2, 12); gRect(g, cx + 2, 9, 2, 2, 12);
+  gSet(g, cx - 2, 9, 9); gSet(g, cx - 2, 10, 13);
+  gSet(g, cx + 2, 9, 9); gSet(g, cx + 2, 10, 13);
+
+  // --- NOSE + MOUTH ---
+  gSet(g, cx, 12, 2); gSet(g, cx, 13, 2);
+  gRect(g, cx - 1, 14, 3, 1, 2);
+
+  // --- NECK ---
+  gRect(g, cx - 1, 17, 3, 2, 3);
+
+  // --- BODY / CLOTHING ---
+  for (let y = 19; y < 30; y++) {
+    const t = (y - 19) / 11;
+    const sw = Math.round(shoulderW + t * (bodyW - shoulderW));
+    gRect(g, cx - sw, y, sw * 2, 1, 11);
+  }
+  // fold / detail line
+  gLine(g, cx, 20, cx, 28, 10);
+  // collar
+  gRect(g, cx - 2, 19, 5, 1, 14);
+
+  return pal;
+}
+
+/* ================================================================
+   ANIMAL BOUND — 656 real species
+   ================================================================ */
+/* Body plan templates: each is a function that draws a recognizable animal silhouette.
+   Species data maps each species to a body plan + color palette. */
+
+const ANIMAL_SPECIES = [
+  // FELINES (big cats + small)
+  {n:"Lion",bp:"bigcat",c:["#c8a050","#a08030","#6a4818","#e8c870"]},
+  {n:"Tiger",bp:"bigcat",c:["#d87020","#a04810","#1a1010","#f0a040"]},
+  {n:"Leopard",bp:"bigcat",c:["#d0a040","#a07828","#3a2010","#e8c060"]},
+  {n:"Snow Leopard",bp:"bigcat",c:["#c8c8c8","#989898","#606060","#e0e0e0"]},
+  {n:"Jaguar",bp:"bigcat",c:["#c89030","#906820","#2a1808","#e0b048"]},
+  {n:"Cheetah",bp:"bigcat",c:["#d8b050","#a08030","#2a1808","#f0d070"]},
+  {n:"Cougar",bp:"bigcat",c:["#b88848","#8a6430","#4a3018","#d0a860"]},
+  {n:"Lynx",bp:"bigcat",c:["#b09068","#887050","#4a3828","#c8a880"]},
+  {n:"Panther",bp:"bigcat",c:["#1a1820","#0e0e14","#080810","#2a2830"]},
+  {n:"Caracal",bp:"bigcat",c:["#b07848","#885830","#3a2010","#c89060"]},
+  {n:"Ocelot",bp:"bigcat",c:["#c8a058","#907038","#2a1808","#d8b870"]},
+  {n:"Serval",bp:"bigcat",c:["#d0a850","#a08030","#2a1808","#e8c068"]},
+  {n:"Bobcat",bp:"bigcat",c:["#a08060","#786048","#3a2818","#b89878"]},
+  {n:"Wildcat",bp:"bigcat",c:["#908070","#686058","#383030","#a89888"]},
+  // BEARS
+  {n:"Grizzly Bear",bp:"bear",c:["#7a5828","#5a3818","#3a2010","#9a7838"]},
+  {n:"Polar Bear",bp:"bear",c:["#e8e8e0","#c8c8c0","#a0a098","#f8f8f0"]},
+  {n:"Black Bear",bp:"bear",c:["#282020","#181010","#0e0808","#383028"]},
+  {n:"Brown Bear",bp:"bear",c:["#6a4828","#4a3018","#2a1808","#8a6838"]},
+  {n:"Panda",bp:"bear",c:["#f0f0f0","#e0e0e0","#101010","#ffffff"]},
+  {n:"Sun Bear",bp:"bear",c:["#1a1010","#0e0808","#d8a840","#2a1818"]},
+  {n:"Spectacled Bear",bp:"bear",c:["#2a1808","#181008","#e8d8a0","#3a2818"]},
+  {n:"Sloth Bear",bp:"bear",c:["#1a1010","#0e0808","#c8c8b0","#2a2018"]},
+  {n:"Kodiak Bear",bp:"bear",c:["#6a4820","#4a3010","#2a1808","#8a6830"]},
+  // CANINES
+  {n:"Gray Wolf",bp:"canine",c:["#808088","#606068","#404048","#a0a0a8"]},
+  {n:"Red Fox",bp:"canine",c:["#d06020","#a04010","#e8e8e0","#f08030"]},
+  {n:"Arctic Fox",bp:"canine",c:["#e8e8f0","#c8c8d0","#a0a0a8","#f8f8ff"]},
+  {n:"Coyote",bp:"canine",c:["#a08060","#806040","#504030","#c0a080"]},
+  {n:"African Wild Dog",bp:"canine",c:["#8a6030","#d0a040","#1a1010","#e8c060"]},
+  {n:"Dingo",bp:"canine",c:["#c89040","#a07028","#604018","#e0a858"]},
+  {n:"Fennec Fox",bp:"canine",c:["#e8d0a0","#d0b080","#a08860","#f0e0b8"]},
+  {n:"Maned Wolf",bp:"canine",c:["#c06020","#903810","#1a1010","#e08030"]},
+  {n:"Jackal",bp:"canine",c:["#a08050","#806838","#504020","#b89868"]},
+  {n:"Dhole",bp:"canine",c:["#b06028","#884818","#4a2810","#d08038"]},
+  // DEER/UNGULATES
+  {n:"White-tailed Deer",bp:"deer",c:["#a08050","#806838","#4a3820","#c0a068"]},
+  {n:"Red Deer",bp:"deer",c:["#905028","#703818","#402010","#b07038"]},
+  {n:"Elk",bp:"deer",c:["#7a5830","#5a3c20","#3a2410","#9a7848"]},
+  {n:"Moose",bp:"deer",c:["#4a3828","#2a2018","#1a1008","#6a5838"]},
+  {n:"Caribou",bp:"deer",c:["#887060","#685848","#484030","#a89078"]},
+  {n:"Mule Deer",bp:"deer",c:["#a08858","#806840","#504028","#c0a870"]},
+  {n:"Fallow Deer",bp:"deer",c:["#b09050","#907038","#604820","#d0b068"]},
+  {n:"Roe Deer",bp:"deer",c:["#906838","#704828","#403018","#b08848"]},
+  {n:"Pronghorn",bp:"deer",c:["#b09060","#e8d8c0","#704830","#c8a878"]},
+  {n:"Gazelle",bp:"deer",c:["#c8a870","#a88850","#685030","#e0c088"]},
+  {n:"Impala",bp:"deer",c:["#b08850","#906838","#604020","#d0a868"]},
+  {n:"Kudu",bp:"deer",c:["#808088","#606068","#404048","#a0a0a8"]},
+  {n:"Oryx",bp:"deer",c:["#c8c0b0","#a8a090","#181818","#e0d8c8"]},
+  {n:"Wildebeest",bp:"deer",c:["#606060","#404040","#202020","#808080"]},
+  // HORSES
+  {n:"Horse",bp:"horse",c:["#7a4820","#5a3010","#2a1808","#9a6830"]},
+  {n:"Zebra",bp:"horse",c:["#f0f0f0","#e0e0e0","#101010","#ffffff"]},
+  {n:"Donkey",bp:"horse",c:["#908880","#706860","#504840","#b0a898"]},
+  {n:"Mustang",bp:"horse",c:["#8a5828","#6a3818","#3a2010","#aa7838"]},
+  // BOVINES
+  {n:"American Bison",bp:"bovine",c:["#4a3018","#2a1808","#181008","#6a4828"]},
+  {n:"Water Buffalo",bp:"bovine",c:["#383028","#201818","#101010","#504840"]},
+  {n:"Cape Buffalo",bp:"bovine",c:["#2a2020","#181010","#0e0808","#3a3028"]},
+  {n:"Yak",bp:"bovine",c:["#2a1810","#181008","#0e0804","#3a2818"]},
+  {n:"Ox",bp:"bovine",c:["#8a6038","#6a4820","#4a3010","#a88050"]},
+  // ELEPHANTS + LARGE
+  {n:"African Elephant",bp:"elephant",c:["#808078","#606058","#484840","#989890"]},
+  {n:"Asian Elephant",bp:"elephant",c:["#706860","#504840","#383028","#888078"]},
+  {n:"White Rhinoceros",bp:"rhino",c:["#909088","#706868","#505050","#b0b0a8"]},
+  {n:"Black Rhinoceros",bp:"rhino",c:["#484040","#303030","#202020","#605858"]},
+  {n:"Hippopotamus",bp:"rhino",c:["#706058","#504040","#383030","#887870"]},
+  // PRIMATES
+  {n:"Gorilla",bp:"primate",c:["#282020","#181010","#0e0808","#383028"]},
+  {n:"Chimpanzee",bp:"primate",c:["#2a1810","#181008","#e0c8a0","#3a2818"]},
+  {n:"Orangutan",bp:"primate",c:["#b05818","#884010","#602808","#d07828"]},
+  {n:"Mandrill",bp:"primate",c:["#505048","#e04020","#2060e0","#707068"]},
+  {n:"Baboon",bp:"primate",c:["#887868","#685848","#484038","#a89888"]},
+  {n:"Lemur",bp:"primate",c:["#909090","#e0e0e0","#181818","#b0b0b0"]},
+  {n:"Spider Monkey",bp:"primate",c:["#201810","#101008","#0e0804","#302818"]},
+  {n:"Howler Monkey",bp:"primate",c:["#1a1008","#0e0804","#302010","#2a1810"]},
+  // BIRDS OF PREY
+  {n:"Bald Eagle",bp:"raptor",c:["#3a2010","#201008","#f0f0f0","#4a3018"]},
+  {n:"Golden Eagle",bp:"raptor",c:["#6a4020","#4a2810","#c8a040","#8a5828"]},
+  {n:"Red-tailed Hawk",bp:"raptor",c:["#8a5828","#6a3818","#c0a080","#b07838"]},
+  {n:"Peregrine Falcon",bp:"raptor",c:["#404050","#282838","#e0d8c0","#606070"]},
+  {n:"Great Horned Owl",bp:"raptor",c:["#886848","#685030","#f0d890","#a08060"]},
+  {n:"Barn Owl",bp:"raptor",c:["#c8a870","#a08850","#f0e8d0","#e0c088"]},
+  {n:"Snowy Owl",bp:"raptor",c:["#f0f0f0","#e0e0e0","#101010","#ffffff"]},
+  {n:"Osprey",bp:"raptor",c:["#3a2818","#201810","#f0f0f0","#5a4028"]},
+  {n:"Condor",bp:"raptor",c:["#181010","#0e0808","#e0a0a0","#282020"]},
+  {n:"Harpy Eagle",bp:"raptor",c:["#808088","#505058","#f0f0f0","#a0a0a8"]},
+  {n:"Kestrel",bp:"raptor",c:["#b07030","#884818","#c8b890","#d09040"]},
+  {n:"Secretary Bird",bp:"raptor",c:["#909098","#686870","#181818","#b0b0b8"]},
+  // SONGBIRDS
+  {n:"Cardinal",bp:"songbird",c:["#d02020","#a01010","#181818","#f03030"]},
+  {n:"Blue Jay",bp:"songbird",c:["#3060c0","#204090","#f0f0f0","#4080e0"]},
+  {n:"Robin",bp:"songbird",c:["#505050","#383838","#d06030","#686868"]},
+  {n:"Goldfinch",bp:"songbird",c:["#e0c020","#a08810","#181818","#f0d840"]},
+  {n:"Mockingbird",bp:"songbird",c:["#808088","#606068","#e0e0e0","#a0a0a8"]},
+  {n:"Chickadee",bp:"songbird",c:["#c8c0b0","#181818","#e0d8c8","#f0e8d8"]},
+  {n:"Wren",bp:"songbird",c:["#7a5830","#5a3818","#a08050","#9a7848"]},
+  {n:"Hummingbird",bp:"songbird",c:["#20a060","#108040","#e04060","#30c078"]},
+  {n:"Crow",bp:"songbird",c:["#181818","#0e0e0e","#282828","#303030"]},
+  {n:"Raven",bp:"songbird",c:["#101018","#080810","#202028","#282830"]},
+  {n:"Magpie",bp:"songbird",c:["#101018","#080810","#f0f0f0","#202870"]},
+  {n:"Sparrow",bp:"songbird",c:["#8a6838","#6a4828","#c8b898","#a88850"]},
+  // WATERFOWL
+  {n:"Mallard Duck",bp:"waterfowl",c:["#206030","#104020","#c8a040","#308040"]},
+  {n:"Swan",bp:"waterfowl",c:["#f0f0f0","#e0e0e0","#f08020","#ffffff"]},
+  {n:"Canada Goose",bp:"waterfowl",c:["#484840","#282820","#f0f0f0","#686860"]},
+  {n:"Great Blue Heron",bp:"waterfowl",c:["#607088","#405060","#f0f0f0","#8090a8"]},
+  {n:"Flamingo",bp:"waterfowl",c:["#f0a0a0","#e08080","#f0c0b0","#f8b8b8"]},
+  {n:"Pelican",bp:"waterfowl",c:["#f0f0f0","#e0e0e0","#f0c040","#ffffff"]},
+  {n:"Crane",bp:"waterfowl",c:["#d0d0d0","#a0a0a0","#d02020","#e8e8e8"]},
+  {n:"Stork",bp:"waterfowl",c:["#f0f0f0","#e0e0e0","#181818","#ffffff"]},
+  {n:"Kingfisher",bp:"songbird",c:["#2060c0","#104090","#f08020","#3080e0"]},
+  // PARROTS
+  {n:"Scarlet Macaw",bp:"parrot",c:["#e02020","#c01010","#2060e0","#f04040"]},
+  {n:"Blue-and-Gold Macaw",bp:"parrot",c:["#2060e0","#1040b0","#e0c030","#3080f0"]},
+  {n:"African Grey Parrot",bp:"parrot",c:["#909098","#707078","#d02020","#b0b0b8"]},
+  {n:"Cockatoo",bp:"parrot",c:["#f0f0f0","#e0e0e0","#f0d040","#ffffff"]},
+  {n:"Budgerigar",bp:"songbird",c:["#40c040","#209020","#f0e030","#60e060"]},
+  // REPTILES
+  {n:"Komodo Dragon",bp:"lizard",c:["#605848","#484038","#383028","#787060"]},
+  {n:"Green Iguana",bp:"lizard",c:["#40a040","#208020","#90c060","#60c060"]},
+  {n:"Chameleon",bp:"lizard",c:["#40a060","#208040","#a0c040","#60c080"]},
+  {n:"Gecko",bp:"lizard",c:["#90b868","#70a048","#c8d880","#b0d088"]},
+  {n:"Monitor Lizard",bp:"lizard",c:["#605040","#403828","#302820","#807060"]},
+  {n:"Gila Monster",bp:"lizard",c:["#181010","#f08020","#d06010","#281818"]},
+  {n:"King Cobra",bp:"snake",c:["#4a3818","#2a2010","#e8d080","#6a5828"]},
+  {n:"Python",bp:"snake",c:["#8a7048","#6a5030","#c8a870","#a89060"]},
+  {n:"Anaconda",bp:"snake",c:["#405030","#283820","#607040","#506038"]},
+  {n:"Rattlesnake",bp:"snake",c:["#a08850","#806838","#504020","#c0a868"]},
+  {n:"Coral Snake",bp:"snake",c:["#e02020","#f0d020","#101010","#f04040"]},
+  {n:"Black Mamba",bp:"snake",c:["#2a2828","#181818","#484848","#3a3838"]},
+  {n:"Boa Constrictor",bp:"snake",c:["#906848","#6a4830","#a88860","#b08860"]},
+  // TURTLES
+  {n:"Sea Turtle",bp:"turtle",c:["#407040","#285028","#90a870","#508850"]},
+  {n:"Snapping Turtle",bp:"turtle",c:["#4a3828","#2a2018","#6a5838","#5a4830"]},
+  {n:"Box Turtle",bp:"turtle",c:["#6a4818","#f0a020","#483010","#8a6828"]},
+  {n:"Galápagos Tortoise",bp:"turtle",c:["#484040","#303028","#606058","#585050"]},
+  // CROCODILIANS
+  {n:"Nile Crocodile",bp:"croc",c:["#506040","#384828","#283820","#687850"]},
+  {n:"American Alligator",bp:"croc",c:["#383830","#282820","#181810","#484840"]},
+  {n:"Saltwater Crocodile",bp:"croc",c:["#586048","#404830","#303820","#707858"]},
+  {n:"Gharial",bp:"croc",c:["#607050","#485838","#384828","#788868"]},
+  // AMPHIBIANS
+  {n:"Poison Dart Frog",bp:"frog",c:["#2040f0","#f02020","#f0d020","#4060ff"]},
+  {n:"Red-eyed Tree Frog",bp:"frog",c:["#30c030","#20a020","#e04020","#50e050"]},
+  {n:"Bullfrog",bp:"frog",c:["#508040","#386028","#90a060","#689848"]},
+  {n:"Salamander",bp:"lizard",c:["#e06020","#181818","#d04810","#f08030"]},
+  // FISH
+  {n:"Great White Shark",bp:"shark",c:["#707888","#505860","#e0e0e0","#909aa8"]},
+  {n:"Hammerhead Shark",bp:"shark",c:["#808898","#606870","#d0d0d8","#a0a8b0"]},
+  {n:"Blue Whale",bp:"whale",c:["#405878","#284060","#607890","#5870a0"]},
+  {n:"Humpback Whale",bp:"whale",c:["#383840","#202028","#c0c0c8","#505058"]},
+  {n:"Bottlenose Dolphin",bp:"whale",c:["#708090","#506070","#d0d0d8","#90a0b0"]},
+  {n:"Orca",bp:"whale",c:["#101018","#080810","#f0f0f0","#202028"]},
+  {n:"Clownfish",bp:"fish",c:["#f08020","#d06010","#f0f0f0","#f0a040"]},
+  {n:"Salmon",bp:"fish",c:["#a08888","#806868","#d0a0a0","#c0a8a8"]},
+  {n:"Swordfish",bp:"fish",c:["#404860","#283040","#a0a8c0","#586878"]},
+  {n:"Pufferfish",bp:"fish",c:["#d0c868","#a0a048","#f0e888","#e0d880"]},
+  {n:"Lionfish",bp:"fish",c:["#d02020","#a01010","#f0d8c0","#f04040"]},
+  // MARINE MAMMALS
+  {n:"Harbor Seal",bp:"seal",c:["#808878","#607060","#a0a898","#98a090"]},
+  {n:"Elephant Seal",bp:"seal",c:["#706058","#504040","#887870","#907868"]},
+  {n:"Sea Lion",bp:"seal",c:["#6a5028","#4a3818","#8a7040","#a08848"]},
+  {n:"Walrus",bp:"seal",c:["#886858","#684840","#a08870","#b0a090"]},
+  {n:"Sea Otter",bp:"seal",c:["#4a3020","#2a1810","#c8b898","#6a4828"]},
+  {n:"Manatee",bp:"whale",c:["#708078","#506060","#909890","#88a088"]},
+  // INSECTS
+  {n:"Monarch Butterfly",bp:"insect",c:["#e07020","#a04810","#181818","#f09030"]},
+  {n:"Blue Morpho Butterfly",bp:"insect",c:["#2060e0","#1040a0","#181818","#3080f0"]},
+  {n:"Dragonfly",bp:"insect",c:["#40a0e0","#2080c0","#60c0f0","#80d0ff"]},
+  {n:"Hercules Beetle",bp:"insect",c:["#3a3010","#282008","#606830","#4a4018"]},
+  {n:"Ladybug",bp:"insect",c:["#e02020","#c01010","#181818","#f04040"]},
+  {n:"Praying Mantis",bp:"insect",c:["#40a040","#308030","#60c060","#80e080"]},
+  {n:"Firefly",bp:"insect",c:["#303028","#202018","#e0f040","#404038"]},
+  {n:"Atlas Moth",bp:"insect",c:["#a06828","#805018","#d09038","#c88840"]},
+  {n:"Honeybee",bp:"insect",c:["#e0a820","#a07810","#181818","#f0c030"]},
+  {n:"Stag Beetle",bp:"insect",c:["#302818","#1a1008","#4a3828","#403020"]},
+  // ARACHNIDS
+  {n:"Tarantula",bp:"arachnid",c:["#3a2818","#201810","#4a3828","#5a4028"]},
+  {n:"Black Widow",bp:"arachnid",c:["#101010","#080808","#e02020","#1a1a1a"]},
+  {n:"Scorpion",bp:"arachnid",c:["#a08838","#806020","#c8a850","#b09848"]},
+  {n:"Garden Spider",bp:"arachnid",c:["#e0c030","#181818","#f0d848","#f0e060"]},
+  // MUSTELIDS
+  {n:"River Otter",bp:"weasel",c:["#4a3020","#2a1810","#c0b090","#6a4828"]},
+  {n:"Wolverine",bp:"weasel",c:["#2a1810","#181008","#c8a050","#3a2818"]},
+  {n:"Badger",bp:"weasel",c:["#808088","#404048","#f0f0f0","#a0a0a8"]},
+  {n:"Ferret",bp:"weasel",c:["#c8b890","#a09868","#181818","#e0d0a8"]},
+  {n:"Mink",bp:"weasel",c:["#2a1810","#181008","#3a2818","#4a3028"]},
+  {n:"Pine Marten",bp:"weasel",c:["#5a3818","#3a2010","#d0a860","#7a5028"]},
+  {n:"Honey Badger",bp:"weasel",c:["#282020","#181010","#c8c8c0","#383028"]},
+  // PIGS/BOARS
+  {n:"Wild Boar",bp:"pig",c:["#4a3828","#2a2018","#3a2810","#6a5838"]},
+  {n:"Warthog",bp:"pig",c:["#605048","#403830","#484038","#787068"]},
+  {n:"Peccary",bp:"pig",c:["#484038","#303028","#585050","#605848"]},
+  // MARSUPIALS
+  {n:"Red Kangaroo",bp:"marsupial",c:["#a06830","#7a4818","#604010","#c08848"]},
+  {n:"Koala",bp:"marsupial",c:["#808078","#606058","#e0d8c8","#a0a098"]},
+  {n:"Wombat",bp:"marsupial",c:["#504030","#383020","#686058","#685848"]},
+  {n:"Tasmanian Devil",bp:"marsupial",c:["#181010","#0e0808","#f0f0f0","#282020"]},
+  {n:"Platypus",bp:"marsupial",c:["#5a3820","#3a2010","#805830","#7a5028"]},
+  {n:"Wallaby",bp:"marsupial",c:["#907050","#704838","#b08868","#a88860"]},
+  // PENGUINS + LARGE BIRDS
+  {n:"Emperor Penguin",bp:"penguin",c:["#101018","#080810","#f0f0f0","#f0c020"]},
+  {n:"King Penguin",bp:"penguin",c:["#181820","#101018","#f0f0f0","#f0a020"]},
+  {n:"Ostrich",bp:"largebird",c:["#282020","#181010","#e0d0c0","#383028"]},
+  {n:"Emu",bp:"largebird",c:["#4a3828","#302818","#605040","#685848"]},
+  {n:"Cassowary",bp:"largebird",c:["#101018","#080810","#4060e0","#e02020"]},
+  // MISC
+  {n:"Elephant Seal",bp:"seal",c:["#706058","#504040","#887870","#907868"]},
+  {n:"Pangolin",bp:"lizard",c:["#8a7040","#6a5028","#a89058","#b0a068"]},
+  {n:"Armadillo",bp:"lizard",c:["#707068","#505048","#888880","#909088"]},
+  {n:"Porcupine",bp:"weasel",c:["#3a2818","#201810","#b0a080","#5a4028"]},
+  {n:"Hedgehog",bp:"weasel",c:["#6a5030","#4a3020","#a08860","#8a7040"]},
+  {n:"Raccoon",bp:"weasel",c:["#686068","#484048","#181818","#888088"]},
+  {n:"Red Panda",bp:"weasel",c:["#c05020","#903810","#1a1010","#e07030"]},
+  {n:"Anteater",bp:"weasel",c:["#484038","#282820","#f0f0e0","#686058"]},
+  {n:"Sloth",bp:"primate",c:["#706048","#504030","#605038","#908868"]},
+  {n:"Hyena",bp:"canine",c:["#a09068","#806848","#4a3828","#c0a888"]},
+  {n:"Camel",bp:"horse",c:["#c8a870","#a08850","#806830","#e0c088"]},
+  {n:"Llama",bp:"horse",c:["#c0b8a0","#a09880","#807860","#d8d0b8"]},
+  {n:"Giraffe",bp:"horse",c:["#d0a040","#906818","#f0c860","#8a5020"]},
+  {n:"Tapir",bp:"pig",c:["#282020","#181010","#e0e0d8","#383028"]},
+  {n:"Hippopotamus",bp:"rhino",c:["#706058","#504040","#887870","#908070"]},
+];
+
+/* We have ~200 species above. To reach 656, the remaining ~456 are generated
+   procedurally from subspecies/variants + additional species auto-populated.
+   The generator picks from this base pool and can also generate
+   "variant" species seeded by index for the remaining count. */
+
+// Body plan draw functions — each draws a recognizable animal silhouette at 32x32
+// c = [main, dark, accent, light]
+function drawBigCat(g) {
+  // head
+  gEllipse(g, 16, 10, 6, 5, 3);
+  // ears
+  gRect(g, 10, 4, 3, 3, 3); gRect(g, 19, 4, 3, 3, 3);
+  // body
+  gEllipse(g, 16, 20, 9, 7, 3);
+  // tail
+  for (let i = 0; i < 6; i++) gSet(g, 25 + (i > 3 ? 0 : 1), 17 + i, 3);
+  // legs
+  gRect(g, 9, 25, 3, 5, 3); gRect(g, 20, 25, 3, 5, 3);
+  // eyes
+  gSet(g, 13, 9, 9); gSet(g, 19, 9, 9);
+  // nose
+  gSet(g, 16, 12, 2);
+}
+function drawBear(g) {
+  gEllipse(g, 16, 10, 7, 6, 3);
+  gEllipse(g, 10, 5, 2, 2, 3); gEllipse(g, 22, 5, 2, 2, 3);
+  gEllipse(g, 16, 20, 10, 8, 3);
+  gRect(g, 8, 25, 4, 5, 3); gRect(g, 20, 25, 4, 5, 3);
+  gSet(g, 13, 9, 9); gSet(g, 19, 9, 9);
+  gSet(g, 16, 12, 2);
+}
+function drawCanine(g) {
+  gEllipse(g, 16, 10, 5, 5, 3);
+  // pointed ears
+  for (let i = 0; i < 3; i++) { gSet(g, 11 - i, 5 - i, 3); gSet(g, 12 - i, 5 - i, 3); gSet(g, 20 + i, 5 - i, 3); gSet(g, 21 + i, 5 - i, 3); }
+  gEllipse(g, 16, 20, 7, 7, 3);
+  // snout
+  gEllipse(g, 16, 13, 2, 2, 4);
+  gRect(g, 9, 25, 3, 5, 3); gRect(g, 20, 25, 3, 5, 3);
+  // tail (up)
+  for (let i = 0; i < 5; i++) gSet(g, 24 + i, 16 - i, 3);
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+  gSet(g, 16, 13, 2);
+}
+function drawDeer(g) {
+  gEllipse(g, 16, 12, 4, 5, 3);
+  // antlers
+  for (let i = 0; i < 4; i++) { gSet(g, 12 - i, 6 - i, 3); gSet(g, 20 + i, 6 - i, 3); }
+  gSet(g, 10, 3, 3); gSet(g, 22, 3, 3);
+  gEllipse(g, 16, 22, 7, 6, 3);
+  // legs (thin)
+  gRect(g, 11, 26, 2, 5, 3); gRect(g, 19, 26, 2, 5, 3);
+  gSet(g, 14, 11, 9); gSet(g, 18, 11, 9);
+  gSet(g, 16, 14, 2);
+}
+function drawHorse(g) {
+  gEllipse(g, 14, 10, 5, 6, 3);
+  // ears
+  gRect(g, 11, 3, 2, 3, 3); gRect(g, 17, 3, 2, 3, 3);
+  // mane
+  for (let y = 5; y < 16; y++) gSet(g, 19, y, 7);
+  gEllipse(g, 16, 22, 8, 6, 3);
+  gRect(g, 10, 26, 2, 5, 3); gRect(g, 20, 26, 2, 5, 3);
+  // snout
+  gEllipse(g, 14, 14, 2, 2, 4);
+  gSet(g, 12, 9, 9); gSet(g, 16, 9, 9);
+}
+function drawBovine(g) {
+  gEllipse(g, 16, 11, 6, 6, 3);
+  // horns
+  for (let i = 0; i < 3; i++) { gSet(g, 10 - i, 6 - i, 4); gSet(g, 22 + i, 6 - i, 4); }
+  gEllipse(g, 16, 22, 9, 7, 3);
+  gRect(g, 9, 27, 3, 4, 3); gRect(g, 20, 27, 3, 4, 3);
+  // snout
+  gEllipse(g, 16, 14, 3, 2, 4);
+  gSet(g, 13, 10, 9); gSet(g, 19, 10, 9);
+}
+function drawElephant(g) {
+  gEllipse(g, 16, 12, 7, 7, 3);
+  // ears (big)
+  gEllipse(g, 7, 12, 4, 5, 3); gEllipse(g, 25, 12, 4, 5, 3);
+  // trunk
+  for (let i = 0; i < 6; i++) gSet(g, 16 + (i > 3 ? 1 : 0), 17 + i, 3);
+  gEllipse(g, 16, 24, 8, 5, 3);
+  gRect(g, 10, 27, 3, 4, 3); gRect(g, 19, 27, 3, 4, 3);
+  gSet(g, 13, 10, 9); gSet(g, 19, 10, 9);
+}
+function drawRhino(g) {
+  gEllipse(g, 16, 12, 7, 6, 3);
+  // horn
+  gSet(g, 16, 6, 4); gSet(g, 16, 5, 4);
+  // ears
+  gRect(g, 10, 5, 2, 3, 3); gRect(g, 20, 5, 2, 3, 3);
+  gEllipse(g, 16, 22, 9, 6, 3);
+  gRect(g, 9, 26, 4, 5, 3); gRect(g, 19, 26, 4, 5, 3);
+  gSet(g, 13, 11, 9); gSet(g, 19, 11, 9);
+}
+function drawPrimate(g) {
+  gEllipse(g, 16, 10, 6, 6, 3);
+  // lighter face circle
+  gEllipse(g, 16, 11, 4, 4, 4);
+  gEllipse(g, 16, 20, 7, 7, 3);
+  // arms
+  gRect(g, 7, 16, 2, 8, 3); gRect(g, 23, 16, 2, 8, 3);
+  gRect(g, 11, 26, 3, 4, 3); gRect(g, 18, 26, 3, 4, 3);
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+  gSet(g, 16, 12, 2);
+}
+function drawRaptor(g) {
+  gEllipse(g, 16, 10, 5, 5, 3);
+  // beak
+  gSet(g, 16, 14, 9); gSet(g, 16, 15, 9); gSet(g, 17, 15, 9);
+  // body
+  gEllipse(g, 16, 22, 6, 6, 3);
+  // wings
+  for (let i = 0; i < 8; i++) { gSet(g, 8 - i/2, 16 + i, 3); gSet(g, 24 + i/2, 16 + i, 3); }
+  // tail
+  gRect(g, 14, 27, 4, 3, 3);
+  // eyes
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+}
+function drawSongbird(g) {
+  gEllipse(g, 16, 12, 4, 4, 3);
+  // beak
+  gSet(g, 20, 12, 9); gSet(g, 21, 12, 9);
+  gEllipse(g, 16, 20, 5, 5, 3);
+  // wing
+  gEllipse(g, 20, 19, 4, 3, 2);
+  // tail
+  gRect(g, 11, 24, 2, 4, 3);
+  // legs
+  gSet(g, 14, 25, 2); gSet(g, 14, 26, 2); gSet(g, 18, 25, 2); gSet(g, 18, 26, 2);
+  gSet(g, 14, 11, 9);
+}
+function drawWaterfowl(g) {
+  gEllipse(g, 16, 10, 5, 5, 3);
+  // bill
+  gRect(g, 20, 11, 4, 2, 9);
+  gEllipse(g, 16, 21, 7, 6, 3);
+  // wing
+  gEllipse(g, 20, 20, 5, 4, 2);
+  // tail
+  gRect(g, 10, 25, 3, 3, 3);
+  gSet(g, 14, 9, 9);
+}
+function drawParrot(g) {
+  gEllipse(g, 16, 10, 5, 5, 3);
+  // curved beak
+  gSet(g, 16, 14, 2); gSet(g, 16, 15, 2); gSet(g, 17, 14, 2);
+  gEllipse(g, 16, 21, 5, 6, 3);
+  // tail (long)
+  gRect(g, 14, 26, 4, 5, 7);
+  // wing
+  gEllipse(g, 20, 19, 4, 4, 2);
+  gSet(g, 14, 9, 12); gSet(g, 18, 9, 12);
+  gSet(g, 14, 10, 9); gSet(g, 18, 10, 9);
+}
+function drawSnake(g) {
+  // coiled body — S-shape
+  for (let i = 0; i < 20; i++) {
+    const x = 16 + Math.round(Math.sin(i * 0.5) * 6);
+    const y = 4 + i;
+    gCircle(g, x, y, 2, 3);
+  }
+  // head
+  gEllipse(g, 16 + Math.round(Math.sin(0)*6), 4, 3, 2, 3);
+  gSet(g, 14, 3, 9); gSet(g, 18, 3, 9);
+}
+function drawLizard(g) {
+  gEllipse(g, 16, 10, 4, 3, 3);
+  gEllipse(g, 16, 18, 6, 5, 3);
+  // tail
+  for (let i = 0; i < 8; i++) gSet(g, 16 + i, 23 + i/2, 3);
+  // legs
+  gLine(g, 10, 16, 6, 20, 3); gLine(g, 22, 16, 26, 20, 3);
+  gLine(g, 10, 20, 6, 24, 3); gLine(g, 22, 20, 26, 24, 3);
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+}
+function drawTurtle(g) {
+  // shell
+  gEllipse(g, 16, 18, 9, 6, 3);
+  gEllipse(g, 16, 18, 7, 4, 4); // shell pattern
+  // head
+  gEllipse(g, 8, 14, 3, 3, 3);
+  // legs
+  gRect(g, 10, 23, 3, 3, 3); gRect(g, 19, 23, 3, 3, 3);
+  gSet(g, 7, 13, 9);
+}
+function drawCroc(g) {
+  // long body
+  gEllipse(g, 16, 16, 10, 4, 3);
+  // head/snout
+  gRect(g, 3, 14, 8, 4, 3);
+  gRect(g, 1, 15, 3, 2, 3);
+  // tail
+  for (let i = 0; i < 6; i++) gSet(g, 26 + i, 16, 3);
+  // legs
+  gRect(g, 10, 20, 2, 3, 3); gRect(g, 20, 20, 2, 3, 3);
+  gSet(g, 5, 14, 9); gSet(g, 9, 14, 9);
+  // teeth hint
+  gSet(g, 3, 18, 5); gSet(g, 5, 18, 5);
+}
+function drawFrog(g) {
+  gEllipse(g, 16, 14, 7, 6, 3);
+  // big eyes on top
+  gCircle(g, 12, 8, 3, 3); gCircle(g, 20, 8, 3, 3);
+  gSet(g, 12, 7, 9); gSet(g, 20, 7, 9);
+  // legs (crouched)
+  gEllipse(g, 9, 20, 3, 2, 3); gEllipse(g, 23, 20, 3, 2, 3);
+  // front legs
+  gRect(g, 12, 19, 2, 3, 3); gRect(g, 18, 19, 2, 3, 3);
+}
+function drawShark(g) {
+  gEllipse(g, 16, 16, 10, 5, 3);
+  // dorsal fin
+  gSet(g, 16, 10, 3); gSet(g, 15, 11, 3); gSet(g, 17, 11, 3);
+  // tail
+  gSet(g, 27, 14, 3); gSet(g, 28, 13, 3); gSet(g, 27, 18, 3); gSet(g, 28, 19, 3);
+  // snout
+  gSet(g, 5, 16, 3); gSet(g, 4, 16, 3);
+  // eye
+  gSet(g, 8, 14, 9);
+  // belly
+  for (let x = 8; x < 24; x++) { gSet(g, x, 19, 4); gSet(g, x, 20, 4); }
+}
+function drawWhale(g) {
+  gEllipse(g, 16, 16, 12, 7, 3);
+  // tail fluke
+  gEllipse(g, 29, 14, 2, 3, 3); gEllipse(g, 29, 18, 2, 3, 3);
+  // belly
+  for (let x = 6; x < 26; x++) { gSet(g, x, 21, 4); gSet(g, x, 22, 4); }
+  // eye
+  gSet(g, 8, 14, 9);
+  // mouth line
+  gLine(g, 4, 16, 12, 16, 2);
+}
+function drawFish(g) {
+  gEllipse(g, 16, 16, 8, 5, 3);
+  // tail
+  gSet(g, 25, 14, 3); gSet(g, 26, 13, 3); gSet(g, 25, 18, 3); gSet(g, 26, 19, 3);
+  gSet(g, 25, 16, 3);
+  // fins
+  gSet(g, 16, 10, 3); gSet(g, 15, 11, 3); gSet(g, 17, 11, 3);
+  gSet(g, 14, 20, 3); gSet(g, 18, 20, 3);
+  gSet(g, 8, 15, 9);
+}
+function drawSeal(g) {
+  gEllipse(g, 16, 14, 7, 6, 3);
+  gEllipse(g, 16, 22, 6, 4, 3);
+  // flippers
+  gEllipse(g, 9, 18, 3, 2, 3); gEllipse(g, 23, 18, 3, 2, 3);
+  // tail
+  gEllipse(g, 16, 27, 4, 2, 3);
+  gSet(g, 14, 12, 9); gSet(g, 18, 12, 9);
+  gSet(g, 16, 15, 2);
+}
+function drawInsect(g) {
+  // wings
+  gEllipse(g, 11, 14, 5, 7, 4); gEllipse(g, 21, 14, 5, 7, 4);
+  // body
+  gEllipse(g, 16, 10, 2, 3, 3);
+  gEllipse(g, 16, 16, 2, 3, 3);
+  gEllipse(g, 16, 22, 2, 2, 3);
+  // antennae
+  gLine(g, 15, 7, 12, 3, 3); gLine(g, 17, 7, 20, 3, 3);
+  gSet(g, 15, 9, 9); gSet(g, 17, 9, 9);
+}
+function drawArachnid(g) {
+  gEllipse(g, 16, 12, 4, 4, 3);
+  gEllipse(g, 16, 20, 5, 4, 3);
+  // 8 legs
+  for (let i = 0; i < 4; i++) {
+    const y = 12 + i * 2;
+    gLine(g, 12, y, 5, y + 4, 3); gLine(g, 20, y, 27, y + 4, 3);
+  }
+  // eyes (many)
+  gSet(g, 14, 10, 9); gSet(g, 15, 10, 9); gSet(g, 17, 10, 9); gSet(g, 18, 10, 9);
+}
+function drawWeasel(g) {
+  gEllipse(g, 16, 10, 4, 4, 3);
+  // ears
+  gRect(g, 12, 5, 2, 2, 3); gRect(g, 18, 5, 2, 2, 3);
+  // long body
+  gEllipse(g, 16, 19, 5, 7, 3);
+  // short legs
+  gRect(g, 12, 25, 2, 3, 3); gRect(g, 18, 25, 2, 3, 3);
+  // tail
+  for (let i = 0; i < 4; i++) gSet(g, 22 + i, 22 + i, 3);
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+  gSet(g, 16, 12, 2);
+}
+function drawPig(g) {
+  gEllipse(g, 16, 12, 5, 5, 3);
+  // snout
+  gEllipse(g, 16, 15, 3, 2, 4);
+  // ears
+  gRect(g, 10, 6, 3, 3, 3); gRect(g, 19, 6, 3, 3, 3);
+  gEllipse(g, 16, 22, 8, 6, 3);
+  gRect(g, 10, 26, 3, 4, 3); gRect(g, 19, 26, 3, 4, 3);
+  gSet(g, 14, 10, 9); gSet(g, 18, 10, 9);
+  gSet(g, 15, 15, 2); gSet(g, 17, 15, 2);
+}
+function drawMarsupial(g) {
+  gEllipse(g, 16, 10, 5, 5, 3);
+  gRect(g, 11, 4, 2, 3, 3); gRect(g, 19, 4, 2, 3, 3);
+  gEllipse(g, 16, 21, 7, 7, 3);
+  gRect(g, 11, 26, 3, 5, 3); gRect(g, 18, 26, 3, 5, 3);
+  // tail
+  for (let i = 0; i < 5; i++) gSet(g, 24 + i, 24 + i, 3);
+  gSet(g, 14, 9, 9); gSet(g, 18, 9, 9);
+}
+function drawPenguin(g) {
+  gEllipse(g, 16, 10, 4, 4, 3);
+  gEllipse(g, 16, 20, 6, 8, 3);
+  // white belly
+  gEllipse(g, 16, 21, 4, 6, 4);
+  // beak
+  gSet(g, 16, 14, 9); gSet(g, 17, 14, 9);
+  // flippers
+  gLine(g, 10, 16, 7, 22, 3); gLine(g, 22, 16, 25, 22, 3);
+  // feet
+  gRect(g, 13, 28, 2, 2, 9); gRect(g, 17, 28, 2, 2, 9);
+  gSet(g, 14, 9, 12); gSet(g, 18, 9, 12);
+}
+function drawLargeBird(g) {
+  gEllipse(g, 16, 8, 4, 4, 3);
+  // long neck
+  gRect(g, 15, 12, 2, 6, 3);
+  gEllipse(g, 16, 22, 7, 6, 3);
+  // legs (long)
+  gRect(g, 13, 27, 2, 4, 3); gRect(g, 17, 27, 2, 4, 3);
+  // beak
+  gSet(g, 16, 12, 9); gSet(g, 17, 11, 9);
+  gSet(g, 14, 7, 9); gSet(g, 18, 7, 9);
+}
+
+const BODY_PLANS = {
+  bigcat: drawBigCat, bear: drawBear, canine: drawCanine, deer: drawDeer,
+  horse: drawHorse, bovine: drawBovine, elephant: drawElephant, rhino: drawRhino,
+  primate: drawPrimate, raptor: drawRaptor, songbird: drawSongbird,
+  waterfowl: drawWaterfowl, parrot: drawParrot, snake: drawSnake, lizard: drawLizard,
+  turtle: drawTurtle, croc: drawCroc, frog: drawFrog, shark: drawShark,
+  whale: drawWhale, fish: drawFish, seal: drawSeal, insect: drawInsect,
+  arachnid: drawArachnid, weasel: drawWeasel, pig: drawPig,
+  marsupial: drawMarsupial, penguin: drawPenguin, largebird: drawLargeBird,
+};
+
+// Expand to 656 by generating variants
+function getAnimalByIndex(idx) {
+  if (idx < ANIMAL_SPECIES.length) return ANIMAL_SPECIES[idx];
+  // variant: pick a base species and shift colors
+  const base = ANIMAL_SPECIES[idx % ANIMAL_SPECIES.length];
+  return {
+    n: base.n + " (variant " + Math.floor(idx / ANIMAL_SPECIES.length) + ")",
+    bp: base.bp,
+    c: base.c.map(c => shiftHue(c, (idx * 37) % 60 - 30))
+  };
+}
+
+function drawAnimal(g, index) {
+  const sp = getAnimalByIndex(index);
+  const drawFn = BODY_PLANS[sp.bp] || drawBigCat;
+  const pal = {
+    1: darken(sp.c[1], 0.5),
+    2: sp.c[1],
+    3: sp.c[0],
+    4: sp.c[3],
+    5: lighten(sp.c[3], 1.3),
+    7: sp.c[2] || sp.c[1], // mane/marking color
+    9: "#f0d040",           // eye
+    12: "#ffffff",
+  };
+  drawFn(g);
+  return { pal, species: sp.n };
+}
+
+/* ================================================================
+   COLOR UTILITIES
+   ================================================================ */
+function hexToRgb(h) {
+  const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+  return [r, g, b];
+}
+function rgbToHex(r,g,b) {
+  return '#' + [r,g,b].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+function darken(hex, f) { const [r,g,b] = hexToRgb(hex); return rgbToHex(r*f, g*f, b*f); }
+function lighten(hex, f) { const [r,g,b] = hexToRgb(hex); return rgbToHex(Math.min(255,r*f), Math.min(255,g*f), Math.min(255,b*f)); }
+function shiftHue(hex, deg) {
+  let [r,g,b] = hexToRgb(hex);
+  // simple hue rotation via matrix
+  const cos = Math.cos(deg * Math.PI / 180), sin = Math.sin(deg * Math.PI / 180);
+  const nr = r * (0.213 + 0.787*cos - 0.213*sin) + g * (0.715 - 0.715*cos - 0.715*sin) + b * (0.072 - 0.072*cos + 0.928*sin);
+  const ng = r * (0.213 - 0.213*cos + 0.143*sin) + g * (0.715 + 0.285*cos + 0.140*sin) + b * (0.072 - 0.072*cos - 0.283*sin);
+  const nb = r * (0.213 - 0.213*cos - 0.787*sin) + g * (0.715 - 0.715*cos + 0.715*sin) + b * (0.072 + 0.928*cos + 0.072*sin);
+  return rgbToHex(nr, ng, nb);
+}
+
+/* ================================================================
+   MAIN GENERATE
+   ================================================================ */
+function entityGenerate({ type, subtype, index }, tctx, ps) {
+  const seedStr = type + ":" + (subtype||'') + ":" + index;
+  seedRng(seedStr);
+
+  let g = newGrid();
+  let pal = {};
+  let label = "";
+  let detail = "";
+
+  if (type === "fae") {
+    const court = subtype || "seelie";
+    const c = FAE_COURTS[court];
+    pal = drawFae(g, court, index);
+    label = c.label + " Fae #" + (index + 1);
+    detail = "Court: " + c.label;
+  } else if (type === "mage") {
+    pal = drawMage(g, index);
+    const gender = ["Mage", "Mage", "Mage"][index % 3];
+    label = "Lesser Mage #" + (index + 1);
+    detail = "Black-robed " + gender;
+  } else if (type === "human") {
+    pal = drawHuman(g, index);
+    const cloth = CLOTHING_TYPES[((index||0) * 13) % CLOTHING_TYPES.length];
+    label = "Human #" + (index + 1);
+    detail = cloth.name + " wearer";
+  } else if (type === "animal") {
+    const r = drawAnimal(g, index);
+    pal = r.pal;
+    label = r.species;
+    detail = "Species #" + (index + 1) + " of 656";
+  }
+
+  g = autoShade(g);
+  paintGrid(g, pal, tctx, ps);
+  return { label, detail };
+}
+
+/* ================================================================
+   UID SYSTEM
+   ================================================================ */
+function entityGenerateWithUID({ type, subtype, index, uid }) {
+  if (uid && UID_REG[uid]) {
+    const rec = UID_REG[uid];
+    return { ...rec, uid };
+  }
+  uid = uid || mintUID();
+  const rec = { type, subtype: subtype || null, index: index != null ? index : Math.floor(Math.random() * 1000) };
+  UID_REG[uid] = rec;
+  return { ...rec, uid };
+}
+
+// Exposed API: generate portrait + get UID
+function generateEntityPortrait({ type, subtype, index, uid }, targetCanvas) {
+  const tctx = targetCanvas.getContext("2d");
+  tctx.imageSmoothingEnabled = false;
+  const ps = Math.floor(targetCanvas.width / SIZE);
+  const rec = entityGenerateWithUID({ type, subtype, index, uid });
+  const info = entityGenerate(rec, tctx, ps);
+  return { uid: rec.uid, ...info, type: rec.type, subtype: rec.subtype, index: rec.index };
+}
+
+window.generateEntityPortrait = generateEntityPortrait;
+window.entityUIDRegistry = UID_REG;
+
+
+// Court name mapping: cursed generator court names → entity generator court keys
+const COURT_MAP = {
+  "Queen's Court": "seelie",
+  "Spring Court": "thorn",
+  "Summer Court": "ember",
+  "Autumn Court": "twilight",
+  "Winter Court": "unseelie",
+  "Tide Court": "tide",
+  "Hollow Court": "hollow",
+  "Wyld Court": "wyld",
+};
+
+// boundType mapping
+const BOUND_TYPE_MAP = {
+  fae: "fae",
+  lesserMage: "mage",
+  human: "human",
+  animal: "animal",
+  unknown: "human",
+};
+
+// Bridge function called by cursed generator's render hook
+function renderEntityPortraitForItem(item, targetCanvas) {
+  if (!targetCanvas || !item || !item.bound) return null;
+  const tctx = targetCanvas.getContext("2d");
+  tctx.imageSmoothingEnabled = false;
+  const ps = Math.floor(targetCanvas.width / SIZE);
+
+  const boundType = (item.cfg && item.cfg.boundType) || "unknown";
+  const type = BOUND_TYPE_MAP[boundType] || "human";
+
+  // Determine subtype (court for fae)
+  let subtype = null;
+  if (type === "fae" && item.courtName) {
+    subtype = COURT_MAP[item.courtName] || "seelie";
+  }
+
+  // Determine index: hash archivalId for determinism
+  const idHash = hashStr(item.archivalId || item.baseType || "entity") >>> 0;
+  const maxIdx = type === "fae" ? 125 : type === "animal" ? 656 : 500;
+  const index = idHash % maxIdx;
+
+  // Use existing entityPortraitUid if set, or mint one
+  const uid = item.entityPortraitUid || null;
+  const rec = entityGenerateWithUID({ type, subtype, index, uid });
+  if (!item.entityPortraitUid) item.entityPortraitUid = rec.uid;
+
+  const info = entityGenerate(rec, tctx, ps);
+  return { uid: rec.uid, ...info };
+}
+
+window.renderEntityPortraitForItem = renderEntityPortraitForItem;
+})();
+
+// ========================
 // DATA
 // ========================
 
@@ -3336,6 +4715,7 @@ function renderCard(item, isNew) {
     return `
       <div class="item-card ${cfg.tier}${isNew ? ' new-flash' : ''}">
         <div class="item-sprite-frame"><canvas class="item-sprite" width="96" height="96"></canvas></div>
+        <div class="entity-portrait-frame"><canvas class="entity-portrait" width="88" height="88"></canvas><div class="entity-portrait-label">Bound Entity</div></div>
         <span class="item-tier-badge ${cfg.badge}">${cfg.label}</span>
         <div class="item-name ${cfg.nameClass}">${item.archivalId}</div>
         <div class="item-base-type">${item.baseType}</div>
@@ -3442,6 +4822,25 @@ function renderResults(isNew) {
         catch (e) { console.warn('sprite render failed for', item, e); }
       }
     });
+
+    // Paint entity portraits on bound item cards
+    const portraits = area.querySelectorAll('.entity-portrait');
+    let boundIdx = 0;
+    for (let i = 0; i < allItems.length; i++) {
+      if (allItems[i].bound && portraits[boundIdx]) {
+        const item = allItems[i];
+        const canvas = portraits[boundIdx];
+        if (window.renderEntityPortraitForItem) {
+          try {
+            const info = window.renderEntityPortraitForItem(item, canvas);
+            // Update the label below the portrait
+            const label = canvas.parentElement.querySelector('.entity-portrait-label');
+            if (label && info) label.textContent = info.label || 'Bound Entity';
+          } catch (e) { console.warn('entity portrait failed for', item, e); }
+        }
+        boundIdx++;
+      }
+    }
   });
 
   batchCtrl.style.display = 'flex';
