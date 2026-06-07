@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cursed Reliquary — Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --gold: #c8a951;
+  --gold-light: #f0d080;
+  --gold-dark: #8a6f2e;
+  --blood: #8b0000;
+  --blood-light: #cc2200;
+  --parchment: #1a120a;
+  --text-main: #e8d5a0;
+  --text-dim: #a0885a;
+  --text-bright: #f5e8c0;
+  --set-green: #44bb44;
+  --corrupt-purple-bright: #bb88ee;
+  --border-color: #5a3f1e;
+  --border-bright: #8a6030;
+  --glow-gold: rgba(200,169,81,0.3);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0705;
+  color: var(--text-main);
+  font-family: 'IM Fell English', serif;
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(139,0,0,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(153,102,204,0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* NAV */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: rgba(10,7,5,0.96);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+.nav-logo { font-family:'Cinzel',serif; font-size:11px; letter-spacing:3px; color:var(--gold-dark); text-transform:uppercase; }
+.nav-links a {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px;
+  color:var(--text-dim); text-decoration:none; margin-left:20px;
+  text-transform:uppercase; transition:color 0.2s;
+}
+.nav-links a:hover { color:var(--gold-light); }
+.nav-links a.active { color:var(--gold); border-bottom:1px solid var(--gold-dark); }
+.db-status { display:inline-flex; align-items:center; gap:6px; font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--text-dim); text-transform:uppercase; }
+.db-dot { width:6px; height:6px; border-radius:50%; background:#444; transition:background 0.5s; }
+.db-dot.online { background:var(--set-green); box-shadow:0 0 6px rgba(68,187,68,0.5); }
+.db-dot.offline { background:var(--blood); }
+
+/* LAYOUT */
+.admin-wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 900px) { .admin-wrap { grid-template-columns: 1fr; } }
+
+/* PANEL */
+.panel {
+  background: linear-gradient(145deg, #1a100a, #120c06);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  padding: 24px 28px;
+  position: relative;
+}
+.panel::before {
+  content:''; position:absolute; inset:2px;
+  border:1px solid rgba(90,63,30,0.25); border-radius:1px; pointer-events:none;
+}
+.panel-title {
+  font-family:'Cinzel Decorative',serif;
+  font-size:13px;
+  letter-spacing:3px;
+  color:var(--gold-light);
+  text-transform:uppercase;
+  margin-bottom:20px;
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(90,63,30,0.4);
+}
+.panel-sub {
+  font-family:'Cinzel',serif;
+  font-size:10px;
+  letter-spacing:2px;
+  color:var(--text-dim);
+  text-transform:uppercase;
+  margin:20px 0 10px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.panel-sub::after { content:''; flex:1; height:1px; background:rgba(90,63,30,0.3); }
+
+/* FORM */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-grid.cols-1 { grid-template-columns: 1fr; }
+.form-group { display:flex; flex-direction:column; gap:5px; }
+.form-group.span-2 { grid-column: span 2; }
+.form-group label {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px;
+  color:var(--text-dim); text-transform:uppercase;
+}
+.form-group label .req { color:var(--blood-light); margin-left:2px; }
+input[type="text"], input[type="number"], select, textarea {
+  background: #0d0906;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-family: 'IM Fell English', serif;
+  font-size: 14px;
+  padding: 9px 12px;
+  border-radius: 2px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+  border-color: var(--gold-dark);
+  box-shadow: 0 0 8px rgba(200,169,81,0.12);
+}
+input::placeholder, textarea::placeholder { color:rgba(90,63,30,0.5); font-style:italic; font-size:13px; }
+select { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a6030'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:28px; cursor:pointer; }
+select option { background:#120c06; }
+textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+
+/* UID row */
+.uid-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.uid-preview {
+  font-family:'Cinzel',serif; font-size:13px; letter-spacing:2px;
+  color:var(--gold); padding:9px 14px; border:1px solid rgba(90,63,30,0.5);
+  border-radius:2px; flex:1; background:#0d0906; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.gen-uid-btn {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px;
+  color:var(--text-dim); background:transparent; border:1px solid rgba(90,63,30,0.5);
+  padding:9px 14px; border-radius:2px; cursor:pointer; white-space:nowrap;
+  text-transform:uppercase; transition:all 0.15s;
+}
+.gen-uid-btn:hover { border-color:var(--gold-dark); color:var(--gold); }
+
+/* Checkbox toggle */
+.toggle-row { display:flex; align-items:center; gap:10px; }
+.toggle-row input[type="checkbox"] { width:16px; height:16px; accent-color:var(--gold); cursor:pointer; }
+.toggle-row label { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; margin:0; cursor:pointer; }
+
+/* Submit button */
+.submit-btn {
+  display: block;
+  width: 100%;
+  margin-top: 22px;
+  padding: 14px 24px;
+  font-family:'Cinzel',serif; font-size:14px; font-weight:700;
+  letter-spacing:4px; text-transform:uppercase;
+  color:#0a0705;
+  background: linear-gradient(180deg, #e0c060 0%, #c8a030 40%, #a07820 100%);
+  border:none; border-radius:2px; cursor:pointer;
+  transition:all 0.15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.submit-btn:hover {
+  background: linear-gradient(180deg, #f0d070 0%, #d8b040 40%, #b08830 100%);
+  box-shadow: 0 4px 16px var(--glow-gold), inset 0 1px 0 rgba(255,255,255,0.25);
+  transform: translateY(-1px);
+}
+.submit-btn:disabled { opacity:0.4; cursor:default; pointer-events:none; transform:none; }
+.submit-btn.saving { animation:pulse 1s infinite; }
+
+.form-status {
+  margin-top:12px;
+  padding:10px 14px;
+  border-radius:2px;
+  font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px;
+  display:none;
+}
+.form-status.success { background:rgba(40,100,40,0.3); border:1px solid rgba(68,187,68,0.4); color:var(--set-green); }
+.form-status.error { background:rgba(100,0,0,0.3); border:1px solid rgba(139,0,0,0.4); color:#ff6666; }
+
+/* Right panel — archive list */
+.archive-panel { position: sticky; top: 80px; }
+.archive-controls {
+  display:flex; gap:8px; margin-bottom:14px;
+}
+.search-mini {
+  flex:1; background:#0d0906; border:1px solid var(--border-color);
+  color:var(--text-main); font-family:'Cinzel',serif; font-size:11px;
+  padding:8px 10px; border-radius:2px; outline:none; letter-spacing:1px;
+  text-transform:uppercase;
+}
+.search-mini:focus { border-color:var(--gold-dark); }
+.filter-sel {
+  background:#0d0906; border:1px solid var(--border-color);
+  color:var(--text-dim); font-family:'Cinzel',serif; font-size:10px;
+  padding:8px 10px; border-radius:2px; outline:none; cursor:pointer;
+}
+
+/* Item list */
+.item-list { display:flex; flex-direction:column; gap:1px; max-height:70vh; overflow-y:auto; }
+.item-list::-webkit-scrollbar { width:4px; }
+.item-list::-webkit-scrollbar-track { background:#0a0705; }
+.item-list::-webkit-scrollbar-thumb { background:var(--border-color); }
+
+.item-row {
+  display:grid;
+  grid-template-columns: 1fr auto;
+  gap:8px;
+  padding:10px 12px;
+  border-bottom:1px solid rgba(90,63,30,0.15);
+  cursor:pointer;
+  transition:background 0.1s;
+  align-items:center;
+}
+.item-row:hover { background:rgba(90,63,30,0.1); }
+.item-row.manual-row { border-left:2px solid var(--gold-dark); padding-left:10px; }
+.item-row.generated-row { border-left:2px solid rgba(90,63,30,0.3); padding-left:10px; }
+
+.row-left {}
+.row-uid { font-family:'Cinzel',serif; font-size:9px; color:var(--gold-dark); letter-spacing:1px; }
+.row-name { font-size:13px; color:var(--text-main); margin-top:2px; }
+.row-meta { font-family:'Cinzel',serif; font-size:9px; color:var(--text-dim); letter-spacing:1px; margin-top:2px; }
+.row-badge {
+  font-family:'Cinzel',serif; font-size:8px; letter-spacing:1px; text-transform:uppercase;
+  padding:3px 7px; border-radius:1px; white-space:nowrap;
+}
+.badge-manual { background:rgba(200,169,81,0.15); border:1px solid rgba(200,169,81,0.3); color:var(--gold); }
+.badge-gen    { background:rgba(90,63,30,0.15); border:1px solid rgba(90,63,30,0.3); color:var(--text-dim); }
+
+.row-actions { display:flex; gap:6px; align-items:center; margin-top:4px; }
+.row-btn {
+  font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; text-transform:uppercase;
+  padding:3px 8px; border:1px solid rgba(90,63,30,0.4); border-radius:1px;
+  background:transparent; color:var(--text-dim); cursor:pointer; transition:all 0.1s;
+}
+.row-btn:hover { border-color:var(--gold-dark); color:var(--gold); }
+.row-btn.del:hover { border-color:var(--blood-light); color:var(--blood-light); }
+
+.empty-archive {
+  text-align:center; padding:40px 20px; color:var(--text-dim);
+  font-style:italic; font-size:14px; opacity:0.6;
+}
+
+.tab-row { display:flex; gap:0; margin-bottom:14px; border-bottom:1px solid rgba(90,63,30,0.3); }
+.tab-btn {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-dim); background:transparent; border:none;
+  padding:8px 16px; cursor:pointer; transition:all 0.15s;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab-btn:hover { color:var(--gold-light); }
+.tab-btn.active { color:var(--gold); border-bottom-color:var(--gold-dark); }
+
+/* Confirm delete modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.85);
+  z-index:1000; display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 0.2s;
+}
+.modal-overlay.visible { opacity:1; pointer-events:auto; }
+.modal-box {
+  background:linear-gradient(145deg, #1e1208, #160e06);
+  border:1px solid var(--border-color); border-radius:2px;
+  padding:28px 32px; max-width:400px; width:90%;
+  text-align:center;
+}
+.modal-title { font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; color:var(--blood-light); margin-bottom:12px; }
+.modal-body { font-size:14px; color:var(--text-dim); margin-bottom:20px; line-height:1.6; }
+.modal-uid { font-family:'Cinzel',serif; font-size:12px; color:var(--gold); letter-spacing:1px; }
+.modal-btns { display:flex; gap:12px; justify-content:center; }
+.modal-btn {
+  font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  padding:10px 20px; border-radius:2px; cursor:pointer; transition:all 0.15s;
+}
+.modal-btn.cancel { background:transparent; border:1px solid var(--border-color); color:var(--text-dim); }
+.modal-btn.cancel:hover { border-color:var(--gold-dark); color:var(--gold); }
+.modal-btn.confirm { background:linear-gradient(180deg,#cc2200,#8b0000); border:none; color:#fff; }
+.modal-btn.confirm:hover { background:linear-gradient(180deg,#ee3311,#aa1100); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav-bar">
+  <div class="nav-logo">☠ Cursed Reliquary — Admin</div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <div class="db-status"><div class="db-dot" id="db-dot"></div><span id="db-label">Connecting…</span></div>
+    <div class="nav-links">
+      <a href="index.html">Generator</a>
+      <a href="admin.html" class="active">Admin Panel</a>
+    </div>
+  </div>
+</nav>
+
+<div class="admin-wrap">
+
+  <!-- LEFT: ENTRY FORM -->
+  <div class="panel">
+    <div class="panel-title">☩ Add Unique Item</div>
+
+    <!-- UID -->
+    <div class="panel-sub">Archival Identity</div>
+    <div class="form-grid cols-1" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>UID Code <span class="req">*</span></label>
+        <div class="uid-row">
+          <div class="uid-preview" id="uid-preview">—</div>
+          <button class="gen-uid-btn" onclick="generateUID()">⟳ Generate</button>
+        </div>
+        <input type="hidden" id="f-uid" />
+      </div>
+      <div class="form-group">
+        <label>Item Name <span class="req">*</span> <span style="font-size:9px;opacity:0.6;">(displayed on card)</span></label>
+        <input type="text" id="f-name" placeholder="e.g. The Lantern of Pale Debt" />
+      </div>
+    </div>
+
+    <!-- BASE INFO -->
+    <div class="panel-sub">Classification</div>
+    <div class="form-grid" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>Base Type <span class="req">*</span></label>
+        <input type="text" id="f-base-type" placeholder="e.g. Cracked Lantern" />
+      </div>
+      <div class="form-group">
+        <label>Rarity / Tier <span class="req">*</span></label>
+        <select id="f-rarity">
+          <option value="common">Common</option>
+          <option value="uncommon">Uncommon</option>
+          <option value="rare">Rare</option>
+          <option value="corrupted">Corrupted</option>
+          <option value="extremelyRare">Extremely Rare</option>
+          <option value="mythical">Mythical</option>
+          <option value="legendary">Legendary</option>
+          <option value="paradigm">Paradigm</option>
+          <option value="nebulith">Nebulith</option>
+          <option value="subumbral">Subumbral</option>
+          <option value="faeBound">Fae Bound</option>
+          <option value="animalBound">Animal Bound</option>
+          <option value="lesserMage">Lesser Mage Bound</option>
+          <option value="humanBound">Human Bound</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Curse Type Label <span class="req">*</span></label>
+        <input type="text" id="f-curse-label" placeholder="e.g. Anchored, Escalative…" />
+      </div>
+      <div class="form-group">
+        <label>Curse Subtype</label>
+        <input type="text" id="f-curse-subtype" placeholder="e.g. Active while Touched" />
+      </div>
+      <div class="form-group span-2">
+        <label>Curse Type Description</label>
+        <input type="text" id="f-curse-desc" placeholder="Tooltip description of this curse type" />
+      </div>
+      <div class="form-group">
+        <label>Domain</label>
+        <select id="f-domain">
+          <option value="">— None —</option>
+          <option value="Somatic">Somatic (S)</option>
+          <option value="Cognitive">Cognitive (C)</option>
+          <option value="Environmental">Environmental (E)</option>
+          <option value="Metaphysical">Metaphysical (M)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Intensity (0–5) <span class="req">*</span></label>
+        <select id="f-intensity">
+          <option value="0">0 — Trace (I)</option>
+          <option value="1">1 — Mild (II)</option>
+          <option value="2" selected>2 — Moderate (III)</option>
+          <option value="3">3 — Severe (IV)</option>
+          <option value="4">4 — Critical (V)</option>
+          <option value="5">5 — Absolute (VI)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- PRIMARY EFFECT -->
+    <div class="panel-sub">Primary Effect</div>
+    <div class="form-grid cols-1" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>Effect Name <span class="req">*</span></label>
+        <input type="text" id="f-eff-name" placeholder="e.g. Memory Dissolution" />
+      </div>
+      <div class="form-group">
+        <label>Effect Description <span class="req">*</span></label>
+        <textarea id="f-eff-desc" placeholder="What this effect does to the bearer…"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Penalty / Drawback</label>
+        <textarea id="f-eff-penalty" placeholder="At high intensity or permanence…" style="min-height:60px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Condition Modifier</label>
+        <input type="text" id="f-condition" placeholder="e.g. only activates under direct moonlight" />
+      </div>
+    </div>
+
+    <!-- SECONDARY EFFECT (optional) -->
+    <div class="panel-sub">Secondary Resonance <span style="font-size:9px;opacity:0.5;">(optional)</span></div>
+    <div class="form-grid cols-1" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>Secondary Effect Name</label>
+        <input type="text" id="f-sec-name" placeholder="Leave blank if none" />
+      </div>
+      <div class="form-group">
+        <label>Secondary Effect Description</label>
+        <textarea id="f-sec-desc" placeholder="Description of secondary resonance…" style="min-height:60px;"></textarea>
+      </div>
+    </div>
+
+    <!-- BOUND ENTITY -->
+    <div class="panel-sub">Bound Entity <span style="font-size:9px;opacity:0.5;">(if applicable)</span></div>
+    <div style="margin-bottom:10px;">
+      <div class="toggle-row">
+        <input type="checkbox" id="f-bound" onchange="toggleBound()" />
+        <label for="f-bound">This item has a bound entity</label>
+      </div>
+    </div>
+    <div id="bound-fields" style="display:none;">
+      <div class="form-grid cols-1" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label>Entity Name</label>
+          <input type="text" id="f-entity-name" placeholder="e.g. Kitsune Variant 46" />
+        </div>
+        <div class="form-group">
+          <label>Entity Type</label>
+          <input type="text" id="f-entity-type" placeholder="e.g. Shapeshifter, Guardian, Spirit Entity…" />
+        </div>
+        <div class="form-group">
+          <label>Entity Description</label>
+          <textarea id="f-entity-desc" placeholder="Description of the bound entity…" style="min-height:70px;"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- LORE & NOTES -->
+    <div class="panel-sub">Lore &amp; Notes</div>
+    <div class="form-grid cols-1" style="margin-bottom:14px;">
+      <div class="form-group">
+        <label>Lore Line</label>
+        <textarea id="f-lore" placeholder='"An archival note or flavour quotation…" — Source, record reference'></textarea>
+      </div>
+      <div class="form-group">
+        <label>Admin Notes <span style="font-size:9px;opacity:0.5;">(visible on public card)</span></label>
+        <textarea id="f-notes" placeholder="Optional notes displayed beneath the item card…" style="min-height:60px;"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div class="toggle-row">
+        <input type="checkbox" id="f-published" checked />
+        <label for="f-published">Published (visible to the public)</label>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitItem()">☩ Commit to Archive</button>
+    <div class="form-status" id="form-status"></div>
+  </div>
+
+  <!-- RIGHT: ARCHIVE VIEW -->
+  <div class="archive-panel">
+    <div class="panel">
+      <div class="panel-title">☩ Archive</div>
+
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-manual" onclick="switchTab('manual')">Unique Items</button>
+        <button class="tab-btn" id="tab-generated" onclick="switchTab('generated')">Generated</button>
+      </div>
+
+      <div class="archive-controls">
+        <input type="text" class="search-mini" id="archive-search" placeholder="Search…" oninput="filterList()" />
+        <select class="filter-sel" id="archive-rarity" onchange="filterList()">
+          <option value="">All Rarities</option>
+          <option value="common">Common</option>
+          <option value="uncommon">Uncommon</option>
+          <option value="rare">Rare</option>
+          <option value="corrupted">Corrupted</option>
+          <option value="extremelyRare">Extremely Rare</option>
+          <option value="mythical">Mythical</option>
+          <option value="legendary">Legendary</option>
+          <option value="paradigm">Paradigm</option>
+          <option value="nebulith">Nebulith</option>
+          <option value="subumbral">Subumbral</option>
+          <option value="faeBound">Fae Bound</option>
+          <option value="animalBound">Animal Bound</option>
+          <option value="lesserMage">Lesser Mage</option>
+          <option value="humanBound">Human Bound</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+
+      <div class="item-list" id="item-list">
+        <div class="empty-archive">Loading archive…</div>
+      </div>
+
+      <div style="margin-top:12px;font-family:'Cinzel',serif;font-size:9px;letter-spacing:1px;color:rgba(90,63,30,0.5);">
+        <span id="list-count">—</span> records · click to edit
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">⚠ Confirm Deletion</div>
+    <div class="modal-body">
+      This will permanently remove<br>
+      <span class="modal-uid" id="modal-uid">—</span><br>
+      from the archive. This cannot be undone.
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========================
+// SUPABASE CONFIG
+// ========================
+const SUPABASE_URL  = 'https://mhlwfevnjpezaaocbwwr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obHdmZXZuanBlemFhb2Nid3dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkzMTkwOTIsImV4cCI6MjA2NDg5NTA5Mn0.placeholder';
+
+const { createClient } = supabase;
+let db = null;
+let dbOnline = false;
+
+// Archive data
+let allManualItems = [];
+let allGeneratedItems = [];
+let currentTab = 'manual';
+let editingId = null;
+let deleteTarget = null;
+
+// ========================
+// INIT
+// ========================
+async function initDB() {
+  try {
+    db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { error } = await db.from('manual_items').select('id').limit(1);
+    if (error && error.code !== 'PGRST116') throw error;
+    dbOnline = true;
+    document.getElementById('db-dot').className = 'db-dot online';
+    document.getElementById('db-label').textContent = 'Archive Online';
+    generateUID();
+    loadArchive();
+  } catch(e) {
+    dbOnline = false;
+    document.getElementById('db-dot').className = 'db-dot offline';
+    document.getElementById('db-label').textContent = 'Archive Offline';
+    document.getElementById('item-list').innerHTML = '<div class="empty-archive">Archive is offline.</div>';
+    generateUID(); // still let them compose
+  }
+}
+
+// ========================
+// UID GENERATION
+// ========================
+function generateUID() {
+  const prefixes = ['CE','CX','CR','CA','CI','CF','CK','CM','CN','CU'];
+  const suffixes = ['A','B','C','D','E','F','G','H','K','M','N','P','R','S','T','V','X'];
+  const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const y = Math.floor(Math.random() * 899) + 101;
+  const s = String(Math.floor(Math.random() * 9999) + 1).padStart(4,'0');
+  const x = suffixes[Math.floor(Math.random() * suffixes.length)];
+  const uid = `${p}-${y}-${s}-${x}`;
+  document.getElementById('f-uid').value = uid;
+  document.getElementById('uid-preview').textContent = uid;
+}
+
+function toggleBound() {
+  const checked = document.getElementById('f-bound').checked;
+  document.getElementById('bound-fields').style.display = checked ? 'block' : 'none';
+}
+
+// ========================
+// SUBMIT ITEM
+// ========================
+async function submitItem() {
+  const uid     = document.getElementById('f-uid').value.trim();
+  const name    = document.getElementById('f-name').value.trim();
+  const base    = document.getElementById('f-base-type').value.trim();
+  const rarity  = document.getElementById('f-rarity').value;
+  const cLabel  = document.getElementById('f-curse-label').value.trim();
+  const effName = document.getElementById('f-eff-name').value.trim();
+  const effDesc = document.getElementById('f-eff-desc').value.trim();
+
+  // Validation
+  if (!uid || !name || !base || !rarity || !cLabel || !effName || !effDesc) {
+    showStatus('error', 'Please fill all required fields (marked with *).');
+    return;
+  }
+
+  if (!dbOnline || !db) {
+    showStatus('error', 'Archive is offline — cannot save.');
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.classList.add('saving');
+  btn.textContent = editingId ? '☩ Updating…' : '☩ Committing…';
+
+  const bound = document.getElementById('f-bound').checked;
+
+  const payload = {
+    uid_code:               uid,
+    archival_id:            uid,
+    item_name:              name,
+    rarity:                 rarity,
+    base_type:              base,
+    curse_type_label:       cLabel,
+    curse_type_subtype:     document.getElementById('f-curse-subtype').value.trim() || null,
+    curse_type_desc:        document.getElementById('f-curse-desc').value.trim() || null,
+    domain:                 document.getElementById('f-domain').value || null,
+    primary_effect_name:    effName,
+    primary_effect_desc:    effDesc,
+    primary_effect_penalty: document.getElementById('f-eff-penalty').value.trim() || null,
+    secondary_effect_name:  document.getElementById('f-sec-name').value.trim() || null,
+    secondary_effect_desc:  document.getElementById('f-sec-desc').value.trim() || null,
+    intensity:              parseInt(document.getElementById('f-intensity').value),
+    lore:                   document.getElementById('f-lore').value.trim() || null,
+    condition:              document.getElementById('f-condition').value.trim() || null,
+    notes:                  document.getElementById('f-notes').value.trim() || null,
+    bound:                  bound,
+    bound_entity_name:      bound ? (document.getElementById('f-entity-name').value.trim() || null) : null,
+    bound_entity_type:      bound ? (document.getElementById('f-entity-type').value.trim() || null) : null,
+    bound_entity_desc:      bound ? (document.getElementById('f-entity-desc').value.trim() || null) : null,
+    is_published:           document.getElementById('f-published').checked,
+  };
+
+  try {
+    let error;
+    if (editingId) {
+      // UPDATE existing
+      const res = await db.from('manual_items').update(payload).eq('id', editingId);
+      error = res.error;
+    } else {
+      // INSERT new
+      const res = await db.from('manual_items').insert(payload);
+      error = res.error;
+    }
+
+    if (error) {
+      if (error.code === '23505') {
+        showStatus('error', `UID already exists: ${uid} — generate a new one.`);
+      } else {
+        throw error;
+      }
+    } else {
+      showStatus('success', editingId ? `Item updated: ${uid}` : `Item archived: ${uid}`);
+      resetForm();
+      loadArchive();
+    }
+  } catch(e) {
+    showStatus('error', 'Save failed: ' + e.message);
+    console.error(e);
+  }
+
+  btn.disabled = false;
+  btn.classList.remove('saving');
+  btn.textContent = '☩ Commit to Archive';
+}
+
+function showStatus(type, msg) {
+  const el = document.getElementById('form-status');
+  el.className = 'form-status ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function resetForm() {
+  editingId = null;
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-base-type').value = '';
+  document.getElementById('f-rarity').value = 'common';
+  document.getElementById('f-curse-label').value = '';
+  document.getElementById('f-curse-subtype').value = '';
+  document.getElementById('f-curse-desc').value = '';
+  document.getElementById('f-domain').value = '';
+  document.getElementById('f-intensity').value = '2';
+  document.getElementById('f-eff-name').value = '';
+  document.getElementById('f-eff-desc').value = '';
+  document.getElementById('f-eff-penalty').value = '';
+  document.getElementById('f-condition').value = '';
+  document.getElementById('f-sec-name').value = '';
+  document.getElementById('f-sec-desc').value = '';
+  document.getElementById('f-lore').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('f-bound').checked = false;
+  document.getElementById('f-entity-name').value = '';
+  document.getElementById('f-entity-type').value = '';
+  document.getElementById('f-entity-desc').value = '';
+  document.getElementById('f-published').checked = true;
+  document.getElementById('bound-fields').style.display = 'none';
+  document.getElementById('submit-btn').textContent = '☩ Commit to Archive';
+  generateUID();
+}
+
+// ========================
+// LOAD ARCHIVE
+// ========================
+async function loadArchive() {
+  if (!db) return;
+  try {
+    // Load manual items
+    const { data: manual, error: me } = await db
+      .from('manual_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (me) throw me;
+    allManualItems = manual || [];
+
+    // Load generated items
+    const { data: gen, error: ge } = await db
+      .from('cursed_items')
+      .select('id, uid_code, archival_id, rarity, base_type, created_at, is_manual')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (ge) throw ge;
+    allGeneratedItems = gen || [];
+
+    renderList();
+  } catch(e) {
+    console.error('Load archive failed:', e);
+  }
+}
+
+// ========================
+// TABS
+// ========================
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-manual').className = 'tab-btn' + (tab === 'manual' ? ' active' : '');
+  document.getElementById('tab-generated').className = 'tab-btn' + (tab === 'generated' ? ' active' : '');
+  renderList();
+}
+
+// ========================
+// FILTER & RENDER LIST
+// ========================
+function filterList() { renderList(); }
+
+function renderList() {
+  const searchVal = (document.getElementById('archive-search').value || '').toLowerCase();
+  const rarityFilter = document.getElementById('archive-rarity').value;
+  const list = document.getElementById('item-list');
+  const countEl = document.getElementById('list-count');
+
+  const items = currentTab === 'manual' ? allManualItems : allGeneratedItems;
+
+  const filtered = items.filter(r => {
+    if (rarityFilter && r.rarity !== rarityFilter) return false;
+    if (searchVal) {
+      const haystack = [r.uid_code, r.base_type, r.rarity, r.item_name || ''].join(' ').toLowerCase();
+      if (!haystack.includes(searchVal)) return false;
+    }
+    return true;
+  });
+
+  countEl.textContent = `${filtered.length}`;
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-archive">${items.length ? 'No matches.' : 'No items in archive.'}</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => {
+    const isManual = currentTab === 'manual';
+    const displayName = r.item_name || r.base_type;
+    const dateStr = new Date(r.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+    return `<div class="item-row ${isManual ? 'manual-row' : 'generated-row'}">
+      <div class="row-left">
+        <div class="row-uid">${r.uid_code}</div>
+        <div class="row-name">${displayName}</div>
+        <div class="row-meta">${r.rarity} · ${dateStr}</div>
+        ${isManual ? `<div class="row-actions">
+          <button class="row-btn" onclick="editItem('${r.id}')">Edit</button>
+          <button class="row-btn del" onclick="promptDelete('${r.id}','${r.uid_code}')">Delete</button>
+          ${!r.is_published ? '<span style="font-size:9px;color:var(--blood-light);letter-spacing:1px;">UNPUBLISHED</span>' : ''}
+        </div>` : `<div class="row-actions">
+          <button class="row-btn del" onclick="promptDeleteGenerated('${r.id}','${r.uid_code}')">Remove</button>
+        </div>`}
+      </div>
+      <div>
+        <span class="row-badge ${isManual ? 'badge-manual' : 'badge-gen'}">${isManual ? '✦ Unique' : 'Generated'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ========================
+// EDIT ITEM
+// ========================
+async function editItem(id) {
+  const item = allManualItems.find(r => r.id === id);
+  if (!item) return;
+
+  editingId = id;
+  document.getElementById('f-uid').value = item.uid_code;
+  document.getElementById('uid-preview').textContent = item.uid_code;
+  document.getElementById('f-name').value = item.item_name || '';
+  document.getElementById('f-base-type').value = item.base_type || '';
+  document.getElementById('f-rarity').value = item.rarity || 'common';
+  document.getElementById('f-curse-label').value = item.curse_type_label || '';
+  document.getElementById('f-curse-subtype').value = item.curse_type_subtype || '';
+  document.getElementById('f-curse-desc').value = item.curse_type_desc || '';
+  document.getElementById('f-domain').value = item.domain || '';
+  document.getElementById('f-intensity').value = String(item.intensity || 2);
+  document.getElementById('f-eff-name').value = item.primary_effect_name || '';
+  document.getElementById('f-eff-desc').value = item.primary_effect_desc || '';
+  document.getElementById('f-eff-penalty').value = item.primary_effect_penalty || '';
+  document.getElementById('f-condition').value = item.condition || '';
+  document.getElementById('f-sec-name').value = item.secondary_effect_name || '';
+  document.getElementById('f-sec-desc').value = item.secondary_effect_desc || '';
+  document.getElementById('f-lore').value = item.lore || '';
+  document.getElementById('f-notes').value = item.notes || '';
+  document.getElementById('f-bound').checked = !!item.bound;
+  document.getElementById('f-entity-name').value = item.bound_entity_name || '';
+  document.getElementById('f-entity-type').value = item.bound_entity_type || '';
+  document.getElementById('f-entity-desc').value = item.bound_entity_desc || '';
+  document.getElementById('f-published').checked = !!item.is_published;
+  document.getElementById('bound-fields').style.display = item.bound ? 'block' : 'none';
+  document.getElementById('submit-btn').textContent = '☩ Update Archive Entry';
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showStatus('', '');
+  document.getElementById('form-status').style.display = 'none';
+}
+
+// ========================
+// DELETE FLOW
+// ========================
+function promptDelete(id, uid) {
+  deleteTarget = { id, uid, table: 'manual_items' };
+  document.getElementById('modal-uid').textContent = uid;
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function promptDeleteGenerated(id, uid) {
+  deleteTarget = { id, uid, table: 'cursed_items' };
+  document.getElementById('modal-uid').textContent = uid;
+  document.getElementById('modal-overlay').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('visible');
+  deleteTarget = null;
+}
+
+async function confirmDelete() {
+  if (!deleteTarget || !db) return;
+  try {
+    const { error } = await db.from(deleteTarget.table).delete().eq('id', deleteTarget.id);
+    if (error) throw error;
+    closeModal();
+    loadArchive();
+    if (editingId === deleteTarget.id) resetForm();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ========================
+// BOOT
+// ========================
+initDB();
+</script>
+</body>
+</html>
