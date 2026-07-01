@@ -1626,7 +1626,7 @@ function TeachersToolkitApp({
       backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E\")"
     }
   }), /*#__PURE__*/React.createElement("div", {
-    className: "relative max-w-6xl mx-auto px-6 py-8 app-content"
+    className: "relative max-w-6xl mx-auto px-3 py-4 md:px-6 md:py-8 app-content"
   }, /*#__PURE__*/React.createElement(Header, {
     view: view,
     setView: setView,
@@ -2081,6 +2081,16 @@ function StepsTable({
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Watch for viewport size changes
+  useEffect(() => {
+    function checkMobile() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto",
     style: {
@@ -2100,7 +2110,270 @@ function StepsTable({
       fontFamily: "Georgia, serif",
       textDecoration: "underline"
     }
-  }, allExpanded ? "Collapse all fields" : "Expand all fields")), /*#__PURE__*/React.createElement("table", {
+  }, allExpanded ? "Collapse all fields" : "Expand all fields")), isMobile ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MobileStepsCards, {
+    steps: steps,
+    updateStep: updateStep,
+    removeStep: removeStep,
+    moveStep: moveStep,
+    allExpanded: allExpanded
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 py-3 flex items-center justify-between",
+    style: {
+      background: "rgba(160, 82, 45, 0.15)",
+      borderTop: "1px solid rgba(58, 30, 12, 0.3)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontVariant: "small-caps",
+      letterSpacing: "0.05em",
+      fontWeight: 700,
+      color: "#3a1e0c"
+    }
+  }, /*#__PURE__*/React.createElement(Clock, {
+    size: 13,
+    className: "inline mr-2"
+  }), " Total Time"), /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-lg",
+    style: {
+      color: "#3a1e0c"
+    }
+  }, totalTime, " ", /*#__PURE__*/React.createElement("span", {
+    className: "text-xs italic font-normal"
+  }, "min")))) : /*#__PURE__*/React.createElement(DesktopStepsTable, {
+    steps: steps,
+    updateStep: updateStep,
+    removeStep: removeStep,
+    moveStep: moveStep,
+    reorderSteps: reorderSteps,
+    totalTime: totalTime,
+    allExpanded: allExpanded,
+    draggedId: draggedId,
+    setDraggedId: setDraggedId,
+    dragOverId: dragOverId,
+    setDragOverId: setDragOverId
+  }));
+}
+
+// ============================================================
+// MOBILE VIEW: One card per step, stacked vertically
+// ============================================================
+function MobileStepsCards({
+  steps,
+  updateStep,
+  removeStep,
+  moveStep,
+  allExpanded
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "p-2 space-y-3"
+  }, steps.map((s, i) => /*#__PURE__*/React.createElement("div", {
+    key: s.id,
+    className: "p-3",
+    style: {
+      background: "#fff",
+      border: "1px solid rgba(58, 30, 12, 0.3)",
+      borderLeft: "4px solid #a0522d",
+      boxShadow: "2px 2px 0 rgba(58, 30, 12, 0.15)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3 pb-2",
+    style: {
+      borderBottom: "1px dashed rgba(58,30,12,0.2)"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-base",
+    style: {
+      color: "#3a1e0c",
+      fontVariant: "small-caps"
+    }
+  }, "Step ", i + 1), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => moveStep(s.id, -1),
+    disabled: i === 0,
+    className: "px-2 py-1 text-sm",
+    style: {
+      background: "#fef6e4",
+      border: "1px solid #3a1e0c",
+      fontFamily: "Georgia, serif",
+      opacity: i === 0 ? 0.3 : 1
+    },
+    title: "Move up"
+  }, "^"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => moveStep(s.id, 1),
+    disabled: i === steps.length - 1,
+    className: "px-2 py-1 text-sm",
+    style: {
+      background: "#fef6e4",
+      border: "1px solid #3a1e0c",
+      fontFamily: "Georgia, serif",
+      opacity: i === steps.length - 1 ? 0.3 : 1
+    },
+    title: "Move down"
+  }, "v"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeStep(s.id),
+    className: "px-2 py-1 text-sm",
+    style: {
+      background: "#fef6e4",
+      border: "1px solid #c9302c",
+      color: "#c9302c"
+    },
+    title: "Delete step"
+  }, /*#__PURE__*/React.createElement(Trash2, {
+    size: 12
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.08em"
+    }
+  }, "Step Name"), /*#__PURE__*/React.createElement("input", {
+    value: s.name,
+    onChange: e => updateStep(s.id, "name", e.target.value),
+    placeholder: "e.g. Warmer",
+    className: "w-full p-2 italic",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "1rem",
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4"
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-3 gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.05em"
+    }
+  }, "Interaction"), /*#__PURE__*/React.createElement("select", {
+    value: s.interaction,
+    onChange: e => updateStep(s.id, "interaction", e.target.value),
+    className: "w-full p-2 italic",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "0.9rem",
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4"
+    }
+  }, INTERACTION_TYPES.map(t => /*#__PURE__*/React.createElement("option", {
+    key: t,
+    value: t
+  }, t)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.05em"
+    }
+  }, "Time (min)"), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "0",
+    value: s.time,
+    onChange: e => updateStep(s.id, "time", e.target.value),
+    className: "w-full p-2 text-center italic",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "1rem",
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.05em"
+    }
+  }, "Bloom's"), /*#__PURE__*/React.createElement("select", {
+    value: s.bloom || "",
+    onChange: e => updateStep(s.id, "bloom", e.target.value),
+    className: "w-full p-2 italic",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "0.85rem",
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4"
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, " -- "), BLOOMS_LEVELS.map(b => /*#__PURE__*/React.createElement("option", {
+    key: b,
+    value: b
+  }, b))))), /*#__PURE__*/React.createElement("div", {
+    className: "mb-3"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.08em"
+    }
+  }, "Description"), /*#__PURE__*/React.createElement("textarea", {
+    value: s.description,
+    onChange: e => updateStep(s.id, "description", e.target.value),
+    placeholder: "What happens in this step?",
+    rows: allExpanded ? undefined : 3,
+    className: "w-full p-2 italic resize-none",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "0.95rem",
+      lineHeight: 1.5,
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4",
+      minHeight: allExpanded ? "6em" : "4em"
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.08em"
+    }
+  }, "Differentiation"), /*#__PURE__*/React.createElement("textarea", {
+    value: s.differentiation || "",
+    onChange: e => updateStep(s.id, "differentiation", e.target.value),
+    placeholder: "Adaptations for different learners...",
+    rows: allExpanded ? undefined : 2,
+    className: "w-full p-2 italic resize-none",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "0.9rem",
+      lineHeight: 1.5,
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4",
+      minHeight: allExpanded ? "5em" : "3em"
+    }
+  })))));
+}
+
+// ============================================================
+// DESKTOP VIEW: Original table layout
+// ============================================================
+function DesktopStepsTable({
+  steps,
+  updateStep,
+  removeStep,
+  moveStep,
+  reorderSteps,
+  totalTime,
+  allExpanded,
+  draggedId,
+  setDraggedId,
+  dragOverId,
+  setDragOverId
+}) {
+  return /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm",
     style: {
       borderCollapse: "collapse"
@@ -2241,7 +2514,7 @@ function StepsTable({
     }
   }, totalTime), /*#__PURE__*/React.createElement("td", {
     className: "px-3 py-3 text-xs italic"
-  }, "min")))));
+  }, "min"))));
 }
 function Th({
   children
