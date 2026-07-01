@@ -2839,11 +2839,11 @@ function WeekPlanner({
     className: "text-center py-12 italic text-amber-900/60"
   }, weeks.length === 0 ? "Click 'New Week' to start planning your week." : "Select a week above."), week && /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-5 gap-3"
-  }, Object.keys(week.days).map(day => /*#__PURE__*/React.createElement(DayColumn, {
+  }, ["Mon", "Tue", "Wed", "Thu", "Fri"].map(day => /*#__PURE__*/React.createElement(DayColumn, {
     key: day,
     day: day,
     weekId: week.id,
-    lessonIds: week.days[day],
+    lessonIds: week.days[day] || [],
     savedLessons: savedLessons,
     onAdd: addLessonToDay,
     onRemove: removeLessonFromDay
