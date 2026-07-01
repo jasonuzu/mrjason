@@ -1728,34 +1728,37 @@ function Header({
     style: {
       color: "#a0522d"
     }
-  }, "Canvas")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3 flex-wrap"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm italic tracking-wide text-amber-900/70"
-  }, "~ a toolkit for thoughtful lessons ~"), profile && /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-3 py-1",
+  }, "Canvas")), profile && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2",
     style: {
-      background: "#fef6e4",
-      border: "1px solid #3a1e0c"
+      position: "relative",
+      zIndex: 10
     }
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-xs italic",
+    className: "text-sm italic",
     style: {
       fontFamily: "Georgia, serif",
       color: "#3a1e0c"
     }
-  }, profile.display_name), /*#__PURE__*/React.createElement("button", {
-    onClick: onLogout,
-    className: "text-xs italic hover:underline",
+  }, "Hi, ", /*#__PURE__*/React.createElement("strong", null, profile.display_name)), /*#__PURE__*/React.createElement("button", {
+    onClick: () => onLogout(),
+    type: "button",
+    className: "text-xs px-3 py-1 transition-all hover:translate-x-0.5",
     style: {
+      background: "#a0522d",
+      color: "#fef6e4",
+      border: "2px solid #3a1e0c",
+      boxShadow: "2px 2px 0 #3a1e0c",
       fontFamily: "Georgia, serif",
-      color: "#a0522d",
-      background: "none",
-      border: "none",
+      fontVariant: "small-caps",
+      letterSpacing: "0.05em",
       cursor: "pointer",
-      padding: 0
+      position: "relative",
+      zIndex: 10
     }
-  }, "Sign out")))), /*#__PURE__*/React.createElement("div", {
+  }, "Sign out"))), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm italic tracking-wide text-amber-900/70 mb-3"
+  }, "~ a toolkit for thoughtful lessons ~"), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-2 items-center"
   }, /*#__PURE__*/React.createElement(ToolbarBtn, {
     onClick: () => setView("builder"),
