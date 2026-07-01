@@ -921,7 +921,16 @@ function TeachersToolkit() {
     localStorage.removeItem("tcanvas:weeks:v1");
     localStorage.removeItem("tcanvas:favorites:v1");
     localStorage.removeItem("tcanvas:lessons:v1");
-    await sb.auth.signOut();
+    try {
+      await sb.auth.signOut();
+    } catch (e) {
+      console.error("Sign out error:", e);
+    }
+
+    // Force a full page reload to ensure everything is cleared.
+    // This guarantees logout works even if browser extensions or state issues
+    // prevent React from re-rendering the auth screen.
+    window.location.reload();
   }
   if (authLoading) {
     return /*#__PURE__*/React.createElement("div", {
