@@ -1,1 +1,391 @@
-placeholder
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔐 Class Memory Vault</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #0b0e1a;
+    --bg-card: #141829;
+    --bg-card-hover: #1a1f38;
+    --border: #2a2f4a;
+    --border-correct: #34d399;
+    --gold: #f4c542;
+    --gold-dim: #b8942f;
+    --amber: #f59e0b;
+    --text: #e2e4ef;
+    --text-dim: #7a7f9e;
+    --correct-glow: rgba(52, 211, 153, 0.15);
+    --input-bg: #0f1225;
+  }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .stars {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  .stars span {
+    position: absolute; border-radius: 50%; background: #fff;
+    animation: twinkle var(--dur) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    0% { opacity: 0.15; transform: scale(0.8); }
+    100% { opacity: 0.7; transform: scale(1.2); }
+  }
+
+  .header {
+    position: relative; z-index: 1;
+    text-align: center; padding: 50px 20px 30px;
+  }
+  .header .vault-icon {
+    font-size: 64px; display: block; margin-bottom: 12px;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  .header h1 {
+    font-size: clamp(1.8rem, 5vw, 2.8rem); font-weight: 800;
+    background: linear-gradient(135deg, var(--gold), #fde68a, var(--amber));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .header p {
+    color: var(--text-dim); font-size: 1rem; margin-top: 8px; font-weight: 300;
+  }
+
+  .progress-wrap {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11, 14, 26, 0.92); backdrop-filter: blur(12px);
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+  }
+  .progress-inner {
+    max-width: 700px; margin: 0 auto;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .progress-bar {
+    flex: 1; height: 8px; background: var(--border);
+    border-radius: 99px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--gold), var(--border-correct));
+    border-radius: 99px; transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .progress-label {
+    font-family: 'Space Mono', monospace; font-size: 0.82rem;
+    color: var(--gold); min-width: 50px; text-align: right;
+  }
+
+  .grid {
+    position: relative; z-index: 1; max-width: 820px;
+    margin: 0 auto; padding: 24px 20px 60px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px;
+  }
+  @media (max-width: 420px) { .grid { grid-template-columns: 1fr; } }
+
+  /* === CARD === */
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    display: flex; align-items: center; gap: 16px;
+    transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .card:hover { background: var(--bg-card-hover); }
+  .card.correct {
+    border-color: var(--border-correct); background: var(--correct-glow);
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.08);
+  }
+  .card.correct .status-dot { background: var(--border-correct); box-shadow: 0 0 8px var(--border-correct); }
+  .card.incorrect { animation: shake 0.4s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
+  }
+
+  .card-number {
+    font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700;
+    color: var(--gold); min-width: 36px; text-align: center; flex-shrink: 0;
+  }
+
+  .card input {
+    flex: 1; font-family: 'Space Mono', monospace; font-size: 0.95rem;
+    padding: 10px 14px; background: var(--input-bg);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    color: var(--text); outline: none; transition: border-color 0.3s;
+  }
+  .card input:focus { border-color: var(--gold-dim); }
+  .card.correct input {
+    border-color: var(--border-correct); color: var(--border-correct);
+    background: rgba(52, 211, 153, 0.06);
+  }
+  .card.correct input::placeholder {
+    color: var(--border-correct); opacity: 0.7; font-style: normal; font-weight: 600;
+  }
+  .card input::placeholder { color: #3d4260; font-style: italic; }
+
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--border);
+    flex-shrink: 0; transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  /* === CORRECT FLASH OVERLAY === */
+  .flash-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(52, 211, 153, 0.2);
+    border-radius: 14px; pointer-events: none;
+    opacity: 0; z-index: 5;
+  }
+  .flash-overlay.show {
+    animation: flashIn 1.2s ease forwards;
+  }
+  @keyframes flashIn {
+    0%   { opacity: 0; transform: scale(0.9); }
+    15%  { opacity: 1; transform: scale(1.03); }
+    60%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+  .flash-text {
+    font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800;
+    color: var(--border-correct); letter-spacing: 4px; text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(52, 211, 153, 0.5);
+  }
+
+  /* === SECRET MESSAGE === */
+  .secret-wrap {
+    position: relative; z-index: 1; max-width: 700px;
+    margin: 0 auto 80px; padding: 0 20px; display: none;
+  }
+  .secret-wrap.revealed { display: block; animation: riseIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+  @keyframes riseIn {
+    0% { opacity: 0; transform: translateY(40px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .secret-box {
+    text-align: center; padding: 44px 32px; border-radius: 20px;
+    background: linear-gradient(135deg, #1a1440, #0f2027, #1a1440);
+    border: 2px solid var(--gold);
+    box-shadow: 0 0 60px rgba(244, 197, 66, 0.12), 0 0 120px rgba(244, 197, 66, 0.05);
+  }
+  .secret-box .trophy { font-size: 56px; display: block; margin-bottom: 16px; }
+  .secret-box h2 {
+    font-size: 1.1rem; font-weight: 600; color: var(--gold);
+    letter-spacing: 3px; text-transform: uppercase; margin-bottom: 20px;
+  }
+  .secret-box .message {
+    font-size: clamp(1.3rem, 4vw, 1.8rem); font-weight: 700;
+    color: #fff; line-height: 1.5;
+    text-shadow: 0 0 30px rgba(244, 197, 66, 0.3);
+  }
+
+  .confetti-piece {
+    position: fixed; z-index: 100; pointer-events: none;
+    animation: confettiFall var(--fall-dur) ease-in forwards;
+  }
+  @keyframes confettiFall {
+    0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+    100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="header">
+  <span class="vault-icon">🔐</span>
+  <h1>Class Memory Vault</h1>
+  <p>Enter the correct codes to unlock the message.</p>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-inner">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 19</div>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="secret-wrap" id="secretWrap">
+  <div class="secret-box">
+    <span class="trophy">🏆</span>
+    <h2>Vault Unlocked</h2>
+    <div class="message">You will always be classmates!<br>Keep in contact and help each other!</div>
+  </div>
+</div>
+
+<script>
+// Only SHA-256 hashes stored — answers are impossible to reverse!
+const puzzles = [
+  { id: 1,  hash: "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084" },
+  { id: 2,  hash: "ea325d761f98c6b73320e442b67f2a3574d9924716d788ddc0dbbdcaca853fe7" },
+  { id: 3,  hash: "06b9a6eacd7a77b9361123fd19776455eb16b9c83426a1abbf514a414792b73f" },
+  { id: 4,  hash: "bc56ada309bb04a86c197733cb92c50f46713b383aa8c3bb822518c5bc9e4441" },
+  { id: 5,  hash: "1680049d21eb8653db050b28e9cbdf8f20bfaad57409c283ee1573031df85452" },
+  { id: 6,  hash: "a3ec1ae842ed11dae4d70fbc044324d699c9d30176d2eb1a9c4d6de045110657" },
+  { id: 7,  hash: "dc2fc19d8fce376c47641cf15f823a03ad10f2dc7da3f43230551f50706914f5" },
+  { id: 8,  hash: "fc31ac92775f34f0410ac88080e2ff95b779ddd842e46c34bad18a7e9de9dd76" },
+  { id: 9,  hash: "033b0ed6f935d813721934a7f0e2c20f15c934f0aaf6e5da15c8291f996d24a0" },
+  { id: 10, hash: "0815b5f30f0b04bf3c15f698a8f3b5877005440e0e88807ff1cdb05f5f3a3876" },
+  { id: 11, hash: "490ca3ed5811c020ba8372021ff5dc839a726dc73b392a2ed564b6683e2e844a" },
+  { id: 12, hash: "1cb6508098e9e5955ef7b22b1f0c43f59fe17e429ac321791073cb04e06e4864" },
+  { id: 13, hash: "b6234d2ea0d6022be63db80d7b80e221097fe4a469dc44febcd2a9241effdeba" },
+  { id: 14, hash: "32c1cf49a2feee269ed74dd860f72644ac71029839b21b1ce0c212efafa9ef07" },
+  { id: 15, hash: "4507b9cefd7a5339c99de9eaed46d98bdd52da97dabdef52452f80aab11b5718" },
+  { id: 16, hash: "765dbb8c38a58a5dc019d7b3133dffb251d643cb291328ad8e86d4f05655e68b" },
+  { id: 17, hash: "c82edc3f5fd95a5feb60eded79f96ac3585958d1898c236daf2bfe139893585a" },
+  { id: 18, hash: "8a798890fe93817163b10b5f7bd2ca4d25d84c52739a645a889c173eee7d9d3d" },
+  { id: 19, hash: "4492aabd733f37cb76fc0ed1fd75a11c5dd05ba8977988e28487739a20975b85" },
+];
+
+const TOTAL = puzzles.length;
+let correctCount = 0;
+const solved = new Set();
+const STORAGE_KEY = 'classVaultProgress';
+
+// SHA-256 via Web Crypto API
+async function sha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Save / Load progress
+function saveProgress() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...solved]));
+  } catch(e) {}
+}
+function loadProgress() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (Array.isArray(data)) return new Set(data);
+  } catch(e) {}
+  return new Set();
+}
+
+// Stars
+(function() {
+  const c = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('span');
+    const size = Math.random() * 2.5 + 1;
+    s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--dur:${Math.random()*3+2}s;animation-delay:${Math.random()*3}s;`;
+    c.appendChild(s);
+  }
+})();
+
+// Mark a card as complete (used for both fresh solves and restored progress)
+function markComplete(card, input, animate) {
+  card.classList.add('correct');
+  input.value = '';
+  input.setAttribute('readonly', true);
+  input.setAttribute('placeholder', '✓ Complete');
+
+  if (animate) {
+    const flash = card.querySelector('.flash-overlay');
+    flash.classList.add('show');
+    setTimeout(() => flash.classList.remove('show'), 1300);
+  }
+}
+
+// Build cards
+(function() {
+  const grid = document.getElementById('grid');
+  const savedProgress = loadProgress();
+
+  puzzles.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = `card-${p.id}`;
+    card.innerHTML = `
+      <span class="card-number">${p.id}</span>
+      <input type="text" id="input-${p.id}" placeholder="..." autocomplete="off" spellcheck="false">
+      <span class="status-dot" id="dot-${p.id}"></span>
+      <div class="flash-overlay"><span class="flash-text">Correct!</span></div>
+    `;
+    grid.appendChild(card);
+
+    const input = card.querySelector('input');
+
+    // Restore saved progress
+    if (savedProgress.has(p.id)) {
+      solved.add(p.id);
+      correctCount++;
+      markComplete(card, input, false);
+    }
+
+    let debounce = null;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => checkAnswer(p, card, input), 150);
+    });
+  });
+
+  updateProgress();
+  if (correctCount === TOTAL) {
+    document.getElementById('secretWrap').classList.add('revealed');
+  }
+})();
+
+async function checkAnswer(puzzle, card, input) {
+  const val = input.value.trim();
+  if (!val || solved.has(puzzle.id)) return;
+
+  const hashed = await sha256(val.toLowerCase());
+  const isCorrect = hashed === puzzle.hash;
+
+  if (isCorrect) {
+    solved.add(puzzle.id);
+    correctCount++;
+    markComplete(card, input, true);
+    saveProgress();
+    updateProgress();
+    if (correctCount === TOTAL) revealSecret();
+  } else if (val.length >= 2) {
+    card.classList.remove('incorrect');
+    void card.offsetWidth;
+    card.classList.add('incorrect');
+    setTimeout(() => card.classList.remove('incorrect'), 500);
+  }
+}
+
+function updateProgress() {
+  document.getElementById('progressFill').style.width = (correctCount / TOTAL) * 100 + '%';
+  document.getElementById('progressLabel').textContent = `${correctCount} / ${TOTAL}`;
+}
+
+function revealSecret() {
+  const wrap = document.getElementById('secretWrap');
+  wrap.classList.add('revealed');
+  setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  const colors = ['#f4c542','#34d399','#f59e0b','#60a5fa','#f472b6','#a78bfa','#fb923c'];
+  for (let i = 0; i < 120; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `left:${Math.random()*100}vw;top:-12px;background:${colors[Math.floor(Math.random()*colors.length)]};width:${Math.random()*8+6}px;height:${Math.random()*8+6}px;border-radius:${Math.random()>0.5?'50%':'2px'};--fall-dur:${Math.random()*2.5+2}s;animation-delay:${Math.random()*1.5}s;`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+}
+</script>
+</body>
+</html>
