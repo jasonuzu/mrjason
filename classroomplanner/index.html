@@ -1,1 +1,443 @@
-5
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Classroom Designer</title>
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --primary-hover: #3b5a84;
+            --draw-mode: #28a745;
+            --bg: #f8f9fa;
+            --panel-bg: #ffffff;
+            --border: #cccccc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #toolbar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        h2 { font-size: 1.4rem; color: #333; margin-bottom: 5px; }
+        .section { border-top: 1px solid #eee; padding-top: 15px; }
+        .section-title { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #777; margin-bottom: 10px; font-weight: bold; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        button {
+            padding: 10px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        button.danger { background-color: #d9534f; }
+        button.danger:hover { background-color: #c9302c; }
+        
+        button#btn-draw { background-color: white; color: var(--draw-mode); border: 2px solid var(--draw-mode); grid-column: span 2; }
+        button#btn-draw.active { background-color: var(--draw-mode); color: white; }
+
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 5px; }
+        input[type="text"], input[type="color"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+        input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: auto;
+            background-color: #e5e5e5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 50px;
+        }
+
+        #classroom-canvas {
+            width: 1000px;
+            height: 700px;
+            background-color: white;
+            background-image: 
+                linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+        #classroom-canvas.drawing-mode { cursor: crosshair; }
+
+        .movable-element {
+            position: absolute;
+            border: 2px solid #333;
+            background-color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            font-weight: bold;
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; }
+        .elem-student { border-radius: 4px; }
+        .elem-teacher { border-radius: 2px; border-width: 3px; }
+        .elem-door { border-right: 5px double #333; background: #e0d0b0; }
+        .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important;}
+        .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
+
+        .instructions { font-size: 0.8rem; color: #666; line-height: 1.4; margin-top: auto; background: #f0f4f8; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <div>
+            <h2>Classroom Plan</h2>
+            <p style="font-size: 0.8rem; color: #666;">Seating Chart Designer</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">1. Spawn Items</div>
+            <div class="btn-grid">
+                <button onclick="spawnItem('student')">Student Desk</button>
+                <button onclick="spawnItem('teacher')">Teacher Desk</button>
+                <button onclick="spawnItem('door')">Door</button>
+                <button onclick="spawnItem('arrow')">Arrow</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">2. Draw Shapes</div>
+            <div class="btn-grid">
+                <button id="btn-draw" onclick="toggleDrawMode()">✏️ Draw Custom Block</button>
+            </div>
+        </div>
+
+        <div class="section" id="inspector" style="display: none;">
+            <div class="section-title">Properties</div>
+            <div class="form-group">
+                <label id="label-text-tag">Label:</label>
+                <input type="text" id="prop-label" oninput="updateProperties()">
+            </div>
+            <div class="form-group" id="prop-color-group">
+                <label>Fill Color:</label>
+                <input type="color" id="prop-color" oninput="updateProperties()">
+            </div>
+            <div class="btn-grid">
+                <button onclick="rotateItem()">Rotate 90°</button>
+                <button class="danger" onclick="deleteItem()">Delete</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Actions</div>
+            <button class="danger" style="width: 100%;" onclick="clearRoom()">Clear Entire Room</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div>
+    </div>
+
+    <script>
+        // Global State Variables
+        var canvas = document.getElementById('classroom-canvas');
+        var inspector = document.getElementById('inspector');
+        var propLabel = document.getElementById('prop-label');
+        var propColor = document.getElementById('prop-color');
+        var btnDraw = document.getElementById('btn-draw');
+        var labelTag = document.getElementById('label-text-tag');
+
+        var selectedEl = null;
+        var isDragging = false;
+        var isDrawMode = false;
+        var isDrawingBox = false;
+        var dragOffsetX = 0, dragOffsetY = 0;
+        var drawStartX = 0, drawStartY = 0;
+        var currentBox = null;
+
+        // Ensure mouse move and up are tracked globally
+        document.onmousemove = handleMouseMove;
+        document.onmouseup = handleMouseUp;
+
+        // --- BUTTON SPAWNERS ---
+        function spawnItem(type) {
+            if(isDrawMode) toggleDrawMode();
+            
+            var el = document.createElement('div');
+            el.className = 'movable-element';
+            el.setAttribute('data-type', type);
+            el.setAttribute('data-rot', '0');
+            el.style.left = '50px';
+            el.style.top = '50px';
+
+            if (type === 'student') {
+                el.classList.add('elem-student');
+                el.style.width = '60px';
+                el.style.height = '40px';
+                el.style.backgroundColor = '#a3cef1';
+                el.innerText = 'Student';
+            } else if (type === 'teacher') {
+                el.classList.add('elem-teacher');
+                el.style.width = '100px';
+                el.style.height = '60px';
+                el.style.backgroundColor = '#84a59d';
+                el.innerText = 'Teacher Desk';
+            } else if (type === 'door') {
+                el.classList.add('elem-door');
+                el.style.width = '60px';
+                el.style.height = '15px';
+                el.innerText = 'Door';
+            } else if (type === 'arrow') {
+                el.classList.add('elem-arrow');
+                el.style.width = '80px';
+                el.style.height = '30px';
+                el.style.backgroundColor = 'transparent';
+                drawArrowSVG(el, '#333333', '');
+            }
+
+            el.onmousedown = function(e) { itemMouseDown(e, el); };
+            canvas.appendChild(el);
+            selectItem(el);
+        }
+
+        // --- DRAW MODE LOGIC ---
+        function toggleDrawMode() {
+            isDrawMode = !isDrawMode;
+            if (isDrawMode) {
+                btnDraw.classList.add('active');
+                btnDraw.innerText = "Stop Drawing";
+                canvas.classList.add('drawing-mode');
+                deselectAll();
+            } else {
+                btnDraw.classList.remove('active');
+                btnDraw.innerText = "✏️ Draw Custom Block";
+                canvas.classList.remove('drawing-mode');
+            }
+        }
+
+        function canvasMouseDown(e) {
+            if (e.target !== canvas) return;
+            
+            if (!isDrawMode) {
+                deselectAll();
+                return;
+            }
+
+            var rect = canvas.getBoundingClientRect();
+            drawStartX = e.clientX - rect.left;
+            drawStartY = e.clientY - rect.top;
+            isDrawingBox = true;
+
+            currentBox = document.createElement('div');
+            currentBox.className = 'movable-element elem-block';
+            currentBox.setAttribute('data-type', 'block');
+            currentBox.setAttribute('data-rot', '0');
+            currentBox.style.left = drawStartX + 'px';
+            currentBox.style.top = drawStartY + 'px';
+            currentBox.style.width = '0px';
+            currentBox.style.height = '0px';
+            currentBox.style.backgroundColor = '#e0aaff';
+            currentBox.innerText = 'Custom Block';
+            
+            currentBox.onmousedown = function(ev) { itemMouseDown(ev, currentBox); };
+            canvas.appendChild(currentBox);
+        }
+
+        // --- GLOBAL MOUSE TRACKING ---
+        function handleMouseMove(e) {
+            var rect = canvas.getBoundingClientRect();
+
+            // Handling Drawing a new Box
+            if (isDrawMode && isDrawingBox && currentBox) {
+                var currentX = e.clientX - rect.left;
+                var currentY = e.clientY - rect.top;
+
+                // 10px Grid Snap
+                currentX = Math.round(currentX / 10) * 10;
+                currentY = Math.round(currentY / 10) * 10;
+                var startSnapX = Math.round(drawStartX / 10) * 10;
+                var startSnapY = Math.round(drawStartY / 10) * 10;
+
+                var w = Math.abs(currentX - startSnapX);
+                var h = Math.abs(currentY - startSnapY);
+                var l = Math.min(currentX, startSnapX);
+                var t = Math.min(currentY, startSnapY);
+
+                currentBox.style.width = w + 'px';
+                currentBox.style.height = h + 'px';
+                currentBox.style.left = l + 'px';
+                currentBox.style.top = t + 'px';
+            }
+
+            // Handling Dragging an existing Item
+            if (!isDrawMode && isDragging && selectedEl) {
+                var newX = e.clientX - rect.left - dragOffsetX;
+                var newY = e.clientY - rect.top - dragOffsetY;
+
+                // 10px Grid Snap
+                newX = Math.round(newX / 10) * 10;
+                newY = Math.round(newY / 10) * 10;
+
+                // Keep inside canvas boundaries
+                var maxLeft = canvas.clientWidth - selectedEl.offsetWidth;
+                var maxTop = canvas.clientHeight - selectedEl.offsetHeight;
+                
+                newX = Math.max(0, Math.min(newX, maxLeft));
+                newY = Math.max(0, Math.min(newY, maxTop));
+
+                selectedEl.style.left = newX + 'px';
+                selectedEl.style.top = newY + 'px';
+            }
+        }
+
+        function handleMouseUp() {
+            // Finish Drawing
+            if (isDrawMode && isDrawingBox && currentBox) {
+                if (parseInt(currentBox.style.width) < 20 || parseInt(currentBox.style.height) < 20) {
+                    currentBox.remove();
+                } else {
+                    selectItem(currentBox);
+                    toggleDrawMode();
+                }
+                isDrawingBox = false;
+                currentBox = null;
+            }
+
+            // Finish Dragging
+            isDragging = false;
+        }
+
+        // --- ITEM INTERACTION ---
+        function itemMouseDown(e, el) {
+            if (isDrawMode) return;
+            e.stopPropagation();
+            selectItem(el);
+            isDragging = true;
+            
+            var elRect = el.getBoundingClientRect();
+            dragOffsetX = e.clientX - elRect.left;
+            dragOffsetY = e.clientY - elRect.top;
+        }
+
+        function selectItem(el) {
+            deselectAll();
+            selectedEl = el;
+            el.classList.add('selected');
+            inspector.style.display = 'block';
+
+            var type = el.getAttribute('data-type');
+            if (type === 'arrow') {
+                labelTag.innerText = "Arrow Label:";
+                var textNode = el.querySelector('text');
+                propLabel.value = textNode ? textNode.textContent : '';
+                propColor.value = el.getAttribute('data-arrow-color') || '#333333';
+                document.getElementById('prop-color-group').style.display = 'block';
+            } else {
+                labelTag.innerText = type === 'student' ? "Student Name:" : "Label:";
+                propLabel.value = el.innerText;
+                propColor.value = rgbToHex(el.style.backgroundColor);
+                document.getElementById('prop-color-group').style.display = 'block';
+            }
+        }
+
+        function deselectAll() {
+            var items = document.querySelectorAll('.movable-element');
+            for(var i=0; i<items.length; i++) {
+                items[i].classList.remove('selected');
+            }
+            selectedEl = null;
+            inspector.style.display = 'none';
+        }
+
+        // --- PROPERTIES PANEL ---
+        function updateProperties() {
+            if (!selectedEl) return;
+            var type = selectedEl.getAttribute('data-type');
+
+            if (type === 'arrow') {
+                selectedEl.setAttribute('data-arrow-color', propColor.value);
+                drawArrowSVG(selectedEl, propColor.value, propLabel.value);
+            } else {
+                selectedEl.innerText = propLabel.value;
+                selectedEl.style.backgroundColor = propColor.value;
+            }
+        }
+
+        function rotateItem() {
+            if (!selectedEl) return;
+            var currentRot = parseInt(selectedEl.getAttribute('data-rot')) || 0;
+            currentRot = (currentRot + 90) % 360;
+            selectedEl.setAttribute('data-rot', currentRot);
+            selectedEl.style.transform = 'rotate(' + currentRot + 'deg)';
+        }
+
+        function deleteItem() {
+            if (selectedEl) {
+                selectedEl.remove();
+                deselectAll();
+            }
+        }
+
+        function clearRoom() {
+            if(confirm("Are you sure you want to clear the layout?")) {
+                canvas.innerHTML = '';
+                deselectAll();
+            }
+        }
+
+        // --- UTILS ---
+        function drawArrowSVG(el, color, text) {
+            el.innerHTML = 
+                '<svg class="arrow-svg" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">' +
+                    '<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+                        '<polygon points="0 0, 6 3, 0 6" fill="' + color + '"/>' +
+                    '</marker></defs>' +
+                    '<line x1="5" y1="20" x2="85" y2="20" stroke="' + color + '" stroke-width="4" marker-end="url(#arrowhead)" />' +
+                    '<text x="40" y="15" font-size="12" fill="' + color + '" text-anchor="middle" font-weight="bold">' + text + '</text>' +
+                '</svg>';
+        }
+
+        function rgbToHex(rgb) {
+            if (!rgb || rgb.indexOf('rgb') === -1) return rgb || '#ffffff';
+            var colors = rgb.match(/\d+/g);
+            if (!colors || colors.length < 3) return '#ffffff';
+            var r = parseInt(colors[0]).toString(16).padStart(2, '0');
+            var g = parseInt(colors[1]).toString(16).padStart(2, '0');
+            var b = parseInt(colors[2]).toString(16).padStart(2, '0');
+            return '#' + r + g + b;
+        }
+    </script>
+</body>
+</html>
