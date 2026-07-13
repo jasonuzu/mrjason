@@ -94,6 +94,7 @@
         }
         #classroom-canvas.drawing-mode { cursor: crosshair; }
 
+        /* ALL items are now universally resizable */
         .movable-element {
             position: absolute;
             border: 2px solid #333;
@@ -107,23 +108,21 @@
             text-align: center;
             padding: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            resize: both; /* Added to all */
+            overflow: hidden; /* Required for resize to work */
+            min-width: 30px;
+            min-height: 30px;
         }
         .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; }
         
-        .elem-student { border-radius: 4px; overflow: hidden; }
-        .elem-teacher { border-radius: 2px; border-width: 3px; overflow: hidden; }
-        .elem-door { border-right: 5px double #333; background: #e0d0b0; overflow: hidden; }
+        .elem-student { border-radius: 4px; }
+        .elem-teacher { border-radius: 2px; border-width: 3px; }
+        .elem-door { border-right: 5px double #333; background: #e0d0b0; }
+        .elem-block { min-width: 40px; min-height: 40px; }
+        .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important; resize: both; }
         
-        /* Custom Block Resizing CSS */
-        .elem-block { 
-            resize: both; 
-            overflow: hidden; 
-            min-width: 40px; 
-            min-height: 40px; 
-        }
-
-        .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important;}
         .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
+        .element-label { pointer-events: none; word-wrap: break-word; max-width: 100%; }
 
         .instructions { font-size: 0.8rem; color: #666; line-height: 1.4; margin-top: auto; background: #f0f4f8; padding: 10px; border-radius: 4px; }
     </style>
@@ -166,7 +165,7 @@
             </div>
             <div class="btn-grid">
                 <button onclick="rotateItem()">Rotate 90°</button>
-                <button class="danger" onclick="deleteItem()">Delete</button>
+                <button class="danger" onclick="deleteItem()">Delete (Del)</button>
             </div>
         </div>
 
@@ -176,7 +175,8 @@
         </div>
 
         <div class="instructions">
-            <strong>Custom Blocks:</strong> Click and drag the bottom-right corner to resize them. Use the Properties panel above to change their label.
+            <strong>Move & Resize:</strong> Drag the center of an item to move it. Drag the bottom-right corner to resize it.<br><br>
+            <strong>Delete:</strong> Select an item and press the Delete key.
         </div>
     </div>
 
@@ -203,6 +203,15 @@
         document.onmousemove = handleMouseMove;
         document.onmouseup = handleMouseUp;
 
+        // --- GLOBAL KEYBOARD LISTENER (DELETE) ---
+        document.addEventListener('keydown', function(e) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEl) {
+                // Ensure we don't delete the item if the user is typing in the label input box
+                if (document.activeElement.tagName === 'INPUT') return;
+                deleteItem();
+            }
+        });
+
         // --- BUTTON SPAWNERS ---
         function spawnItem(type) {
             if(isDrawMode) toggleDrawMode();
@@ -214,33 +223,40 @@
             el.style.left = '50px';
             el.style.top = '50px';
 
+            var innerTextSpan = document.createElement('span');
+            innerTextSpan.className = 'element-label';
+
             if (type === 'student') {
                 el.classList.add('elem-student');
-                el.style.width = '60px';
-                el.style.height = '40px';
+                el.style.width = '80px';
+                el.style.height = '50px';
                 el.style.backgroundColor = '#a3cef1';
-                el.innerText = 'Student';
+                innerTextSpan.innerText = 'Student';
+                el.appendChild(innerTextSpan);
             } else if (type === 'teacher') {
                 el.classList.add('elem-teacher');
-                el.style.width = '100px';
+                el.style.width = '120px';
                 el.style.height = '60px';
                 el.style.backgroundColor = '#84a59d';
-                el.innerText = 'Teacher Desk';
+                innerTextSpan.innerText = 'Teacher Desk';
+                el.appendChild(innerTextSpan);
             } else if (type === 'block') {
                 el.classList.add('elem-block');
-                el.style.width = '120px';
+                el.style.width = '100px';
                 el.style.height = '80px';
                 el.style.backgroundColor = '#e0aaff';
-                el.innerText = 'Custom Block';
+                innerTextSpan.innerText = 'Custom Block';
+                el.appendChild(innerTextSpan);
             } else if (type === 'door') {
                 el.classList.add('elem-door');
                 el.style.width = '60px';
-                el.style.height = '15px';
-                el.innerText = 'Door';
+                el.style.height = '20px';
+                innerTextSpan.innerText = 'Door';
+                el.appendChild(innerTextSpan);
             } else if (type === 'arrow') {
                 el.classList.add('elem-arrow');
-                el.style.width = '80px';
-                el.style.height = '30px';
+                el.style.width = '100px';
+                el.style.height = '40px';
                 el.style.backgroundColor = 'transparent';
                 drawArrowSVG(el, '#333333', '');
             }
@@ -287,7 +303,11 @@
             currentBox.style.width = '0px';
             currentBox.style.height = '0px';
             currentBox.style.backgroundColor = '#e0aaff';
-            currentBox.innerText = 'Custom Block';
+            
+            var labelSpan = document.createElement('span');
+            labelSpan.className = 'element-label';
+            labelSpan.innerText = 'Custom Block';
+            currentBox.appendChild(labelSpan);
             
             currentBox.onmousedown = function(ev) { itemMouseDown(ev, currentBox); };
             canvas.appendChild(currentBox);
@@ -359,11 +379,9 @@
             var clickX = e.clientX - elRect.left;
             var clickY = e.clientY - elRect.top;
 
-            // PREVENT DRAG IF CLICKING THE RESIZE HANDLE (bottom right 20x20 pixels)
-            if (el.getAttribute('data-type') === 'block') {
-                if (clickX > elRect.width - 20 && clickY > elRect.height - 20) {
-                    return; // Abort drag, let the browser resize the element
-                }
+            // UNIVERSAL DRAG PROTECTION: If clicking the bottom-right 20px, let the browser resize it instead of dragging
+            if (clickX > elRect.width - 20 && clickY > elRect.height - 20) {
+                return;
             }
 
             isDragging = true;
@@ -385,7 +403,8 @@
                 propColor.value = el.getAttribute('data-arrow-color') || '#333333';
             } else {
                 labelTag.innerText = type === 'student' ? "Student Name:" : "Label:";
-                propLabel.value = el.innerText;
+                var textSpan = el.querySelector('.element-label');
+                propLabel.value = textSpan ? textSpan.innerText : '';
                 propColor.value = rgbToHex(el.style.backgroundColor);
             }
         }
@@ -408,7 +427,10 @@
                 selectedEl.setAttribute('data-arrow-color', propColor.value);
                 drawArrowSVG(selectedEl, propColor.value, propLabel.value);
             } else {
-                selectedEl.innerText = propLabel.value;
+                var textSpan = selectedEl.querySelector('.element-label');
+                if (textSpan) {
+                    textSpan.innerText = propLabel.value;
+                }
                 selectedEl.style.backgroundColor = propColor.value;
             }
         }
