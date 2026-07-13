@@ -616,13 +616,59 @@
     border-color: var(--accent); color: var(--accent);
   }
 
-  /* Print: always show everything, no chevron */
+  /* Print: always show everything in collapsible sections, no chevron */
   @media print {
     .section-block.collapsed > *:not(.sb-head) { display: revert !important; }
     .section-block > .sb-head::before { display: none; }
     .section-block > .sb-head { cursor: default; }
     .collapse-controls { display: none; }
+
+    /* Hide verbose interactive report, show compact print summary */
+    .screen-report-body { display: none !important; }
+    .print-summary { display: block !important; }
+    .print-summary * { color: #1a1a1a !important; }
+
+    body { background: #fff; font-size: 11px; }
+    .topbar, .no-print, .action-row, .student-meta-card { display: none !important; }
+    .section-block, .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+    .report-header { margin-bottom: 12px; }
+    .report-title { font-size: 20px; }
+    .report-meta { font-size: 11px; }
   }
+
+  /* Print summary styles (hidden on screen) */
+  .print-summary { display: none; }
+  .ps-header { border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 10px; }
+  .ps-header h1 { font-size: 18px; margin: 0 0 2px; font-family: Georgia, serif; }
+  .ps-header .ps-meta { font-size: 10px; color: #666; }
+  .ps-section { margin-bottom: 12px; break-inside: avoid; }
+  .ps-section-title {
+    font-family: Georgia, serif; font-size: 12px; font-weight: 700;
+    border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-bottom: 6px;
+  }
+  .ps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 10.5px; line-height: 1.5; }
+  .ps-grid dt { font-weight: 600; color: #555; }
+  .ps-grid dd { margin: 0; }
+  .ps-zone-table {
+    width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 8px;
+  }
+  .ps-zone-table th {
+    text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1.5px solid #333; padding: 4px 6px; color: #555;
+  }
+  .ps-zone-table td { padding: 5px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  .ps-zone-table td:nth-child(2), .ps-zone-table td:nth-child(3) { text-align: center; white-space: nowrap; }
+  .ps-zone-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .ps-inline-list { font-size: 10.5px; line-height: 1.6; }
+  .ps-inline-list strong { font-size: 10px; text-transform: uppercase; letter-spacing: 0.3px; color: #555; }
+  .ps-posts { font-size: 10px; line-height: 1.5; }
+  .ps-post { margin-bottom: 6px; padding-left: 8px; border-left: 2px solid #ccc; }
+  .ps-post-date { font-weight: 600; font-size: 9px; color: #777; text-transform: uppercase; }
+  .ps-goal-box {
+    border: 1.5px solid #333; border-radius: 4px; padding: 6px 10px;
+    font-size: 11px; font-style: italic; margin-bottom: 10px; line-height: 1.5;
+  }
+  .ps-footer { font-size: 8.5px; color: #888; border-top: 1px solid #ccc; padding-top: 6px; margin-top: 12px; }
 
   @media (max-width: 640px) {
     .field-grid-2 { grid-template-columns: 1fr; }
@@ -1676,6 +1722,8 @@ function renderReport(){
       <button onclick="App.expandAllSections()">Expand all sections</button>
     </div>
 
+    <div class="screen-report-body">
+
     <div class="section-block no-print-collapse">
       <div class="sb-head">
         <div>
@@ -1778,9 +1826,14 @@ function renderReport(){
       This is a screening tool for instructional planning, not a validated clinical instrument or diagnosis. Items are adapted and reworded from concepts in the SDQ (Goodman, 1997) and BASC-3 BESS (Kamphaus &amp; Reynolds, 2015) — the original reliability statistics apply to those exact instruments, not to this adapted version. Learning preferences are descriptive only (Pashler et al., 2008; Rogowsky et al., 2020). Score zones are proportional heuristics, not normed clinical cutoffs. Elevated emotional/behavioural scores should prompt follow-up with a school counsellor. See <a onclick="App.goResearch()" style="cursor:pointer;color:var(--accent);">Research &amp; Methodology</a> for full detail.
     </div>
 
+    </div><!-- end screen-report-body -->
+
+    ${renderPrintSummary(rec, lvl)}
+
     <div class="action-row no-print">
-      <button class="btn btn-primary" onclick="window.print()" style="background:${lvl.color};">Print Report</button>
-      <button class="btn btn-ghost" onclick="App.startReassessment('${rec.id}')">📊 Reassess this Student</button>
+      <button class="btn btn-primary" onclick="window.print()" style="background:${lvl.color};">Print Summary</button>
+      <button class="btn btn-ghost" onclick="App.exportStudentCSV('${rec.id}')">📊 Export CSV</button>
+      <button class="btn btn-ghost" onclick="App.startReassessment('${rec.id}')">Reassess</button>
       <button class="btn btn-ghost" onclick="App.editRecord('${rec.id}')">Edit Answers</button>
       <button class="btn btn-danger-ghost" onclick="App.confirmDelete('${rec.id}')">Delete Record</button>
     </div>
@@ -2050,6 +2103,180 @@ function renderPost(post){
     </div>`;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   PRINT SUMMARY — compact 2-3 page version hidden on screen
+   ══════════════════════════════════════════════════════════════ */
+
+function renderPrintSummary(rec, lvl){
+  const secs = SECTIONS[rec.level];
+  const scaleMax = scaleMaxFor(rec.level);
+  const date = new Date(rec.updatedAt||rec.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'long',year:'numeric'});
+  const ageDisplay = computeAge(rec.birthdate) !== null ? computeAge(rec.birthdate) : (rec.age || '?');
+
+  // Compute all zones + scores
+  const scoredIds = ['A','C','D','E'];
+  const zoneRows = scoredIds.map(id => {
+    const sec = secs.find(s=>s.id===id);
+    if(!sec) return null;
+    const res = computeSectionResult(sec, rec.answers, scaleMax);
+    const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+    const zm = ZONE_META[zone];
+    const matrix = ACTION_MATRIX[sec.id] && ACTION_MATRIX[sec.id][zone];
+    return { sec, res, zone, zm, recommendation: matrix ? matrix.meaning : '' };
+  }).filter(Boolean);
+
+  // Learning preferences top 2
+  const secB = secs.find(s=>s.id==='B');
+  let topPrefs = '—';
+  if(secB){
+    const bScores = {};
+    secB.items.forEach(it => bScores[it.domain] = (bScores[it.domain]||0) + (rec.answers[it.id]||0));
+    const sorted = Object.entries(bScores).sort((a,b)=>b[1]-a[1]);
+    topPrefs = sorted.slice(0,2).map(([d])=>DOMAIN_LABELS[d]||d).join(', ');
+  }
+
+  // Goal orientation
+  const secG = secs.find(s=>s.id==='G');
+  let goalOrientation = '—', goalNote = '';
+  if(secG){
+    const gScores = {};
+    secG.items.forEach(it => gScores[it.domain] = (gScores[it.domain]||0) + (rec.answers[it.id]||0));
+    const sorted = Object.entries(gScores).sort((a,b)=>b[1]-a[1]);
+    if(sorted.length){
+      const top = sorted[0][0];
+      const guide = GOAL_GUIDE[top];
+      goalOrientation = guide ? guide.label : top;
+      goalNote = guide ? guide.text.split('.').slice(0,2).join('.') + '.' : '';
+    }
+  }
+
+  // Posts (newest first, compact)
+  const posts = (rec.posts||[]).slice().sort((a,b)=>b.timestamp-a.timestamp);
+
+  // Cambridge exams summary
+  const cambridgeSummary = (rec.cambridgeExams||[]).map(e => {
+    const type = CAMBRIDGE_EXAM_TYPES.find(t=>t.value===e.testType);
+    const label = type ? type.label : (e.testType||'Unknown');
+    const dateStr = e.date ? new Date(e.date).toLocaleDateString(undefined,{month:'short',year:'numeric'}) : '';
+    return `${label}${dateStr?' ('+dateStr+')':''}: ${e.total||'—'}`;
+  }).join('; ');
+
+  const otherTestsSummary = (rec.otherEnglishTests||[]).map(t => {
+    const dateStr = t.date ? new Date(t.date).toLocaleDateString(undefined,{month:'short',year:'numeric'}) : '';
+    return `${t.testName||'Test'}${dateStr?' ('+dateStr+')':''}: ${t.score||'—'}`;
+  }).join('; ');
+
+  return `
+  <div class="print-summary">
+    <div class="ps-header">
+      <h1>Learner Profile — ${escapeHtml(rec.name)}</h1>
+      <div class="ps-meta">${lvl.label} · ${lvl.grades} · Age ${ageDisplay} · Class: ${escapeHtml(rec.className||'—')} · Assessed: ${date}${rec.birthdate ? ' · DOB: '+escapeHtml(rec.birthdate) : ''}</div>
+    </div>
+
+    ${rec.goal ? `<div class="ps-goal-box"><strong>Goal:</strong> ${escapeHtml(rec.goal)}</div>` : ''}
+
+    <div class="ps-section">
+      <div class="ps-section-title">Assessment Summary</div>
+      <table class="ps-zone-table">
+        <thead><tr><th>Domain</th><th>Score</th><th>Zone</th><th>Interpretation</th></tr></thead>
+        <tbody>
+          ${zoneRows.map(r => {
+            const zoneColor = r.zone==='green'?'#2E7D32':r.zone==='yellow'?'#E8A000':'#C62828';
+            return `<tr>
+              <td><strong>${r.sec.title}</strong></td>
+              <td>${r.res.compositeScore} / ${r.res.compositeMax}</td>
+              <td><span class="ps-zone-dot" style="background:${zoneColor};"></span>${r.zm.label}</td>
+              <td>${escapeHtml(r.recommendation)}</td>
+            </tr>`;
+          }).join('')}
+          <tr>
+            <td><strong>Learning Preferences</strong></td>
+            <td colspan="2">Top: ${escapeHtml(topPrefs)}</td>
+            <td>Descriptive only — not predictive of outcomes</td>
+          </tr>
+          <tr>
+            <td><strong>Goal Orientation</strong></td>
+            <td colspan="2">${escapeHtml(goalOrientation)}</td>
+            <td>${escapeHtml(goalNote)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ps-section">
+      <div class="ps-section-title">Student Profile</div>
+      <div class="ps-grid">
+        ${(rec.subjectStrengths||[]).length ? `<dt>Subject strengths</dt><dd>${(rec.subjectStrengths||[]).map(s=>escapeHtml(s)).join(', ')}</dd>` : ''}
+        ${rec.likes ? `<dt>Likes</dt><dd>${escapeHtml(rec.likes)}</dd>` : ''}
+        ${rec.dislikes ? `<dt>Dislikes</dt><dd>${escapeHtml(rec.dislikes)}</dd>` : ''}
+        ${(rec.interestsChecked||[]).length ? `<dt>Interests</dt><dd>${(rec.interestsChecked||[]).map(i=>escapeHtml(i)).join(', ')}</dd>` : ''}
+        ${rec.interestsFree ? `<dt>Other interests</dt><dd>${escapeHtml(rec.interestsFree)}</dd>` : ''}
+      </div>
+    </div>
+
+    <div class="ps-section">
+      <div class="ps-section-title">Learning Access</div>
+      <div class="ps-grid">
+        ${(rec.accommodations||[]).length ? `<dt>Accommodations</dt><dd>${(rec.accommodations||[]).map(a=>escapeHtml(a)).join(', ')}</dd>` : ''}
+        ${rec.accommodationNotes ? `<dt>Accommodation notes</dt><dd>${escapeHtml(rec.accommodationNotes)}</dd>` : ''}
+        ${rec.attendancePattern ? `<dt>Attendance</dt><dd>${escapeHtml(ATTENDANCE_OPTIONS.find(o=>o.value===rec.attendancePattern)?.label || rec.attendancePattern)}${rec.attendanceNote ? ' — '+escapeHtml(rec.attendanceNote) : ''}</dd>` : ''}
+        ${rec.firstLanguage ? `<dt>First language</dt><dd>${escapeHtml(rec.firstLanguage)}</dd>` : ''}
+        ${rec.otherLanguages ? `<dt>Other languages</dt><dd>${escapeHtml(rec.otherLanguages)}</dd>` : ''}
+        ${rec.englishProficiency ? `<dt>English proficiency</dt><dd>${escapeHtml(PROFICIENCY_LEVELS.find(o=>o.value===rec.englishProficiency)?.label || rec.englishProficiency)}${rec.cefrLevel ? ' (CEFR: '+escapeHtml(rec.cefrLevel)+')' : ''}</dd>` : rec.cefrLevel ? `<dt>CEFR level</dt><dd>${escapeHtml(rec.cefrLevel)}</dd>` : ''}
+        ${rec.chineseProficiency ? `<dt>Chinese proficiency</dt><dd>${escapeHtml(PROFICIENCY_LEVELS.find(o=>o.value===rec.chineseProficiency)?.label || rec.chineseProficiency)}</dd>` : ''}
+        ${cambridgeSummary ? `<dt>Cambridge exams</dt><dd>${escapeHtml(cambridgeSummary)}</dd>` : ''}
+        ${otherTestsSummary ? `<dt>Other English tests</dt><dd>${escapeHtml(otherTestsSummary)}</dd>` : ''}
+        ${rec.physicalMedicalNotes ? `<dt>Physical / medical</dt><dd>${escapeHtml(rec.physicalMedicalNotes)}</dd>` : ''}
+      </div>
+    </div>
+
+    ${(rec.communicationPreferences?.length || rec.bestTimeOfDay || rec.groupRoleTendency || rec.familyContext || rec.supportNetwork) ? `
+    <div class="ps-section">
+      <div class="ps-section-title">Communication &amp; Context</div>
+      <div class="ps-grid">
+        ${rec.bestTimeOfDay ? `<dt>Best time of day</dt><dd>${escapeHtml(TIME_OF_DAY_OPTIONS.find(o=>o.value===rec.bestTimeOfDay)?.label || rec.bestTimeOfDay)}</dd>` : ''}
+        ${(rec.communicationPreferences||[]).length ? `<dt>Communication prefs</dt><dd>${rec.communicationPreferences.map(c=>escapeHtml(c)).join(', ')}</dd>` : ''}
+        ${rec.groupRoleTendency ? `<dt>Group role</dt><dd>${escapeHtml(GROUP_ROLE_OPTIONS.find(o=>o.value===rec.groupRoleTendency)?.label || rec.groupRoleTendency)}</dd>` : ''}
+        ${rec.familyContext ? `<dt>Family context</dt><dd>${escapeHtml(rec.familyContext)}</dd>` : ''}
+        ${rec.supportNetwork ? `<dt>Support network</dt><dd>${escapeHtml(rec.supportNetwork)}</dd>` : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    ${rec.notes ? `
+    <div class="ps-section">
+      <div class="ps-section-title">Additional Notes</div>
+      <div class="ps-inline-list">${escapeHtml(rec.notes)}</div>
+    </div>
+    ` : ''}
+
+    ${(rec.teacherObs && Object.values(rec.teacherObs).some(v=>v)) ? `
+    <div class="ps-section">
+      <div class="ps-section-title">Teacher Observation</div>
+      <div class="ps-grid">
+        ${rec.teacherObs.attention ? `<dt>Attention / Focus</dt><dd>${escapeHtml(rec.teacherObs.attention)}</dd>` : ''}
+        ${rec.teacherObs.social ? `<dt>Social Interaction</dt><dd>${escapeHtml(rec.teacherObs.social)}</dd>` : ''}
+        ${rec.teacherObs.emotional ? `<dt>Emotional Regulation</dt><dd>${escapeHtml(rec.teacherObs.emotional)}</dd>` : ''}
+        ${rec.teacherObs.workHabits ? `<dt>Work Habits</dt><dd>${escapeHtml(rec.teacherObs.workHabits)}</dd>` : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    ${posts.length ? `
+    <div class="ps-section">
+      <div class="ps-section-title">Posts &amp; Updates (${posts.length})</div>
+      <div class="ps-posts">
+        ${posts.map(p => `<div class="ps-post"><span class="ps-post-date">${formatPostTimestamp(p.timestamp)}${p.editedAt?' (edited)':''}</span><br>${escapeHtml(p.content)}</div>`).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="ps-footer">
+      Learner Profile System — screening tool for instructional planning. Not a validated clinical instrument. Score zones are proportional heuristics, not normed cutoffs.
+    </div>
+  </div>`;
+}
+
 function renderScoredSection(sec, rec, lvl, scaleMax){
   const res = computeSectionResult(sec, rec.answers, scaleMax);
   const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
@@ -2309,6 +2536,7 @@ function renderClassOverview(){
     <div class="class-actions-bar no-print">
       <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
+      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
 
@@ -2830,8 +3058,11 @@ function renderData(){
 
     <div class="data-section">
       <h2>Export all records</h2>
-      <p>Download all your records as a single JSON file. This is your backup — keep it somewhere safe.</p>
-      <button class="btn btn-primary" onclick="App.exportAll()" ${state.students.length===0?'disabled':''}>Download JSON</button>
+      <p>Download all your records as a single JSON file (for backup or transfer) or as a CSV file (for spreadsheet analysis in Excel or Google Sheets).</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="App.exportAll()" ${state.students.length===0?'disabled':''}>Download JSON (backup)</button>
+        <button class="btn btn-primary" onclick="App.exportAllCSV()" ${state.students.length===0?'disabled':''}>Download CSV (analysis)</button>
+      </div>
     </div>
 
     <div class="data-section">
@@ -3506,6 +3737,27 @@ const App = {
     render();
   },
 
+  /* ── CSV Export ── */
+  exportStudentCSV(id){
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    const csv = buildStudentCSV([rec]);
+    downloadCSV(csv, `learner-profile-${(rec.name||'student').replace(/[^a-zA-Z0-9]/g,'-')}.csv`);
+  },
+
+  exportClassCSV(className){
+    const students = studentsInClass(className);
+    if(!students.length){ alert('No students in this class.'); return; }
+    const csv = buildStudentCSV(students);
+    downloadCSV(csv, `class-${(className||'all').replace(/[^a-zA-Z0-9]/g,'-')}-profiles.csv`);
+  },
+
+  exportAllCSV(){
+    if(!state.students.length){ alert('No student records to export.'); return; }
+    const csv = buildStudentCSV(state.students);
+    downloadCSV(csv, `all-learner-profiles-${new Date().toISOString().slice(0,10)}.csv`);
+  },
+
   /* ── Export / Import ── */
   exportAll(){
     const payload = {
@@ -3544,6 +3796,146 @@ const App = {
   },
 };
 window.App = App;
+
+/* ══════════════════════════════════════════════════════════════
+   UTIL
+   ══════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════
+   CSV EXPORT HELPERS
+   ══════════════════════════════════════════════════════════════ */
+
+function csvEscape(val){
+  val = String(val == null ? '' : val);
+  if(val.indexOf(',') >= 0 || val.indexOf('"') >= 0 || val.indexOf('\n') >= 0)
+    return '"' + val.replace(/"/g, '""') + '"';
+  return val;
+}
+
+function downloadCSV(csv, filename){
+  const bom = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+  const blob = new Blob([bom + csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function buildStudentCSV(students){
+  const headers = [
+    'Name','Age','Birthdate','Class','Level','Goal',
+    'Subject Strengths','Likes','Dislikes',
+    'Accommodations','Accommodation Notes','Attendance Pattern','Attendance Note',
+    'First Language','Other Languages','English Proficiency','CEFR Level','Chinese Proficiency',
+    'Cambridge Exams','Other English Tests',
+    'Physical/Medical Notes',
+    'Best Time of Day','Communication Preferences','Group Role','Family Context','Support Network',
+    'Section A Score','Section A Max','Section A Zone',
+    'Section C Score','Section C Max','Section C Zone',
+    'Section D Score','Section D Max','Section D Zone',
+    'Section E Score','Section E Max','Section E Zone',
+    'Top Learning Preference','Dominant Goal Orientation',
+    'Interests','Interest Free Response',
+    'Teacher Obs: Attention','Teacher Obs: Social','Teacher Obs: Emotional','Teacher Obs: Work Habits',
+    'Notes','Post Count','Latest Post Date',
+    'Assessment Count','Latest Assessment Date',
+  ];
+
+  const rows = students.map(rec => {
+    const secs = SECTIONS[rec.level];
+    const scaleMax = scaleMaxFor(rec.level);
+    const vals = [];
+
+    vals.push(rec.name||'');
+    vals.push(computeAge(rec.birthdate) !== null ? computeAge(rec.birthdate) : (rec.age||''));
+    vals.push(rec.birthdate||'');
+    vals.push(rec.className||'');
+    vals.push(LEVEL_META[rec.level]?.label||rec.level||'');
+    vals.push(rec.goal||'');
+    vals.push((rec.subjectStrengths||[]).join('; '));
+    vals.push(rec.likes||'');
+    vals.push(rec.dislikes||'');
+    vals.push((rec.accommodations||[]).join('; '));
+    vals.push(rec.accommodationNotes||'');
+    vals.push(ATTENDANCE_OPTIONS.find(o=>o.value===rec.attendancePattern)?.label || rec.attendancePattern || '');
+    vals.push(rec.attendanceNote||'');
+    vals.push(rec.firstLanguage||'');
+    vals.push(rec.otherLanguages||'');
+    vals.push(PROFICIENCY_LEVELS.find(o=>o.value===rec.englishProficiency)?.label || rec.englishProficiency || '');
+    vals.push(rec.cefrLevel||'');
+    vals.push(PROFICIENCY_LEVELS.find(o=>o.value===rec.chineseProficiency)?.label || rec.chineseProficiency || '');
+
+    // Cambridge exams as compact string
+    const camStr = (rec.cambridgeExams||[]).map(e => {
+      const t = CAMBRIDGE_EXAM_TYPES.find(x=>x.value===e.testType);
+      return `${t?t.label:e.testType||'?'}: R${e.reading||'-'} W${e.writing||'-'} L${e.listening||'-'} S${e.speaking||'-'} T${e.total||'-'}${e.date?' ('+e.date+')':''}`;
+    }).join('; ');
+    vals.push(camStr);
+
+    const otherStr = (rec.otherEnglishTests||[]).map(t => `${t.testName||'?'}: ${t.score||'-'}${t.date?' ('+t.date+')':''}${t.notes?' ['+t.notes+']':''}`).join('; ');
+    vals.push(otherStr);
+
+    vals.push(rec.physicalMedicalNotes||'');
+    vals.push(TIME_OF_DAY_OPTIONS.find(o=>o.value===rec.bestTimeOfDay)?.label || rec.bestTimeOfDay || '');
+    vals.push((rec.communicationPreferences||[]).join('; '));
+    vals.push(GROUP_ROLE_OPTIONS.find(o=>o.value===rec.groupRoleTendency)?.label || rec.groupRoleTendency || '');
+    vals.push(rec.familyContext||'');
+    vals.push(rec.supportNetwork||'');
+
+    // Scored sections
+    ['A','C','D','E'].forEach(id => {
+      const sec = secs.find(s=>s.id===id);
+      if(!sec){ vals.push('','',''); return; }
+      const res = computeSectionResult(sec, rec.answers, scaleMax);
+      const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+      vals.push(res.compositeScore);
+      vals.push(res.compositeMax);
+      vals.push(ZONE_META[zone].label);
+    });
+
+    // Top learning preference
+    const secB = secs.find(s=>s.id==='B');
+    if(secB){
+      const bScores = {};
+      secB.items.forEach(it => bScores[it.domain] = (bScores[it.domain]||0)+(rec.answers[it.id]||0));
+      const top = Object.entries(bScores).sort((a,b)=>b[1]-a[1]);
+      vals.push(top.length ? (DOMAIN_LABELS[top[0][0]]||top[0][0]) : '');
+    } else vals.push('');
+
+    // Dominant goal orientation
+    const secG = secs.find(s=>s.id==='G');
+    if(secG){
+      const gScores = {};
+      secG.items.forEach(it => gScores[it.domain] = (gScores[it.domain]||0)+(rec.answers[it.id]||0));
+      const top = Object.entries(gScores).sort((a,b)=>b[1]-a[1]);
+      vals.push(top.length ? (GOAL_LABELS[top[0][0]]||top[0][0]) : '');
+    } else vals.push('');
+
+    vals.push((rec.interestsChecked||[]).join('; '));
+    vals.push(rec.interestsFree||'');
+
+    const obs = rec.teacherObs||{};
+    vals.push(obs.attention||'');
+    vals.push(obs.social||'');
+    vals.push(obs.emotional||'');
+    vals.push(obs.workHabits||'');
+
+    vals.push(rec.notes||'');
+    const posts = rec.posts||[];
+    vals.push(posts.length);
+    vals.push(posts.length ? new Date(Math.max(...posts.map(p=>p.timestamp))).toLocaleDateString() : '');
+
+    const history = rec.history||[];
+    vals.push(history.length + 1);
+    vals.push(new Date(rec.updatedAt||rec.createdAt).toLocaleDateString());
+
+    return vals.map(csvEscape).join(',');
+  });
+
+  return headers.map(csvEscape).join(',') + '\n' + rows.join('\n');
+}
 
 /* ══════════════════════════════════════════════════════════════
    UTIL
