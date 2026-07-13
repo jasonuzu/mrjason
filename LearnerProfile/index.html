@@ -474,6 +474,107 @@
     font-size: 12.5px; font-style: italic;
   }
 
+  /* ── Learning Context sections (subsection headers, radio chips, badges) ── */
+  .subsection-header {
+    font-family: Georgia, serif; font-weight: 700; font-size: 14px; color: var(--ink);
+    margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule-soft);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .subsection-header:first-child { margin-top: 0; }
+  .subsection-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 10px; line-height: 1.5; }
+
+  .radio-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .radio-chip {
+    padding: 6px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500;
+    border: 1.5px solid var(--rule); background: var(--paper-raised); color: var(--ink-soft);
+    cursor: pointer; font-family: inherit; transition: all 0.1s;
+  }
+  .radio-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .radio-chip.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .field-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+  }
+  .field-grid-2 label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field-grid-2 input[type=text] {
+    width: 100%; padding: 9px 12px; border-radius: 5px;
+    border: 1.5px solid var(--rule); font-size: 13.5px; font-family: inherit;
+    background: var(--paper-raised); color: var(--ink); outline: none; box-sizing: border-box;
+  }
+  .field-grid-2 input[type=text]:focus { border-color: var(--accent); }
+  .context-textarea {
+    width: 100%; padding: 10px 12px; border-radius: 5px; border: 1.5px solid var(--rule);
+    font-size: 13.5px; font-family: inherit; resize: vertical; min-height: 60px;
+    outline: none; background: var(--paper-raised); line-height: 1.55; box-sizing: border-box;
+    margin-bottom: 8px;
+  }
+  .context-textarea:focus { border-color: var(--accent); }
+
+  /* ACC badge on record cards */
+  .acc-badge {
+    background: var(--accent); color: #fff; font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 3px; letter-spacing: 0.5px; text-transform: uppercase;
+    margin-left: 6px; vertical-align: middle;
+  }
+
+  /* ── English test score cards ── */
+  .test-card {
+    border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px;
+    margin-bottom: 10px; background: #FBFAF6;
+  }
+  .test-card-head {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .test-card-head select, .test-card-head input[type=text], .test-card-head input[type=date] {
+    padding: 6px 10px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 13px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none;
+  }
+  .test-card-head select:focus, .test-card-head input:focus { border-color: var(--accent); }
+  .test-card-head select { flex: 1.5; min-width: 140px; }
+  .test-card-head input[type=text].test-name { flex: 1.5; min-width: 140px; }
+  .test-card-head input[type=date] { flex: 1; min-width: 120px; }
+  .test-card-head .del-btn {
+    background: transparent; border: 1px solid var(--rule);
+    color: var(--ink-faint); width: 28px; height: 28px;
+    border-radius: 4px; font-size: 16px; line-height: 1; cursor: pointer;
+    padding: 0; display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  .test-card-head .del-btn:hover {
+    border-color: var(--red-border); color: var(--red); background: var(--red-bg);
+  }
+  .score-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    margin-bottom: 8px;
+  }
+  .score-field { display: flex; flex-direction: column; }
+  .score-field label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--ink-faint); margin-bottom: 3px; text-align: center; font-weight: 600;
+  }
+  .score-field input {
+    padding: 7px 8px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 12.5px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; text-align: center; box-sizing: border-box;
+  }
+  .score-field input:focus { border-color: var(--accent); }
+  .other-test-score {
+    width: 100%; padding: 8px 12px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 13px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; margin-bottom: 8px; box-sizing: border-box;
+  }
+  .other-test-score:focus { border-color: var(--accent); }
+  .test-empty-state {
+    padding: 12px; text-align: center; color: var(--ink-faint);
+    font-size: 12.5px; font-style: italic; margin-bottom: 8px;
+  }
+
+  @media (max-width: 640px) {
+    .field-grid-2 { grid-template-columns: 1fr; }
+    .score-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
   @media (max-width: 640px) {
     .interest-grid { grid-template-columns: 1fr; }
     .level-options { grid-template-columns: 1fr; }
@@ -670,6 +771,85 @@ const SUBJECTS = [
   'Math', 'Biology', 'Chemistry', 'Physical Education',
   'Science', 'History', 'Geography',
   'Chinese Language', 'English Language', 'Literature'
+];
+
+// Tier 1: Learning Access predefined options
+const ACCOMMODATIONS = [
+  'Extended time on tests',
+  'Preferential seating',
+  'Movement breaks',
+  'Sensory tools allowed',
+  'Assistive technology',
+  'Modified assignments',
+  'Reduced homework load',
+  'Written + verbal instructions',
+  'Frequent check-ins',
+  'Chunked instructions',
+  'Access to quiet space',
+  'Rest breaks during long tasks',
+];
+
+const ATTENDANCE_OPTIONS = [
+  { value: 'regular', label: 'Regular attendance' },
+  { value: 'occasional', label: 'Occasional absences' },
+  { value: 'frequent', label: 'Frequent absences' },
+];
+
+const PROFICIENCY_LEVELS = [
+  { value: 'beginner', label: 'Beginner' },
+  { value: 'developing', label: 'Developing' },
+  { value: 'proficient', label: 'Proficient' },
+  { value: 'native', label: 'Native / Fluent' },
+];
+
+// CEFR levels for European framework English proficiency
+const CEFR_LEVELS = [
+  { value: 'A1', label: 'A1' },
+  { value: 'A2', label: 'A2' },
+  { value: 'B1', label: 'B1' },
+  { value: 'B2', label: 'B2' },
+  { value: 'C1', label: 'C1' },
+  { value: 'C2', label: 'C2' },
+];
+
+// Cambridge English exam types
+const CAMBRIDGE_EXAM_TYPES = [
+  { value: 'YLE_Starters', label: 'YLE Starters (Pre A1)' },
+  { value: 'YLE_Movers', label: 'YLE Movers (A1)' },
+  { value: 'YLE_Flyers', label: 'YLE Flyers (A2)' },
+  { value: 'KET', label: 'KET / A2 Key' },
+  { value: 'PET', label: 'PET / B1 Preliminary' },
+  { value: 'FCE', label: 'FCE / B2 First' },
+  { value: 'CAE', label: 'CAE / C1 Advanced' },
+  { value: 'CPE', label: 'CPE / C2 Proficiency' },
+];
+
+// Tier 2: Communication & Context predefined options
+const COMMUNICATION_PREFS = [
+  'Public praise works well',
+  'Private praise preferred',
+  'Written feedback preferred',
+  'Verbal feedback preferred',
+  'Direct / blunt feedback OK',
+  'Prefers gentle framing',
+  'Avoid calling out in class',
+  'Responds well to challenge',
+];
+
+const TIME_OF_DAY_OPTIONS = [
+  { value: 'mornings', label: 'Mornings' },
+  { value: 'midday', label: 'Middle of day' },
+  { value: 'afternoons', label: 'Afternoons' },
+  { value: 'after_breaks', label: 'After breaks' },
+  { value: 'varies', label: 'Varies' },
+];
+
+const GROUP_ROLE_OPTIONS = [
+  { value: 'leader', label: 'Natural leader' },
+  { value: 'contributor', label: 'Active contributor' },
+  { value: 'follower', label: 'Steady follower' },
+  { value: 'observer', label: 'Quiet observer' },
+  { value: 'varies', label: 'Varies' },
 ];
 
 // Compute integer age (in whole years) from an ISO date string. Returns null if invalid.
@@ -875,6 +1055,25 @@ function migrateStudent(rec){
   if(rec.likes === undefined) rec.likes = '';
   if(rec.dislikes === undefined) rec.dislikes = '';
   if(!rec.posts) rec.posts = [];
+  // Tier 1: Learning Access
+  if(!rec.accommodations) rec.accommodations = [];
+  if(rec.accommodationNotes === undefined) rec.accommodationNotes = '';
+  if(rec.attendancePattern === undefined) rec.attendancePattern = '';
+  if(rec.attendanceNote === undefined) rec.attendanceNote = '';
+  if(rec.firstLanguage === undefined) rec.firstLanguage = '';
+  if(rec.otherLanguages === undefined) rec.otherLanguages = '';
+  if(rec.englishProficiency === undefined) rec.englishProficiency = '';
+  if(rec.chineseProficiency === undefined) rec.chineseProficiency = '';
+  if(rec.cefrLevel === undefined) rec.cefrLevel = '';
+  if(!rec.cambridgeExams) rec.cambridgeExams = [];
+  if(!rec.otherEnglishTests) rec.otherEnglishTests = [];
+  if(rec.familyContext === undefined) rec.familyContext = '';
+  if(rec.physicalMedicalNotes === undefined) rec.physicalMedicalNotes = '';
+  // Tier 2: Communication & Context
+  if(rec.supportNetwork === undefined) rec.supportNetwork = '';
+  if(rec.bestTimeOfDay === undefined) rec.bestTimeOfDay = '';
+  if(!rec.communicationPreferences) rec.communicationPreferences = [];
+  if(rec.groupRoleTendency === undefined) rec.groupRoleTendency = '';
   return rec;
 }
 
@@ -962,6 +1161,11 @@ function suggestLevel(age){
 function newDraft(){
   return { id:uid(), name:'', age:'', birthdate:'', level:null, className:'', notes:'',
     subjectStrengths:[], likes:'', dislikes:'', posts:[],
+    accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
+    firstLanguage:'', otherLanguages:'', englishProficiency:'', chineseProficiency:'',
+    cefrLevel:'', cambridgeExams:[], otherEnglishTests:[],
+    familyContext:'', physicalMedicalNotes:'',
+    supportNetwork:'', bestTimeOfDay:'', communicationPreferences:[], groupRoleTendency:'',
     sectionIndex:0, answers:{}, interestsChecked:[], interestsFree:'',
     teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' }, createdAt:Date.now() };
 }
@@ -1082,6 +1286,7 @@ function renderRecordCard(rec){
   const initials = (rec.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
   const allClasses = getAllClassNames();
   const currentClass = (rec.className||'').trim();
+  const hasAccommodations = (rec.accommodations && rec.accommodations.length) || (rec.accommodationNotes && rec.accommodationNotes.trim());
   // Build the "move" select options: existing classes + Unassigned + option to prompt for new
   const moveOptions = [
     `<option value="" disabled selected>Move to…</option>`,
@@ -1093,7 +1298,7 @@ function renderRecordCard(rec){
   <div class="record-card" style="border-left-color:${lvl.color};">
     <div class="record-tab" style="background:${lvl.light};color:${lvl.color};">${initials}</div>
     <div class="record-info" onclick="App.openReport('${rec.id}')">
-      <div class="record-name">${escapeHtml(rec.name)}</div>
+      <div class="record-name">${escapeHtml(rec.name)}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
       <div class="record-meta">${lvl.label} · Age ${escapeHtml(String(rec.age||'?'))} · Updated ${date}</div>
     </div>
     <div class="record-zones" onclick="App.openReport('${rec.id}')" title="Section zones">
@@ -1442,6 +1647,9 @@ function renderReport(){
       </div>
     </div>
 
+    ${renderLearningAccessSection(rec, lvl)}
+    ${renderContextSection(rec, lvl)}
+
     <div class="section-block no-print-collapse">
       <div class="sb-head">
         <div>
@@ -1499,6 +1707,206 @@ function formatPostTimestamp(ts){
   const dateStr = d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
   const timeStr = d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
   return dateStr + ' · ' + timeStr;
+}
+
+// Render a single-select radio-chip group. currentValue is the stored value, options is [{value,label},...]
+function renderRadioGroup(currentValue, options, onSelectMethod){
+  return `<div class="radio-group">
+    ${options.map(o => `<button class="radio-chip ${currentValue===o.value?'selected':''}" onclick="App.${onSelectMethod}('${escapeAttr(o.value)}')">${escapeHtml(o.label)}</button>`).join('')}
+    ${currentValue ? `<button class="radio-chip" onclick="App.${onSelectMethod}('')" style="color:var(--ink-faint);border-style:dashed;">Clear</button>` : ''}
+  </div>`;
+}
+
+// Render a multi-select chip group (checkbox-style), for accommodations/communication prefs
+function renderChipMultiSelect(selectedList, allOptions, toggleMethod, lvl){
+  const selected = selectedList || [];
+  const custom = selected.filter(x => !allOptions.includes(x));
+  const chips = [...allOptions, ...custom];
+  return chips.map(item => {
+    const checked = selected.includes(item);
+    return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.${toggleMethod}('${escapeAttr(item)}')">
+      <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(item)}
+    </div>`;
+  }).join('');
+}
+
+// Render a Cambridge exam entry card
+function renderCambridgeExamCard(exam){
+  return `
+    <div class="test-card">
+      <div class="test-card-head">
+        <select onchange="App.updateCambridgeExam('${exam.id}', 'testType', this.value)">
+          <option value="">— Select test —</option>
+          ${CAMBRIDGE_EXAM_TYPES.map(t => `<option value="${t.value}" ${exam.testType===t.value?'selected':''}>${escapeHtml(t.label)}</option>`).join('')}
+        </select>
+        <input type="date" value="${escapeHtml(exam.date||'')}" title="Date taken"
+          oninput="App.updateCambridgeExam('${exam.id}', 'date', this.value)">
+        <button class="del-btn no-print" title="Delete this exam entry"
+          onclick="App.deleteCambridgeExam('${exam.id}')">×</button>
+      </div>
+      <div class="score-grid">
+        <div class="score-field">
+          <label>Reading</label>
+          <input type="text" value="${escapeHtml(exam.reading||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'reading', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Writing</label>
+          <input type="text" value="${escapeHtml(exam.writing||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'writing', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Listening</label>
+          <input type="text" value="${escapeHtml(exam.listening||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'listening', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Speaking</label>
+          <input type="text" value="${escapeHtml(exam.speaking||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'speaking', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Total</label>
+          <input type="text" value="${escapeHtml(exam.total||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'total', this.value)"
+            style="font-weight:600;">
+        </div>
+      </div>
+    </div>`;
+}
+
+// Render an "other English test" entry card
+function renderOtherEnglishTestCard(test){
+  return `
+    <div class="test-card">
+      <div class="test-card-head">
+        <input type="text" class="test-name" value="${escapeHtml(test.testName||'')}"
+          placeholder="Test name — e.g. IELTS, TOEFL, PTE, Duolingo English Test"
+          oninput="App.updateOtherEnglishTest('${test.id}', 'testName', this.value)">
+        <input type="date" value="${escapeHtml(test.date||'')}" title="Date taken"
+          oninput="App.updateOtherEnglishTest('${test.id}', 'date', this.value)">
+        <button class="del-btn no-print" title="Delete this test entry"
+          onclick="App.deleteOtherEnglishTest('${test.id}')">×</button>
+      </div>
+      <input type="text" class="other-test-score" value="${escapeHtml(test.score||'')}"
+        placeholder="Overall score — e.g. 7.5, 105/120, B2 High"
+        oninput="App.updateOtherEnglishTest('${test.id}', 'score', this.value)">
+      <textarea class="context-textarea" style="min-height:44px;margin-bottom:0;"
+        placeholder="Optional notes — subscores, test variant (Academic/General), percentile, etc."
+        oninput="App.updateOtherEnglishTest('${test.id}', 'notes', this.value)">${escapeHtml(test.notes||'')}</textarea>
+    </div>`;
+}
+
+function renderLearningAccessSection(rec, lvl){
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Learning Access &amp; Accommodations</div>
+          <div class="sb-domain">Practical information that affects how this student can access the lesson</div>
+        </div>
+      </div>
+
+      <h4 class="subsection-header">🛠 Accommodations</h4>
+      <p class="subsection-hint">Tick anything this student is entitled to or benefits from.</p>
+      <div class="interest-grid">
+        ${renderChipMultiSelect(rec.accommodations, ACCOMMODATIONS, 'toggleAccommodation', lvl)}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;" class="no-print">
+        <input type="text" id="rp-custom-accommodation" placeholder="Add custom accommodation…" style="flex:1;padding:8px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13px;font-family:inherit;background:var(--paper-raised);outline:none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();App.addCustomAccommodation();}">
+        <button class="btn btn-ghost btn-sm" onclick="App.addCustomAccommodation()" style="white-space:nowrap;">+ Add</button>
+      </div>
+      <textarea class="context-textarea" placeholder="Notes on accommodations — implementation details, IEP references, when to apply…"
+        oninput="App.updateAccommodationNotes(this.value)">${escapeHtml(rec.accommodationNotes||'')}</textarea>
+
+      <h4 class="subsection-header">📅 Attendance Pattern</h4>
+      ${renderRadioGroup(rec.attendancePattern, ATTENDANCE_OPTIONS, 'setAttendancePattern')}
+      <textarea class="context-textarea" placeholder="Context — e.g. medical appointments Fridays, family situation causing lateness, home schooling arrangements…"
+        oninput="App.updateAttendanceNote(this.value)">${escapeHtml(rec.attendanceNote||'')}</textarea>
+
+      <h4 class="subsection-header">🗣 Language Background</h4>
+      <div class="field-grid-2">
+        <div>
+          <label>First language</label>
+          <input type="text" value="${escapeHtml(rec.firstLanguage||'')}" placeholder="e.g. Mandarin, Cantonese, English"
+            oninput="App.updateFirstLanguage(this.value)">
+        </div>
+        <div>
+          <label>Other languages spoken</label>
+          <input type="text" value="${escapeHtml(rec.otherLanguages||'')}" placeholder="e.g. Shanghainese, Spanish"
+            oninput="App.updateOtherLanguages(this.value)">
+        </div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">English proficiency</label>
+        ${renderRadioGroup(rec.englishProficiency, PROFICIENCY_LEVELS, 'setEnglishProficiency')}
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">CEFR level <span style="text-transform:none;font-weight:400;color:var(--ink-faint);">(European framework — more precise, if known)</span></label>
+        ${renderRadioGroup(rec.cefrLevel, CEFR_LEVELS, 'setCEFRLevel')}
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Chinese proficiency</label>
+        ${renderRadioGroup(rec.chineseProficiency, PROFICIENCY_LEVELS, 'setChineseProficiency')}
+      </div>
+
+      <h4 class="subsection-header">📝 English Test Scores</h4>
+      <p class="subsection-hint">Record standardized English test results. Add multiple entries to track scores over time.</p>
+
+      <div style="font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:14px 0 8px;">Cambridge English exams</div>
+      ${(rec.cambridgeExams && rec.cambridgeExams.length)
+        ? rec.cambridgeExams.map(renderCambridgeExamCard).join('')
+        : '<div class="test-empty-state">No Cambridge exams recorded yet.</div>'}
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.addCambridgeExam()" style="margin-bottom:16px;">+ Add Cambridge exam</button>
+
+      <div style="font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:8px 0 8px;">Other English tests</div>
+      <p class="subsection-hint" style="margin-top:-2px;">IELTS, TOEFL, PTE, school-internal tests — any test with its own scoring.</p>
+      ${(rec.otherEnglishTests && rec.otherEnglishTests.length)
+        ? rec.otherEnglishTests.map(renderOtherEnglishTestCard).join('')
+        : '<div class="test-empty-state">No other tests recorded yet.</div>'}
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.addOtherEnglishTest()">+ Add other test</button>
+
+      <h4 class="subsection-header">🏥 Physical / Medical Notes</h4>
+      <p class="subsection-hint">Only what's needed for classroom function — sight or hearing needs, medication affecting attention, allergies for lab classes, etc.</p>
+      <textarea class="context-textarea" placeholder="e.g. wears hearing aid on the right ear, requires seat near board; carries EpiPen for peanut allergy…"
+        oninput="App.updatePhysicalMedicalNotes(this.value)">${escapeHtml(rec.physicalMedicalNotes||'')}</textarea>
+    </div>`;
+}
+
+function renderContextSection(rec, lvl){
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Communication &amp; Personal Context</div>
+          <div class="sb-domain">How to reach this student and family — soft context that shapes daily interactions</div>
+        </div>
+      </div>
+
+      <h4 class="subsection-header">⏰ Best Time of Day for Focused Work</h4>
+      ${renderRadioGroup(rec.bestTimeOfDay, TIME_OF_DAY_OPTIONS, 'setBestTimeOfDay')}
+
+      <h4 class="subsection-header">💬 Communication Preferences</h4>
+      <p class="subsection-hint">How this student best receives feedback and attention. Tick any that apply.</p>
+      <div class="interest-grid">
+        ${renderChipMultiSelect(rec.communicationPreferences, COMMUNICATION_PREFS, 'toggleCommunicationPref', lvl)}
+      </div>
+
+      <h4 class="subsection-header">👥 Group Role Tendency</h4>
+      <p class="subsection-hint">How this student typically shows up in groups — complements the grouping suggestions tool.</p>
+      ${renderRadioGroup(rec.groupRoleTendency, GROUP_ROLE_OPTIONS, 'setGroupRoleTendency')}
+
+      <h4 class="subsection-header">👪 Family / Caregiver Context</h4>
+      <p class="subsection-hint">Only if known and relevant. One line about the home situation — e.g. "lives with grandmother," "shared custody, alternate weeks," "parent works nights."</p>
+      <textarea class="context-textarea" placeholder="Optional — brief context about home life relevant to school"
+        oninput="App.updateFamilyContext(this.value)">${escapeHtml(rec.familyContext||'')}</textarea>
+
+      <h4 class="subsection-header">🤝 Support Network at School</h4>
+      <p class="subsection-hint">Others who work with this student — learning support teacher, counsellor, sports coach, form tutor, peer mentor.</p>
+      <textarea class="context-textarea" placeholder="e.g. Ms. Chen (learning support, Tues+Thurs), Mr. Li (counselling, biweekly), swim coach…"
+        oninput="App.updateSupportNetwork(this.value)">${escapeHtml(rec.supportNetwork||'')}</textarea>
+    </div>`;
 }
 
 function renderPostsSection(rec){
@@ -2666,6 +3074,186 @@ const App = {
     if(!rec) return;
     rec.dislikes = val;
     saveStudent(rec);
+  },
+
+  /* ── Learning Access & Accommodations (Tier 1) ── */
+  toggleAccommodation(item){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.accommodations) rec.accommodations = [];
+    const idx = rec.accommodations.indexOf(item);
+    if(idx>=0) rec.accommodations.splice(idx,1);
+    else rec.accommodations.push(item);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addCustomAccommodation(){
+    const input = document.getElementById('rp-custom-accommodation');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.accommodations) rec.accommodations = [];
+    if(!rec.accommodations.some(a => a.toLowerCase() === val.toLowerCase())){
+      rec.accommodations.push(val);
+    }
+    input.value = '';
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateAccommodationNotes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.accommodationNotes = val;
+    saveStudent(rec);
+  },
+  setAttendancePattern(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.attendancePattern = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateAttendanceNote(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.attendanceNote = val;
+    saveStudent(rec);
+  },
+  updateFirstLanguage(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.firstLanguage = val;
+    saveStudent(rec);
+  },
+  updateOtherLanguages(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.otherLanguages = val;
+    saveStudent(rec);
+  },
+  setEnglishProficiency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.englishProficiency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setChineseProficiency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.chineseProficiency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setCEFRLevel(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.cefrLevel = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addCambridgeExam(){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.cambridgeExams) rec.cambridgeExams = [];
+    rec.cambridgeExams.push({
+      id: 'ce_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      testType: '', date: '',
+      reading: '', writing: '', listening: '', speaking: '', total: '',
+    });
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateCambridgeExam(id, field, val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.cambridgeExams) return;
+    const exam = rec.cambridgeExams.find(e => e.id === id);
+    if(!exam) return;
+    exam[field] = val;
+    saveStudent(rec);
+    // No re-render — silent update preserves focus in text inputs
+  },
+  deleteCambridgeExam(id){
+    if(!confirm('Delete this Cambridge exam entry? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.cambridgeExams) return;
+    rec.cambridgeExams = rec.cambridgeExams.filter(e => e.id !== id);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addOtherEnglishTest(){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.otherEnglishTests) rec.otherEnglishTests = [];
+    rec.otherEnglishTests.push({
+      id: 'oe_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      testName: '', date: '', score: '', notes: '',
+    });
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateOtherEnglishTest(id, field, val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.otherEnglishTests) return;
+    const test = rec.otherEnglishTests.find(e => e.id === id);
+    if(!test) return;
+    test[field] = val;
+    saveStudent(rec);
+    // No re-render — silent update preserves focus
+  },
+  deleteOtherEnglishTest(id){
+    if(!confirm('Delete this test entry? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.otherEnglishTests) return;
+    rec.otherEnglishTests = rec.otherEnglishTests.filter(e => e.id !== id);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updatePhysicalMedicalNotes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.physicalMedicalNotes = val;
+    saveStudent(rec);
+  },
+
+  /* ── Communication & Personal Context (Tier 1 family + Tier 2) ── */
+  updateFamilyContext(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.familyContext = val;
+    saveStudent(rec);
+  },
+  updateSupportNetwork(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.supportNetwork = val;
+    saveStudent(rec);
+  },
+  setBestTimeOfDay(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.bestTimeOfDay = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  toggleCommunicationPref(item){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.communicationPreferences) rec.communicationPreferences = [];
+    const idx = rec.communicationPreferences.indexOf(item);
+    if(idx>=0) rec.communicationPreferences.splice(idx,1);
+    else rec.communicationPreferences.push(item);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setGroupRoleTendency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.groupRoleTendency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
   },
 
   /* ── Posts / Timeline ── */
