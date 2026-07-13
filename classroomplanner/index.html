@@ -154,7 +154,6 @@
             text-align: center;
             padding: 5px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-            transition: outline 0.1s;
         }
 
         .movable-element.selected {
@@ -238,7 +237,7 @@
     </div>
 
     <div id="canvas-container">
-        <div id="classroom-canvas" id="canvas"></div>
+        <div id="classroom-canvas"></div>
     </div>
 
     <script>
@@ -284,7 +283,6 @@
                 el.innerText = 'Teacher Desk';
             } else if (type === 'block') {
                 el.classList.add('elem-block');
-                el.style.width = '8px';
                 el.style.width = '120px';
                 el.style.height = '80px';
                 el.style.backgroundColor = '#e0aaff';
@@ -318,7 +316,6 @@
                 isDragging = true;
                 selectElement(el);
                 
-                // Get initial mouse position relative to element top-left
                 startX = e.clientX - el.offsetLeft;
                 startY = e.clientY - el.offsetTop;
                 
@@ -329,15 +326,13 @@
             function mouseMoveHandler(e) {
                 if (!isDragging) return;
                 
-                // Calculate position inside canvas bounds
                 let left = e.clientX - startX;
                 let top = e.clientY - startY;
                 
-                // Grid snapping (optional, step size 10px)
+                // Snap to 10px grid spacing
                 left = Math.round(left / 10) * 10;
                 top = Math.round(top / 10) * 10;
 
-                // Boundary constraints
                 const maxLeft = canvas.clientWidth - el.offsetWidth;
                 const maxTop = canvas.clientHeight - el.offsetHeight;
                 
@@ -361,7 +356,6 @@
             el.classList.add('selected');
             inspector.style.display = 'block';
             
-            // Dynamic Inspector Configs
             const type = el.dataset.type;
             if (type === 'arrow') {
                 propColorGroup.style.display = 'block';
@@ -419,7 +413,6 @@
             }
         }
 
-        // Helper: Generates SVG arrow inside element dynamically to scale neatly
         function generateArrowSVG(el, color, text = "") {
             el.innerHTML = `
                 <svg class="arrow-svg" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg">
@@ -434,7 +427,6 @@
             `;
         }
 
-        // Helper: Convert CSS color to Hex values for color picker default input matching
         function rgbToHex(rgb) {
             if (!rgb || rgb.startsWith('#')) return rgb || '#ffffff';
             const rgbValues = rgb.match(/\d+/g);
