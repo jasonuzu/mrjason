@@ -26,7 +26,8 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
-            user-select: none; /* Stops the blinking text cursor globally */
+            user-select: none; /* Disables the blinking text cursor completely */
+            -webkit-user-select: none;
         }
 
         /* Sidebar Control Panel */
@@ -120,6 +121,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             border-radius: 4px;
             cursor: default;
+            touch-action: none;
         }
 
         #classroom-canvas.drawing-mode { cursor: crosshair; }
@@ -170,17 +172,17 @@
         <div class="section">
             <div class="section-title">1. Spawn Items</div>
             <div class="btn-grid">
-                <button onclick="createElement('student')">Student Desk</button>
-                <button onclick="createElement('teacher')">Teacher Desk</button>
-                <button onclick="createElement('door')">Door</button>
-                <button onclick="createElement('arrow')">Arrow</button>
+                <button id="btn-student">Student Desk</button>
+                <button id="btn-teacher">Teacher Desk</button>
+                <button id="btn-door">Door</button>
+                <button id="btn-arrow">Arrow</button>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title">2. Draw Shapes</div>
             <div class="btn-grid">
-                <button id="btn-draw" onclick="toggleDrawMode()">✏️ Draw Custom Block</button>
+                <button id="btn-draw">✏️ Draw Custom Block</button>
             </div>
         </div>
 
@@ -188,26 +190,26 @@
             <div class="section-title">Properties</div>
             <div class="form-group" id="prop-label-group">
                 <label id="label-text-tag">Label:</label>
-                <input type="text" id="prop-label" oninput="updateSelectedElement()">
+                <input type="text" id="prop-label">
             </div>
             <div class="form-group" id="prop-color-group">
                 <label>Fill Color:</label>
-                <input type="color" id="prop-color" oninput="updateSelectedElement()">
+                <input type="color" id="prop-color">
             </div>
             <div class="btn-grid">
-                <button onclick="rotateElement()">Rotate 90°</button>
-                <button class="danger" onclick="deleteElement()">Delete</button>
+                <button id="btn-rotate">Rotate 90°</button>
+                <button class="danger" id="btn-delete">Delete</button>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title">Actions</div>
-            <button class="danger" style="width: 100%;" onclick="clearCanvas()">Clear Entire Room</button>
+            <button class="danger" style="width: 100%;" id="btn-clear">Clear Entire Room</button>
         </div>
 
         <div class="instructions">
-            <strong>Move Mode:</strong> Click buttons to spawn desks, then drag to move.<br><br>
-            <strong>Draw Mode:</strong> Click the "Draw Custom Block" button, then click and drag on the grid to draw rugs or tables.
+            <strong>Move Mode:</strong> Click buttons to spawn items, then drag.<br><br>
+            <strong>Draw Mode:</strong> Click the "Draw" button, then click and drag on the grid.
         </div>
     </div>
 
@@ -216,27 +218,70 @@
     </div>
 
     <script>
-        const canvas = document.getElementById('classroom-canvas');
-        const inspector = document.getElementById('inspector');
-        const propLabel = document.getElementById('prop-label');
-        const propLabelTag = document.getElementById('label-text-tag');
-        const propColor = document.getElementById('prop-color');
-        const propColorGroup = document.getElementById('prop-color-group');
-        const btnDraw = document.getElementById('btn-draw');
-        
-        let selectedElement = null;
-        let isDraggingItem = false;
-        let startX, startY;
+        // Wait until the entire HTML document is fully loaded before attaching scripts
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // Core DOM Elements
+            const canvas = document.getElementById('classroom-canvas');
+            const inspector = document.getElementById('inspector');
+            const propLabel = document.getElementById('prop-label');
+            const propLabelTag = document.getElementById('label-text-tag');
+            const propColor = document.getElementById('prop-color');
+            const propColorGroup = document.getElementById('prop-color-group');
+            const btnDraw = document.getElementById('btn-draw');
+            
+            // State variables
+            let selectedElement = null;
+            let isDraggingItem = false;
+            let isDrawMode = false;
+            let isDrawing = false;
+            let startX, startY;
+            let currentBox = null;
 
-        // Draw Mode Variables
-        let isDrawMode = false;
-        let isDrawing = false;
-        let drawStartX, drawStartY;
-        let currentDrawnEl = null;
+            // ---- BUTTON EVENT LISTENERS ----
+            document.getElementById('btn-student').addEventListener('click', () => createElement('student'));
+            document.getElementById('btn-teacher').addEventListener('click', () => createElement('teacher'));
+            document.getElementById('btn-door').addEventListener('click', () => createElement('door'));
+            document.getElementById('btn-arrow').addEventListener('click', () => createElement('arrow'));
+            document.getElementById('btn-draw').addEventListener('click', toggleDrawMode);
+            document.getElementById('btn-rotate').addEventListener('click', rotateElement);
+            document.getElementById('btn-delete').addEventListener('click', deleteElement);
+            document.getElementById('btn-clear').addEventListener('click', clearCanvas);
+            
+            propLabel.addEventListener('input', updateSelectedElement);
+            propColor.addEventListener('input', updateSelectedElement);
 
-        // Toggle Draw Mode
-        function toggleDrawMode() {
-            isDrawMode = !isDrawMode;
-            if (isDrawMode) {
-                btnDraw.classList.add('active');
-                btnDraw.innerText =
+            // ---- DRAW MODE LOGIC ----
+            function toggleDrawMode() {
+                isDrawMode = !isDrawMode;
+                if (isDrawMode) {
+                    btnDraw.classList.add('active');
+                    btnDraw.innerText = "Stop Drawing";
+                    canvas.classList.add('drawing-mode');
+                    deselectAll();
+                } else {
+                    btnDraw.classList.remove('active');
+                    btnDraw.innerText = "✏️ Draw Custom Block";
+                    canvas.classList.remove('drawing-mode');
+                }
+            }
+
+            canvas.addEventListener('mousedown', (e) => {
+                // If clicking canvas background while NOT in draw mode, just deselect
+                if (e.target === canvas && !isDrawMode) {
+                    deselectAll();
+                    return;
+                }
+
+                // If in Draw Mode, start creating a shape
+                if (isDrawMode && e.target === canvas) {
+                    isDrawing = true;
+                    const rect = canvas.getBoundingClientRect();
+                    startX = e.clientX - rect.left;
+                    startY = e.clientY - rect.top;
+
+                    currentBox = document.createElement('div');
+                    currentBox.classList.add('movable-element', 'elem-block');
+                    currentBox.dataset.type = 'block';
+                    currentBox.dataset.rotation = "0";
+                    currentBox.style.left = startX + 'px';
