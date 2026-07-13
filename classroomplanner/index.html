@@ -26,11 +26,10 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
-            user-select: none; /* Disables the blinking text cursor completely */
+            user-select: none;
             -webkit-user-select: none;
         }
 
-        /* Sidebar Control Panel */
         #toolbar {
             width: 320px;
             background-color: var(--panel-bg);
@@ -45,23 +44,9 @@
         }
 
         h2 { font-size: 1.4rem; color: #333; margin-bottom: 5px; }
-
         .section { border-top: 1px solid #eee; padding-top: 15px; }
-
-        .section-title {
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #777;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-
-        .btn-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
+        .section-title { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #777; margin-bottom: 10px; font-weight: bold; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
         button {
             padding: 10px;
@@ -71,33 +56,19 @@
             border-radius: 4px;
             cursor: pointer;
             font-weight: 500;
-            transition: background 0.2s;
         }
-
         button:hover { background-color: var(--primary-hover); }
         button.danger { background-color: #d9534f; }
         button.danger:hover { background-color: #c9302c; }
         
-        button#btn-draw {
-            background-color: white;
-            color: var(--draw-mode);
-            border: 2px solid var(--draw-mode);
-            grid-column: span 2;
-        }
-        button#btn-draw.active {
-            background-color: var(--draw-mode);
-            color: white;
-        }
+        button#btn-draw { background-color: white; color: var(--draw-mode); border: 2px solid var(--draw-mode); grid-column: span 2; }
+        button#btn-draw.active { background-color: var(--draw-mode); color: white; }
 
-        /* Property Editor */
         .form-group { margin-bottom: 12px; }
         label { display: block; font-size: 0.85rem; color: #555; margin-bottom: 5px; }
-        input[type="text"], select, input[type="color"] {
-            width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;
-        }
+        input[type="text"], input[type="color"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
         input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
 
-        /* Canvas Area */
         #canvas-container {
             flex-grow: 1;
             position: relative;
@@ -120,13 +91,9 @@
             position: relative;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             border-radius: 4px;
-            cursor: default;
-            touch-action: none;
         }
-
         #classroom-canvas.drawing-mode { cursor: crosshair; }
 
-        /* Furniture/Elements */
         .movable-element {
             position: absolute;
             border: 2px solid #333;
@@ -135,7 +102,6 @@
             align-items: center;
             justify-content: center;
             cursor: move;
-            user-select: none;
             font-weight: bold;
             font-size: 0.85rem;
             text-align: center;
@@ -143,22 +109,14 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
             overflow: hidden;
         }
-
-        .movable-element.selected {
-            outline: 3px solid #007bff;
-            outline-offset: 2px;
-        }
-
+        .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; }
         .elem-student { border-radius: 4px; }
         .elem-teacher { border-radius: 2px; border-width: 3px; }
         .elem-door { border-right: 5px double #333; background: #e0d0b0; }
         .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important;}
         .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
 
-        .instructions {
-            font-size: 0.8rem; color: #666; line-height: 1.4; margin-top: auto;
-            background: #f0f4f8; padding: 10px; border-radius: 4px;
-        }
+        .instructions { font-size: 0.8rem; color: #666; line-height: 1.4; margin-top: auto; background: #f0f4f8; padding: 10px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -172,116 +130,155 @@
         <div class="section">
             <div class="section-title">1. Spawn Items</div>
             <div class="btn-grid">
-                <button id="btn-student">Student Desk</button>
-                <button id="btn-teacher">Teacher Desk</button>
-                <button id="btn-door">Door</button>
-                <button id="btn-arrow">Arrow</button>
+                <button onclick="spawnItem('student')">Student Desk</button>
+                <button onclick="spawnItem('teacher')">Teacher Desk</button>
+                <button onclick="spawnItem('door')">Door</button>
+                <button onclick="spawnItem('arrow')">Arrow</button>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title">2. Draw Shapes</div>
             <div class="btn-grid">
-                <button id="btn-draw">✏️ Draw Custom Block</button>
+                <button id="btn-draw" onclick="toggleDrawMode()">✏️ Draw Custom Block</button>
             </div>
         </div>
 
         <div class="section" id="inspector" style="display: none;">
             <div class="section-title">Properties</div>
-            <div class="form-group" id="prop-label-group">
+            <div class="form-group">
                 <label id="label-text-tag">Label:</label>
-                <input type="text" id="prop-label">
+                <input type="text" id="prop-label" oninput="updateProperties()">
             </div>
             <div class="form-group" id="prop-color-group">
                 <label>Fill Color:</label>
-                <input type="color" id="prop-color">
+                <input type="color" id="prop-color" oninput="updateProperties()">
             </div>
             <div class="btn-grid">
-                <button id="btn-rotate">Rotate 90°</button>
-                <button class="danger" id="btn-delete">Delete</button>
+                <button onclick="rotateItem()">Rotate 90°</button>
+                <button class="danger" onclick="deleteItem()">Delete</button>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title">Actions</div>
-            <button class="danger" style="width: 100%;" id="btn-clear">Clear Entire Room</button>
-        </div>
-
-        <div class="instructions">
-            <strong>Move Mode:</strong> Click buttons to spawn items, then drag.<br><br>
-            <strong>Draw Mode:</strong> Click the "Draw" button, then click and drag on the grid.
+            <button class="danger" style="width: 100%;" onclick="clearRoom()">Clear Entire Room</button>
         </div>
     </div>
 
     <div id="canvas-container">
-        <div id="classroom-canvas"></div>
+        <div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div>
     </div>
 
     <script>
-        // Wait until the entire HTML document is fully loaded before attaching scripts
-        document.addEventListener('DOMContentLoaded', () => {
-            
-            // Core DOM Elements
-            const canvas = document.getElementById('classroom-canvas');
-            const inspector = document.getElementById('inspector');
-            const propLabel = document.getElementById('prop-label');
-            const propLabelTag = document.getElementById('label-text-tag');
-            const propColor = document.getElementById('prop-color');
-            const propColorGroup = document.getElementById('prop-color-group');
-            const btnDraw = document.getElementById('btn-draw');
-            
-            // State variables
-            let selectedElement = null;
-            let isDraggingItem = false;
-            let isDrawMode = false;
-            let isDrawing = false;
-            let startX, startY;
-            let currentBox = null;
+        // Global State Variables
+        var canvas = document.getElementById('classroom-canvas');
+        var inspector = document.getElementById('inspector');
+        var propLabel = document.getElementById('prop-label');
+        var propColor = document.getElementById('prop-color');
+        var btnDraw = document.getElementById('btn-draw');
+        var labelTag = document.getElementById('label-text-tag');
 
-            // ---- BUTTON EVENT LISTENERS ----
-            document.getElementById('btn-student').addEventListener('click', () => createElement('student'));
-            document.getElementById('btn-teacher').addEventListener('click', () => createElement('teacher'));
-            document.getElementById('btn-door').addEventListener('click', () => createElement('door'));
-            document.getElementById('btn-arrow').addEventListener('click', () => createElement('arrow'));
-            document.getElementById('btn-draw').addEventListener('click', toggleDrawMode);
-            document.getElementById('btn-rotate').addEventListener('click', rotateElement);
-            document.getElementById('btn-delete').addEventListener('click', deleteElement);
-            document.getElementById('btn-clear').addEventListener('click', clearCanvas);
-            
-            propLabel.addEventListener('input', updateSelectedElement);
-            propColor.addEventListener('input', updateSelectedElement);
+        var selectedEl = null;
+        var isDragging = false;
+        var isDrawMode = false;
+        var isDrawingBox = false;
+        var dragOffsetX = 0, dragOffsetY = 0;
+        var drawStartX = 0, drawStartY = 0;
+        var currentBox = null;
 
-            // ---- DRAW MODE LOGIC ----
-            function toggleDrawMode() {
-                isDrawMode = !isDrawMode;
-                if (isDrawMode) {
-                    btnDraw.classList.add('active');
-                    btnDraw.innerText = "Stop Drawing";
-                    canvas.classList.add('drawing-mode');
-                    deselectAll();
-                } else {
-                    btnDraw.classList.remove('active');
-                    btnDraw.innerText = "✏️ Draw Custom Block";
-                    canvas.classList.remove('drawing-mode');
-                }
+        // Ensure mouse move and up are tracked globally
+        document.onmousemove = handleMouseMove;
+        document.onmouseup = handleMouseUp;
+
+        // --- BUTTON SPAWNERS ---
+        function spawnItem(type) {
+            if(isDrawMode) toggleDrawMode();
+            
+            var el = document.createElement('div');
+            el.className = 'movable-element';
+            el.setAttribute('data-type', type);
+            el.setAttribute('data-rot', '0');
+            el.style.left = '50px';
+            el.style.top = '50px';
+
+            if (type === 'student') {
+                el.classList.add('elem-student');
+                el.style.width = '60px';
+                el.style.height = '40px';
+                el.style.backgroundColor = '#a3cef1';
+                el.innerText = 'Student';
+            } else if (type === 'teacher') {
+                el.classList.add('elem-teacher');
+                el.style.width = '100px';
+                el.style.height = '60px';
+                el.style.backgroundColor = '#84a59d';
+                el.innerText = 'Teacher Desk';
+            } else if (type === 'door') {
+                el.classList.add('elem-door');
+                el.style.width = '60px';
+                el.style.height = '15px';
+                el.innerText = 'Door';
+            } else if (type === 'arrow') {
+                el.classList.add('elem-arrow');
+                el.style.width = '80px';
+                el.style.height = '30px';
+                el.style.backgroundColor = 'transparent';
+                drawArrowSVG(el, '#333333', '');
             }
 
-            canvas.addEventListener('mousedown', (e) => {
-                // If clicking canvas background while NOT in draw mode, just deselect
-                if (e.target === canvas && !isDrawMode) {
-                    deselectAll();
-                    return;
-                }
+            el.onmousedown = function(e) { itemMouseDown(e, el); };
+            canvas.appendChild(el);
+            selectItem(el);
+        }
 
-                // If in Draw Mode, start creating a shape
-                if (isDrawMode && e.target === canvas) {
-                    isDrawing = true;
-                    const rect = canvas.getBoundingClientRect();
-                    startX = e.clientX - rect.left;
-                    startY = e.clientY - rect.top;
+        // --- DRAW MODE LOGIC ---
+        function toggleDrawMode() {
+            isDrawMode = !isDrawMode;
+            if (isDrawMode) {
+                btnDraw.classList.add('active');
+                btnDraw.innerText = "Stop Drawing";
+                canvas.classList.add('drawing-mode');
+                deselectAll();
+            } else {
+                btnDraw.classList.remove('active');
+                btnDraw.innerText = "✏️ Draw Custom Block";
+                canvas.classList.remove('drawing-mode');
+            }
+        }
 
-                    currentBox = document.createElement('div');
-                    currentBox.classList.add('movable-element', 'elem-block');
-                    currentBox.dataset.type = 'block';
-                    currentBox.dataset.rotation = "0";
-                    currentBox.style.left = startX + 'px';
+        function canvasMouseDown(e) {
+            if (e.target !== canvas) return;
+            
+            if (!isDrawMode) {
+                deselectAll();
+                return;
+            }
+
+            var rect = canvas.getBoundingClientRect();
+            drawStartX = e.clientX - rect.left;
+            drawStartY = e.clientY - rect.top;
+            isDrawingBox = true;
+
+            currentBox = document.createElement('div');
+            currentBox.className = 'movable-element elem-block';
+            currentBox.setAttribute('data-type', 'block');
+            currentBox.setAttribute('data-rot', '0');
+            currentBox.style.left = drawStartX + 'px';
+            currentBox.style.top = drawStartY + 'px';
+            currentBox.style.width = '0px';
+            currentBox.style.height = '0px';
+            currentBox.style.backgroundColor = '#e0aaff';
+            currentBox.innerText = 'Custom Block';
+            
+            currentBox.onmousedown = function(ev) { itemMouseDown(ev, currentBox); };
+            canvas.appendChild(currentBox);
+        }
+
+        // --- GLOBAL MOUSE TRACKING ---
+        function handleMouseMove(e) {
+            var rect = canvas.getBoundingClientRect();
+
+            // Handling Drawing a new Box
+            if (isDrawMode && isDrawingBox && currentBox) {
+                var currentX = e.clientX - rect.left;
