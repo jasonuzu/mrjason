@@ -1,103 +1,3540 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Classroom Designer</title>
-    <style>
-        :root { --primary: #4a6fa5; --draw-mode: #28a745; --bg: #f8f9fa; --panel-bg: #ffffff; --border: #cccccc; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { background-color: var(--bg); display: flex; height: 100vh; overflow: hidden; user-select: none; }
-        #toolbar { width: 320px; background-color: var(--panel-bg); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 20px; z-index: 10; overflow-y: auto; }
-        .section { border-top: 1px solid #eee; padding-top: 15px; }
-        .section-title { font-size: 0.8rem; text-transform: uppercase; color: #777; margin-bottom: 10px; font-weight: bold; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { padding: 10px; background-color: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button.danger { background-color: #d9534f; }
-        input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
-        #canvas-container { flex-grow: 1; position: relative; overflow: auto; background-color: #e5e5e5; display: flex; justify-content: center; align-items: center; padding: 50px; }
-        #classroom-canvas { width: 1000px; height: 700px; background-color: white; background-size: 20px 20px; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .movable-element { position: absolute; border: 2px solid #333; background-color: #fff; display: flex; align-items: center; justify-content: center; cursor: move; font-weight: bold; padding: 5px; resize: both; overflow: hidden; min-width: 30px; min-height: 30px; }
-        .movable-element.selected { outline: 3px solid #007bff; }
-        .element-label { pointer-events: none; word-wrap: break-word; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learner Profile System</title>
+<style>
+  :root {
+    --paper: #F7F5F0;
+    --paper-raised: #FFFFFF;
+    --ink: #1E2A32;
+    --ink-soft: #4A5A63;
+    --ink-faint: #8B979D;
+    --rule: #D8D3C7;
+    --rule-soft: #E8E4DA;
+    --accent: #3B6E71;
+    --accent-light: #E3EEEE;
+    --primary: #2B7A5F;
+    --primary-light: #E8F5EE;
+    --primary-mid: #B8DFC9;
+    --junior: #2D5FA6;
+    --junior-light: #E8EFF8;
+    --junior-mid: #B3CCE8;
+    --senior: #7B3FA0;
+    --senior-light: #F3ECF8;
+    --senior-mid: #D4B8E8;
+    --green: #2E7D32;
+    --green-bg: #E8F5E9;
+    --green-border: #A5D6A7;
+    --yellow: #B35C00;
+    --yellow-bg: #FFF3E0;
+    --yellow-border: #FFCC80;
+    --red: #B23A34;
+    --red-bg: #FBEAE9;
+    --red-border: #E8A8A3;
+    --shadow: 0 1px 2px rgba(30,42,50,0.06), 0 4px 12px rgba(30,42,50,0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  #app { min-height: 100vh; padding-bottom: 60px; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  .wrap-narrow { max-width: 640px; margin: 0 auto; padding: 0 24px; }
+
+  h1, h2, h3, h4 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; color: var(--ink); margin: 0; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--paper-raised);
+    border-bottom: 1px solid var(--rule);
+    padding: 18px 0;
+    margin-bottom: 32px;
+  }
+  .topbar-inner { display: flex; align-items: baseline; justify-content: space-between; }
+  .brand { display: flex; align-items: baseline; gap: 10px; cursor: pointer; }
+  .brand-mark { font-family: Georgia, serif; font-weight: 700; font-size: 20px; color: var(--accent); letter-spacing: -0.01em; }
+  .brand-sub { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-faint); }
+  .topbar-nav { display: flex; gap: 18px; align-items: center; }
+  .topbar-nav a { font-size: 13px; color: var(--ink-soft); text-decoration: none; cursor: pointer; border-bottom: 1px solid transparent; }
+  .topbar-nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 6px; border: 1.5px solid transparent;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+    transition: all 0.12s ease;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2f595c; }
+  .btn-primary:disabled { background: #C6CDCF; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--ink-soft); border-color: var(--rule); }
+  .btn-ghost:hover { border-color: var(--ink-faint); color: var(--ink); }
+  .btn-danger-ghost { background: transparent; color: var(--red); border-color: var(--red-border); }
+  .btn-danger-ghost:hover { background: var(--red-bg); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 5px; }
+  .btn-block { width: 100%; justify-content: center; }
+
+  /* ── Cards / index-card motif ── */
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule-soft);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .record-tab {
+    font-family: Georgia, serif; font-weight: 700; font-size: 15px;
+    width: 40px; height: 40px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .record-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .record-meta { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+  .zone-dot { width: 9px; height: 9px; border-radius: 50%; }
+  .record-arrow { color: var(--ink-faint); font-size: 16px; flex-shrink: 0; }
+
+  /* ── Empty state ── */
+  .empty-state { text-align: center; padding: 64px 24px; color: var(--ink-faint); }
+  .empty-state h3 { color: var(--ink-soft); margin-bottom: 8px; font-size: 17px; }
+  .empty-state p { font-size: 14px; margin: 0 0 20px; }
+
+  /* ── Form elements ── */
+  label.field-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-soft); margin-bottom: 6px; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 11px 14px; border-radius: 6px;
+    border: 1.5px solid var(--rule); font-size: 15px; font-family: inherit;
+    background: var(--paper-raised); color: var(--ink);
+    outline: none; transition: border-color 0.12s;
+  }
+  input[type=text]:focus, input[type=number]:focus { border-color: var(--accent); }
+  .field-group { margin-bottom: 20px; }
+
+  /* ── Level picker ── */
+  .level-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .level-opt {
+    border: 1.5px solid var(--rule); border-radius: 8px; padding: 14px 10px;
+    text-align: center; cursor: pointer; background: var(--paper-raised);
+    transition: all 0.12s;
+  }
+  .level-opt.selected { border-width: 2px; }
+  .level-opt .lo-label { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .level-opt .lo-grades { font-size: 11px; color: var(--ink-faint); }
+
+  /* ── Progress ── */
+  .progress-track { height: 4px; background: var(--rule-soft); border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.25s; }
+  .progress-label { font-size: 11px; color: var(--ink-faint); display: flex; justify-content: space-between; margin-bottom: 20px; }
+
+  .section-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+  .section-tab {
+    padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid var(--rule); background: var(--paper-raised); color: var(--ink-faint);
+    cursor: pointer;
+  }
+  .section-tab.active { border-width: 2px; }
+  .section-tab.complete::before { content: "✓ "; }
+
+  /* ── Question items ── */
+  .q-item {
+    border: 1px solid var(--rule-soft); border-radius: 8px; padding: 16px 18px;
+    margin-bottom: 12px; background: var(--paper-raised);
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .q-item.answered { }
+  .q-text { font-size: 14px; color: var(--ink); margin-bottom: 12px; line-height: 1.5; }
+  .q-num { color: var(--ink-faint); font-size: 12px; margin-right: 6px; }
+  .q-scale { display: flex; gap: 6px; flex-wrap: wrap; }
+  .q-opt {
+    flex: 1; min-width: 90px; padding: 8px 10px; border-radius: 6px; text-align: center;
+    border: 1.5px solid var(--rule); font-size: 12px; cursor: pointer; background: var(--paper-raised);
+    color: var(--ink-soft); font-weight: 500; transition: all 0.1s;
+  }
+  .q-opt.selected { color: #fff; }
+
+  /* ── Interest checklist ── */
+  .interest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 20px; }
+  .interest-chip {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border: 1.5px solid var(--rule); border-radius: 6px; cursor: pointer; background: var(--paper-raised);
+    font-size: 13.5px; color: var(--ink-soft); transition: all 0.1s;
+  }
+  .interest-chip.checked { font-weight: 600; }
+  .interest-chip .box { width: 16px; height: 16px; border: 1.5px solid var(--ink-faint); border-radius: 3px; flex-shrink: 0; display:flex; align-items:center; justify-content:center; font-size: 11px; }
+  textarea {
+    width: 100%; padding: 11px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 14px; font-family: inherit; resize: vertical; min-height: 70px; outline: none;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  /* ── Nav row ── */
+  .nav-row { display: flex; justify-content: space-between; margin-top: 28px; gap: 12px; }
+
+  /* ── Report ── */
+  .report-header { margin-bottom: 28px; }
+  .report-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-faint); margin-bottom: 6px; }
+  .report-title { font-size: 26px; margin-bottom: 4px; }
+  .report-meta { font-size: 13px; color: var(--ink-faint); }
+
+  .zone-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 28px; }
+  .zone-card { border-radius: 8px; padding: 14px 14px; text-align: center; border: 1.5px solid; }
+  .zone-card .zc-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .zone-card .zc-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+
+  .section-block {
+    background: var(--paper-raised); border: 1px solid var(--rule-soft); border-radius: 10px;
+    padding: 22px 26px; margin-bottom: 20px;
+  }
+  .sb-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .sb-title { font-size: 17px; margin-bottom: 2px; }
+  .sb-domain { font-size: 11.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+  .zone-pill { padding: 4px 12px; border-radius: 14px; font-size: 11px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+
+  .score-bar-track { height: 9px; background: var(--rule-soft); border-radius: 5px; margin: 6px 0 4px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 5px; }
+  .score-bar-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-faint); margin-bottom: 4px; }
+
+  .item-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--rule-soft); font-size: 13px; }
+  .item-row:last-child { border-bottom: none; }
+  .item-row .it-text { color: var(--ink-soft); flex: 1; }
+  .item-tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--rule-soft); color: var(--ink-soft); white-space: nowrap; }
+
+  .strategy-box { background: var(--accent-light); border-radius: 8px; padding: 14px 16px; margin-top: 14px; }
+  .strategy-box .sx-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .strategy-box ul { margin: 0; padding-left: 18px; }
+  .strategy-box li { font-size: 13px; color: var(--ink); margin-bottom: 5px; line-height: 1.5; }
+
+  .pref-row { margin-bottom: 12px; }
+  .pref-row-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 3px; }
+  .pref-row-head strong { color: var(--ink); }
+  .pref-bar-track { height: 8px; background: var(--rule-soft); border-radius: 4px; overflow: hidden; }
+  .pref-bar-fill { height: 100%; border-radius: 4px; }
+  .pref-strategy { font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; }
+
+  .info-callout {
+    border-radius: 8px; padding: 14px 16px; font-size: 12.5px; line-height: 1.6;
+    margin-bottom: 16px; border: 1px solid;
+  }
+  .info-callout strong { display: block; margin-bottom: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  .interest-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .interest-tag { background: var(--primary-light); color: var(--primary); padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }
+  .free-response { background: var(--rule-soft); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--ink-soft); font-style: italic; }
+
+  .obs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+  .obs-field select {
+    width: 100%; padding: 9px 10px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 13px; font-family: inherit; background: var(--paper-raised); color: var(--ink);
+  }
+  .obs-field label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+  .match-note { font-size: 12.5px; padding: 10px 12px; border-radius: 6px; margin-top: 10px; }
+
+  .disclaimer-footer { font-size: 11px; color: var(--ink-faint); line-height: 1.6; padding-top: 18px; border-top: 1px solid var(--rule); margin-top: 8px; }
+
+  .action-row { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+
+  /* Research page */
+  .evidence-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+  .evidence-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-faint); border-bottom: 2px solid var(--rule); padding: 8px 10px; }
+  .evidence-table td { padding: 10px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  .grade-badge { font-weight: 700; font-size: 12px; color: var(--accent); white-space: nowrap; }
+
+  @media print {
+    .topbar, .no-print { display: none !important; }
+    body { background: #fff; }
+    .section-block, .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+  }
+
+  /* ── Class grouping on dashboard ── */
+  .class-group { margin-bottom: 32px; }
+  .class-group-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 8px 12px 10px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 4px 4px 0 0;
+    transition: background 0.1s;
+  }
+  .class-group-header.clickable { cursor: pointer; }
+  .class-group-header.clickable:hover { background: var(--accent-light); }
+  .class-group-name {
+    font-family: Georgia, serif; font-weight: 700; font-size: 16px; color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .class-group-hint { font-size: 11px; color: var(--accent); margin-top: 1px; }
+  .class-group-count {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-faint);
+  }
+
+  /* ── Class overview page ── */
+  .class-actions-bar { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--paper-raised); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .stat-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-faint); margin-bottom: 12px; }
+  .stat-bars { display: flex; flex-direction: column; gap: 6px; }
+  .stat-bar-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+  .stat-bar-track { flex: 1; height: 8px; border-radius: 4px; background: var(--rule-soft); overflow: hidden; }
+  .stat-bar-fill { height: 100%; border-radius: 4px; }
+  .stat-count { font-weight: 700; min-width: 24px; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .stat-names { font-size: 11.5px; color: var(--ink-faint); margin-top: 4px; padding-left: 18px; }
+  .stat-names .name-chip { display: inline-block; margin: 2px 4px 2px 0; padding: 1px 8px; border-radius: 3px; background: var(--rule-soft); color: var(--ink-soft); cursor: pointer; font-size: 11px; }
+  .stat-names .name-chip:hover { background: var(--accent-light); color: var(--accent); }
+
+  /* Interest tally list */
+  .interest-tally { display: flex; flex-direction: column; gap: 10px; }
+  .interest-tally-row { border-bottom: 1px solid var(--rule-soft); padding-bottom: 8px; }
+  .interest-tally-row:last-child { border-bottom: none; }
+  .interest-tally-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .interest-tally-head strong { color: var(--ink); }
+  .interest-tally-count { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-faint); font-size: 12px; }
+
+  /* Watch list */
+  .watch-list-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 6px; background: var(--paper-raised);
+    border: 1px solid var(--rule-soft); margin-bottom: 8px;
+    cursor: pointer; transition: background 0.1s;
+  }
+  .watch-list-row:hover { background: var(--red-bg); }
+  .watch-list-name { font-weight: 600; font-size: 14px; color: var(--ink); flex: 1; }
+  .watch-list-reasons { font-size: 12px; color: var(--ink-faint); }
+  .watch-list-badge { padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700; background: var(--red-bg); color: var(--red); }
+
+  /* Compare view */
+  .compare-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .compare-picker select { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1.5px solid var(--rule); font-size: 14px; font-family: inherit; background: var(--paper-raised); }
+  .compare-table {
+    width: 100%; border-collapse: collapse; background: var(--paper-raised);
+    border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 24px;
+  }
+  .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--rule-soft); font-size: 13.5px; }
+  .compare-table th { background: var(--rule-soft); font-family: Georgia, serif; font-weight: 700; font-size: 15px; }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table td:first-child { font-weight: 600; color: var(--ink-soft); background: #FBFAF6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; width: 25%; }
+  .compare-insights { background: var(--accent-light); border-radius: 8px; padding: 16px 20px; }
+  .compare-insights h3 { font-size: 14px; margin-bottom: 8px; color: var(--accent); }
+  .compare-insights li { font-size: 13px; margin-bottom: 6px; }
+
+  /* Grouping view */
+  .group-controls { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; margin-bottom: 20px; align-items: end; }
+  .group-controls select { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1.5px solid var(--rule); font-size: 14px; font-family: inherit; background: var(--paper-raised); }
+  .group-card {
+    background: var(--paper-raised); border: 1px solid var(--rule-soft); border-left: 4px solid var(--accent);
+    border-radius: 6px; padding: 16px 20px; margin-bottom: 14px; box-shadow: var(--shadow);
+  }
+  .group-card h3 { font-size: 15px; margin-bottom: 10px; color: var(--accent); }
+  .group-members { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .group-member { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .group-member .zone-dot { width: 8px; height: 8px; }
+  .group-member-name { font-weight: 500; }
+  .group-member-role { font-size: 11px; color: var(--ink-faint); font-style: italic; margin-left: 4px; }
+  .group-rationale { font-size: 12.5px; color: var(--ink-soft); background: #FBFAF6; padding: 8px 12px; border-radius: 5px; line-height: 1.55; border-left: 3px solid var(--rule); }
+
+  /* Data view */
+  .data-section {
+    background: var(--paper-raised); border: 1px solid var(--rule-soft); border-radius: 10px;
+    padding: 20px 24px; margin-bottom: 16px; box-shadow: var(--shadow);
+  }
+  .data-section h2 { font-size: 17px; margin-bottom: 6px; }
+  .data-section p { font-size: 13px; color: var(--ink-soft); margin: 0 0 12px; line-height: 1.55; }
+  .file-input-wrap {
+    border: 1.5px dashed var(--rule); border-radius: 6px; padding: 20px; text-align: center;
+    background: #FBFAF6; margin-bottom: 12px;
+  }
+  .file-input-wrap input[type=file] { font-family: inherit; font-size: 13px; }
+
+  /* Trend indicators on report */
+  .trend-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .trend-improved { background: var(--green-bg); color: var(--green); }
+  .trend-worsened { background: var(--red-bg); color: var(--red); }
+  .trend-same { background: var(--rule-soft); color: var(--ink-faint); }
+  .history-strip {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    font-size: 11.5px; color: var(--ink-faint);
+    padding: 10px 14px; background: #FBFAF6; border-radius: 6px; margin-bottom: 16px;
+  }
+  .history-strip strong { color: var(--ink-soft); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .history-item { padding: 3px 10px; border-radius: 12px; background: var(--paper-raised); border: 1px solid var(--rule); }
+  .history-item.current { background: var(--accent-light); color: var(--accent); font-weight: 600; border-color: var(--accent); }
+
+  /* ── Record card actions ── */
+  .record-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule-soft);
+    border-left: 6px solid var(--accent);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+    box-shadow: var(--shadow);
+    transition: transform 0.1s ease;
+    margin-bottom: 10px;
+  }
+  .record-card:hover { transform: translateX(2px); }
+  .record-info { flex: 1; min-width: 0; cursor: pointer; }
+  .record-zones { display: flex; gap: 5px; flex-shrink: 0; cursor: pointer; }
+  .record-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .record-move {
+    padding: 6px 8px; border-radius: 5px; border: 1px solid var(--rule);
+    background: var(--paper-raised); font-size: 12px; color: var(--ink-soft);
+    cursor: pointer; font-family: inherit; max-width: 140px;
+  }
+  .record-move:hover { border-color: var(--accent); color: var(--accent); }
+  .record-delete {
+    width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--rule);
+    background: var(--paper-raised); color: var(--ink-faint); font-size: 18px; line-height: 1;
+    cursor: pointer; font-family: inherit; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .record-delete:hover { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+
+  /* ── Report page — student meta card & notes ── */
+  .student-meta-card {
+    background: var(--paper-raised); border: 1px solid var(--rule-soft); border-radius: 10px;
+    padding: 20px 24px; margin-bottom: 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .student-meta-field label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--ink-faint); margin-bottom: 4px; }
+  .student-meta-field input { width: 100%; padding: 8px 10px; border-radius: 5px; border: 1.5px solid var(--rule); font-size: 14px; font-family: inherit; background: var(--paper-raised); outline: none; }
+  .student-meta-field input:focus { border-color: var(--accent); }
+  .notes-textarea {
+    width: 100%; padding: 12px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 14px; font-family: inherit; resize: vertical; min-height: 120px;
+    outline: none; background: var(--paper-raised); line-height: 1.6;
+  }
+  .notes-textarea:focus { border-color: var(--accent); }
+
+  /* ── Posts / Timeline section ── */
+  .new-post-form {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 20px; padding: 14px 16px;
+    border: 1px solid var(--rule-soft); border-radius: 6px;
+    background: #FBFAF6;
+  }
+  .new-post-form textarea {
+    width: 100%; padding: 10px 12px; border-radius: 5px;
+    border: 1.5px solid var(--rule); font-family: inherit; font-size: 13.5px;
+    resize: vertical; min-height: 60px; outline: none; background: var(--paper-raised);
+    line-height: 1.55; box-sizing: border-box;
+  }
+  .new-post-form textarea:focus { border-color: var(--accent); }
+  .new-post-form .form-row {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .new-post-hint { font-size: 11px; color: var(--ink-faint); }
+
+  .posts-list { display: flex; flex-direction: column; gap: 10px; }
+  .post-item {
+    border: 1px solid var(--rule-soft); border-left: 3px solid var(--accent);
+    border-radius: 5px; padding: 12px 14px; background: var(--paper-raised);
+  }
+  .post-timestamp {
+    font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px; font-weight: 600;
+  }
+  .post-timestamp .edited-marker {
+    text-transform: none; font-weight: 400; margin-left: 6px; font-size: 10.5px;
+  }
+  .post-content {
+    font-size: 13.5px; line-height: 1.55; color: var(--ink);
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .post-edit-textarea {
+    width: 100%; padding: 8px 10px; border-radius: 4px;
+    border: 1.5px solid var(--accent); font-family: inherit; font-size: 13.5px;
+    resize: vertical; min-height: 60px; outline: none; background: var(--paper-raised);
+    line-height: 1.55; box-sizing: border-box;
+  }
+  .post-actions {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .post-action {
+    padding: 4px 12px; font-size: 11.5px; border-radius: 4px;
+    border: 1px solid var(--rule); background: var(--paper-raised);
+    color: var(--ink-soft); cursor: pointer; font-family: inherit;
+    transition: all 0.1s;
+  }
+  .post-action:hover { border-color: var(--accent); color: var(--accent); }
+  .post-action.danger:hover { border-color: var(--red-border); color: var(--red); background: var(--red-bg); }
+  .post-action.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .post-action.primary:hover { background: #2f595c; color: #fff; }
+  .no-posts-state {
+    text-align: center; padding: 20px 12px; color: var(--ink-faint);
+    font-size: 12.5px; font-style: italic;
+  }
+
+  /* ── Learning Context sections (subsection headers, radio chips, badges) ── */
+  .subsection-header {
+    font-family: Georgia, serif; font-weight: 700; font-size: 14px; color: var(--ink);
+    margin: 22px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--rule-soft);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .subsection-header:first-child { margin-top: 0; }
+  .subsection-hint { font-size: 12px; color: var(--ink-faint); margin: 0 0 10px; line-height: 1.5; }
+
+  .radio-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .radio-chip {
+    padding: 6px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 500;
+    border: 1.5px solid var(--rule); background: var(--paper-raised); color: var(--ink-soft);
+    cursor: pointer; font-family: inherit; transition: all 0.1s;
+  }
+  .radio-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .radio-chip.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .field-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+  }
+  .field-grid-2 label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .field-grid-2 input[type=text] {
+    width: 100%; padding: 9px 12px; border-radius: 5px;
+    border: 1.5px solid var(--rule); font-size: 13.5px; font-family: inherit;
+    background: var(--paper-raised); color: var(--ink); outline: none; box-sizing: border-box;
+  }
+  .field-grid-2 input[type=text]:focus { border-color: var(--accent); }
+  .context-textarea {
+    width: 100%; padding: 10px 12px; border-radius: 5px; border: 1.5px solid var(--rule);
+    font-size: 13.5px; font-family: inherit; resize: vertical; min-height: 60px;
+    outline: none; background: var(--paper-raised); line-height: 1.55; box-sizing: border-box;
+    margin-bottom: 8px;
+  }
+  .context-textarea:focus { border-color: var(--accent); }
+
+  /* ACC badge on record cards */
+  .acc-badge {
+    background: var(--accent); color: #fff; font-size: 9px; font-weight: 700;
+    padding: 2px 6px; border-radius: 3px; letter-spacing: 0.5px; text-transform: uppercase;
+    margin-left: 6px; vertical-align: middle;
+  }
+
+  /* ── English test score cards ── */
+  .test-card {
+    border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px;
+    margin-bottom: 10px; background: #FBFAF6;
+  }
+  .test-card-head {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .test-card-head select, .test-card-head input[type=text], .test-card-head input[type=date] {
+    padding: 6px 10px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 13px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none;
+  }
+  .test-card-head select:focus, .test-card-head input:focus { border-color: var(--accent); }
+  .test-card-head select { flex: 1.5; min-width: 140px; }
+  .test-card-head input[type=text].test-name { flex: 1.5; min-width: 140px; }
+  .test-card-head input[type=date] { flex: 1; min-width: 120px; }
+  .test-card-head .del-btn {
+    background: transparent; border: 1px solid var(--rule);
+    color: var(--ink-faint); width: 28px; height: 28px;
+    border-radius: 4px; font-size: 16px; line-height: 1; cursor: pointer;
+    padding: 0; display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  .test-card-head .del-btn:hover {
+    border-color: var(--red-border); color: var(--red); background: var(--red-bg);
+  }
+  .score-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    margin-bottom: 8px;
+  }
+  .score-field { display: flex; flex-direction: column; }
+  .score-field label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--ink-faint); margin-bottom: 3px; text-align: center; font-weight: 600;
+  }
+  .score-field input {
+    padding: 7px 8px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 12.5px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; text-align: center; box-sizing: border-box;
+  }
+  .score-field input:focus { border-color: var(--accent); }
+  .other-test-score {
+    width: 100%; padding: 8px 12px; border-radius: 4px; border: 1.5px solid var(--rule);
+    font-size: 13px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; margin-bottom: 8px; box-sizing: border-box;
+  }
+  .other-test-score:focus { border-color: var(--accent); }
+  .test-empty-state {
+    padding: 12px; text-align: center; color: var(--ink-faint);
+    font-size: 12.5px; font-style: italic; margin-bottom: 8px;
+  }
+
+  /* ── Collapsible sections ── */
+  .section-block > .sb-head {
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 8px;
+    margin: -6px -8px 14px;
+    border-radius: 5px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: background 0.1s;
+  }
+  .section-block > .sb-head:hover { background: rgba(30, 42, 50, 0.035); }
+  .section-block > .sb-head > div:first-of-type { flex: 1; min-width: 0; }
+  .section-block > .sb-head::before {
+    content: '▾';
+    color: var(--ink-faint);
+    font-size: 12px;
+    line-height: 1.8;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+    display: inline-block;
+  }
+  .section-block.collapsed > .sb-head::before { transform: rotate(-90deg); }
+  .section-block.collapsed > .sb-head { margin-bottom: 0; }
+  .section-block.collapsed {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+  .section-block.collapsed > *:not(.sb-head) { display: none !important; }
+
+  .collapse-controls {
+    display: flex; gap: 8px; justify-content: flex-end;
+    margin-bottom: 14px; font-size: 12px;
+  }
+  .collapse-controls button {
+    padding: 5px 12px; border: 1px solid var(--rule);
+    background: transparent; color: var(--ink-faint);
+    border-radius: 4px; cursor: pointer; font-family: inherit;
+    font-size: 11.5px; font-weight: 500;
+    transition: all 0.1s;
+  }
+  .collapse-controls button:hover {
+    border-color: var(--accent); color: var(--accent);
+  }
+
+  /* Print: always show everything, no chevron */
+  @media print {
+    .section-block.collapsed > *:not(.sb-head) { display: revert !important; }
+    .section-block > .sb-head::before { display: none; }
+    .section-block > .sb-head { cursor: default; }
+    .collapse-controls { display: none; }
+  }
+
+  @media (max-width: 640px) {
+    .field-grid-2 { grid-template-columns: 1fr; }
+    .score-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  @media (max-width: 640px) {
+    .interest-grid { grid-template-columns: 1fr; }
+    .level-options { grid-template-columns: 1fr; }
+    .obs-grid { grid-template-columns: 1fr; }
+    .student-meta-card { grid-template-columns: 1fr; }
+    .record-card { flex-wrap: wrap; }
+    .record-actions { width: 100%; justify-content: flex-end; }
+  }
+</style>
 </head>
 <body>
-    <div id="toolbar">
-        <h2>Classroom Plan</h2>
-        <div class="section"><div class="section-title">Spawn/Draw</div>
-            <button onclick="spawnItem('block')">Spawn Block</button>
-            <button id="btn-draw" onclick="toggleDrawMode()">Draw Block</button>
-        </div>
-        <div class="section" id="inspector" style="display: none;">
-            <div class="section-title">Properties</div>
-            <label>Label:</label>
-            <input type="text" id="prop-label" oninput="updateLabel()">
-            <button class="danger" style="margin-top:10px; width:100%" onclick="deleteItem()">Delete Item</button>
-        </div>
+<div id="app"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════
+   DATA MODEL — mirrors the print assessments exactly for consistency
+   ══════════════════════════════════════════════════════════════ */
+
+const LEVEL_META = {
+  primary: { key:'primary', label:'Primary', grades:'Grades 5–6', ageMin:10, ageMax:12,
+    color:'#2B7A5F', light:'#E8F5EE', mid:'#B8DFC9',
+    scale:['Not like me','Sometimes','Very like me'] },
+  junior: { key:'junior', label:'Junior High', grades:'Grades 7–8', ageMin:12, ageMax:14,
+    color:'#2D5FA6', light:'#E8EFF8', mid:'#B3CCE8',
+    scale:['Strongly Disagree','Disagree','Agree','Strongly Agree'] },
+  senior: { key:'senior', label:'Senior High', grades:'Grades 9–10', ageMin:14, ageMax:16,
+    color:'#7B3FA0', light:'#F3ECF8', mid:'#D4B8E8',
+    scale:['Strongly Disagree','Disagree','Neutral','Agree','Strongly Agree'] },
+};
+
+const SECTIONS = {
+  primary: [
+    { id:'A', title:'How I Feel', subtitle:'Think about how you usually feel at school. There are no right or wrong answers.', domainLabel:'Emotional & Behavioural', items:[
+      {id:'A1', text:"I worry about things a lot.", domain:'emotional', direction:'difficulty'},
+      {id:'A2', text:"I feel sad or unhappy for no reason.", domain:'emotional', direction:'difficulty'},
+      {id:'A3', text:"I get very angry and lose my temper.", domain:'conduct', direction:'difficulty'},
+      {id:'A4', text:"I do what adults ask me to do.", domain:'conduct', direction:'strength'},
+      {id:'A5', text:"I can't stay still — I move around a lot.", domain:'hyperactivity', direction:'difficulty'},
+      {id:'A6', text:"I have at least one good friend.", domain:'peer', direction:'strength'},
+      {id:'A7', text:"Other kids pick on me or bully me.", domain:'peer', direction:'difficulty'},
+      {id:'A8', text:"I help others when they need it.", domain:'prosocial', direction:'strength'},
+    ]},
+    { id:'B', title:'How I Like to Learn', subtitle:'Think about what helps you learn best.', domainLabel:'Learning Preferences', items:[
+      {id:'B1', text:"I learn best when I see pictures, charts, or videos.", domain:'visual', direction:'preference'},
+      {id:'B2', text:"I learn best when someone explains things out loud.", domain:'auditory', direction:'preference'},
+      {id:'B3', text:"I learn best by doing things with my hands (building, drawing, experiments).", domain:'kinesthetic', direction:'preference'},
+      {id:'B4', text:"I like working with a group of classmates.", domain:'social', direction:'preference'},
+      {id:'B5', text:"I prefer to work by myself.", domain:'independent', direction:'preference'},
+    ]},
+    { id:'C', title:'Paying Attention', subtitle:'Think about how you act during class time.', domainLabel:'Attention & Self-Regulation', items:[
+      {id:'C1', text:"I can keep working even when the room is noisy.", domain:'focus', direction:'strength'},
+      {id:'C2', text:"I forget to finish my work.", domain:'attention', direction:'difficulty'},
+      {id:'C3', text:"I start daydreaming during class.", domain:'attention', direction:'difficulty'},
+      {id:'C4', text:"I finish tasks I start without needing reminders.", domain:'task', direction:'strength'},
+      {id:'C5', text:"I follow instructions the first time.", domain:'compliance', direction:'strength'},
+    ]},
+    { id:'D', title:'How I Feel About School', subtitle:'Think about your schoolwork and how confident you feel.', domainLabel:'Motivation & Confidence', items:[
+      {id:'D1', text:"I think I can do well in math.", domain:'math', direction:'strength'},
+      {id:'D2', text:"I think I can do well in reading and writing.", domain:'ela', direction:'strength'},
+      {id:'D3', text:"I like learning new things, even when they're hard.", domain:'curiosity', direction:'strength'},
+      {id:'D4', text:"When something is difficult, I keep trying.", domain:'persistence', direction:'strength'},
+    ]},
+    { id:'E', title:'Me and Other People', subtitle:'Think about how you get along with others at school.', domainLabel:'Social-Emotional', items:[
+      {id:'E1', text:"I get along well with most other students.", domain:'social', direction:'strength'},
+      {id:'E2', text:"I sometimes feel lonely at school.", domain:'loneliness', direction:'difficulty'},
+      {id:'E3', text:"When I disagree with someone, I can stay calm.", domain:'regulation', direction:'strength'},
+      {id:'E4', text:"I like to help out in class (hand out papers, lead a group).", domain:'initiative', direction:'strength'},
+    ]},
+    { id:'G', title:'How I Handle Tricky Work', subtitle:'Think about how you feel when work is hard or when you make mistakes.', domainLabel:'Approach to Challenges', items:[
+      {id:'G1', text:"I like getting better at things, even if I don't get everything right.", domain:'mastery', direction:'preference'},
+      {id:'G2', text:"Learning something new matters more to me than getting the best mark.", domain:'mastery', direction:'preference'},
+      {id:'G3', text:"I like doing better than my classmates.", domain:'performance_approach', direction:'preference'},
+      {id:'G4', text:"I like showing others what I'm good at.", domain:'performance_approach', direction:'preference'},
+      {id:'G5', text:"I don't like answering in class in case I get it wrong.", domain:'performance_avoidance', direction:'preference'},
+      {id:'G6', text:"I worry about looking less smart than other kids.", domain:'performance_avoidance', direction:'preference'},
+    ]},
+  ],
+  junior: [
+    { id:'A', title:'Feelings & Behaviour', subtitle:'Rate how much each statement is like you. Be honest — there are no right or wrong answers.', domainLabel:'Emotional & Behavioural', items:[
+      {id:'A1', text:"I often feel worried or nervous about things.", domain:'emotional', direction:'difficulty'},
+      {id:'A2', text:"I sometimes feel sad or down for no clear reason.", domain:'emotional', direction:'difficulty'},
+      {id:'A3', text:"I get frustrated easily and sometimes react aggressively.", domain:'conduct', direction:'difficulty'},
+      {id:'A4', text:"I generally follow school rules without being reminded.", domain:'conduct', direction:'strength'},
+      {id:'A5', text:"I find it hard to sit still for a whole lesson.", domain:'hyperactivity', direction:'difficulty'},
+      {id:'A6', text:"I find it difficult to wait my turn.", domain:'hyperactivity', direction:'difficulty'},
+      {id:'A7', text:"I have friends I can rely on at school.", domain:'peer', direction:'strength'},
+      {id:'A8', text:"I feel like other students don't include me.", domain:'peer', direction:'difficulty'},
+      {id:'A9', text:"I try to be kind and helpful to others.", domain:'prosocial', direction:'strength'},
+    ]},
+    { id:'B', title:'Learning Preferences', subtitle:'Think about how you learn best and what helps you understand new material.', domainLabel:'Learning Preferences', items:[
+      {id:'B1', text:"I understand better when information is shown visually (diagrams, videos, charts).", domain:'visual', direction:'preference'},
+      {id:'B2', text:"I learn well by listening to explanations or class discussions.", domain:'auditory', direction:'preference'},
+      {id:'B3', text:"I learn best through hands-on activities like experiments or building things.", domain:'kinesthetic', direction:'preference'},
+      {id:'B4', text:"I prefer reading and writing to learn new content.", domain:'read_write', direction:'preference'},
+      {id:'B5', text:"I learn more when I work in a group than when I work alone.", domain:'social', direction:'preference'},
+      {id:'B6', text:"I do my best work when I can study independently.", domain:'independent', direction:'preference'},
+    ]},
+    { id:'C', title:'Focus & Self-Management', subtitle:'Think about how you manage your attention and behaviour in class.', domainLabel:'Attention & Self-Regulation', items:[
+      {id:'C1', text:"I can concentrate on my work even when there are distractions.", domain:'focus', direction:'strength'},
+      {id:'C2', text:"I often forget about assignments or lose track of deadlines.", domain:'organisation', direction:'difficulty'},
+      {id:'C3', text:"My mind wanders during lessons.", domain:'attention', direction:'difficulty'},
+      {id:'C4', text:"I can break a big task into smaller steps and complete them.", domain:'planning', direction:'strength'},
+      {id:'C5', text:"I follow multi-step instructions without needing them repeated.", domain:'working_memory', direction:'strength'},
+      {id:'C6', text:"I think before I act, rather than doing things impulsively.", domain:'inhibition', direction:'strength'},
+    ]},
+    { id:'D', title:'Motivation & Confidence', subtitle:'Think about how you feel about your abilities and schoolwork.', domainLabel:'Motivation & Confidence', items:[
+      {id:'D1', text:"I feel confident in my ability to do well in maths.", domain:'math', direction:'strength'},
+      {id:'D2', text:"I feel confident in my ability to do well in English / reading.", domain:'ela', direction:'strength'},
+      {id:'D3', text:"I enjoy learning new things, even if they seem challenging at first.", domain:'curiosity', direction:'strength'},
+      {id:'D4', text:"When I struggle with something, I keep trying instead of giving up.", domain:'persistence', direction:'strength'},
+      {id:'D5', text:"I set goals for myself in my schoolwork.", domain:'goal_setting', direction:'strength'},
+    ]},
+    { id:'E', title:'Social & Emotional Skills', subtitle:'Think about how you interact with others and handle your emotions.', domainLabel:'Social-Emotional', items:[
+      {id:'E1', text:"I get along well with classmates and teachers.", domain:'social', direction:'strength'},
+      {id:'E2', text:"I sometimes feel isolated or left out at school.", domain:'loneliness', direction:'difficulty'},
+      {id:'E3', text:"I can manage my emotions when I'm upset or frustrated.", domain:'regulation', direction:'strength'},
+      {id:'E4', text:"I feel comfortable speaking up or sharing my ideas in class.", domain:'participation', direction:'strength'},
+      {id:'E5', text:"I take responsibility when I make a mistake.", domain:'accountability', direction:'strength'},
+    ]},
+    { id:'G', title:'How I Approach Challenges', subtitle:'Think about what matters to you when work gets difficult.', domainLabel:'Approach to Challenges', items:[
+      {id:'G1', text:"I want to really understand something, not just get a good grade.", domain:'mastery', direction:'preference'},
+      {id:'G2', text:"I feel proud when I improve, even if my score isn't the highest.", domain:'mastery', direction:'preference'},
+      {id:'G3', text:"I want to do better than my classmates.", domain:'performance_approach', direction:'preference'},
+      {id:'G4', text:"I like it when others see that I'm good at something.", domain:'performance_approach', direction:'preference'},
+      {id:'G5', text:"I avoid answering in class in case I get it wrong.", domain:'performance_avoidance', direction:'preference'},
+      {id:'G6', text:"I worry about seeming less capable than my classmates.", domain:'performance_avoidance', direction:'preference'},
+    ]},
+  ],
+  senior: [
+    { id:'A', title:'Psychological Adjustment', subtitle:'Consider how well each statement describes your typical experience. Answer honestly.', domainLabel:'Emotional & Behavioural', items:[
+      {id:'A1', text:"I frequently experience worry or anxiety that interferes with my daily life.", domain:'emotional', direction:'difficulty'},
+      {id:'A2', text:"I sometimes feel persistently low or unmotivated without an obvious cause.", domain:'emotional', direction:'difficulty'},
+      {id:'A3', text:"I find it difficult to control my temper in stressful situations.", domain:'conduct', direction:'difficulty'},
+      {id:'A4', text:"I consistently follow expectations and commitments.", domain:'conduct', direction:'strength'},
+      {id:'A5', text:"I feel restless and find it hard to stay seated or focused for extended periods.", domain:'hyperactivity', direction:'difficulty'},
+      {id:'A6', text:"I have a supportive circle of friends at school.", domain:'peer', direction:'strength'},
+      {id:'A7', text:"I feel socially excluded or misunderstood by peers.", domain:'peer', direction:'difficulty'},
+      {id:'A8', text:"I actively look for ways to help or support others.", domain:'prosocial', direction:'strength'},
+    ]},
+    { id:'B', title:'Learning Preferences', subtitle:'Reflect on the conditions and methods that help you learn most effectively.', domainLabel:'Learning Preferences', items:[
+      {id:'B1', text:"I find visual materials (diagrams, infographics, videos) more helpful than text-only explanations.", domain:'visual', direction:'preference'},
+      {id:'B2', text:"I absorb information effectively through lectures, discussions, and verbal explanations.", domain:'auditory', direction:'preference'},
+      {id:'B3', text:"I learn most effectively through practical, hands-on experiences.", domain:'kinesthetic', direction:'preference'},
+      {id:'B4', text:"I prefer learning through reading texts and taking written notes.", domain:'read_write', direction:'preference'},
+      {id:'B5', text:"Collaborative work with peers enhances my understanding of material.", domain:'social', direction:'preference'},
+      {id:'B6', text:"I produce my best work when studying independently.", domain:'independent', direction:'preference'},
+    ]},
+    { id:'C', title:'Executive Function & Self-Regulation', subtitle:'Consider how you manage attention, organisation, and impulse control.', domainLabel:'Attention & Self-Regulation', items:[
+      {id:'C1', text:"I can sustain focus on tasks even in distracting environments.", domain:'focus', direction:'strength'},
+      {id:'C2', text:"I frequently miss deadlines or forget about assignments.", domain:'organisation', direction:'difficulty'},
+      {id:'C3', text:"I find my attention drifting during lessons, even when I want to concentrate.", domain:'attention', direction:'difficulty'},
+      {id:'C4', text:"I can plan and manage long-term projects effectively.", domain:'planning', direction:'strength'},
+      {id:'C5', text:"I can hold multiple instructions in mind and carry them out sequentially.", domain:'working_memory', direction:'strength'},
+      {id:'C6', text:"I consider the consequences before making decisions.", domain:'inhibition', direction:'strength'},
+    ]},
+    { id:'D', title:'Academic Motivation & Self-Efficacy', subtitle:'Reflect on your confidence, goals, and attitude towards learning.', domainLabel:'Motivation & Confidence', items:[
+      {id:'D1', text:"I believe I have the ability to succeed in mathematics.", domain:'math', direction:'strength'},
+      {id:'D2', text:"I believe I have the ability to succeed in English/language arts.", domain:'ela', direction:'strength'},
+      {id:'D3', text:"I am genuinely curious about new topics and enjoy intellectual challenges.", domain:'curiosity', direction:'strength'},
+      {id:'D4', text:"I persist with difficult material rather than avoiding it.", domain:'persistence', direction:'strength'},
+      {id:'D5', text:"I set specific academic goals and work systematically towards them.", domain:'goal_setting', direction:'strength'},
+      {id:'D6', text:"I can identify my own strengths and areas for improvement as a learner.", domain:'metacognition', direction:'strength'},
+    ]},
+    { id:'E', title:'Social-Emotional Competence', subtitle:'Consider your social interactions and emotional awareness.', domainLabel:'Social-Emotional', items:[
+      {id:'E1', text:"I maintain positive relationships with peers and adults at school.", domain:'social', direction:'strength'},
+      {id:'E2', text:"I sometimes feel isolated or disconnected from others at school.", domain:'loneliness', direction:'difficulty'},
+      {id:'E3', text:"I can regulate my emotions effectively, even under pressure.", domain:'regulation', direction:'strength'},
+      {id:'E4', text:"I feel confident expressing my ideas and opinions in academic settings.", domain:'participation', direction:'strength'},
+      {id:'E5', text:"I take ownership of my actions and accept constructive criticism.", domain:'accountability', direction:'strength'},
+      {id:'E6', text:"I can see situations from others' perspectives, even when I disagree.", domain:'empathy', direction:'strength'},
+    ]},
+    { id:'G', title:'Approach to Academic Challenges', subtitle:'Consider what genuinely matters to you when facing difficult academic work.', domainLabel:'Approach to Challenges', items:[
+      {id:'G1', text:"I am motivated by genuinely understanding material, not just achieving a high grade.", domain:'mastery', direction:'preference'},
+      {id:'G2', text:"I feel satisfied when I improve, even if my result isn't the best in the class.", domain:'mastery', direction:'preference'},
+      {id:'G3', text:"I am motivated by outperforming my classmates.", domain:'performance_approach', direction:'preference'},
+      {id:'G4', text:"I like it when my abilities are recognised by others.", domain:'performance_approach', direction:'preference'},
+      {id:'G5', text:"I avoid participating in class discussion in case I give a wrong answer.", domain:'performance_avoidance', direction:'preference'},
+      {id:'G6', text:"I worry about appearing less capable than my peers.", domain:'performance_avoidance', direction:'preference'},
+    ]},
+  ],
+};
+
+const INTERESTS = {
+  primary: ["Sports & moving around","Art & drawing","Music","Games & technology","Science & how things work","Reading stories","Animals & nature","Building & making things","Helping others","Acting, dancing, or performing"],
+  junior: ["Sports & physical activity","Visual arts & design","Music & performing arts","Technology, coding, or gaming","Science & experiments","Reading & writing","Nature & the environment","Building, making, or engineering","Social issues & helping others","Debate & public speaking"],
+  senior: ["Sports & fitness","Visual arts & design","Music & performing arts","Technology, coding, or gaming","Science, research, or experiments","Reading, writing, or media","Environment & sustainability","Engineering, building, or design","Social justice & community issues","Debate, public speaking, or leadership"],
+};
+
+// Default subject list for the Subject Strengths field (applies to all levels)
+const SUBJECTS = [
+  'Math', 'Biology', 'Chemistry', 'Physical Education',
+  'Science', 'History', 'Geography',
+  'Chinese Language', 'English Language', 'Literature'
+];
+
+// Tier 1: Learning Access predefined options
+const ACCOMMODATIONS = [
+  'Extended time on tests',
+  'Preferential seating',
+  'Movement breaks',
+  'Sensory tools allowed',
+  'Assistive technology',
+  'Modified assignments',
+  'Reduced homework load',
+  'Written + verbal instructions',
+  'Frequent check-ins',
+  'Chunked instructions',
+  'Access to quiet space',
+  'Rest breaks during long tasks',
+];
+
+const ATTENDANCE_OPTIONS = [
+  { value: 'regular', label: 'Regular attendance' },
+  { value: 'occasional', label: 'Occasional absences' },
+  { value: 'frequent', label: 'Frequent absences' },
+];
+
+const PROFICIENCY_LEVELS = [
+  { value: 'beginner', label: 'Beginner' },
+  { value: 'developing', label: 'Developing' },
+  { value: 'proficient', label: 'Proficient' },
+  { value: 'native', label: 'Native / Fluent' },
+];
+
+// CEFR levels for European framework English proficiency
+const CEFR_LEVELS = [
+  { value: 'A1', label: 'A1' },
+  { value: 'A2', label: 'A2' },
+  { value: 'B1', label: 'B1' },
+  { value: 'B2', label: 'B2' },
+  { value: 'C1', label: 'C1' },
+  { value: 'C2', label: 'C2' },
+];
+
+// Cambridge English exam types
+const CAMBRIDGE_EXAM_TYPES = [
+  { value: 'YLE_Starters', label: 'YLE Starters (Pre A1)' },
+  { value: 'YLE_Movers', label: 'YLE Movers (A1)' },
+  { value: 'YLE_Flyers', label: 'YLE Flyers (A2)' },
+  { value: 'KET', label: 'KET / A2 Key' },
+  { value: 'PET', label: 'PET / B1 Preliminary' },
+  { value: 'FCE', label: 'FCE / B2 First' },
+  { value: 'CAE', label: 'CAE / C1 Advanced' },
+  { value: 'CPE', label: 'CPE / C2 Proficiency' },
+];
+
+// Tier 2: Communication & Context predefined options
+const COMMUNICATION_PREFS = [
+  'Public praise works well',
+  'Private praise preferred',
+  'Written feedback preferred',
+  'Verbal feedback preferred',
+  'Direct / blunt feedback OK',
+  'Prefers gentle framing',
+  'Avoid calling out in class',
+  'Responds well to challenge',
+];
+
+const TIME_OF_DAY_OPTIONS = [
+  { value: 'mornings', label: 'Mornings' },
+  { value: 'midday', label: 'Middle of day' },
+  { value: 'afternoons', label: 'Afternoons' },
+  { value: 'after_breaks', label: 'After breaks' },
+  { value: 'varies', label: 'Varies' },
+];
+
+const GROUP_ROLE_OPTIONS = [
+  { value: 'leader', label: 'Natural leader' },
+  { value: 'contributor', label: 'Active contributor' },
+  { value: 'follower', label: 'Steady follower' },
+  { value: 'observer', label: 'Quiet observer' },
+  { value: 'varies', label: 'Varies' },
+];
+
+// Compute integer age (in whole years) from an ISO date string. Returns null if invalid.
+function computeAge(birthdateISO){
+  if(!birthdateISO) return null;
+  const bd = new Date(birthdateISO);
+  if(isNaN(bd.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if(m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+const DOMAIN_LABELS = {
+  visual:'Visual', auditory:'Auditory', kinesthetic:'Hands-on / Kinesthetic', read_write:'Reading & Writing',
+  social:'Collaborative / Group', independent:'Independent / Solo',
+};
+const DOMAIN_STRATEGIES = {
+  visual:'Use diagrams, charts, colour-coding, videos, and graphic organisers.',
+  auditory:'Include class discussions, verbal explanations, podcasts, and read-alouds.',
+  kinesthetic:'Provide experiments, manipulatives, role-play, and project-based tasks.',
+  read_write:'Offer reading materials, note-taking strategies, and written reflections.',
+  social:'Plan group projects, peer tutoring, and collaborative problem-solving.',
+  independent:'Allow quiet study time, individual projects, and self-paced options.',
+};
+
+const GOAL_LABELS = { mastery:'Mastery', performance_approach:'Performance-approach', performance_avoidance:'Performance-avoidance' };
+
+/* Action matrix — condensed from the printable Scoring & Interpretation Guide */
+const ACTION_MATRIX = {
+  A: {
+    red: { label:'Support', meaning:"May be experiencing significant emotional distress, conduct difficulties, or social isolation.", actions:[
+      "Assign a consistent seat near a supportive peer, away from conflict triggers.",
+      "Use private check-ins at lesson start (30 sec: “How are you doing today?”).",
+      "Build in 1–2 choice moments per lesson to increase sense of control.",
+      "Avoid public correction — use proximity and quiet redirection.",
+      "Refer to school counsellor if emotional items score highest.",
+      "For conduct items: use a simple, visible behaviour contract with positive reinforcement.",
+    ]},
+    yellow: { label:'Monitor', meaning:"Some concerns but within a manageable range. May fluctuate with context.", actions:[
+      "Maintain predictable lesson routines (same opening structure each class).",
+      "Include brief SEL warm-ups (e.g. a feelings check-in).",
+      "Pair with a steady, prosocial classmate for group tasks.",
+      "Monitor for two weeks; re-assess if the pattern worsens.",
+    ]},
+    green: { label:'Strength', meaning:"Strong emotional and behavioural adjustment; good peer relationships.", actions:[
+      "Leverage as a peer mentor or group leader.",
+      "Can handle open-ended tasks, ambiguity, and flexible grouping.",
+      "Assign responsibilities (material manager, discussion facilitator).",
+    ]},
+  },
+  C: {
+    red: { label:'Support', meaning:"Significant difficulty sustaining attention, completing tasks, or following multi-step instructions.", actions:[
+      "Seat near the front, away from doors/windows/high-traffic areas.",
+      "Break every task into 2–3 explicit steps; write steps on the board.",
+      "Use visible countdown timers for focused work segments (8–12 min).",
+      "Provide a printed checklist for multi-step assignments.",
+      "Allow movement breaks every 15–20 minutes.",
+      "Pair verbal instructions with written/visual ones — always both.",
+      "Check understanding before independent work: “Tell me step one.”",
+    ]},
+    yellow: { label:'Monitor', meaning:"Inconsistent focus — concentrates in some contexts but struggles in others.", actions:[
+      "Use varied activity types within a lesson (input → practice → discussion).",
+      "Provide graphic organisers and planning templates for larger tasks.",
+      "Offer a brief transition activity between lesson phases.",
+      "Seat near focused peers rather than near the teacher.",
+    ]},
+    green: { label:'Strength', meaning:"Good self-regulation, task completion, and ability to follow complex instructions.", actions:[
+      "Can be given extended independent work with minimal check-ins.",
+      "Suitable for complex, multi-step projects and self-paced learning.",
+      "May thrive with inquiry-based or open-ended tasks.",
+    ]},
+  },
+  D: {
+    red: { label:'Support', meaning:"Low academic self-efficacy — does not believe they can succeed and/or avoids challenge. This is one of the strongest predictors of disengagement.", actions:[
+      "Start every task at their current success level — scaffold up, not down.",
+      "Use specific process praise: “Your method for solving that was really logical” — not “good job.”",
+      "Offer genuine choice: which problem set, which topic, which format.",
+      "Break grading into low-stakes formative checkpoints.",
+      "Connect content to stated interests (see Interests below).",
+      "Set micro-goals visible to the student: “Today's target: complete 3 of 5.”",
+      "Avoid normative comparison — frame progress against their own prior work.",
+    ]},
+    yellow: { label:'Monitor', meaning:"Moderate confidence — may be subject-specific.", actions:[
+      "In the weaker-confidence subject, pair with a supportive peer, not the top achiever.",
+      "Provide worked examples alongside practice problems.",
+      "Use think-pair-share so the student can rehearse answers before going public.",
+      "Celebrate small wins explicitly.",
+    ]},
+    green: { label:'Strength', meaning:"High self-efficacy, intrinsic motivation, and willingness to engage with challenge.", actions:[
+      "Offer extension tasks, research projects, or depth over breadth.",
+      "Allow self-directed learning opportunities.",
+      "Can handle constructive criticism and honest feedback on work quality.",
+    ]},
+  },
+  E: {
+    red: { label:'Support', meaning:"Poor peer relationships, emotional dysregulation, or social withdrawal.", actions:[
+      "Start with pair work before group work — triads maximum at first.",
+      "Assign specific, structured roles in any group activity.",
+      "Avoid random cold-calling — use “write first, then share” protocols.",
+      "Teach conflict resolution explicitly: model → practice → apply.",
+      "Create a private signal the student can use to request a break.",
+      "Monitor for bullying if peer-relations items scored highest.",
+    ]},
+    yellow: { label:'Monitor', meaning:"Some social difficulty or inconsistent regulation; functions well in structured settings.", actions:[
+      "Use structured cooperative learning (roles, time limits, clear product).",
+      "Include community-building activities in the first 3 weeks.",
+      "Provide sentence frames for class discussion participation.",
+    ]},
+    green: { label:'Strength', meaning:"Strong social skills, emotional regulation, and classroom participation.", actions:[
+      "Natural candidate for peer tutoring and collaborative leadership.",
+      "Can facilitate group discussions and mediate peer disputes.",
+      "Benefits from debate, Socratic seminar, and public-speaking tasks.",
+    ]},
+  },
+};
+
+const GOAL_GUIDE = {
+  mastery: { label:'Mastery', fill:'green', text:"Predicts deep learning strategies, persistence, intrinsic motivation, and resilience after failure. Offer genuine challenge, give process-focused feedback, let them revise and resubmit, and avoid over-praising talent. Protect this orientation by not over-emphasising grades or rankings." },
+  performance_approach: { label:'Performance-approach', fill:'yellow', text:"Can achieve good grades and enjoy recognition, but motivation may be fragile and dependent on winning or comparison. Channel competitiveness into personal-best framing rather than beating peers; ensure feedback also reinforces understanding, not just relative rank." },
+  performance_avoidance: { label:'Performance-avoidance', fill:'red', text:"The orientation most consistently linked to low effort, reduced help-seeking, and avoidance of visible struggle — worth actively addressing. Reduce public failure risk (no cold-calling, allow private responses first), separate effort from performance in feedback, scaffold before exposure, and normalise mistakes explicitly." },
+};
+
+const INTEREST_STRATEGY_NOTE = "Grounded in the four-phase model of interest development (Hidi & Renninger, 2006) — connecting content to a student's existing interests is genuinely linked to deeper engagement. This is different from “learning styles”: it is about the CONTENT and CONTEXT of examples, not the format of instruction.";
+
+const EVIDENCE_ROWS = [
+  { section:'A · Feelings & Behaviour', grade:'Strong (adapted)', text:"Structure follows the SDQ (Goodman, 1997), a well-validated screener (\u03b1 \u2248 0.77–0.81 for the original instrument). This adapted, reworded version has not itself been independently validated — treat scores as directional, not diagnostic." },
+  { section:'B · Learning Preferences', grade:'Descriptive only', text:"VARK-style categories. Strong evidence (Pashler et al. 2008; Rogowsky et al. 2015, 2020) that matching instruction format to preference does NOT improve learning. Use only to vary engagement, never to sort students." },
+  { section:'C · Attention & Self-Regulation', grade:'Strong (adapted)', text:"Reflects executive-function and attention constructs used in brief ADHD/EF screeners. Not equivalent to longer, clinically normed tools like Conners or BRIEF." },
+  { section:'D · Motivation & Confidence', grade:'Strong theory', text:"Grounded in self-determination theory (Ryan & Deci) — one of the most empirically supported motivation frameworks in psychology." },
+  { section:'E · Social-Emotional', grade:'Moderate', text:"Draws on SDQ peer/prosocial concepts. Peer-relations items are consistently the weakest-performing subscale in the source literature (\u03b1 often <0.60) — interpret cautiously." },
+  { section:'F · Interests', grade:'Genuinely predictive', text:"Based on interest development theory (Hidi & Renninger, 2006). Unlike learning styles, connecting content to interest is a well-supported engagement lever." },
+  { section:'G · Approach to Challenges', grade:'Strong, established', text:"Achievement goal theory (Ames 1992; Dweck & Elliot 2005; Elliot 2005) — decades of research link orientation to engagement and persistence." },
+];
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE — uses localStorage in a normal browser, falls back to
+   an in-memory store if localStorage is unavailable (e.g. very
+   restricted sandboxes). Records survive page reloads and browser
+   restarts on the machine you saved them on.
+   ══════════════════════════════════════════════════════════════ */
+
+const storage = (function(){
+  let mem = {};
+  let persistent = false;
+  try{
+    if(typeof localStorage !== 'undefined'){
+      localStorage.setItem('__lp_test__','1');
+      localStorage.removeItem('__lp_test__');
+      persistent = true;
+    }
+  }catch(e){ persistent = false; }
+
+  if(persistent){
+    return {
+      persistent: true,
+      set(k,v){ localStorage.setItem(k,v); return v; },
+      get(k){ return localStorage.getItem(k); },
+      del(k){ localStorage.removeItem(k); },
+      keys(prefix){
+        const out = [];
+        for(let i=0;i<localStorage.length;i++){
+          const k = localStorage.key(i);
+          if(!prefix || (k && k.indexOf(prefix)===0)) out.push(k);
+        }
+        return out;
+      },
+    };
+  }
+  return {
+    persistent: false,
+    set(k,v){ mem[k]=v; return v; },
+    get(k){ return (k in mem) ? mem[k] : null; },
+    del(k){ delete mem[k]; },
+    keys(prefix){ return Object.keys(mem).filter(k=>!prefix||k.indexOf(prefix)===0); },
+  };
+})();
+
+function loadAllStudents(){
+  const out = [];
+  const keys = storage.keys('student:');
+  for(const k of keys){
+    try{
+      const raw = storage.get(k);
+      if(raw) out.push(migrateStudent(JSON.parse(raw)));
+    }catch(e){ /* skip unreadable record */ }
+  }
+  out.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  return out;
+}
+
+// Migrate records from earlier versions of this tool so they work with new features
+function migrateStudent(rec){
+  if(!rec.history) rec.history = [];
+  if(rec.notes === undefined) rec.notes = '';
+  if(rec.className === undefined) rec.className = '';
+  if(!rec.teacherObs) rec.teacherObs = { attention:'', social:'', emotional:'', workHabits:'' };
+  if(!rec.interestsChecked) rec.interestsChecked = [];
+  if(rec.interestsFree === undefined) rec.interestsFree = '';
+  if(rec.birthdate === undefined) rec.birthdate = '';
+  if(!rec.subjectStrengths) rec.subjectStrengths = [];
+  if(rec.likes === undefined) rec.likes = '';
+  if(rec.dislikes === undefined) rec.dislikes = '';
+  if(!rec.posts) rec.posts = [];
+  // Tier 1: Learning Access
+  if(!rec.accommodations) rec.accommodations = [];
+  if(rec.accommodationNotes === undefined) rec.accommodationNotes = '';
+  if(rec.attendancePattern === undefined) rec.attendancePattern = '';
+  if(rec.attendanceNote === undefined) rec.attendanceNote = '';
+  if(rec.firstLanguage === undefined) rec.firstLanguage = '';
+  if(rec.otherLanguages === undefined) rec.otherLanguages = '';
+  if(rec.englishProficiency === undefined) rec.englishProficiency = '';
+  if(rec.chineseProficiency === undefined) rec.chineseProficiency = '';
+  if(rec.cefrLevel === undefined) rec.cefrLevel = '';
+  if(!rec.cambridgeExams) rec.cambridgeExams = [];
+  if(!rec.otherEnglishTests) rec.otherEnglishTests = [];
+  if(rec.familyContext === undefined) rec.familyContext = '';
+  if(rec.physicalMedicalNotes === undefined) rec.physicalMedicalNotes = '';
+  // Tier 2: Communication & Context
+  if(rec.supportNetwork === undefined) rec.supportNetwork = '';
+  if(rec.bestTimeOfDay === undefined) rec.bestTimeOfDay = '';
+  if(!rec.communicationPreferences) rec.communicationPreferences = [];
+  if(rec.groupRoleTendency === undefined) rec.groupRoleTendency = '';
+  return rec;
+}
+
+function saveStudent(rec){
+  rec.updatedAt = Date.now();
+  try{
+    storage.set('student:'+rec.id, JSON.stringify(rec));
+    return true;
+  }catch(e){ console.error('Save failed:', e); return false; }
+}
+
+function deleteStudentRecord(id){
+  try{ storage.del('student:'+id); }catch(e){}
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SCORING
+   ══════════════════════════════════════════════════════════════ */
+
+function scaleMaxFor(level){ return LEVEL_META[level].scale.length - 1; }
+
+function computeSectionResult(sec, answers, scaleMax){
+  const isProfile = sec.items.every(i=>i.direction==='preference');
+  if(isProfile){
+    const domainScores = {};
+    sec.items.forEach(it=>{
+      domainScores[it.domain] = (domainScores[it.domain]||0) + (answers[it.id]||0);
+    });
+    return { type:'profile', domainScores };
+  }
+  let diffScore=0, diffMax=0, strScore=0, strMax=0;
+  sec.items.forEach(it=>{
+    const v = answers[it.id]||0;
+    if(it.direction==='difficulty'){ diffScore+=v; diffMax+=scaleMax; }
+    else if(it.direction==='strength'){ strScore+=v; strMax+=scaleMax; }
+  });
+  const isPositive = (sec.id==='D' || sec.id==='E');
+  let compositeScore, compositeMax;
+  if(isPositive){ compositeScore = strScore; compositeMax = strMax; }
+  else { compositeScore = diffScore + (strMax - strScore); compositeMax = diffMax + strMax; }
+  return { type:'composite', compositeScore, compositeMax, isPositive };
+}
+
+function getZone(compositeScore, compositeMax, isPositive){
+  if(compositeMax===0) return 'neutral';
+  const pct = compositeScore/compositeMax;
+  if(isPositive){
+    if(pct>=0.75) return 'green';
+    if(pct>=0.4) return 'yellow';
+    return 'red';
+  }
+  if(pct>=0.65) return 'red';
+  if(pct>=0.35) return 'yellow';
+  return 'green';
+}
+
+const ZONE_META = {
+  green: { bg:'var(--green-bg)', border:'var(--green-border)', text:'var(--green)', label:'Strength' },
+  yellow:{ bg:'var(--yellow-bg)', border:'var(--yellow-border)', text:'var(--yellow)', label:'Monitor' },
+  red:   { bg:'var(--red-bg)', border:'var(--red-border)', text:'var(--red)', label:'Support Needed' },
+  neutral:{ bg:'var(--rule-soft)', border:'var(--rule)', text:'var(--ink-faint)', label:'—' },
+};
+
+/* ══════════════════════════════════════════════════════════════
+   STATE + ROUTER
+   ══════════════════════════════════════════════════════════════ */
+
+const state = {
+  view: 'loading',
+  students: [],
+  draft: null,      // in-progress assessment
+  activeId: null,   // id of student being viewed in report
+};
+
+function uid(){ return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
+
+function suggestLevel(age){
+  age = Number(age);
+  if(!age) return null;
+  if(age <= 11) return 'primary';
+  if(age <= 13) return 'junior';
+  return 'senior';
+}
+
+function newDraft(){
+  return { id:uid(), name:'', age:'', birthdate:'', level:null, className:'', notes:'',
+    subjectStrengths:[], likes:'', dislikes:'', posts:[],
+    accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
+    firstLanguage:'', otherLanguages:'', englishProficiency:'', chineseProficiency:'',
+    cefrLevel:'', cambridgeExams:[], otherEnglishTests:[],
+    familyContext:'', physicalMedicalNotes:'',
+    supportNetwork:'', bestTimeOfDay:'', communicationPreferences:[], groupRoleTendency:'',
+    sectionIndex:0, answers:{}, interestsChecked:[], interestsFree:'',
+    teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' }, createdAt:Date.now() };
+}
+
+function getAllClassNames(){
+  const set = new Set();
+  state.students.forEach(s => { if(s.className && s.className.trim()) set.add(s.className.trim()); });
+  return Array.from(set).sort((a,b) => a.localeCompare(b));
+}
+
+function init(){
+  state.students = loadAllStudents();
+  state.view = 'dashboard';
+  render();
+
+  // Event delegation: clicking a .sb-head toggles its parent .section-block between collapsed/expanded
+  document.getElementById('app').addEventListener('click', function(e){
+    const head = e.target.closest('.section-block > .sb-head');
+    if(!head) return;
+    // Don't toggle if the click was on an interactive element inside the header (e.g. a zone-pill link)
+    if(e.target.closest('a, button, select, input, textarea')) return;
+    const block = head.parentElement;
+    if(block && block.classList.contains('section-block')){
+      block.classList.toggle('collapsed');
+    }
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER: shell + router
+   ══════════════════════════════════════════════════════════════ */
+
+function render(opts){
+  opts = opts || {};
+  const app = document.getElementById('app');
+  let body = '';
+  if(state.view === 'loading') body = renderLoading();
+  else if(state.view === 'dashboard') body = renderDashboard();
+  else if(state.view === 'newInfo') body = renderNewInfo();
+  else if(state.view === 'assess') body = renderAssess();
+  else if(state.view === 'report') body = renderReport();
+  else if(state.view === 'research') body = renderResearch();
+  else if(state.view === 'classOverview') body = renderClassOverview();
+  else if(state.view === 'compare') body = renderCompare();
+  else if(state.view === 'grouping') body = renderGrouping();
+  else if(state.view === 'data') body = renderData();
+
+  app.innerHTML = `
+    ${state.view !== 'loading' ? renderTopbar() : ''}
+    ${body}
+  `;
+  if(!opts.preserveScroll) window.scrollTo(0,0);
+}
+
+function renderTopbar(){
+  return `
+  <div class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand" onclick="App.goDashboard()">
+        <span class="brand-mark">Learner Profile</span>
+        <span class="brand-sub">Record System</span>
+      </div>
+      <div class="topbar-nav">
+        <a onclick="App.goDashboard()">Records</a>
+        <a onclick="App.goData()">Data</a>
+        <a onclick="App.goResearch()">Research &amp; Methodology</a>
+      </div>
     </div>
-    <div id="canvas-container"><div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div></div>
+  </div>`;
+}
 
-    <script>
-        var canvas = document.getElementById('classroom-canvas'), selectedEl = null;
-        var isDrawMode = false, isDrawingBox = false, currentBox = null, drawStartX, drawStartY;
+function renderLoading(){
+  return `<div class="wrap" style="padding-top:120px;text-align:center;color:var(--ink-faint);">Loading records…</div>`;
+}
 
-        function spawnItem(type) {
-            var el = document.createElement('div');
-            el.className = 'movable-element';
-            el.innerHTML = '<span class="element-label">New Block</span>';
-            el.style.left = '50px'; el.style.top = '50px'; el.style.width = '100px'; el.style.height = '60px';
-            el.onmousedown = function(e) { selectItem(el); };
-            canvas.appendChild(el);
-            selectItem(el);
+/* ── Dashboard ── */
+
+function renderDashboard(){
+  const students = state.students;
+
+  // Group by class
+  const groups = {};
+  students.forEach(s => {
+    const key = (s.className && s.className.trim()) ? s.className.trim() : '__unassigned__';
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+  const classNames = Object.keys(groups).filter(k => k !== '__unassigned__').sort((a,b)=>a.localeCompare(b));
+  const orderedGroups = classNames.map(c => ({ name: c, students: groups[c], isUnassigned: false }));
+  if(groups.__unassigned__) orderedGroups.push({ name: 'Unassigned', students: groups.__unassigned__, isUnassigned: true });
+
+  return `
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:16px;flex-wrap:wrap;">
+      <div>
+        <h1 style="font-size:24px;">Student Records</h1>
+        <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} record${students.length===1?'':'s'} across ${classNames.length} class${classNames.length===1?'':'es'}${groups.__unassigned__ ? ' + unassigned' : ''}</p>
+      </div>
+      <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
+    </div>
+    ${students.length === 0 ? `
+      <div class="empty-state card">
+        <h3>No records yet</h3>
+        <p>Start a new assessment to build a student's first learner profile.</p>
+        <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
+      </div>
+    ` : orderedGroups.map(renderClassGroup).join('')}
+  </div>`;
+}
+
+function renderClassGroup(g){
+  const clickable = !g.isUnassigned;
+  return `
+  <div class="class-group">
+    <div class="class-group-header ${clickable?'clickable':''}" ${clickable?`onclick="App.openClassOverview('${escapeAttr(g.name)}')"`:''}>
+      <div>
+        <div class="class-group-name" style="${g.isUnassigned ? 'color:var(--ink-faint);font-style:italic;' : ''}">${escapeHtml(g.name)}</div>
+        ${clickable ? '<div class="class-group-hint">View class overview →</div>' : ''}
+      </div>
+      <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
+    </div>
+    ${g.students.map(renderRecordCard).join('')}
+  </div>`;
+}
+
+function renderRecordCard(rec){
+  const lvl = LEVEL_META[rec.level] || LEVEL_META.primary;
+  const zones = computeAllZones(rec);
+  const date = new Date(rec.updatedAt || rec.createdAt).toLocaleDateString(undefined,{ day:'numeric', month:'short', year:'numeric' });
+  const initials = (rec.name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const allClasses = getAllClassNames();
+  const currentClass = (rec.className||'').trim();
+  const hasAccommodations = (rec.accommodations && rec.accommodations.length) || (rec.accommodationNotes && rec.accommodationNotes.trim());
+  // Build the "move" select options: existing classes + Unassigned + option to prompt for new
+  const moveOptions = [
+    `<option value="" disabled selected>Move to…</option>`,
+    ...allClasses.filter(c => c !== currentClass).map(c => `<option value="__cls__${escapeHtml(c)}">${escapeHtml(c)}</option>`),
+    currentClass ? `<option value="__unassign__">Unassigned</option>` : '',
+    `<option value="__new__">+ New class…</option>`,
+  ].join('');
+  return `
+  <div class="record-card" style="border-left-color:${lvl.color};">
+    <div class="record-tab" style="background:${lvl.light};color:${lvl.color};">${initials}</div>
+    <div class="record-info" onclick="App.openReport('${rec.id}')">
+      <div class="record-name">${escapeHtml(rec.name)}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
+      <div class="record-meta">${lvl.label} · Age ${escapeHtml(String(rec.age||'?'))} · Updated ${date}</div>
+    </div>
+    <div class="record-zones" onclick="App.openReport('${rec.id}')" title="Section zones">
+      ${zones.map(z=>`<div class="zone-dot" style="background:${ZONE_META[z].text};" title="${ZONE_META[z].label}"></div>`).join('')}
+    </div>
+    <div class="record-actions">
+      <select class="record-move" onchange="App.quickMove('${rec.id}', this.value); this.value='';" onclick="event.stopPropagation()" title="Move to a different class">
+        ${moveOptions}
+      </select>
+      <button class="record-delete" onclick="event.stopPropagation(); App.confirmDelete('${rec.id}')" title="Delete record">×</button>
+    </div>
+  </div>`;
+}
+
+function computeAllZones(rec){
+  const secs = SECTIONS[rec.level] || [];
+  const scaleMax = scaleMaxFor(rec.level);
+  const zones = [];
+  ['A','C','D','E'].forEach(id=>{
+    const sec = secs.find(s=>s.id===id);
+    if(!sec) return;
+    const res = computeSectionResult(sec, rec.answers, scaleMax);
+    zones.push(getZone(res.compositeScore, res.compositeMax, res.isPositive));
+  });
+  return zones;
+}
+
+/* ── New assessment: Step 1 info ── */
+
+function renderLevelOptionsHTML(d){
+  return Object.values(LEVEL_META).map(lvl => `
+    <div class="level-opt ${d.level===lvl.key?'selected':''}"
+         style="${d.level===lvl.key ? `border-color:${lvl.color};background:${lvl.light};` : ''}"
+         onclick="App.chooseLevel('${lvl.key}')">
+      <div class="lo-label" style="color:${d.level===lvl.key?lvl.color:'var(--ink)'};">${lvl.label}</div>
+      <div class="lo-grades">${lvl.grades}</div>
+    </div>
+  `).join('');
+}
+
+function renderNewInfo(){
+  const d = state.draft;
+  const suggested = suggestLevel(d.age);
+  const storageWarn = storage.persistent ? '' : `
+    <div class="info-callout" style="background:var(--yellow-bg);border-color:var(--yellow-border);color:var(--ink);margin-bottom:20px;">
+      <strong style="color:var(--yellow);">Storage unavailable</strong>
+      Your browser is blocking persistent storage, so records will be lost when you close this tab. Open the file in a regular browser window (not private/incognito) to save records between sessions.
+    </div>`;
+  return `
+  <div class="wrap-narrow">
+    <h1 style="font-size:22px;margin-bottom:6px;">New Learner Profile</h1>
+    <p style="color:var(--ink-faint);font-size:13px;margin-bottom:28px;">Enter the student's details to begin.</p>
+    ${storageWarn}
+
+    <div class="field-group">
+      <label class="field-label" for="f-name">Student name</label>
+      <input type="text" id="f-name" value="${escapeHtml(d.name)}" placeholder="Enter full name"
+        oninput="App.updateDraftName(this.value)"
+        autocomplete="off">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="f-birthdate">Birthdate <span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(optional — auto-calculates age)</span></label>
+      <input type="date" id="f-birthdate" value="${escapeHtml(d.birthdate||'')}"
+        oninput="App.updateDraftBirthdate(this.value)"
+        autocomplete="off">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="f-age">Age</label>
+      <input type="number" id="f-age" min="9" max="19" value="${escapeHtml(d.age)}" placeholder="e.g. 13"
+        oninput="App.updateDraftAge(this.value)"
+        autocomplete="off">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="f-class">Class ${getAllClassNames().length ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(type new or pick existing)</span>' : '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(optional)</span>'}</label>
+      <input type="text" id="f-class" list="class-suggestions" value="${escapeHtml(d.className||'')}"
+        placeholder="e.g. 8A, Year 9 English"
+        oninput="App.updateDraftClass(this.value)"
+        autocomplete="off">
+      <datalist id="class-suggestions">
+        ${getAllClassNames().map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}
+      </datalist>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Assessment level ${suggested ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(suggested based on age — adjust if needed)</span>' : ''}</label>
+      <div class="level-options" id="level-options">
+        ${renderLevelOptionsHTML(d)}
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-ghost" onclick="App.goDashboard()">Cancel</button>
+      <button class="btn btn-primary" id="btn-begin" ${(!d.name.trim()||!d.level)?'disabled':''} onclick="App.beginAssessment()">Start Assessment →</button>
+    </div>
+  </div>`;
+}
+
+/* ── New assessment: Step 2..N — sections ── */
+
+function renderAssess(){
+  const d = state.draft;
+  const lvl = LEVEL_META[d.level];
+  const secs = SECTIONS[d.level];
+  const idx = d.sectionIndex;
+  // virtual section list: A,B,C,D,E,F(interests),G,H(personal profile)
+  const order = ['A','B','C','D','E','F','G','H'];
+  const currentKey = order[idx];
+
+  const totalQuestions = secs.reduce((n,s)=>n+s.items.length,0);
+  const answeredCount = Object.keys(d.answers).length;
+
+  let content = '';
+  if(currentKey === 'F'){
+    content = renderInterestStep(d, lvl);
+  } else if(currentKey === 'H'){
+    content = renderPersonalProfileStep(d, lvl);
+  } else {
+    const sec = secs.find(s=>s.id===currentKey);
+    content = renderQuestionStep(sec, d, lvl);
+  }
+
+  const allSectionsComplete = order.every(k => isStepComplete(k, d, secs));
+
+  return `
+  <div class="wrap-narrow">
+    <div class="progress-label">
+      <span>Step ${idx+1} of ${order.length}</span>
+      <span>${answeredCount}/${totalQuestions} questions answered</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" style="width:${((idx+1)/order.length)*100}%;background:${lvl.color};"></div>
+    </div>
+
+    <div class="section-tabs">
+      ${order.map((k,i)=>{
+        const complete = isStepComplete(k, d, secs);
+        const active = i===idx;
+        return `<div class="section-tab ${complete?'complete':''} ${active?'active':''}"
+          style="${active? `border-color:${lvl.color};color:${lvl.color};background:${lvl.light};` : complete ? `color:var(--ink-soft);` : ''}"
+          onclick="App.jumpToStep(${i})">${k}</div>`;
+      }).join('')}
+    </div>
+
+    ${content}
+
+    <div class="nav-row">
+      <button class="btn btn-ghost" onclick="App.stepBack()">${idx===0?'Cancel':'← Back'}</button>
+      ${idx < order.length-1
+        ? `<button class="btn btn-primary" ${!isStepComplete(currentKey,d,secs)?'disabled':''} onclick="App.stepNext()" style="background:${lvl.color};">Next →</button>`
+        : `<button class="btn btn-primary" ${!allSectionsComplete?'disabled':''} onclick="App.finishAssessment()" style="background:${lvl.color};">View Interpretation →</button>`
+      }
+    </div>
+  </div>`;
+}
+
+function isStepComplete(key, d, secs){
+  if(key === 'F') return true; // interests optional
+  if(key === 'H') return true; // personal profile optional
+  const sec = secs.find(s=>s.id===key);
+  if(!sec) return true;
+  return sec.items.every(it => d.answers[it.id] !== undefined);
+}
+
+function renderQuestionStep(sec, d, lvl){
+  return `
+  <div style="margin-bottom:8px;">
+    <h2 style="font-size:19px;margin-bottom:4px;">${sec.title}</h2>
+    <p style="color:var(--ink-faint);font-size:13px;margin:0 0 18px;">${sec.subtitle}</p>
+  </div>
+  ${sec.items.map((it,i)=>{
+    const val = d.answers[it.id];
+    return `
+    <div class="q-item ${val!==undefined?'answered':''}" style="${val!==undefined?`border-color:${lvl.mid};`:''}">
+      <div class="q-text"><span class="q-num">${i+1}</span>${escapeHtml(it.text)}</div>
+      <div class="q-scale">
+        ${lvl.scale.map((label,v)=>{
+          const sel = val===v;
+          return `<div class="q-opt ${sel?'selected':''}" style="${sel?`background:${lvl.color};border-color:${lvl.color};`:''}"
+            onclick="App.answer('${it.id}', ${v})">${label}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('')}`;
+}
+
+function renderInterestStep(d, lvl){
+  const list = INTERESTS[d.level];
+  return `
+  <div style="margin-bottom:8px;">
+    <h2 style="font-size:19px;margin-bottom:4px;">My Interests</h2>
+    <p style="color:var(--ink-faint);font-size:13px;margin:0 0 18px;">Tick anything that interests the student. This helps connect lessons to things they enjoy. (Optional — not scored.)</p>
+  </div>
+  <div class="interest-grid">
+    ${list.map(cat=>{
+      const checked = d.interestsChecked.includes(cat);
+      return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.toggleInterest('${escapeAttr(cat)}')">
+        <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(cat)}
+      </div>`;
+    }).join('')}
+  </div>
+  <label class="field-label">Outside school, this student really enjoys…</label>
+  <textarea placeholder="Optional free response" oninput="App.updateInterestFree(this.value)">${escapeHtml(d.interestsFree)}</textarea>
+  `;
+}
+
+function renderPersonalProfileStep(d, lvl){
+  const strengths = d.subjectStrengths || [];
+  const customSubjects = strengths.filter(s => !SUBJECTS.includes(s));
+  const allChips = [...SUBJECTS, ...customSubjects];
+  return `
+  <div style="margin-bottom:8px;">
+    <h2 style="font-size:19px;margin-bottom:4px;">About This Student</h2>
+    <p style="color:var(--ink-faint);font-size:13px;margin:0 0 18px;">Personal profile info to help you connect with and plan for this student. All fields are optional.</p>
+  </div>
+
+  <label class="field-label">Subject strengths</label>
+  <p style="color:var(--ink-faint);font-size:12px;margin:0 0 12px;">Tick any subject this student is strong in. Add another subject at the bottom if it's not listed.</p>
+  <div class="interest-grid">
+    ${allChips.map(sub => {
+      const checked = strengths.includes(sub);
+      return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.toggleSubject('${escapeAttr(sub)}')">
+        <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(sub)}
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:24px;">
+    <input type="text" id="custom-subject" placeholder="Add another subject (e.g. Robotics, Drama)…" style="flex:1;padding:9px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13.5px;font-family:inherit;background:var(--paper-raised);outline:none;"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();App.addCustomSubject();}">
+    <button class="btn btn-ghost btn-sm" onclick="App.addCustomSubject()" style="white-space:nowrap;">+ Add subject</button>
+  </div>
+
+  <div style="margin-bottom:22px;">
+    <label class="field-label" for="f-likes">Likes</label>
+    <p style="color:var(--ink-faint);font-size:12px;margin:0 0 6px;">What does this student enjoy? Foods, activities, topics, styles of work — anything specific helps.</p>
+    <textarea id="f-likes" placeholder="e.g. animals, video games, working in small groups, humor, hands-on tasks"
+      oninput="App.updateDraftLikes(this.value)">${escapeHtml(d.likes||'')}</textarea>
+  </div>
+
+  <div>
+    <label class="field-label" for="f-dislikes">Dislikes</label>
+    <p style="color:var(--ink-faint);font-size:12px;margin:0 0 6px;">What does this student find aversive? Loud noise, being called on, timed tests — anything that trips them up.</p>
+    <textarea id="f-dislikes" placeholder="e.g. speaking in front of class, math word problems, loud environments, unclear instructions"
+      oninput="App.updateDraftDislikes(this.value)">${escapeHtml(d.dislikes||'')}</textarea>
+  </div>
+  `;
+}
+
+/* ── Report view ── */
+
+function renderReport(){
+  const rec = state.students.find(s=>s.id===state.activeId) || state.draft;
+  const lvl = LEVEL_META[rec.level];
+  const secs = SECTIONS[rec.level];
+  const scaleMax = scaleMaxFor(rec.level);
+  const date = new Date(rec.updatedAt||rec.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'long',year:'numeric'});
+
+  const scoredSecs = secs.filter(s=>s.id!=='B' && s.id!=='G');
+  const overview = scoredSecs.map(sec=>{
+    const res = computeSectionResult(sec, rec.answers, scaleMax);
+    const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+    return { sec, zone };
+  });
+
+  return `
+  <div class="wrap">
+    <div class="no-print" style="margin-bottom:18px;">
+      <button class="btn btn-ghost btn-sm" onclick="App.goDashboard()">← All records</button>
+    </div>
+
+    <div class="report-header">
+      <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}</div>
+      <h1 class="report-title">Learner Profile — ${escapeHtml(rec.name)}</h1>
+      <div class="report-meta">${(function(){
+        const parts = [];
+        const ageFromBirth = computeAge(rec.birthdate);
+        if(ageFromBirth !== null) parts.push('Age ' + ageFromBirth);
+        else if(rec.age) parts.push('Age ' + escapeHtml(String(rec.age)));
+        parts.push('Assessed ' + date);
+        if(rec.className) parts.push('Class: ' + escapeHtml(rec.className));
+        return parts.join(' · ');
+      })()}</div>
+    </div>
+
+    <div class="student-meta-card no-print">
+      <div class="student-meta-field">
+        <label for="rp-class">Class</label>
+        <input type="text" id="rp-class" list="class-suggestions-report" value="${escapeHtml(rec.className||'')}"
+          placeholder="Assign to a class"
+          oninput="App.updateStudentClass(this.value)"
+          autocomplete="off">
+        <datalist id="class-suggestions-report">
+          ${getAllClassNames().map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}
+        </datalist>
+      </div>
+      <div class="student-meta-field">
+        <label for="rp-birthdate">Birthdate ${rec.birthdate && computeAge(rec.birthdate)!==null ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(age ' + computeAge(rec.birthdate) + ')</span>' : ''}</label>
+        <input type="date" id="rp-birthdate" value="${escapeHtml(rec.birthdate||'')}"
+          oninput="App.updateStudentBirthdate(this.value)">
+      </div>
+    </div>
+
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">About This Student</div>
+          <div class="sb-domain">Personal profile — updates as you type</div>
+        </div>
+      </div>
+
+      <label class="field-label" style="margin-bottom:8px;">Subject strengths</label>
+      <div class="interest-grid" style="margin-bottom:14px;">
+        ${(function(){
+          const strengths = rec.subjectStrengths || [];
+          const custom = strengths.filter(s => !SUBJECTS.includes(s));
+          const allChips = [...SUBJECTS, ...custom];
+          return allChips.map(sub => {
+            const checked = strengths.includes(sub);
+            return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.toggleStudentSubject('${escapeAttr(sub)}')">
+              <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(sub)}
+            </div>`;
+          }).join('');
+        })()}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:22px;" class="no-print">
+        <input type="text" id="rp-custom-subject" placeholder="Add another subject…" style="flex:1;padding:8px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13px;font-family:inherit;background:var(--paper-raised);outline:none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();App.addStudentCustomSubject();}">
+        <button class="btn btn-ghost btn-sm" onclick="App.addStudentCustomSubject()" style="white-space:nowrap;">+ Add</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <label class="field-label" for="rp-likes">Likes</label>
+          <textarea id="rp-likes" class="notes-textarea" style="min-height:80px;"
+            placeholder="e.g. animals, gaming, group work, hands-on tasks"
+            oninput="App.updateStudentLikes(this.value)">${escapeHtml(rec.likes||'')}</textarea>
+        </div>
+        <div>
+          <label class="field-label" for="rp-dislikes">Dislikes</label>
+          <textarea id="rp-dislikes" class="notes-textarea" style="min-height:80px;"
+            placeholder="e.g. cold-calling, timed tests, loud environments"
+            oninput="App.updateStudentDislikes(this.value)">${escapeHtml(rec.dislikes||'')}</textarea>
+        </div>
+      </div>
+    </div>
+
+    ${renderLearningAccessSection(rec, lvl)}
+    ${renderContextSection(rec, lvl)}
+
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Additional Notes</div>
+          <div class="sb-domain">Free-form observations, context, or plans — saves automatically</div>
+        </div>
+      </div>
+      <textarea class="notes-textarea"
+        placeholder="Add any additional context about this student — background, IEP details, communication with parents, adjustments tried, etc. Saves as you type."
+        oninput="App.updateStudentNotes(this.value)">${escapeHtml(rec.notes||'')}</textarea>
+    </div>
+
+    ${renderPostsSection(rec)}
+
+    <div class="zone-overview">
+      ${overview.map(({sec,zone})=>{
+        const zm = ZONE_META[zone];
+        return `<div class="zone-card" style="background:${zm.bg};border-color:${zm.border};">
+          <div class="zc-label" style="color:${zm.text};">${zm.label}</div>
+          <div class="zc-title">${sec.title}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    ${(rec.history && rec.history.length) ? `
+      <div class="history-strip">
+        <strong>Assessments:</strong>
+        ${rec.history.map(h => `<span class="history-item">${new Date(h.date).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</span>`).join('')}
+        <span class="history-item current">${new Date(rec.updatedAt||rec.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})} · current</span>
+      </div>
+    ` : ''}
+
+    <div class="collapse-controls no-print">
+      <button onclick="App.collapseAllSections()">Collapse all sections</button>
+      <button onclick="App.expandAllSections()">Expand all sections</button>
+    </div>
+
+    ${scoredSecs.map(sec => renderScoredSection(sec, rec, lvl, scaleMax)).join('')}
+
+    ${renderPreferenceSection(secs.find(s=>s.id==='B'), rec, lvl)}
+    ${renderInterestsSection(rec, lvl)}
+    ${renderGoalsSection(secs.find(s=>s.id==='G'), rec, lvl, scaleMax)}
+    ${renderObservationSection(rec)}
+
+    <div class="disclaimer-footer">
+      This is a screening tool for instructional planning, not a validated clinical instrument or diagnosis. Items are adapted and reworded from concepts in the SDQ (Goodman, 1997) and BASC-3 BESS (Kamphaus &amp; Reynolds, 2015) — the original reliability statistics apply to those exact instruments, not to this adapted version. Learning preferences are descriptive only (Pashler et al., 2008; Rogowsky et al., 2020). Score zones are proportional heuristics, not normed clinical cutoffs. Elevated emotional/behavioural scores should prompt follow-up with a school counsellor. See <a onclick="App.goResearch()" style="cursor:pointer;color:var(--accent);">Research &amp; Methodology</a> for full detail.
+    </div>
+
+    <div class="action-row no-print">
+      <button class="btn btn-primary" onclick="window.print()" style="background:${lvl.color};">Print Report</button>
+      <button class="btn btn-ghost" onclick="App.startReassessment('${rec.id}')">📊 Reassess this Student</button>
+      <button class="btn btn-ghost" onclick="App.editRecord('${rec.id}')">Edit Answers</button>
+      <button class="btn btn-danger-ghost" onclick="App.confirmDelete('${rec.id}')">Delete Record</button>
+    </div>
+  </div>`;
+}
+
+function formatPostTimestamp(ts){
+  const d = new Date(ts);
+  const dateStr = d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  const timeStr = d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+  return dateStr + ' · ' + timeStr;
+}
+
+// Render a single-select radio-chip group. currentValue is the stored value, options is [{value,label},...]
+function renderRadioGroup(currentValue, options, onSelectMethod){
+  return `<div class="radio-group">
+    ${options.map(o => `<button class="radio-chip ${currentValue===o.value?'selected':''}" onclick="App.${onSelectMethod}('${escapeAttr(o.value)}')">${escapeHtml(o.label)}</button>`).join('')}
+    ${currentValue ? `<button class="radio-chip" onclick="App.${onSelectMethod}('')" style="color:var(--ink-faint);border-style:dashed;">Clear</button>` : ''}
+  </div>`;
+}
+
+// Render a multi-select chip group (checkbox-style), for accommodations/communication prefs
+function renderChipMultiSelect(selectedList, allOptions, toggleMethod, lvl){
+  const selected = selectedList || [];
+  const custom = selected.filter(x => !allOptions.includes(x));
+  const chips = [...allOptions, ...custom];
+  return chips.map(item => {
+    const checked = selected.includes(item);
+    return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.${toggleMethod}('${escapeAttr(item)}')">
+      <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(item)}
+    </div>`;
+  }).join('');
+}
+
+// Render a Cambridge exam entry card
+function renderCambridgeExamCard(exam){
+  return `
+    <div class="test-card">
+      <div class="test-card-head">
+        <select onchange="App.updateCambridgeExam('${exam.id}', 'testType', this.value)">
+          <option value="">— Select test —</option>
+          ${CAMBRIDGE_EXAM_TYPES.map(t => `<option value="${t.value}" ${exam.testType===t.value?'selected':''}>${escapeHtml(t.label)}</option>`).join('')}
+        </select>
+        <input type="date" value="${escapeHtml(exam.date||'')}" title="Date taken"
+          oninput="App.updateCambridgeExam('${exam.id}', 'date', this.value)">
+        <button class="del-btn no-print" title="Delete this exam entry"
+          onclick="App.deleteCambridgeExam('${exam.id}')">×</button>
+      </div>
+      <div class="score-grid">
+        <div class="score-field">
+          <label>Reading</label>
+          <input type="text" value="${escapeHtml(exam.reading||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'reading', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Writing</label>
+          <input type="text" value="${escapeHtml(exam.writing||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'writing', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Listening</label>
+          <input type="text" value="${escapeHtml(exam.listening||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'listening', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Speaking</label>
+          <input type="text" value="${escapeHtml(exam.speaking||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'speaking', this.value)">
+        </div>
+        <div class="score-field">
+          <label>Total</label>
+          <input type="text" value="${escapeHtml(exam.total||'')}" placeholder="—"
+            oninput="App.updateCambridgeExam('${exam.id}', 'total', this.value)"
+            style="font-weight:600;">
+        </div>
+      </div>
+    </div>`;
+}
+
+// Render an "other English test" entry card
+function renderOtherEnglishTestCard(test){
+  return `
+    <div class="test-card">
+      <div class="test-card-head">
+        <input type="text" class="test-name" value="${escapeHtml(test.testName||'')}"
+          placeholder="Test name — e.g. IELTS, TOEFL, PTE, Duolingo English Test"
+          oninput="App.updateOtherEnglishTest('${test.id}', 'testName', this.value)">
+        <input type="date" value="${escapeHtml(test.date||'')}" title="Date taken"
+          oninput="App.updateOtherEnglishTest('${test.id}', 'date', this.value)">
+        <button class="del-btn no-print" title="Delete this test entry"
+          onclick="App.deleteOtherEnglishTest('${test.id}')">×</button>
+      </div>
+      <input type="text" class="other-test-score" value="${escapeHtml(test.score||'')}"
+        placeholder="Overall score — e.g. 7.5, 105/120, B2 High"
+        oninput="App.updateOtherEnglishTest('${test.id}', 'score', this.value)">
+      <textarea class="context-textarea" style="min-height:44px;margin-bottom:0;"
+        placeholder="Optional notes — subscores, test variant (Academic/General), percentile, etc."
+        oninput="App.updateOtherEnglishTest('${test.id}', 'notes', this.value)">${escapeHtml(test.notes||'')}</textarea>
+    </div>`;
+}
+
+function renderLearningAccessSection(rec, lvl){
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Learning Access &amp; Accommodations</div>
+          <div class="sb-domain">Practical information that affects how this student can access the lesson</div>
+        </div>
+      </div>
+
+      <h4 class="subsection-header">🛠 Accommodations</h4>
+      <p class="subsection-hint">Tick anything this student is entitled to or benefits from.</p>
+      <div class="interest-grid">
+        ${renderChipMultiSelect(rec.accommodations, ACCOMMODATIONS, 'toggleAccommodation', lvl)}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;" class="no-print">
+        <input type="text" id="rp-custom-accommodation" placeholder="Add custom accommodation…" style="flex:1;padding:8px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13px;font-family:inherit;background:var(--paper-raised);outline:none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();App.addCustomAccommodation();}">
+        <button class="btn btn-ghost btn-sm" onclick="App.addCustomAccommodation()" style="white-space:nowrap;">+ Add</button>
+      </div>
+      <textarea class="context-textarea" placeholder="Notes on accommodations — implementation details, IEP references, when to apply…"
+        oninput="App.updateAccommodationNotes(this.value)">${escapeHtml(rec.accommodationNotes||'')}</textarea>
+
+      <h4 class="subsection-header">📅 Attendance Pattern</h4>
+      ${renderRadioGroup(rec.attendancePattern, ATTENDANCE_OPTIONS, 'setAttendancePattern')}
+      <textarea class="context-textarea" placeholder="Context — e.g. medical appointments Fridays, family situation causing lateness, home schooling arrangements…"
+        oninput="App.updateAttendanceNote(this.value)">${escapeHtml(rec.attendanceNote||'')}</textarea>
+
+      <h4 class="subsection-header">🗣 Language Background</h4>
+      <div class="field-grid-2">
+        <div>
+          <label>First language</label>
+          <input type="text" value="${escapeHtml(rec.firstLanguage||'')}" placeholder="e.g. Mandarin, Cantonese, English"
+            oninput="App.updateFirstLanguage(this.value)">
+        </div>
+        <div>
+          <label>Other languages spoken</label>
+          <input type="text" value="${escapeHtml(rec.otherLanguages||'')}" placeholder="e.g. Shanghainese, Spanish"
+            oninput="App.updateOtherLanguages(this.value)">
+        </div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">English proficiency</label>
+        ${renderRadioGroup(rec.englishProficiency, PROFICIENCY_LEVELS, 'setEnglishProficiency')}
+      </div>
+      <div style="margin-bottom:6px;">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">CEFR level <span style="text-transform:none;font-weight:400;color:var(--ink-faint);">(European framework — more precise, if known)</span></label>
+        ${renderRadioGroup(rec.cefrLevel, CEFR_LEVELS, 'setCEFRLevel')}
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Chinese proficiency</label>
+        ${renderRadioGroup(rec.chineseProficiency, PROFICIENCY_LEVELS, 'setChineseProficiency')}
+      </div>
+
+      <h4 class="subsection-header">📝 English Test Scores</h4>
+      <p class="subsection-hint">Record standardized English test results. Add multiple entries to track scores over time.</p>
+
+      <div style="font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:14px 0 8px;">Cambridge English exams</div>
+      ${(rec.cambridgeExams && rec.cambridgeExams.length)
+        ? rec.cambridgeExams.map(renderCambridgeExamCard).join('')
+        : '<div class="test-empty-state">No Cambridge exams recorded yet.</div>'}
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.addCambridgeExam()" style="margin-bottom:16px;">+ Add Cambridge exam</button>
+
+      <div style="font-size:12.5px;font-weight:600;color:var(--ink-soft);margin:8px 0 8px;">Other English tests</div>
+      <p class="subsection-hint" style="margin-top:-2px;">IELTS, TOEFL, PTE, school-internal tests — any test with its own scoring.</p>
+      ${(rec.otherEnglishTests && rec.otherEnglishTests.length)
+        ? rec.otherEnglishTests.map(renderOtherEnglishTestCard).join('')
+        : '<div class="test-empty-state">No other tests recorded yet.</div>'}
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.addOtherEnglishTest()">+ Add other test</button>
+
+      <h4 class="subsection-header">🏥 Physical / Medical Notes</h4>
+      <p class="subsection-hint">Only what's needed for classroom function — sight or hearing needs, medication affecting attention, allergies for lab classes, etc.</p>
+      <textarea class="context-textarea" placeholder="e.g. wears hearing aid on the right ear, requires seat near board; carries EpiPen for peanut allergy…"
+        oninput="App.updatePhysicalMedicalNotes(this.value)">${escapeHtml(rec.physicalMedicalNotes||'')}</textarea>
+    </div>`;
+}
+
+function renderContextSection(rec, lvl){
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Communication &amp; Personal Context</div>
+          <div class="sb-domain">How to reach this student and family — soft context that shapes daily interactions</div>
+        </div>
+      </div>
+
+      <h4 class="subsection-header">⏰ Best Time of Day for Focused Work</h4>
+      ${renderRadioGroup(rec.bestTimeOfDay, TIME_OF_DAY_OPTIONS, 'setBestTimeOfDay')}
+
+      <h4 class="subsection-header">💬 Communication Preferences</h4>
+      <p class="subsection-hint">How this student best receives feedback and attention. Tick any that apply.</p>
+      <div class="interest-grid">
+        ${renderChipMultiSelect(rec.communicationPreferences, COMMUNICATION_PREFS, 'toggleCommunicationPref', lvl)}
+      </div>
+
+      <h4 class="subsection-header">👥 Group Role Tendency</h4>
+      <p class="subsection-hint">How this student typically shows up in groups — complements the grouping suggestions tool.</p>
+      ${renderRadioGroup(rec.groupRoleTendency, GROUP_ROLE_OPTIONS, 'setGroupRoleTendency')}
+
+      <h4 class="subsection-header">👪 Family / Caregiver Context</h4>
+      <p class="subsection-hint">Only if known and relevant. One line about the home situation — e.g. "lives with grandmother," "shared custody, alternate weeks," "parent works nights."</p>
+      <textarea class="context-textarea" placeholder="Optional — brief context about home life relevant to school"
+        oninput="App.updateFamilyContext(this.value)">${escapeHtml(rec.familyContext||'')}</textarea>
+
+      <h4 class="subsection-header">🤝 Support Network at School</h4>
+      <p class="subsection-hint">Others who work with this student — learning support teacher, counsellor, sports coach, form tutor, peer mentor.</p>
+      <textarea class="context-textarea" placeholder="e.g. Ms. Chen (learning support, Tues+Thurs), Mr. Li (counselling, biweekly), swim coach…"
+        oninput="App.updateSupportNetwork(this.value)">${escapeHtml(rec.supportNetwork||'')}</textarea>
+    </div>`;
+}
+
+function renderPostsSection(rec){
+  const posts = rec.posts || [];
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Posts &amp; Updates</div>
+          <div class="sb-domain">Timestamped log — observations, incidents, meetings, plans, calls home</div>
+        </div>
+      </div>
+
+      <div class="new-post-form no-print">
+        <textarea id="new-post-content"
+          placeholder="Add a new update… e.g. 'Contributed 3 times in class discussion today — first time this term' or 'Called home about missed homework — parent supportive'"
+          onkeydown="if(event.key==='Enter' &amp;&amp; (event.metaKey || event.ctrlKey)){event.preventDefault();App.addStudentPost();}"></textarea>
+        <div class="form-row">
+          <span class="new-post-hint">⌘+Enter (or Ctrl+Enter) to post</span>
+          <button class="btn btn-primary btn-sm" onclick="App.addStudentPost()">+ Post Update</button>
+        </div>
+      </div>
+
+      ${posts.length ? `
+        <div class="posts-list">
+          ${[...posts].sort((a,b) => b.timestamp - a.timestamp).map(post => renderPost(post)).join('')}
+        </div>
+      ` : `
+        <div class="no-posts-state">
+          No posts yet. Add your first update above to start building this student's timeline.
+        </div>
+      `}
+    </div>`;
+}
+
+function renderPost(post){
+  const isEditing = state.editingPostId === post.id;
+  return `
+    <div class="post-item">
+      <div class="post-timestamp">
+        ${formatPostTimestamp(post.timestamp)}${post.editedAt ? '<span class="edited-marker">(edited ' + formatPostTimestamp(post.editedAt) + ')</span>' : ''}
+      </div>
+      ${isEditing ? `
+        <textarea id="edit-post-${post.id}" class="post-edit-textarea">${escapeHtml(post.content)}</textarea>
+        <div class="post-actions no-print">
+          <button class="post-action primary" onclick="App.saveEditPost('${post.id}')">Save</button>
+          <button class="post-action" onclick="App.cancelEditPost()">Cancel</button>
+        </div>
+      ` : `
+        <div class="post-content">${escapeHtml(post.content)}</div>
+        <div class="post-actions no-print">
+          <button class="post-action" onclick="App.startEditPost('${post.id}')">Edit</button>
+          <button class="post-action danger" onclick="App.deleteStudentPost('${post.id}')">Delete</button>
+        </div>
+      `}
+    </div>`;
+}
+
+function renderScoredSection(sec, rec, lvl, scaleMax){
+  const res = computeSectionResult(sec, rec.answers, scaleMax);
+  const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+  const zm = ZONE_META[zone];
+  const matrixEntry = (ACTION_MATRIX[sec.id] && ACTION_MATRIX[sec.id][zone]) || null;
+
+  // Trend: compare to previous assessment if there is one
+  let trendBadge = '';
+  if(rec.history && rec.history.length){
+    const prev = rec.history[rec.history.length-1];
+    const prevRes = computeSectionResult(sec, prev.answers || {}, scaleMax);
+    const prevZone = getZone(prevRes.compositeScore, prevRes.compositeMax, prevRes.isPositive);
+    if(prevZone !== zone){
+      const zoneOrder = { green:0, yellow:1, red:2 };
+      const improved = zoneOrder[zone] < zoneOrder[prevZone];
+      trendBadge = improved
+        ? `<span class="trend-badge trend-improved" title="Improved from ${ZONE_META[prevZone].label}">↑ ${ZONE_META[prevZone].label} → ${zm.label}</span>`
+        : `<span class="trend-badge trend-worsened" title="Declined from ${ZONE_META[prevZone].label}">↓ ${ZONE_META[prevZone].label} → ${zm.label}</span>`;
+    } else {
+      trendBadge = `<span class="trend-badge trend-same" title="Unchanged since last assessment">= no change</span>`;
+    }
+  }
+
+  return `
+  <div class="section-block">
+    <div class="sb-head">
+      <div>
+        <div class="sb-title">${sec.title}${trendBadge}</div>
+        <div class="sb-domain">${sec.domainLabel}</div>
+      </div>
+      <span class="zone-pill" style="background:${zm.bg};color:${zm.text};border-color:${zm.border};">${zm.label}</span>
+    </div>
+
+    <div class="score-bar-label">
+      <span>${res.isPositive ? 'Strength score' : 'Difficulty score'}</span>
+      <span class="mono">${res.compositeScore} / ${res.compositeMax}</span>
+    </div>
+    <div class="score-bar-track">
+      <div class="score-bar-fill" style="width:${res.compositeMax? (res.compositeScore/res.compositeMax*100):0}%;background:${zm.text};"></div>
+    </div>
+
+    <div style="margin-top:16px;">
+      ${sec.items.map(it=>{
+        const val = rec.answers[it.id];
+        const label = LEVEL_META[rec.level].scale[val] || '—';
+        return `<div class="item-row"><span class="it-text">${escapeHtml(it.text)}</span><span class="item-tag">${label}</span></div>`;
+      }).join('')}
+    </div>
+
+    ${matrixEntry ? `
+      <div class="strategy-box" style="background:${zm.bg};">
+        <div class="sx-label" style="color:${zm.text};">What this means &amp; recommended strategies</div>
+        <p style="font-size:13px;color:var(--ink);margin:0 0 10px;">${matrixEntry.meaning}</p>
+        <ul>${matrixEntry.actions.map(a=>`<li>${a}</li>`).join('')}</ul>
+      </div>` : ''}
+  </div>`;
+}
+
+function renderPreferenceSection(sec, rec, lvl){
+  if(!sec) return '';
+  const domainScores = {};
+  sec.items.forEach(it=>{ domainScores[it.domain] = (domainScores[it.domain]||0) + (rec.answers[it.id]||0); });
+  const entries = Object.entries(domainScores).sort((a,b)=>b[1]-a[1]);
+  const maxVal = Math.max(...entries.map(e=>e[1]), 1);
+
+  return `
+  <div class="section-block">
+    <div class="sb-head">
+      <div>
+        <div class="sb-title">${sec.title}</div>
+        <div class="sb-domain">Descriptive profile — not a difficulty/strength score</div>
+      </div>
+    </div>
+    <div class="info-callout" style="background:var(--accent-light);border-color:${lvl.mid};color:var(--ink);">
+      <strong style="color:${lvl.color};">Use with care</strong>
+      Research shows matching instruction format to a student's preferred style does not improve learning (Pashler et al., 2008; Rogowsky et al., 2020). Use this only to add variety and engagement — never to sort or limit a student's instruction.
+    </div>
+    ${entries.map(([domain,score])=>`
+      <div class="pref-row">
+        <div class="pref-row-head"><strong>${DOMAIN_LABELS[domain]||domain}</strong><span class="mono">${score}</span></div>
+        <div class="pref-bar-track"><div class="pref-bar-fill" style="width:${(score/maxVal*100)}%;background:${lvl.color};"></div></div>
+        <div class="pref-strategy">${DOMAIN_STRATEGIES[domain]||''}</div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+function renderInterestsSection(rec, lvl){
+  return `
+  <div class="section-block">
+    <div class="sb-head">
+      <div>
+        <div class="sb-title">My Interests</div>
+        <div class="sb-domain">Content connections — not scored</div>
+      </div>
+    </div>
+    <div class="info-callout" style="background:var(--primary-light);border-color:var(--primary-mid);color:var(--ink);">
+      <strong style="color:var(--primary);">Why this matters</strong>
+      ${INTEREST_STRATEGY_NOTE}
+    </div>
+    ${rec.interestsChecked.length ? `<div class="interest-tags">${rec.interestsChecked.map(c=>`<span class="interest-tag">${escapeHtml(c)}</span>`).join('')}</div>` : `<p style="color:var(--ink-faint);font-size:13px;">No interests recorded.</p>`}
+    ${rec.interestsFree ? `<div class="free-response">“${escapeHtml(rec.interestsFree)}”</div>` : ''}
+  </div>`;
+}
+
+function renderGoalsSection(sec, rec, lvl){
+  if(!sec) return '';
+  const domainScores = {};
+  sec.items.forEach(it=>{ domainScores[it.domain] = (domainScores[it.domain]||0) + (rec.answers[it.id]||0); });
+  const entries = Object.entries(domainScores).sort((a,b)=>b[1]-a[1]);
+  const maxVal = Math.max(...entries.map(e=>e[1]), 1);
+  const top = entries[0] ? entries[0][0] : null;
+
+  return `
+  <div class="section-block">
+    <div class="sb-head">
+      <div>
+        <div class="sb-title">${sec.title}</div>
+        <div class="sb-domain">Achievement goal orientation profile</div>
+      </div>
+    </div>
+    <div class="info-callout" style="background:var(--junior-light);border-color:var(--junior-mid);color:var(--ink);">
+      <strong style="color:var(--junior);">Research basis</strong>
+      Achievement goal theory (Ames 1992; Dweck &amp; Elliot 2005; Elliot 2005) — genuinely predictive of engagement, persistence, and response to challenge. Students often show a mix; look at the full pattern, not just the top score.
+    </div>
+    ${entries.map(([domain,score])=>{
+      const g = GOAL_LABELS[domain]||domain;
+      const zm = ZONE_META[GOAL_GUIDE[domain]?.fill]||ZONE_META.neutral;
+      return `<div class="pref-row">
+        <div class="pref-row-head"><strong>${g}</strong><span class="mono">${score}</span></div>
+        <div class="pref-bar-track"><div class="pref-bar-fill" style="width:${(score/maxVal*100)}%;background:${zm.text};"></div></div>
+      </div>`;
+    }).join('')}
+    ${top ? `
+      <div class="strategy-box" style="background:${ZONE_META[GOAL_GUIDE[top].fill].bg};margin-top:16px;">
+        <div class="sx-label" style="color:${ZONE_META[GOAL_GUIDE[top].fill].text};">Dominant orientation: ${GOAL_GUIDE[top].label}</div>
+        <p style="font-size:13px;color:var(--ink);margin:0;">${GOAL_GUIDE[top].text}</p>
+      </div>` : ''}
+  </div>`;
+}
+
+function renderObservationSection(rec){
+  const opts = ['','Rarely','Sometimes','Often','Consistently'];
+  const fields = [
+    {key:'attention', label:'Attention / Focus'},
+    {key:'social', label:'Social Interaction'},
+    {key:'emotional', label:'Emotional Regulation'},
+    {key:'workHabits', label:'Work Habits / Task Completion'},
+  ];
+  return `
+  <div class="section-block no-print-collapse">
+    <div class="sb-head">
+      <div>
+        <div class="sb-title">Teacher Observation Cross-Reference</div>
+        <div class="sb-domain">Optional — compare with self-report</div>
+      </div>
+    </div>
+    <p style="font-size:12.5px;color:var(--ink-faint);margin:0 0 12px;">Record what you directly observe during the first week. Discrepancies with the self-report above are informative, not a problem to resolve — they may indicate limited self-awareness or context-dependent behaviour.</p>
+    <div class="obs-grid">
+      ${fields.map(f=>`
+        <div class="obs-field">
+          <label>${f.label}</label>
+          <select onchange="App.updateObservation('${f.key}', this.value)">
+            ${opts.map(o=>`<option value="${o}" ${rec.teacherObs[f.key]===o?'selected':''}>${o||'— not recorded —'}</option>`).join('')}
+          </select>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+/* ── Research & Methodology page ── */
+
+/* ══════════════════════════════════════════════════════════════
+   CLASS OVERVIEW
+   ══════════════════════════════════════════════════════════════ */
+
+function studentsInClass(className){
+  return state.students.filter(s => (s.className||'').trim() === (className||'').trim());
+}
+
+function renderClassOverview(){
+  const className = state.activeClassName;
+  const students = studentsInClass(className);
+
+  if(students.length === 0){
+    return `
+    <div class="wrap">
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+      <h1 style="font-size:24px;">${escapeHtml(className)}</h1>
+      <p style="color:var(--ink-faint);">No students in this class yet.</p>
+    </div>`;
+  }
+
+  // Compute per-domain zone distribution
+  const zoneCounts = { A:{green:[],yellow:[],red:[]}, C:{green:[],yellow:[],red:[]}, D:{green:[],yellow:[],red:[]}, E:{green:[],yellow:[],red:[]} };
+  const goalCounts = { mastery:[], performance_approach:[], performance_avoidance:[] };
+  const interestCounts = {};
+  const subjectStrengthCounts = {};
+  const watchList = [];
+
+  students.forEach(s => {
+    const secs = SECTIONS[s.level];
+    const scaleMax = scaleMaxFor(s.level);
+    const studentReasons = [];
+    ['A','C','D','E'].forEach(id => {
+      const sec = secs.find(x => x.id === id);
+      if(!sec) return;
+      const res = computeSectionResult(sec, s.answers, scaleMax);
+      const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+      zoneCounts[id][zone].push(s);
+      if(zone === 'red') studentReasons.push(sec.title + ' (Support)');
+    });
+    // Goal orientation dominant
+    const secG = secs.find(x => x.id === 'G');
+    if(secG){
+      const goalRes = computeSectionResult(secG, s.answers, scaleMax);
+      const entries = Object.entries(goalRes.domainScores || {}).sort((a,b)=>b[1]-a[1]);
+      if(entries.length){
+        const top = entries[0][0];
+        goalCounts[top].push(s);
+        if(top === 'performance_avoidance') studentReasons.push('Performance-avoidance dominant');
+      }
+    }
+    // Interests
+    (s.interestsChecked || []).forEach(i => {
+      if(!interestCounts[i]) interestCounts[i] = [];
+      interestCounts[i].push(s);
+    });
+    // Subject strengths
+    (s.subjectStrengths || []).forEach(sub => {
+      if(!subjectStrengthCounts[sub]) subjectStrengthCounts[sub] = [];
+      subjectStrengthCounts[sub].push(s);
+    });
+    if(studentReasons.length) watchList.push({ student:s, reasons:studentReasons });
+  });
+
+  const domainConfig = [
+    { id:'A', label:'Feelings & Behaviour' },
+    { id:'C', label:'Attention & Self-Regulation' },
+    { id:'D', label:'Motivation & Confidence' },
+    { id:'E', label:'Social-Emotional' },
+  ];
+
+  const interestsSorted = Object.entries(interestCounts).sort((a,b)=>b[1].length-a[1].length);
+  const subjectsSorted = Object.entries(subjectStrengthCounts).sort((a,b)=>b[1].length-a[1].length);
+
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Class Overview</div>
+      <h1 style="font-size:26px;font-family:Georgia,serif;">${escapeHtml(className)}</h1>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} student${students.length===1?'':'s'}</div>
+    </div>
+
+    <div class="class-actions-bar no-print">
+      <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
+      <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
+      <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
+    </div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Distribution across domains</h2>
+    <div class="stat-grid">
+      ${domainConfig.map(d => renderZoneStatCard(d, zoneCounts[d.id], students.length)).join('')}
+    </div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Achievement goal orientation</h2>
+    <div class="stat-card" style="margin-bottom:24px;">
+      <div class="stat-bars">
+        ${['mastery','performance_approach','performance_avoidance'].map(g => {
+          const list = goalCounts[g] || [];
+          const meta = { mastery:{label:'Mastery',color:'var(--green)'}, performance_approach:{label:'Performance-approach',color:'var(--yellow)'}, performance_avoidance:{label:'Performance-avoidance',color:'var(--red)'} }[g];
+          const pct = students.length ? (list.length/students.length)*100 : 0;
+          return `
+            <div>
+              <div class="stat-bar-row">
+                <div style="min-width:140px;font-weight:600;color:${meta.color};font-size:12.5px;">${meta.label}</div>
+                <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;background:${meta.color};"></div></div>
+                <div class="stat-count">${list.length}</div>
+              </div>
+              ${list.length ? `<div class="stat-names">${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Common interests</h2>
+    <div class="stat-card" style="margin-bottom:24px;">
+      ${interestsSorted.length ? `<div class="interest-tally">${interestsSorted.map(([interest, list]) => `
+        <div class="interest-tally-row">
+          <div class="interest-tally-head">
+            <strong>${escapeHtml(interest)}</strong>
+            <span class="interest-tally-count">${list.length} student${list.length===1?'':'s'}</span>
+          </div>
+          <div>${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>
+        </div>
+      `).join('')}</div>` : '<p style="color:var(--ink-faint);font-size:13px;margin:0;">No interests recorded yet for this class.</p>'}
+    </div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Common subject strengths</h2>
+    <div class="stat-card" style="margin-bottom:24px;">
+      ${subjectsSorted.length ? `<div class="interest-tally">${subjectsSorted.map(([subject, list]) => `
+        <div class="interest-tally-row">
+          <div class="interest-tally-head">
+            <strong>${escapeHtml(subject)}</strong>
+            <span class="interest-tally-count">${list.length} student${list.length===1?'':'s'}</span>
+          </div>
+          <div>${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>
+        </div>
+      `).join('')}</div>` : '<p style="color:var(--ink-faint);font-size:13px;margin:0;">No subject strengths recorded yet for this class.</p>'}
+    </div>
+
+    ${watchList.length ? `
+      <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Students to keep in mind</h2>
+      <p style="color:var(--ink-faint);font-size:12.5px;margin:0 0 12px;">Students who scored in the Support zone on at least one domain or whose dominant goal orientation is performance-avoidance.</p>
+      ${watchList.map(w => `
+        <div class="watch-list-row" onclick="App.openReport('${w.student.id}')">
+          <div class="watch-list-name">${escapeHtml(w.student.name)}</div>
+          <div class="watch-list-reasons">${w.reasons.map(r => `<span class="watch-list-badge">${escapeHtml(r)}</span>`).join(' ')}</div>
+        </div>
+      `).join('')}
+    ` : ''}
+  </div>`;
+}
+
+function renderZoneStatCard(domain, counts, total){
+  const zones = ['green','yellow','red'];
+  return `
+  <div class="stat-card">
+    <div class="stat-title">${domain.label}</div>
+    <div class="stat-bars">
+      ${zones.map(z => {
+        const list = counts[z] || [];
+        const pct = total ? (list.length/total)*100 : 0;
+        const zm = ZONE_META[z];
+        return `
+          <div>
+            <div class="stat-bar-row">
+              <div style="min-width:90px;font-weight:600;color:${zm.text};font-size:12px;">${zm.label}</div>
+              <div class="stat-bar-track"><div class="stat-bar-fill" style="width:${pct}%;background:${zm.text};"></div></div>
+              <div class="stat-count">${list.length}</div>
+            </div>
+            ${list.length ? `<div class="stat-names">${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>` : ''}
+          </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   COMPARE STUDENTS
+   ══════════════════════════════════════════════════════════════ */
+
+function renderCompare(){
+  const candidates = state.activeClassName
+    ? studentsInClass(state.activeClassName)
+    : state.students;
+
+  const leftId = state.compareLeftId;
+  const rightId = state.compareRightId;
+  const left = candidates.find(s => s.id === leftId);
+  const right = candidates.find(s => s.id === rightId);
+
+  const optionsHtml = (selectedId) => `
+    <option value="">— Choose a student —</option>
+    ${candidates.map(s => `<option value="${s.id}" ${s.id===selectedId?'selected':''}>${escapeHtml(s.name)}${s.className?' ('+escapeHtml(s.className)+')':''}</option>`).join('')}`;
+
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="${state.activeClassName ? `App.openClassOverview('${escapeAttr(state.activeClassName)}')` : 'App.goDashboard()'}" style="margin-bottom:18px;">← Back</button>
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Compare Two Students</div>
+      <h1 style="font-size:24px;font-family:Georgia,serif;">Side-by-side comparison</h1>
+      <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${state.activeClassName ? 'From class: ' + escapeHtml(state.activeClassName) : 'All students'}</p>
+    </div>
+
+    <div class="compare-picker no-print">
+      <select onchange="App.selectCompare('left', this.value)">${optionsHtml(leftId)}</select>
+      <select onchange="App.selectCompare('right', this.value)">${optionsHtml(rightId)}</select>
+    </div>
+
+    ${(left && right) ? renderCompareBody(left, right) : `
+      <div class="stat-card" style="text-align:center;color:var(--ink-faint);padding:32px 20px;">
+        Choose two students above to see their side-by-side comparison.
+      </div>
+    `}
+  </div>`;
+}
+
+function renderCompareBody(left, right){
+  const rows = [];
+  rows.push(['Name', escapeHtml(left.name), escapeHtml(right.name)]);
+  const leftAge = computeAge(left.birthdate);
+  const rightAge = computeAge(right.birthdate);
+  rows.push(['Age', escapeHtml(String(leftAge !== null ? leftAge : (left.age||'?'))), escapeHtml(String(rightAge !== null ? rightAge : (right.age||'?')))]);
+  if(left.birthdate || right.birthdate){
+    rows.push(['Birthdate', escapeHtml(left.birthdate||'—'), escapeHtml(right.birthdate||'—')]);
+  }
+  rows.push(['Class', escapeHtml(left.className||'—'), escapeHtml(right.className||'—')]);
+  rows.push(['Level', LEVEL_META[left.level].label, LEVEL_META[right.level].label]);
+
+  // For each scored section, show zone for both
+  const domainConfig = [
+    { id:'A', label:'Feelings & Behaviour' },
+    { id:'C', label:'Attention & Self-Regulation' },
+    { id:'D', label:'Motivation & Confidence' },
+    { id:'E', label:'Social-Emotional' },
+  ];
+  domainConfig.forEach(d => {
+    rows.push([d.label, renderZoneCell(left, d.id), renderZoneCell(right, d.id)]);
+  });
+
+  // Preferences
+  rows.push(['Top learning preference', getTopPreference(left, 'B'), getTopPreference(right, 'B')]);
+  rows.push(['Dominant goal orientation', getTopPreference(left, 'G', GOAL_LABELS), getTopPreference(right, 'G', GOAL_LABELS)]);
+
+  // Subject strengths
+  const leftSubjects = new Set(left.subjectStrengths || []);
+  const rightSubjects = new Set(right.subjectStrengths || []);
+  const sharedSubjects = [...leftSubjects].filter(x => rightSubjects.has(x));
+  if(leftSubjects.size || rightSubjects.size){
+    rows.push(['Subject strengths', [...leftSubjects].map(i=>escapeHtml(i)).join(', ')||'—', [...rightSubjects].map(i=>escapeHtml(i)).join(', ')||'—']);
+  }
+
+  // Interests overlap
+  const leftInterests = new Set(left.interestsChecked || []);
+  const rightInterests = new Set(right.interestsChecked || []);
+  const sharedInterests = [...leftInterests].filter(x => rightInterests.has(x));
+  rows.push(['Interests', [...leftInterests].map(i=>escapeHtml(i)).join(', ')||'—', [...rightInterests].map(i=>escapeHtml(i)).join(', ')||'—']);
+
+  // Likes / dislikes
+  if(left.likes || right.likes) rows.push(['Likes', escapeHtml(left.likes||'—'), escapeHtml(right.likes||'—')]);
+  if(left.dislikes || right.dislikes) rows.push(['Dislikes', escapeHtml(left.dislikes||'—'), escapeHtml(right.dislikes||'—')]);
+
+  const insights = buildComparisonInsights(left, right, sharedInterests, sharedSubjects);
+
+  return `
+    <table class="compare-table">
+      <thead><tr><th></th><th>${escapeHtml(left.name)}</th><th>${escapeHtml(right.name)}</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
+    </table>
+
+    ${sharedInterests.length ? `<div class="stat-card" style="margin-bottom:16px;background:var(--primary-light);border-color:var(--primary-mid);"><div class="stat-title" style="color:var(--primary);">Shared interests (${sharedInterests.length})</div><div>${sharedInterests.map(i=>`<span class="name-chip" style="background:var(--primary-mid);color:var(--primary);">${escapeHtml(i)}</span>`).join('')}</div></div>` : ''}
+
+    ${sharedSubjects.length ? `<div class="stat-card" style="margin-bottom:16px;background:var(--accent-light);border-color:var(--accent);"><div class="stat-title" style="color:var(--accent);">Shared subject strengths (${sharedSubjects.length})</div><div>${sharedSubjects.map(i=>`<span class="name-chip" style="background:var(--accent);color:#fff;">${escapeHtml(i)}</span>`).join('')}</div></div>` : ''}
+
+    <div class="compare-insights">
+      <h3>Pairing insights</h3>
+      <ul>${insights.map(i => `<li>${i}</li>`).join('')}</ul>
+    </div>
+  `;
+}
+
+function renderZoneCell(rec, secId){
+  const secs = SECTIONS[rec.level];
+  const sec = secs.find(x => x.id === secId);
+  if(!sec) return '—';
+  const res = computeSectionResult(sec, rec.answers, scaleMaxFor(rec.level));
+  const zone = getZone(res.compositeScore, res.compositeMax, res.isPositive);
+  const zm = ZONE_META[zone];
+  return `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${zm.text};"></span>${zm.label}</span>`;
+}
+
+function getTopPreference(rec, secId, labelMap){
+  const secs = SECTIONS[rec.level];
+  const sec = secs.find(x => x.id === secId);
+  if(!sec) return '—';
+  const res = computeSectionResult(sec, rec.answers, scaleMaxFor(rec.level));
+  const entries = Object.entries(res.domainScores || {}).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return '—';
+  const top = entries[0][0];
+  return escapeHtml((labelMap || DOMAIN_LABELS)[top] || top);
+}
+
+function buildComparisonInsights(left, right, sharedInterests, sharedSubjects){
+  const insights = [];
+  const secs = SECTIONS[left.level];
+  const scaleMax = scaleMaxFor(left.level);
+  const zonesFor = (rec) => {
+    const out = {};
+    ['A','C','D','E'].forEach(id => {
+      const s = secs.find(x=>x.id===id);
+      if(!s) return;
+      const r = computeSectionResult(s, rec.answers, scaleMax);
+      out[id] = getZone(r.compositeScore, r.compositeMax, r.isPositive);
+    });
+    return out;
+  };
+  const lz = zonesFor(left), rz = zonesFor(right);
+
+  // Complementary strengths
+  ['A','C','D','E'].forEach(id => {
+    const sec = secs.find(x=>x.id===id);
+    if(!sec) return;
+    if(lz[id]==='green' && rz[id]==='red')
+      insights.push(`${escapeHtml(left.name)} is strong in <strong>${sec.title}</strong> where ${escapeHtml(right.name)} needs support — potentially a supportive pairing.`);
+    if(rz[id]==='green' && lz[id]==='red')
+      insights.push(`${escapeHtml(right.name)} is strong in <strong>${sec.title}</strong> where ${escapeHtml(left.name)} needs support — potentially a supportive pairing.`);
+    if(lz[id]==='red' && rz[id]==='red')
+      insights.push(`Both students scored in the Support zone for <strong>${sec.title}</strong> — this pairing may struggle without teacher scaffolding.`);
+  });
+
+  // Goal orientation dynamics
+  const goalTop = (rec) => {
+    const secG = secs.find(x=>x.id==='G');
+    if(!secG) return null;
+    const res = computeSectionResult(secG, rec.answers, scaleMax);
+    const entries = Object.entries(res.domainScores || {}).sort((a,b)=>b[1]-a[1]);
+    return entries.length ? entries[0][0] : null;
+  };
+  const lg = goalTop(left), rg = goalTop(right);
+  if(lg === 'mastery' && rg === 'performance_avoidance')
+    insights.push(`${escapeHtml(left.name)}'s mastery orientation could positively model resilience for ${escapeHtml(right.name)}, who tends toward performance-avoidance.`);
+  if(rg === 'mastery' && lg === 'performance_avoidance')
+    insights.push(`${escapeHtml(right.name)}'s mastery orientation could positively model resilience for ${escapeHtml(left.name)}, who tends toward performance-avoidance.`);
+  if(lg === 'performance_avoidance' && rg === 'performance_avoidance')
+    insights.push(`Both students lean toward performance-avoidance — pairing them may amplify avoidance behaviour. Consider adding a mastery-oriented third member or teacher check-ins.`);
+
+  // Shared subject strengths
+  if(sharedSubjects && sharedSubjects.length >= 2)
+    insights.push(`Both students are strong in ${sharedSubjects.length} shared subjects (${sharedSubjects.map(s=>escapeHtml(s)).join(', ')}) — a natural pairing for peer teaching in those areas.`);
+  else if(sharedSubjects && sharedSubjects.length === 1)
+    insights.push(`Both are strong in <strong>${escapeHtml(sharedSubjects[0])}</strong> — a natural pairing for peer collaboration in that subject.`);
+
+  // Shared interests
+  if(sharedInterests.length >= 2)
+    insights.push(`Strong shared-interest base (${sharedInterests.length} interests in common) — good for interest-driven project work or contexts.`);
+  else if(sharedInterests.length === 1)
+    insights.push(`One shared interest (${escapeHtml(sharedInterests[0])}) — a possible bridge for early rapport.`);
+  else
+    insights.push(`No shared interests recorded — you may need to bridge with a teacher-chosen context or common project theme.`);
+
+  if(!insights.length) insights.push('No strong complementary or conflicting patterns detected.');
+  return insights;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GROUPING SUGGESTIONS
+   ══════════════════════════════════════════════════════════════ */
+
+const LESSON_TYPES = {
+  group_discussion: {
+    label: 'Group Discussion',
+    description: 'Balances confident participators with quieter students; avoids concentrating performance-avoidance in one group.',
+    trait: 'participationConfidence',
+    rationaleTemplate: 'Anchored by strong participation; distributed so quieter students have supportive peers to model from.',
+  },
+  hands_on_project: {
+    label: 'Hands-on Project',
+    description: 'Distributes students with hands-on preference across groups, and mixes collaborative and independent workers.',
+    trait: 'kinestheticPreference',
+    rationaleTemplate: 'Hands-on learners lead the practical work; independent workers balance the group so it doesn\'t become chaotic.',
+  },
+  presentation_prep: {
+    label: 'Presentation Prep',
+    description: 'Pairs performance-avoidance students with mastery-oriented supportive peers.',
+    trait: 'performanceAvoidance',
+    rationaleTemplate: 'Performance-avoidance students supported by mastery-oriented peers who model resilience and reduce fear of failure.',
+  },
+  peer_feedback: {
+    label: 'Peer Feedback / Review',
+    description: 'Distributes mastery orientation across groups — these students give more constructive feedback.',
+    trait: 'masteryOrientation',
+    rationaleTemplate: 'Mastery-oriented students distributed as feedback anchors; they emphasise understanding over rank.',
+  },
+  independent_work: {
+    label: 'Independent Work',
+    description: 'For independent work, seating rather than grouping matters. This shows a solo-preference ranking to guide seating.',
+    trait: 'independentPreference',
+    rationaleTemplate: 'Students who thrive independently seated with space; students needing support seated near the teacher.',
+  },
+};
+
+function computeGroupingTraits(rec){
+  const secs = SECTIONS[rec.level];
+  const scaleMax = scaleMaxFor(rec.level);
+  const a = rec.answers || {};
+
+  // Aggregated traits
+  const secB = secs.find(x=>x.id==='B');
+  const secG = secs.find(x=>x.id==='G');
+  const secE = secs.find(x=>x.id==='E');
+  const secD = secs.find(x=>x.id==='D');
+
+  const bScores = {};
+  if(secB) secB.items.forEach(it => bScores[it.domain] = (bScores[it.domain]||0) + (a[it.id]||0));
+
+  const gScores = {};
+  if(secG) secG.items.forEach(it => gScores[it.domain] = (gScores[it.domain]||0) + (a[it.id]||0));
+
+  const eRes = secE ? computeSectionResult(secE, a, scaleMax) : {compositeScore:0, compositeMax:1};
+  const dRes = secD ? computeSectionResult(secD, a, scaleMax) : {compositeScore:0, compositeMax:1};
+
+  const aRes = computeSectionResult(secs.find(x=>x.id==='A'), a, scaleMax);
+  const cRes = computeSectionResult(secs.find(x=>x.id==='C'), a, scaleMax);
+
+  return {
+    rec,
+    participationConfidence: (eRes.compositeScore/(eRes.compositeMax||1)) + (dRes.compositeScore/(dRes.compositeMax||1)),
+    kinestheticPreference: bScores.kinesthetic || 0,
+    independentPreference: bScores.independent || 0,
+    socialPreference: bScores.social || 0,
+    performanceAvoidance: gScores.performance_avoidance || 0,
+    masteryOrientation: gScores.mastery || 0,
+    zoneA: getZone(aRes.compositeScore, aRes.compositeMax, aRes.isPositive),
+    zoneC: getZone(cRes.compositeScore, cRes.compositeMax, cRes.isPositive),
+    zoneD: getZone(dRes.compositeScore, dRes.compositeMax, dRes.isPositive),
+    zoneE: getZone(eRes.compositeScore, eRes.compositeMax, eRes.isPositive),
+  };
+}
+
+function buildGroupings(students, lessonType, groupSize){
+  if(!students.length) return [];
+  const cfg = LESSON_TYPES[lessonType];
+  if(!cfg) return [];
+  const traits = students.map(computeGroupingTraits);
+  // Sort DESC on trait for most lesson types, ASC for performance_avoidance-based (distribute avoidance evenly)
+  const asc = (lessonType === 'presentation_prep');
+  traits.sort((a,b) => asc ? a[cfg.trait]-b[cfg.trait] : b[cfg.trait]-a[cfg.trait]);
+  const numGroups = Math.max(1, Math.ceil(students.length / groupSize));
+  const groups = Array.from({length: numGroups}, () => []);
+  // Snake-order distribution: 0,1,2,...N-1,N-1,...,1,0,0,1,...
+  let idx = 0, dir = 1;
+  traits.forEach(t => {
+    groups[idx].push(t);
+    if(numGroups === 1) return;
+    if(dir === 1){ if(idx === numGroups-1) dir = -1; else idx++; }
+    else { if(idx === 0) dir = 1; else idx--; }
+  });
+
+  return groups.map((g, gi) => ({
+    number: gi+1,
+    members: g,
+    rationale: buildGroupRationale(g, lessonType),
+  }));
+}
+
+function buildGroupRationale(members, lessonType){
+  const cfg = LESSON_TYPES[lessonType];
+  if(!members.length) return '';
+  const parts = [];
+
+  if(lessonType === 'group_discussion'){
+    const strong = members.filter(m => m.zoneE === 'green' || m.zoneD === 'green');
+    const shy = members.filter(m => m.performanceAvoidance >= 3);
+    if(strong.length) parts.push(`${strong.map(s=>escapeHtml(s.rec.name)).join(' and ')} can help anchor discussion.`);
+    if(shy.length) parts.push(`${shy.map(s=>escapeHtml(s.rec.name)).join(' and ')} may need explicit invitation to contribute — consider a "write first, then share" opener.`);
+  }
+  if(lessonType === 'hands_on_project'){
+    const hoLovers = members.filter(m => m.kinestheticPreference >= 2);
+    const solo = members.filter(m => m.independentPreference > m.socialPreference);
+    if(hoLovers.length) parts.push(`${hoLovers.map(s=>escapeHtml(s.rec.name)).join(' and ')} strongly prefer hands-on work — natural leads.`);
+    if(solo.length) parts.push(`${solo.map(s=>escapeHtml(s.rec.name)).join(' and ')} tend to prefer solo work — assign them a distinct subtask within the group.`);
+  }
+  if(lessonType === 'presentation_prep'){
+    const avoiders = members.filter(m => m.performanceAvoidance >= 3);
+    const supporters = members.filter(m => m.masteryOrientation >= 3 && m.zoneE === 'green');
+    if(avoiders.length) parts.push(`${avoiders.map(s=>escapeHtml(s.rec.name)).join(' and ')} may fear presenting — pair for rehearsal, offer private feedback.`);
+    if(supporters.length) parts.push(`${supporters.map(s=>escapeHtml(s.rec.name)).join(' and ')} bring mastery orientation and social support — well-placed here.`);
+  }
+  if(lessonType === 'peer_feedback'){
+    const mastery = members.filter(m => m.masteryOrientation >= 3);
+    if(mastery.length) parts.push(`${mastery.map(s=>escapeHtml(s.rec.name)).join(' and ')} give feedback that focuses on understanding rather than rank.`);
+  }
+  if(lessonType === 'independent_work'){
+    parts.push('For this activity, seating matters more than grouping — see individual ranking above.');
+  }
+
+  const supportZones = members.filter(m => m.zoneA === 'red' || m.zoneC === 'red');
+  if(supportZones.length) parts.push(`Watch for: ${supportZones.map(s=>escapeHtml(s.rec.name)).join(', ')} scored in Support zone for behavioural or attention domains — check in briefly during activity.`);
+
+  if(!parts.length) parts.push(cfg.rationaleTemplate);
+  return parts.join(' ');
+}
+
+function renderGrouping(){
+  const className = state.activeClassName;
+  const students = studentsInClass(className);
+  const lessonType = state.groupingLesson || 'group_discussion';
+  const groupSize = state.groupingSize || 4;
+  const results = state.groupingResults;
+
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.openClassOverview('${escapeAttr(className)}')" style="margin-bottom:18px;">← Back to ${escapeHtml(className)}</button>
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Grouping Suggestions</div>
+      <h1 style="font-size:24px;font-family:Georgia,serif;">${escapeHtml(className)}</h1>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} students · Groupings are heuristic suggestions — adjust based on your knowledge of the students.</div>
+    </div>
+
+    <div class="group-controls no-print">
+      <div>
+        <label class="field-label">Lesson type</label>
+        <select onchange="App.updateGroupingLesson(this.value)">
+          ${Object.entries(LESSON_TYPES).map(([k,v]) => `<option value="${k}" ${k===lessonType?'selected':''}>${v.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Target group size</label>
+        <select onchange="App.updateGroupingSize(this.value)">
+          ${[2,3,4,5,6].map(n => `<option value="${n}" ${n===groupSize?'selected':''}>${n} per group</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="App.generateGroupings()">Generate</button>
+    </div>
+
+    <div class="info-callout" style="background:var(--accent-light);border-color:var(--accent);color:var(--ink);margin-bottom:20px;">
+      <strong style="color:var(--accent);">${LESSON_TYPES[lessonType].label}</strong>
+      ${LESSON_TYPES[lessonType].description}
+    </div>
+
+    ${results ? results.map(renderGroupCard).join('') : `<div class="stat-card" style="text-align:center;color:var(--ink-faint);padding:32px 20px;">Choose a lesson type and click Generate to see suggested groupings.</div>`}
+  </div>`;
+}
+
+function renderGroupCard(g){
+  return `
+  <div class="group-card">
+    <h3>Group ${g.number}</h3>
+    <div class="group-members">
+      ${g.members.map(m => {
+        const zones = [m.zoneA, m.zoneC, m.zoneD, m.zoneE];
+        return `<div class="group-member">
+          ${zones.map(z=>`<span class="zone-dot" style="background:${ZONE_META[z].text};" title="${ZONE_META[z].label}"></span>`).join('')}
+          <span class="group-member-name"><span class="name-chip" onclick="App.openReport('${m.rec.id}')">${escapeHtml(m.rec.name)}</span></span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="group-rationale">${g.rationale}</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DATA — EXPORT / IMPORT
+   ══════════════════════════════════════════════════════════════ */
+
+function performImport(incoming, mode){
+  let added = 0, updated = 0, skipped = 0;
+  const currentById = {};
+  state.students.forEach(s => currentById[s.id] = s);
+
+  if(mode === 'overwrite_all'){
+    // Delete all first
+    state.students.forEach(s => deleteStudentRecord(s.id));
+    incoming.forEach(s => { s = migrateStudent(s); saveStudent(s); added++; });
+    return { added, updated, skipped };
+  }
+
+  incoming.forEach(s => {
+    s = migrateStudent(s);
+    if(currentById[s.id]){
+      if(mode === 'replace'){ saveStudent(s); updated++; }
+      else skipped++;
+    } else {
+      saveStudent(s); added++;
+    }
+  });
+  return { added, updated, skipped };
+}
+
+function renderData(){
+  const classNames = getAllClassNames();
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Data Management</div>
+      <h1 style="font-size:24px;font-family:Georgia,serif;">Backup, transfer &amp; restore</h1>
+      <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;max-width:640px;">All records live in your browser's local storage on this device. Use these tools to back up your data, move records to another device, or share anonymised data with a colleague.</p>
+    </div>
+
+    <div class="data-section">
+      <h2>Currently stored</h2>
+      <p>${state.students.length} student record${state.students.length===1?'':'s'} across ${classNames.length} class${classNames.length===1?'':'es'}.</p>
+    </div>
+
+    <div class="data-section">
+      <h2>Export all records</h2>
+      <p>Download all your records as a single JSON file. This is your backup — keep it somewhere safe.</p>
+      <button class="btn btn-primary" onclick="App.exportAll()" ${state.students.length===0?'disabled':''}>Download JSON</button>
+    </div>
+
+    <div class="data-section">
+      <h2>Import records</h2>
+      <p>Upload a previously exported JSON file. Choose how to handle records that already exist:</p>
+      <div style="margin:12px 0;font-size:13px;">
+        <label style="display:block;margin-bottom:6px;"><input type="radio" name="import-mode" value="add_only" checked> <strong>Add new only</strong> — skip records with an existing ID</label>
+        <label style="display:block;margin-bottom:6px;"><input type="radio" name="import-mode" value="replace"> <strong>Merge — replace existing</strong> — overwrite records with matching IDs</label>
+        <label style="display:block;"><input type="radio" name="import-mode" value="overwrite_all"> <strong style="color:var(--red);">Overwrite all</strong> — delete everything currently stored, then import</label>
+      </div>
+      <div class="file-input-wrap">
+        <input type="file" accept="application/json,.json" onchange="App.handleImportFile(this)">
+      </div>
+    </div>
+
+    <div class="data-section" style="background:var(--yellow-bg);border-color:var(--yellow-border);">
+      <h2 style="color:var(--yellow);">A note on privacy</h2>
+      <p>Records include student names, ages, and assessment responses. Treat exported files with the same care as any student record: don't email them insecurely, don't upload to public services, and store them somewhere only you can access. If sharing anonymised data with a colleague, edit names out first.</p>
+    </div>
+  </div>`;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   RESEARCH & METHODOLOGY PAGE
+   ══════════════════════════════════════════════════════════════ */
+
+function renderResearch(){
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <h1 style="font-size:24px;margin-bottom:6px;">Research &amp; Methodology</h1>
+    <p style="color:var(--ink-faint);font-size:13.5px;margin-bottom:24px;max-width:640px;">What this tool borrows from validated research, what it does not, and how to interpret it responsibly.</p>
+
+    <div class="info-callout" style="background:var(--red-bg);border-color:var(--red-border);color:var(--ink);margin-bottom:24px;">
+      <strong style="color:var(--red);">Important distinction</strong>
+      Reliability statistics cited below (e.g. SDQ \u03b1 \u2248 0.77–0.81) belong to the ORIGINAL, exact-wording instruments on large normed samples. This tool uses adapted, reworded, shortened items for classroom use — it has NOT itself been psychometrically validated. Treat it as a structured, research-informed screening conversation-starter, not a validated instrument in its own right.
+    </div>
+
+    <table class="evidence-table">
+      <thead><tr><th style="width:22%;">Section</th><th style="width:20%;">Evidence Grade</th><th>Basis</th></tr></thead>
+      <tbody>
+        ${EVIDENCE_ROWS.map(r=>`<tr><td><strong>${r.section}</strong></td><td class="grade-badge">${r.grade}</td><td>${r.text}</td></tr>`).join('')}
+      </tbody>
+    </table>
+
+    <h3 style="font-size:16px;margin-bottom:10px;">What this can do</h3>
+    <ul style="font-size:13.5px;color:var(--ink-soft);line-height:1.7;">
+      <li>Identify students likely to need emotional/behavioural support</li>
+      <li>Flag attention/self-regulation challenges affecting classroom performance</li>
+      <li>Reveal patterns in academic confidence</li>
+      <li>Provide a starting point for differentiation in the first week</li>
+      <li>Give data to compare against your own observations</li>
+    </ul>
+    <h3 style="font-size:16px;margin:20px 0 10px;">What this cannot do</h3>
+    <ul style="font-size:13.5px;color:var(--ink-soft);line-height:1.7;">
+      <li>Diagnose ADHD, anxiety, depression, or any clinical condition</li>
+      <li>Replace formal psychoeducational assessment or standardised testing</li>
+      <li>Tell you how to teach a student — learning-style matching does not improve outcomes</li>
+      <li>Remain accurate without re-assessment — reassess mid-year</li>
+      <li>Work reliably without the teacher observation cross-reference, especially for younger students</li>
+    </ul>
+
+    <h3 style="font-size:16px;margin:24px 0 10px;">Score zones are heuristics, not clinical norms</h3>
+    <p style="font-size:13.5px;color:var(--ink-soft);line-height:1.7;max-width:680px;">Unlike the SDQ or BASC-3, which derive cutoffs from large normed populations, the Support/Monitor/Strength zones in this tool are simple proportional bands (roughly top/bottom third of the possible range). They have no external validation. Use them to prioritise attention within your own class, not to compare against any population norm or make high-stakes decisions.</p>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACTIONS (exposed globally as App.*)
+   ══════════════════════════════════════════════════════════════ */
+
+const App = {
+  goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null; render(); },
+  goResearch(){ state.view='research'; render(); },
+
+  collapseAllSections(){
+    document.querySelectorAll('.section-block').forEach(el => el.classList.add('collapsed'));
+  },
+  expandAllSections(){
+    document.querySelectorAll('.section-block').forEach(el => el.classList.remove('collapsed'));
+  },
+
+  startNew(){ state.draft = newDraft(); state.view='newInfo'; render(); },
+
+  // Full-render version (used for level clicks, where there's no focused text field to disturb)
+  updateDraftField(key,val){ state.draft[key]=val; render(); },
+
+  // Silent versions for text inputs — never call render(), only surgically update dependent UI.
+  // This preserves keyboard focus during typing.
+  updateDraftName(val){
+    state.draft.name = val;
+    App._syncBeginButton();
+  },
+  updateDraftAge(val){
+    state.draft.age = val;
+    // Auto-suggest a level from age, but only if the teacher hasn't set one yet
+    if(!state.draft._levelChosen){
+      const suggestion = suggestLevel(val);
+      if(suggestion){
+        state.draft.level = suggestion;
+        App._syncLevelOptions();
+      }
+    }
+    App._syncBeginButton();
+  },
+  updateDraftBirthdate(val){
+    state.draft.birthdate = val;
+    const age = computeAge(val);
+    if(age !== null){
+      state.draft.age = String(age);
+      // Silently update the age input in place (no re-render, preserves focus)
+      const ageEl = document.getElementById('f-age');
+      if(ageEl) ageEl.value = String(age);
+      if(!state.draft._levelChosen){
+        const suggestion = suggestLevel(age);
+        if(suggestion){
+          state.draft.level = suggestion;
+          App._syncLevelOptions();
         }
+      }
+    }
+    App._syncBeginButton();
+  },
+  updateDraftClass(val){
+    state.draft.className = val;
+  },
+  chooseLevel(key){
+    state.draft.level = key;
+    state.draft._levelChosen = true;
+    App._syncLevelOptions();
+    App._syncBeginButton();
+  },
+  _syncBeginButton(){
+    const btn = document.getElementById('btn-begin');
+    if(!btn) return;
+    const d = state.draft;
+    const enabled = !!(d && d.name && d.name.trim() && d.level);
+    btn.disabled = !enabled;
+  },
+  _syncLevelOptions(){
+    const container = document.getElementById('level-options');
+    if(container) container.innerHTML = renderLevelOptionsHTML(state.draft);
+  },
 
-        function toggleDrawMode() {
-            isDrawMode = !isDrawMode;
-            document.getElementById('btn-draw').style.backgroundColor = isDrawMode ? 'var(--draw-mode)' : 'var(--primary)';
-        }
+  beginAssessment(){
+    if(!state.draft.name.trim() || !state.draft.level) return;
+    state.view='assess'; render();
+  },
 
-        function canvasMouseDown(e) {
-            if (!isDrawMode || e.target !== canvas) return;
-            isDrawingBox = true;
-            drawStartX = e.clientX - canvas.getBoundingClientRect().left;
-            drawStartY = e.clientY - canvas.getBoundingClientRect().top;
-            currentBox = document.createElement('div');
-            currentBox.className = 'movable-element';
-            currentBox.innerHTML = '<span class="element-label">Block</span>';
-            currentBox.style.left = drawStartX + 'px'; currentBox.style.top = drawStartY + 'px';
-            currentBox.onmousedown = function(ev) { selectItem(currentBox); };
-            canvas.appendChild(currentBox);
-        }
+  answer(itemId, val){ state.draft.answers[itemId] = val; render({preserveScroll:true}); },
+  toggleInterest(cat){
+    const idx = state.draft.interestsChecked.indexOf(cat);
+    if(idx>=0) state.draft.interestsChecked.splice(idx,1);
+    else state.draft.interestsChecked.push(cat);
+    render({preserveScroll:true});
+  },
+  updateInterestFree(val){ state.draft.interestsFree = val; },
 
-        document.onmousemove = function(e) {
-            if (isDrawingBox && currentBox) {
-                var curX = e.clientX - canvas.getBoundingClientRect().left;
-                var curY = e.clientY - canvas.getBoundingClientRect().top;
-                currentBox.style.width = Math.abs(curX - drawStartX) + 'px';
-                currentBox.style.height = Math.abs(curY - drawStartY) + 'px';
-            }
-        }
+  toggleSubject(sub){
+    if(!state.draft.subjectStrengths) state.draft.subjectStrengths = [];
+    const idx = state.draft.subjectStrengths.indexOf(sub);
+    if(idx>=0) state.draft.subjectStrengths.splice(idx,1);
+    else state.draft.subjectStrengths.push(sub);
+    render({preserveScroll:true});
+  },
+  addCustomSubject(){
+    const input = document.getElementById('custom-subject');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    if(!state.draft.subjectStrengths) state.draft.subjectStrengths = [];
+    if(!state.draft.subjectStrengths.some(s => s.toLowerCase() === val.toLowerCase())){
+      state.draft.subjectStrengths.push(val);
+    }
+    input.value = '';
+    render({preserveScroll:true});
+  },
+  updateDraftLikes(val){ state.draft.likes = val; },
+  updateDraftDislikes(val){ state.draft.dislikes = val; },
 
-        document.onmouseup = function() { if(isDrawingBox) { isDrawingBox = false; toggleDrawMode(); } }
+  jumpToStep(i){ state.draft.sectionIndex = i; render(); },
+  stepNext(){
+    const order = ['A','B','C','D','E','F','G','H'];
+    if(state.draft.sectionIndex < order.length-1){ state.draft.sectionIndex++; render(); }
+  },
+  stepBack(){
+    if(state.draft.sectionIndex===0){ App.goDashboard(); return; }
+    state.draft.sectionIndex--; render();
+  },
 
-        function selectItem(el) {
-            if (selectedEl) selectedEl.classList.remove('selected');
-            selectedEl = el;
-            selectedEl.classList.add('selected');
-            document.getElementById('inspector').style.display = 'block';
-            document.getElementById('prop-label').value = el.querySelector('.element-label').innerText;
-        }
+  finishAssessment(){
+    const rec = state.draft;
+    if(rec._studentId){
+      // Reassessment path — update existing student
+      const existing = state.students.find(s => s.id === rec._studentId);
+      if(!existing){ alert('Original record not found; could not save reassessment.'); return; }
+      // Snapshot current data into history before replacing
+      existing.history = existing.history || [];
+      existing.history.push({
+        date: existing.updatedAt || existing.createdAt || Date.now(),
+        answers: existing.answers || {},
+        interestsChecked: existing.interestsChecked || [],
+        interestsFree: existing.interestsFree || '',
+        teacherObs: existing.teacherObs || {},
+      });
+      // Replace current with new answers
+      existing.answers = rec.answers;
+      existing.interestsChecked = rec.interestsChecked;
+      existing.interestsFree = rec.interestsFree;
+      // Allow editable identity + profile fields to update too
+      existing.name = rec.name;
+      existing.age = rec.age;
+      existing.className = rec.className;
+      existing.birthdate = rec.birthdate || '';
+      existing.subjectStrengths = rec.subjectStrengths || [];
+      existing.likes = rec.likes || '';
+      existing.dislikes = rec.dislikes || '';
+      const ok = saveStudent(existing);
+      if(!ok){ alert('Could not save. Please try again.'); return; }
+      state.activeId = existing.id;
+    } else {
+      // New student path
+      if(!rec.history) rec.history = [];
+      if(rec.notes === undefined) rec.notes = '';
+      if(rec.birthdate === undefined) rec.birthdate = '';
+      if(!rec.subjectStrengths) rec.subjectStrengths = [];
+      if(rec.likes === undefined) rec.likes = '';
+      if(rec.dislikes === undefined) rec.dislikes = '';
+      if(!rec.posts) rec.posts = [];
+      const existingIdx = state.students.findIndex(s=>s.id===rec.id);
+      const ok = saveStudent(rec);
+      if(!ok){ alert('Could not save this record. Please try again.'); return; }
+      if(existingIdx>=0) state.students[existingIdx]=rec; else state.students.unshift(rec);
+      state.activeId = rec.id;
+    }
+    state.view='report'; state.draft=null;
+    render();
+  },
 
-        function updateLabel() {
-            if (selectedEl) selectedEl.querySelector('.element-label').innerText = document.getElementById('prop-label').value;
-        }
+  openReport(id){ state.activeId=id; state.view='report'; render(); },
 
-        function deleteItem() {
-            if (selectedEl) { selectedEl.remove(); selectedEl = null; document.getElementById('inspector').style.display = 'none'; }
-        }
-        
-        document.addEventListener('keydown', function(e) { if((e.key === 'Delete' || e.key === 'Backspace') && selectedEl) deleteItem(); });
-    </script>
+  editRecord(id){
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    state.draft = JSON.parse(JSON.stringify(rec));
+    state.draft.sectionIndex = 0;
+    state.draft._levelChosen = true; // preserve the level the record was originally created with
+    state.view='assess'; render();
+  },
+
+  updateObservation(key,val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.teacherObs[key]=val;
+    saveStudent(rec);
+  },
+
+  updateStudentClass(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.className = val;
+    saveStudent(rec);
+    // Also update the meta line silently without re-rendering the whole report
+    const metaEl = document.querySelector('.report-meta');
+    if(metaEl){
+      const trimmed = (val||'').trim();
+      const base = metaEl.getAttribute('data-base') || metaEl.innerText.split(' · Class:')[0];
+      metaEl.setAttribute('data-base', base);
+      metaEl.innerText = base + (trimmed ? ' · Class: ' + trimmed : '');
+    }
+  },
+
+  updateStudentNotes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.notes = val;
+    saveStudent(rec);
+  },
+
+  updateStudentBirthdate(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.birthdate = val;
+    // If the computed age from birthdate differs from stored age, update it
+    const newAge = computeAge(val);
+    if(newAge !== null) rec.age = String(newAge);
+    saveStudent(rec);
+    // Also refresh the label showing "(age N)" — surgical update to avoid focus loss
+    const label = document.querySelector('label[for="rp-birthdate"]');
+    if(label){
+      label.innerHTML = 'Birthdate ' + (newAge !== null ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(age ' + newAge + ')</span>' : '');
+    }
+  },
+
+  toggleStudentSubject(sub){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.subjectStrengths) rec.subjectStrengths = [];
+    const idx = rec.subjectStrengths.indexOf(sub);
+    if(idx>=0) rec.subjectStrengths.splice(idx,1);
+    else rec.subjectStrengths.push(sub);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  addStudentCustomSubject(){
+    const input = document.getElementById('rp-custom-subject');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.subjectStrengths) rec.subjectStrengths = [];
+    if(!rec.subjectStrengths.some(s => s.toLowerCase() === val.toLowerCase())){
+      rec.subjectStrengths.push(val);
+    }
+    input.value = '';
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  updateStudentLikes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.likes = val;
+    saveStudent(rec);
+  },
+
+  updateStudentDislikes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.dislikes = val;
+    saveStudent(rec);
+  },
+
+  /* ── Learning Access & Accommodations (Tier 1) ── */
+  toggleAccommodation(item){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.accommodations) rec.accommodations = [];
+    const idx = rec.accommodations.indexOf(item);
+    if(idx>=0) rec.accommodations.splice(idx,1);
+    else rec.accommodations.push(item);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addCustomAccommodation(){
+    const input = document.getElementById('rp-custom-accommodation');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.accommodations) rec.accommodations = [];
+    if(!rec.accommodations.some(a => a.toLowerCase() === val.toLowerCase())){
+      rec.accommodations.push(val);
+    }
+    input.value = '';
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateAccommodationNotes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.accommodationNotes = val;
+    saveStudent(rec);
+  },
+  setAttendancePattern(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.attendancePattern = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateAttendanceNote(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.attendanceNote = val;
+    saveStudent(rec);
+  },
+  updateFirstLanguage(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.firstLanguage = val;
+    saveStudent(rec);
+  },
+  updateOtherLanguages(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.otherLanguages = val;
+    saveStudent(rec);
+  },
+  setEnglishProficiency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.englishProficiency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setChineseProficiency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.chineseProficiency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setCEFRLevel(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.cefrLevel = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addCambridgeExam(){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.cambridgeExams) rec.cambridgeExams = [];
+    rec.cambridgeExams.push({
+      id: 'ce_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      testType: '', date: '',
+      reading: '', writing: '', listening: '', speaking: '', total: '',
+    });
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateCambridgeExam(id, field, val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.cambridgeExams) return;
+    const exam = rec.cambridgeExams.find(e => e.id === id);
+    if(!exam) return;
+    exam[field] = val;
+    saveStudent(rec);
+    // No re-render — silent update preserves focus in text inputs
+  },
+  deleteCambridgeExam(id){
+    if(!confirm('Delete this Cambridge exam entry? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.cambridgeExams) return;
+    rec.cambridgeExams = rec.cambridgeExams.filter(e => e.id !== id);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  addOtherEnglishTest(){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.otherEnglishTests) rec.otherEnglishTests = [];
+    rec.otherEnglishTests.push({
+      id: 'oe_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      testName: '', date: '', score: '', notes: '',
+    });
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updateOtherEnglishTest(id, field, val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.otherEnglishTests) return;
+    const test = rec.otherEnglishTests.find(e => e.id === id);
+    if(!test) return;
+    test[field] = val;
+    saveStudent(rec);
+    // No re-render — silent update preserves focus
+  },
+  deleteOtherEnglishTest(id){
+    if(!confirm('Delete this test entry? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.otherEnglishTests) return;
+    rec.otherEnglishTests = rec.otherEnglishTests.filter(e => e.id !== id);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  updatePhysicalMedicalNotes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.physicalMedicalNotes = val;
+    saveStudent(rec);
+  },
+
+  /* ── Communication & Personal Context (Tier 1 family + Tier 2) ── */
+  updateFamilyContext(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.familyContext = val;
+    saveStudent(rec);
+  },
+  updateSupportNetwork(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.supportNetwork = val;
+    saveStudent(rec);
+  },
+  setBestTimeOfDay(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.bestTimeOfDay = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  toggleCommunicationPref(item){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.communicationPreferences) rec.communicationPreferences = [];
+    const idx = rec.communicationPreferences.indexOf(item);
+    if(idx>=0) rec.communicationPreferences.splice(idx,1);
+    else rec.communicationPreferences.push(item);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+  setGroupRoleTendency(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.groupRoleTendency = val;
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  /* ── Posts / Timeline ── */
+  addStudentPost(){
+    const input = document.getElementById('new-post-content');
+    if(!input) return;
+    const content = input.value.trim();
+    if(!content) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.posts) rec.posts = [];
+    rec.posts.push({
+      id: 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6),
+      timestamp: Date.now(),
+      content: content,
+    });
+    input.value = '';
+    saveStudent(rec);
+    render();
+  },
+
+  startEditPost(postId){
+    state.editingPostId = postId;
+    render();
+  },
+
+  cancelEditPost(){
+    state.editingPostId = null;
+    render();
+  },
+
+  saveEditPost(postId){
+    const input = document.getElementById('edit-post-' + postId);
+    if(!input) return;
+    const content = input.value.trim();
+    if(!content) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.posts) return;
+    const post = rec.posts.find(p => p.id === postId);
+    if(!post) return;
+    post.content = content;
+    post.editedAt = Date.now();
+    state.editingPostId = null;
+    saveStudent(rec);
+    render();
+  },
+
+  deleteStudentPost(postId){
+    if(!confirm('Delete this post? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.posts) return;
+    rec.posts = rec.posts.filter(p => p.id !== postId);
+    saveStudent(rec);
+    render();
+  },
+
+  quickMove(id, choice){
+    if(!choice) return;
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    let target;
+    if(choice === '__unassign__'){
+      target = '';
+    } else if(choice === '__new__'){
+      const entered = prompt('Enter a new class name:', '');
+      if(entered === null) return;
+      target = entered.trim();
+    } else if(choice.indexOf('__cls__') === 0){
+      target = choice.slice(7);
+    } else return;
+    rec.className = target;
+    saveStudent(rec);
+    render(); // full re-render OK — regrouping the dashboard is the whole point
+  },
+
+  confirmDelete(id){
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    if(!confirm('Delete the record for '+rec.name+'? This cannot be undone.')) return;
+    deleteStudentRecord(id);
+    state.students = state.students.filter(s=>s.id!==id);
+    App.goDashboard();
+  },
+
+  /* ── Reassessment ── */
+  startReassessment(id){
+    const existing = state.students.find(s=>s.id===id);
+    if(!existing) return;
+    state.draft = {
+      id: uid(),
+      _studentId: id,
+      _levelChosen: true,
+      name: existing.name,
+      age: existing.age,
+      birthdate: existing.birthdate || '',
+      className: existing.className || '',
+      level: existing.level,
+      notes: existing.notes || '',
+      subjectStrengths: (existing.subjectStrengths || []).slice(),
+      likes: existing.likes || '',
+      dislikes: existing.dislikes || '',
+      sectionIndex: 0,
+      answers: {},
+      interestsChecked: [],
+      interestsFree: '',
+      teacherObs: existing.teacherObs || { attention:'', social:'', emotional:'', workHabits:'' },
+      createdAt: Date.now(),
+    };
+    state.view = 'assess';
+    render();
+  },
+
+  /* ── New views ── */
+  goData(){ state.view = 'data'; render(); },
+
+  openClassOverview(className){
+    state.activeClassName = className;
+    state.view = 'classOverview';
+    render();
+  },
+
+  openCompare(className){
+    state.activeClassName = className || null;
+    state.compareLeftId = null;
+    state.compareRightId = null;
+    state.view = 'compare';
+    render();
+  },
+
+  selectCompare(side, id){
+    if(side === 'left') state.compareLeftId = id;
+    else state.compareRightId = id;
+    render();
+  },
+
+  openGrouping(className){
+    state.activeClassName = className;
+    state.groupingLesson = state.groupingLesson || 'group_discussion';
+    state.groupingSize = state.groupingSize || 4;
+    state.groupingResults = null;
+    state.view = 'grouping';
+    render();
+  },
+
+  updateGroupingLesson(v){ state.groupingLesson = v; state.groupingResults = null; render(); },
+  updateGroupingSize(v){ state.groupingSize = parseInt(v, 10); state.groupingResults = null; render(); },
+  generateGroupings(){
+    const className = state.activeClassName;
+    const students = state.students.filter(s => (s.className||'').trim() === className);
+    state.groupingResults = buildGroupings(students, state.groupingLesson, state.groupingSize);
+    render();
+  },
+
+  /* ── Export / Import ── */
+  exportAll(){
+    const payload = {
+      _tool: 'Learner Profile System',
+      _version: 1,
+      exportedAt: new Date().toISOString(),
+      students: state.students,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `learner-profiles-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  handleImportFile(input){
+    const file = input.files && input.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try{
+        const data = JSON.parse(e.target.result);
+        if(!data.students || !Array.isArray(data.students)) throw new Error('Invalid file format');
+        const mode = document.querySelector('input[name="import-mode"]:checked').value;
+        const result = performImport(data.students, mode);
+        state.students = loadAllStudents();
+        alert(`Import complete. Added ${result.added}, updated ${result.updated}, skipped ${result.skipped}.`);
+        render();
+      } catch(err){
+        alert('Could not import file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  },
+};
+window.App = App;
+
+/* ══════════════════════════════════════════════════════════════
+   UTIL
+   ══════════════════════════════════════════════════════════════ */
+
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(str){ return String(str||'').replace(/'/g, "\\'"); }
+
+init();
+})();
+</script>
 </body>
 </html>
