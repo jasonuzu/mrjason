@@ -414,6 +414,66 @@
   }
   .notes-textarea:focus { border-color: var(--accent); }
 
+  /* ── Posts / Timeline section ── */
+  .new-post-form {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 20px; padding: 14px 16px;
+    border: 1px solid var(--rule-soft); border-radius: 6px;
+    background: #FBFAF6;
+  }
+  .new-post-form textarea {
+    width: 100%; padding: 10px 12px; border-radius: 5px;
+    border: 1.5px solid var(--rule); font-family: inherit; font-size: 13.5px;
+    resize: vertical; min-height: 60px; outline: none; background: var(--paper-raised);
+    line-height: 1.55; box-sizing: border-box;
+  }
+  .new-post-form textarea:focus { border-color: var(--accent); }
+  .new-post-form .form-row {
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .new-post-hint { font-size: 11px; color: var(--ink-faint); }
+
+  .posts-list { display: flex; flex-direction: column; gap: 10px; }
+  .post-item {
+    border: 1px solid var(--rule-soft); border-left: 3px solid var(--accent);
+    border-radius: 5px; padding: 12px 14px; background: var(--paper-raised);
+  }
+  .post-timestamp {
+    font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 6px; font-weight: 600;
+  }
+  .post-timestamp .edited-marker {
+    text-transform: none; font-weight: 400; margin-left: 6px; font-size: 10.5px;
+  }
+  .post-content {
+    font-size: 13.5px; line-height: 1.55; color: var(--ink);
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .post-edit-textarea {
+    width: 100%; padding: 8px 10px; border-radius: 4px;
+    border: 1.5px solid var(--accent); font-family: inherit; font-size: 13.5px;
+    resize: vertical; min-height: 60px; outline: none; background: var(--paper-raised);
+    line-height: 1.55; box-sizing: border-box;
+  }
+  .post-actions {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .post-action {
+    padding: 4px 12px; font-size: 11.5px; border-radius: 4px;
+    border: 1px solid var(--rule); background: var(--paper-raised);
+    color: var(--ink-soft); cursor: pointer; font-family: inherit;
+    transition: all 0.1s;
+  }
+  .post-action:hover { border-color: var(--accent); color: var(--accent); }
+  .post-action.danger:hover { border-color: var(--red-border); color: var(--red); background: var(--red-bg); }
+  .post-action.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .post-action.primary:hover { background: #2f595c; color: #fff; }
+  .no-posts-state {
+    text-align: center; padding: 20px 12px; color: var(--ink-faint);
+    font-size: 12.5px; font-style: italic;
+  }
+
   @media (max-width: 640px) {
     .interest-grid { grid-template-columns: 1fr; }
     .level-options { grid-template-columns: 1fr; }
@@ -605,6 +665,25 @@ const INTERESTS = {
   senior: ["Sports & fitness","Visual arts & design","Music & performing arts","Technology, coding, or gaming","Science, research, or experiments","Reading, writing, or media","Environment & sustainability","Engineering, building, or design","Social justice & community issues","Debate, public speaking, or leadership"],
 };
 
+// Default subject list for the Subject Strengths field (applies to all levels)
+const SUBJECTS = [
+  'Math', 'Biology', 'Chemistry', 'Physical Education',
+  'Science', 'History', 'Geography',
+  'Chinese Language', 'English Language', 'Literature'
+];
+
+// Compute integer age (in whole years) from an ISO date string. Returns null if invalid.
+function computeAge(birthdateISO){
+  if(!birthdateISO) return null;
+  const bd = new Date(birthdateISO);
+  if(isNaN(bd.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - bd.getFullYear();
+  const m = now.getMonth() - bd.getMonth();
+  if(m < 0 || (m === 0 && now.getDate() < bd.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
 const DOMAIN_LABELS = {
   visual:'Visual', auditory:'Auditory', kinesthetic:'Hands-on / Kinesthetic', read_write:'Reading & Writing',
   social:'Collaborative / Group', independent:'Independent / Solo',
@@ -791,6 +870,11 @@ function migrateStudent(rec){
   if(!rec.teacherObs) rec.teacherObs = { attention:'', social:'', emotional:'', workHabits:'' };
   if(!rec.interestsChecked) rec.interestsChecked = [];
   if(rec.interestsFree === undefined) rec.interestsFree = '';
+  if(rec.birthdate === undefined) rec.birthdate = '';
+  if(!rec.subjectStrengths) rec.subjectStrengths = [];
+  if(rec.likes === undefined) rec.likes = '';
+  if(rec.dislikes === undefined) rec.dislikes = '';
+  if(!rec.posts) rec.posts = [];
   return rec;
 }
 
@@ -876,7 +960,8 @@ function suggestLevel(age){
 }
 
 function newDraft(){
-  return { id:uid(), name:'', age:'', level:null, className:'', notes:'',
+  return { id:uid(), name:'', age:'', birthdate:'', level:null, className:'', notes:'',
+    subjectStrengths:[], likes:'', dislikes:'', posts:[],
     sectionIndex:0, answers:{}, interestsChecked:[], interestsFree:'',
     teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' }, createdAt:Date.now() };
 }
@@ -1071,6 +1156,13 @@ function renderNewInfo(){
     </div>
 
     <div class="field-group">
+      <label class="field-label" for="f-birthdate">Birthdate <span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(optional — auto-calculates age)</span></label>
+      <input type="date" id="f-birthdate" value="${escapeHtml(d.birthdate||'')}"
+        oninput="App.updateDraftBirthdate(this.value)"
+        autocomplete="off">
+    </div>
+
+    <div class="field-group">
       <label class="field-label" for="f-age">Age</label>
       <input type="number" id="f-age" min="9" max="19" value="${escapeHtml(d.age)}" placeholder="e.g. 13"
         oninput="App.updateDraftAge(this.value)"
@@ -1109,8 +1201,8 @@ function renderAssess(){
   const lvl = LEVEL_META[d.level];
   const secs = SECTIONS[d.level];
   const idx = d.sectionIndex;
-  // virtual section list: A,B,C,D,E,F(interests),G
-  const order = ['A','B','C','D','E','F','G'];
+  // virtual section list: A,B,C,D,E,F(interests),G,H(personal profile)
+  const order = ['A','B','C','D','E','F','G','H'];
   const currentKey = order[idx];
 
   const totalQuestions = secs.reduce((n,s)=>n+s.items.length,0);
@@ -1119,6 +1211,8 @@ function renderAssess(){
   let content = '';
   if(currentKey === 'F'){
     content = renderInterestStep(d, lvl);
+  } else if(currentKey === 'H'){
+    content = renderPersonalProfileStep(d, lvl);
   } else {
     const sec = secs.find(s=>s.id===currentKey);
     content = renderQuestionStep(sec, d, lvl);
@@ -1160,6 +1254,7 @@ function renderAssess(){
 
 function isStepComplete(key, d, secs){
   if(key === 'F') return true; // interests optional
+  if(key === 'H') return true; // personal profile optional
   const sec = secs.find(s=>s.id===key);
   if(!sec) return true;
   return sec.items.every(it => d.answers[it.id] !== undefined);
@@ -1207,6 +1302,48 @@ function renderInterestStep(d, lvl){
   `;
 }
 
+function renderPersonalProfileStep(d, lvl){
+  const strengths = d.subjectStrengths || [];
+  const customSubjects = strengths.filter(s => !SUBJECTS.includes(s));
+  const allChips = [...SUBJECTS, ...customSubjects];
+  return `
+  <div style="margin-bottom:8px;">
+    <h2 style="font-size:19px;margin-bottom:4px;">About This Student</h2>
+    <p style="color:var(--ink-faint);font-size:13px;margin:0 0 18px;">Personal profile info to help you connect with and plan for this student. All fields are optional.</p>
+  </div>
+
+  <label class="field-label">Subject strengths</label>
+  <p style="color:var(--ink-faint);font-size:12px;margin:0 0 12px;">Tick any subject this student is strong in. Add another subject at the bottom if it's not listed.</p>
+  <div class="interest-grid">
+    ${allChips.map(sub => {
+      const checked = strengths.includes(sub);
+      return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.toggleSubject('${escapeAttr(sub)}')">
+        <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(sub)}
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:24px;">
+    <input type="text" id="custom-subject" placeholder="Add another subject (e.g. Robotics, Drama)…" style="flex:1;padding:9px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13.5px;font-family:inherit;background:var(--paper-raised);outline:none;"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();App.addCustomSubject();}">
+    <button class="btn btn-ghost btn-sm" onclick="App.addCustomSubject()" style="white-space:nowrap;">+ Add subject</button>
+  </div>
+
+  <div style="margin-bottom:22px;">
+    <label class="field-label" for="f-likes">Likes</label>
+    <p style="color:var(--ink-faint);font-size:12px;margin:0 0 6px;">What does this student enjoy? Foods, activities, topics, styles of work — anything specific helps.</p>
+    <textarea id="f-likes" placeholder="e.g. animals, video games, working in small groups, humor, hands-on tasks"
+      oninput="App.updateDraftLikes(this.value)">${escapeHtml(d.likes||'')}</textarea>
+  </div>
+
+  <div>
+    <label class="field-label" for="f-dislikes">Dislikes</label>
+    <p style="color:var(--ink-faint);font-size:12px;margin:0 0 6px;">What does this student find aversive? Loud noise, being called on, timed tests — anything that trips them up.</p>
+    <textarea id="f-dislikes" placeholder="e.g. speaking in front of class, math word problems, loud environments, unclear instructions"
+      oninput="App.updateDraftDislikes(this.value)">${escapeHtml(d.dislikes||'')}</textarea>
+  </div>
+  `;
+}
+
 /* ── Report view ── */
 
 function renderReport(){
@@ -1232,7 +1369,15 @@ function renderReport(){
     <div class="report-header">
       <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}</div>
       <h1 class="report-title">Learner Profile — ${escapeHtml(rec.name)}</h1>
-      <div class="report-meta">Age ${escapeHtml(String(rec.age||'?'))} · Assessed ${date}${rec.className ? ' · Class: ' + escapeHtml(rec.className) : ''}</div>
+      <div class="report-meta">${(function(){
+        const parts = [];
+        const ageFromBirth = computeAge(rec.birthdate);
+        if(ageFromBirth !== null) parts.push('Age ' + ageFromBirth);
+        else if(rec.age) parts.push('Age ' + escapeHtml(String(rec.age)));
+        parts.push('Assessed ' + date);
+        if(rec.className) parts.push('Class: ' + escapeHtml(rec.className));
+        return parts.join(' · ');
+      })()}</div>
     </div>
 
     <div class="student-meta-card no-print">
@@ -1247,8 +1392,53 @@ function renderReport(){
         </datalist>
       </div>
       <div class="student-meta-field">
-        <label>Level (fixed)</label>
-        <input type="text" value="${lvl.label} · ${lvl.grades}" disabled style="color:var(--ink-faint);background:var(--rule-soft);">
+        <label for="rp-birthdate">Birthdate ${rec.birthdate && computeAge(rec.birthdate)!==null ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(age ' + computeAge(rec.birthdate) + ')</span>' : ''}</label>
+        <input type="date" id="rp-birthdate" value="${escapeHtml(rec.birthdate||'')}"
+          oninput="App.updateStudentBirthdate(this.value)">
+      </div>
+    </div>
+
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">About This Student</div>
+          <div class="sb-domain">Personal profile — updates as you type</div>
+        </div>
+      </div>
+
+      <label class="field-label" style="margin-bottom:8px;">Subject strengths</label>
+      <div class="interest-grid" style="margin-bottom:14px;">
+        ${(function(){
+          const strengths = rec.subjectStrengths || [];
+          const custom = strengths.filter(s => !SUBJECTS.includes(s));
+          const allChips = [...SUBJECTS, ...custom];
+          return allChips.map(sub => {
+            const checked = strengths.includes(sub);
+            return `<div class="interest-chip ${checked?'checked':''}" style="${checked?`border-color:${lvl.color};background:${lvl.light};color:${lvl.color};`:''}" onclick="App.toggleStudentSubject('${escapeAttr(sub)}')">
+              <span class="box" style="${checked?`border-color:${lvl.color};color:${lvl.color};`:''}">${checked?'✓':''}</span>${escapeHtml(sub)}
+            </div>`;
+          }).join('');
+        })()}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:22px;" class="no-print">
+        <input type="text" id="rp-custom-subject" placeholder="Add another subject…" style="flex:1;padding:8px 12px;border-radius:5px;border:1.5px solid var(--rule);font-size:13px;font-family:inherit;background:var(--paper-raised);outline:none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();App.addStudentCustomSubject();}">
+        <button class="btn btn-ghost btn-sm" onclick="App.addStudentCustomSubject()" style="white-space:nowrap;">+ Add</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <label class="field-label" for="rp-likes">Likes</label>
+          <textarea id="rp-likes" class="notes-textarea" style="min-height:80px;"
+            placeholder="e.g. animals, gaming, group work, hands-on tasks"
+            oninput="App.updateStudentLikes(this.value)">${escapeHtml(rec.likes||'')}</textarea>
+        </div>
+        <div>
+          <label class="field-label" for="rp-dislikes">Dislikes</label>
+          <textarea id="rp-dislikes" class="notes-textarea" style="min-height:80px;"
+            placeholder="e.g. cold-calling, timed tests, loud environments"
+            oninput="App.updateStudentDislikes(this.value)">${escapeHtml(rec.dislikes||'')}</textarea>
+        </div>
       </div>
     </div>
 
@@ -1263,6 +1453,8 @@ function renderReport(){
         placeholder="Add any additional context about this student — background, IEP details, communication with parents, adjustments tried, etc. Saves as you type."
         oninput="App.updateStudentNotes(this.value)">${escapeHtml(rec.notes||'')}</textarea>
     </div>
+
+    ${renderPostsSection(rec)}
 
     <div class="zone-overview">
       ${overview.map(({sec,zone})=>{
@@ -1300,6 +1492,69 @@ function renderReport(){
       <button class="btn btn-danger-ghost" onclick="App.confirmDelete('${rec.id}')">Delete Record</button>
     </div>
   </div>`;
+}
+
+function formatPostTimestamp(ts){
+  const d = new Date(ts);
+  const dateStr = d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  const timeStr = d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+  return dateStr + ' · ' + timeStr;
+}
+
+function renderPostsSection(rec){
+  const posts = rec.posts || [];
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Posts &amp; Updates</div>
+          <div class="sb-domain">Timestamped log — observations, incidents, meetings, plans, calls home</div>
+        </div>
+      </div>
+
+      <div class="new-post-form no-print">
+        <textarea id="new-post-content"
+          placeholder="Add a new update… e.g. 'Contributed 3 times in class discussion today — first time this term' or 'Called home about missed homework — parent supportive'"
+          onkeydown="if(event.key==='Enter' &amp;&amp; (event.metaKey || event.ctrlKey)){event.preventDefault();App.addStudentPost();}"></textarea>
+        <div class="form-row">
+          <span class="new-post-hint">⌘+Enter (or Ctrl+Enter) to post</span>
+          <button class="btn btn-primary btn-sm" onclick="App.addStudentPost()">+ Post Update</button>
+        </div>
+      </div>
+
+      ${posts.length ? `
+        <div class="posts-list">
+          ${[...posts].sort((a,b) => b.timestamp - a.timestamp).map(post => renderPost(post)).join('')}
+        </div>
+      ` : `
+        <div class="no-posts-state">
+          No posts yet. Add your first update above to start building this student's timeline.
+        </div>
+      `}
+    </div>`;
+}
+
+function renderPost(post){
+  const isEditing = state.editingPostId === post.id;
+  return `
+    <div class="post-item">
+      <div class="post-timestamp">
+        ${formatPostTimestamp(post.timestamp)}${post.editedAt ? '<span class="edited-marker">(edited ' + formatPostTimestamp(post.editedAt) + ')</span>' : ''}
+      </div>
+      ${isEditing ? `
+        <textarea id="edit-post-${post.id}" class="post-edit-textarea">${escapeHtml(post.content)}</textarea>
+        <div class="post-actions no-print">
+          <button class="post-action primary" onclick="App.saveEditPost('${post.id}')">Save</button>
+          <button class="post-action" onclick="App.cancelEditPost()">Cancel</button>
+        </div>
+      ` : `
+        <div class="post-content">${escapeHtml(post.content)}</div>
+        <div class="post-actions no-print">
+          <button class="post-action" onclick="App.startEditPost('${post.id}')">Edit</button>
+          <button class="post-action danger" onclick="App.deleteStudentPost('${post.id}')">Delete</button>
+        </div>
+      `}
+    </div>`;
 }
 
 function renderScoredSection(sec, rec, lvl, scaleMax){
@@ -1500,6 +1755,7 @@ function renderClassOverview(){
   const zoneCounts = { A:{green:[],yellow:[],red:[]}, C:{green:[],yellow:[],red:[]}, D:{green:[],yellow:[],red:[]}, E:{green:[],yellow:[],red:[]} };
   const goalCounts = { mastery:[], performance_approach:[], performance_avoidance:[] };
   const interestCounts = {};
+  const subjectStrengthCounts = {};
   const watchList = [];
 
   students.forEach(s => {
@@ -1530,6 +1786,11 @@ function renderClassOverview(){
       if(!interestCounts[i]) interestCounts[i] = [];
       interestCounts[i].push(s);
     });
+    // Subject strengths
+    (s.subjectStrengths || []).forEach(sub => {
+      if(!subjectStrengthCounts[sub]) subjectStrengthCounts[sub] = [];
+      subjectStrengthCounts[sub].push(s);
+    });
     if(studentReasons.length) watchList.push({ student:s, reasons:studentReasons });
   });
 
@@ -1541,6 +1802,7 @@ function renderClassOverview(){
   ];
 
   const interestsSorted = Object.entries(interestCounts).sort((a,b)=>b[1].length-a[1].length);
+  const subjectsSorted = Object.entries(subjectStrengthCounts).sort((a,b)=>b[1].length-a[1].length);
 
   return `
   <div class="wrap">
@@ -1593,6 +1855,19 @@ function renderClassOverview(){
           <div>${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>
         </div>
       `).join('')}</div>` : '<p style="color:var(--ink-faint);font-size:13px;margin:0;">No interests recorded yet for this class.</p>'}
+    </div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Common subject strengths</h2>
+    <div class="stat-card" style="margin-bottom:24px;">
+      ${subjectsSorted.length ? `<div class="interest-tally">${subjectsSorted.map(([subject, list]) => `
+        <div class="interest-tally-row">
+          <div class="interest-tally-head">
+            <strong>${escapeHtml(subject)}</strong>
+            <span class="interest-tally-count">${list.length} student${list.length===1?'':'s'}</span>
+          </div>
+          <div>${list.map(s=>`<span class="name-chip" onclick="App.openReport('${s.id}')">${escapeHtml(s.name)}</span>`).join('')}</div>
+        </div>
+      `).join('')}</div>` : '<p style="color:var(--ink-faint);font-size:13px;margin:0;">No subject strengths recorded yet for this class.</p>'}
     </div>
 
     ${watchList.length ? `
@@ -1675,7 +1950,12 @@ function renderCompare(){
 function renderCompareBody(left, right){
   const rows = [];
   rows.push(['Name', escapeHtml(left.name), escapeHtml(right.name)]);
-  rows.push(['Age', escapeHtml(String(left.age||'?')), escapeHtml(String(right.age||'?'))]);
+  const leftAge = computeAge(left.birthdate);
+  const rightAge = computeAge(right.birthdate);
+  rows.push(['Age', escapeHtml(String(leftAge !== null ? leftAge : (left.age||'?'))), escapeHtml(String(rightAge !== null ? rightAge : (right.age||'?')))]);
+  if(left.birthdate || right.birthdate){
+    rows.push(['Birthdate', escapeHtml(left.birthdate||'—'), escapeHtml(right.birthdate||'—')]);
+  }
   rows.push(['Class', escapeHtml(left.className||'—'), escapeHtml(right.className||'—')]);
   rows.push(['Level', LEVEL_META[left.level].label, LEVEL_META[right.level].label]);
 
@@ -1694,13 +1974,25 @@ function renderCompareBody(left, right){
   rows.push(['Top learning preference', getTopPreference(left, 'B'), getTopPreference(right, 'B')]);
   rows.push(['Dominant goal orientation', getTopPreference(left, 'G', GOAL_LABELS), getTopPreference(right, 'G', GOAL_LABELS)]);
 
+  // Subject strengths
+  const leftSubjects = new Set(left.subjectStrengths || []);
+  const rightSubjects = new Set(right.subjectStrengths || []);
+  const sharedSubjects = [...leftSubjects].filter(x => rightSubjects.has(x));
+  if(leftSubjects.size || rightSubjects.size){
+    rows.push(['Subject strengths', [...leftSubjects].map(i=>escapeHtml(i)).join(', ')||'—', [...rightSubjects].map(i=>escapeHtml(i)).join(', ')||'—']);
+  }
+
   // Interests overlap
   const leftInterests = new Set(left.interestsChecked || []);
   const rightInterests = new Set(right.interestsChecked || []);
-  const shared = [...leftInterests].filter(x => rightInterests.has(x));
+  const sharedInterests = [...leftInterests].filter(x => rightInterests.has(x));
   rows.push(['Interests', [...leftInterests].map(i=>escapeHtml(i)).join(', ')||'—', [...rightInterests].map(i=>escapeHtml(i)).join(', ')||'—']);
 
-  const insights = buildComparisonInsights(left, right, shared);
+  // Likes / dislikes
+  if(left.likes || right.likes) rows.push(['Likes', escapeHtml(left.likes||'—'), escapeHtml(right.likes||'—')]);
+  if(left.dislikes || right.dislikes) rows.push(['Dislikes', escapeHtml(left.dislikes||'—'), escapeHtml(right.dislikes||'—')]);
+
+  const insights = buildComparisonInsights(left, right, sharedInterests, sharedSubjects);
 
   return `
     <table class="compare-table">
@@ -1708,7 +2000,9 @@ function renderCompareBody(left, right){
       <tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody>
     </table>
 
-    ${shared.length ? `<div class="stat-card" style="margin-bottom:16px;background:var(--primary-light);border-color:var(--primary-mid);"><div class="stat-title" style="color:var(--primary);">Shared interests (${shared.length})</div><div>${shared.map(i=>`<span class="name-chip" style="background:var(--primary-mid);color:var(--primary);">${escapeHtml(i)}</span>`).join('')}</div></div>` : ''}
+    ${sharedInterests.length ? `<div class="stat-card" style="margin-bottom:16px;background:var(--primary-light);border-color:var(--primary-mid);"><div class="stat-title" style="color:var(--primary);">Shared interests (${sharedInterests.length})</div><div>${sharedInterests.map(i=>`<span class="name-chip" style="background:var(--primary-mid);color:var(--primary);">${escapeHtml(i)}</span>`).join('')}</div></div>` : ''}
+
+    ${sharedSubjects.length ? `<div class="stat-card" style="margin-bottom:16px;background:var(--accent-light);border-color:var(--accent);"><div class="stat-title" style="color:var(--accent);">Shared subject strengths (${sharedSubjects.length})</div><div>${sharedSubjects.map(i=>`<span class="name-chip" style="background:var(--accent);color:#fff;">${escapeHtml(i)}</span>`).join('')}</div></div>` : ''}
 
     <div class="compare-insights">
       <h3>Pairing insights</h3>
@@ -1738,7 +2032,7 @@ function getTopPreference(rec, secId, labelMap){
   return escapeHtml((labelMap || DOMAIN_LABELS)[top] || top);
 }
 
-function buildComparisonInsights(left, right, sharedInterests){
+function buildComparisonInsights(left, right, sharedInterests, sharedSubjects){
   const insights = [];
   const secs = SECTIONS[left.level];
   const scaleMax = scaleMaxFor(left.level);
@@ -1781,6 +2075,12 @@ function buildComparisonInsights(left, right, sharedInterests){
     insights.push(`${escapeHtml(right.name)}'s mastery orientation could positively model resilience for ${escapeHtml(left.name)}, who tends toward performance-avoidance.`);
   if(lg === 'performance_avoidance' && rg === 'performance_avoidance')
     insights.push(`Both students lean toward performance-avoidance — pairing them may amplify avoidance behaviour. Consider adding a mastery-oriented third member or teacher check-ins.`);
+
+  // Shared subject strengths
+  if(sharedSubjects && sharedSubjects.length >= 2)
+    insights.push(`Both students are strong in ${sharedSubjects.length} shared subjects (${sharedSubjects.map(s=>escapeHtml(s)).join(', ')}) — a natural pairing for peer teaching in those areas.`);
+  else if(sharedSubjects && sharedSubjects.length === 1)
+    insights.push(`Both are strong in <strong>${escapeHtml(sharedSubjects[0])}</strong> — a natural pairing for peer collaboration in that subject.`);
 
   // Shared interests
   if(sharedInterests.length >= 2)
@@ -2112,7 +2412,7 @@ function renderResearch(){
    ══════════════════════════════════════════════════════════════ */
 
 const App = {
-  goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; render(); },
+  goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null; render(); },
   goResearch(){ state.view='research'; render(); },
 
   startNew(){ state.draft = newDraft(); state.view='newInfo'; render(); },
@@ -2134,6 +2434,24 @@ const App = {
       if(suggestion){
         state.draft.level = suggestion;
         App._syncLevelOptions();
+      }
+    }
+    App._syncBeginButton();
+  },
+  updateDraftBirthdate(val){
+    state.draft.birthdate = val;
+    const age = computeAge(val);
+    if(age !== null){
+      state.draft.age = String(age);
+      // Silently update the age input in place (no re-render, preserves focus)
+      const ageEl = document.getElementById('f-age');
+      if(ageEl) ageEl.value = String(age);
+      if(!state.draft._levelChosen){
+        const suggestion = suggestLevel(age);
+        if(suggestion){
+          state.draft.level = suggestion;
+          App._syncLevelOptions();
+        }
       }
     }
     App._syncBeginButton();
@@ -2173,9 +2491,31 @@ const App = {
   },
   updateInterestFree(val){ state.draft.interestsFree = val; },
 
+  toggleSubject(sub){
+    if(!state.draft.subjectStrengths) state.draft.subjectStrengths = [];
+    const idx = state.draft.subjectStrengths.indexOf(sub);
+    if(idx>=0) state.draft.subjectStrengths.splice(idx,1);
+    else state.draft.subjectStrengths.push(sub);
+    render({preserveScroll:true});
+  },
+  addCustomSubject(){
+    const input = document.getElementById('custom-subject');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    if(!state.draft.subjectStrengths) state.draft.subjectStrengths = [];
+    if(!state.draft.subjectStrengths.some(s => s.toLowerCase() === val.toLowerCase())){
+      state.draft.subjectStrengths.push(val);
+    }
+    input.value = '';
+    render({preserveScroll:true});
+  },
+  updateDraftLikes(val){ state.draft.likes = val; },
+  updateDraftDislikes(val){ state.draft.dislikes = val; },
+
   jumpToStep(i){ state.draft.sectionIndex = i; render(); },
   stepNext(){
-    const order = ['A','B','C','D','E','F','G'];
+    const order = ['A','B','C','D','E','F','G','H'];
     if(state.draft.sectionIndex < order.length-1){ state.draft.sectionIndex++; render(); }
   },
   stepBack(){
@@ -2202,10 +2542,14 @@ const App = {
       existing.answers = rec.answers;
       existing.interestsChecked = rec.interestsChecked;
       existing.interestsFree = rec.interestsFree;
-      // Allow editable identity fields to update too
+      // Allow editable identity + profile fields to update too
       existing.name = rec.name;
       existing.age = rec.age;
       existing.className = rec.className;
+      existing.birthdate = rec.birthdate || '';
+      existing.subjectStrengths = rec.subjectStrengths || [];
+      existing.likes = rec.likes || '';
+      existing.dislikes = rec.dislikes || '';
       const ok = saveStudent(existing);
       if(!ok){ alert('Could not save. Please try again.'); return; }
       state.activeId = existing.id;
@@ -2213,6 +2557,11 @@ const App = {
       // New student path
       if(!rec.history) rec.history = [];
       if(rec.notes === undefined) rec.notes = '';
+      if(rec.birthdate === undefined) rec.birthdate = '';
+      if(!rec.subjectStrengths) rec.subjectStrengths = [];
+      if(rec.likes === undefined) rec.likes = '';
+      if(rec.dislikes === undefined) rec.dislikes = '';
+      if(!rec.posts) rec.posts = [];
       const existingIdx = state.students.findIndex(s=>s.id===rec.id);
       const ok = saveStudent(rec);
       if(!ok){ alert('Could not save this record. Please try again.'); return; }
@@ -2263,6 +2612,116 @@ const App = {
     saveStudent(rec);
   },
 
+  updateStudentBirthdate(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.birthdate = val;
+    // If the computed age from birthdate differs from stored age, update it
+    const newAge = computeAge(val);
+    if(newAge !== null) rec.age = String(newAge);
+    saveStudent(rec);
+    // Also refresh the label showing "(age N)" — surgical update to avoid focus loss
+    const label = document.querySelector('label[for="rp-birthdate"]');
+    if(label){
+      label.innerHTML = 'Birthdate ' + (newAge !== null ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(age ' + newAge + ')</span>' : '');
+    }
+  },
+
+  toggleStudentSubject(sub){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.subjectStrengths) rec.subjectStrengths = [];
+    const idx = rec.subjectStrengths.indexOf(sub);
+    if(idx>=0) rec.subjectStrengths.splice(idx,1);
+    else rec.subjectStrengths.push(sub);
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  addStudentCustomSubject(){
+    const input = document.getElementById('rp-custom-subject');
+    if(!input) return;
+    const val = input.value.trim();
+    if(!val) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.subjectStrengths) rec.subjectStrengths = [];
+    if(!rec.subjectStrengths.some(s => s.toLowerCase() === val.toLowerCase())){
+      rec.subjectStrengths.push(val);
+    }
+    input.value = '';
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  updateStudentLikes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.likes = val;
+    saveStudent(rec);
+  },
+
+  updateStudentDislikes(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.dislikes = val;
+    saveStudent(rec);
+  },
+
+  /* ── Posts / Timeline ── */
+  addStudentPost(){
+    const input = document.getElementById('new-post-content');
+    if(!input) return;
+    const content = input.value.trim();
+    if(!content) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if(!rec.posts) rec.posts = [];
+    rec.posts.push({
+      id: 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6),
+      timestamp: Date.now(),
+      content: content,
+    });
+    input.value = '';
+    saveStudent(rec);
+    render();
+  },
+
+  startEditPost(postId){
+    state.editingPostId = postId;
+    render();
+  },
+
+  cancelEditPost(){
+    state.editingPostId = null;
+    render();
+  },
+
+  saveEditPost(postId){
+    const input = document.getElementById('edit-post-' + postId);
+    if(!input) return;
+    const content = input.value.trim();
+    if(!content) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.posts) return;
+    const post = rec.posts.find(p => p.id === postId);
+    if(!post) return;
+    post.content = content;
+    post.editedAt = Date.now();
+    state.editingPostId = null;
+    saveStudent(rec);
+    render();
+  },
+
+  deleteStudentPost(postId){
+    if(!confirm('Delete this post? This cannot be undone.')) return;
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec || !rec.posts) return;
+    rec.posts = rec.posts.filter(p => p.id !== postId);
+    saveStudent(rec);
+    render();
+  },
+
   quickMove(id, choice){
     if(!choice) return;
     const rec = state.students.find(s=>s.id===id);
@@ -2301,9 +2760,13 @@ const App = {
       _levelChosen: true,
       name: existing.name,
       age: existing.age,
+      birthdate: existing.birthdate || '',
       className: existing.className || '',
       level: existing.level,
       notes: existing.notes || '',
+      subjectStrengths: (existing.subjectStrengths || []).slice(),
+      likes: existing.likes || '',
+      dislikes: existing.dislikes || '',
       sectionIndex: 0,
       answers: {},
       interestsChecked: [],
