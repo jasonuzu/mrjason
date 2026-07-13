@@ -1128,6 +1128,7 @@ function migrateStudent(rec){
   if(rec.bestTimeOfDay === undefined) rec.bestTimeOfDay = '';
   if(!rec.communicationPreferences) rec.communicationPreferences = [];
   if(rec.groupRoleTendency === undefined) rec.groupRoleTendency = '';
+  if(rec.goal === undefined) rec.goal = '';
   return rec;
 }
 
@@ -1220,6 +1221,7 @@ function newDraft(){
     cefrLevel:'', cambridgeExams:[], otherEnglishTests:[],
     familyContext:'', physicalMedicalNotes:'',
     supportNetwork:'', bestTimeOfDay:'', communicationPreferences:[], groupRoleTendency:'',
+    goal:'',
     sectionIndex:0, answers:{}, interestsChecked:[], interestsFree:'',
     teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' }, createdAt:Date.now() };
 }
@@ -1669,6 +1671,23 @@ function renderReport(){
       </div>
     </div>
 
+    <div class="collapse-controls no-print">
+      <button onclick="App.collapseAllSections()">Collapse all sections</button>
+      <button onclick="App.expandAllSections()">Expand all sections</button>
+    </div>
+
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Goal</div>
+          <div class="sb-domain">What is this student working towards?</div>
+        </div>
+      </div>
+      <textarea class="notes-textarea" style="min-height:80px;"
+        placeholder="Overall goal for this student — e.g. 'Build confidence in speaking English in front of peers by end of semester', 'Achieve B1 level by June', 'Develop independent study habits for the DP programme'."
+        oninput="App.updateStudentGoal(this.value)">${escapeHtml(rec.goal||'')}</textarea>
+    </div>
+
     <div class="section-block no-print-collapse">
       <div class="sb-head">
         <div>
@@ -1713,6 +1732,8 @@ function renderReport(){
       </div>
     </div>
 
+    ${renderPostsSection(rec)}
+
     ${renderLearningAccessSection(rec, lvl)}
     ${renderContextSection(rec, lvl)}
 
@@ -1727,8 +1748,6 @@ function renderReport(){
         placeholder="Add any additional context about this student — background, IEP details, communication with parents, adjustments tried, etc. Saves as you type."
         oninput="App.updateStudentNotes(this.value)">${escapeHtml(rec.notes||'')}</textarea>
     </div>
-
-    ${renderPostsSection(rec)}
 
     <div class="zone-overview">
       ${overview.map(({sec,zone})=>{
@@ -1747,11 +1766,6 @@ function renderReport(){
         <span class="history-item current">${new Date(rec.updatedAt||rec.createdAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})} · current</span>
       </div>
     ` : ''}
-
-    <div class="collapse-controls no-print">
-      <button onclick="App.collapseAllSections()">Collapse all sections</button>
-      <button onclick="App.expandAllSections()">Expand all sections</button>
-    </div>
 
     ${scoredSecs.map(sec => renderScoredSection(sec, rec, lvl, scaleMax)).join('')}
 
@@ -3095,6 +3109,13 @@ const App = {
     const rec = state.students.find(s=>s.id===state.activeId);
     if(!rec) return;
     rec.notes = val;
+    saveStudent(rec);
+  },
+
+  updateStudentGoal(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.goal = val;
     saveStudent(rec);
   },
 
