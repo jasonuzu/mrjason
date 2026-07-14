@@ -3,26 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classroom Designer</title>
+    <title>Classroom Layout & Seating Designer</title>
     <style>
-        :root { --primary: #4a6fa5; --bg: #f8f9fa; --panel-bg: #ffffff; --border: #cccccc; }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { background-color: var(--bg); display: flex; height: 100vh; overflow: hidden; user-select: none; }
-        #toolbar { width: 300px; background-color: var(--panel-bg); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        button { padding: 10px; background-color: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        :root { 
+            --primary: #4a6fa5; 
+            --bg: #f8f9fa; 
+            --panel-bg: #ffffff; 
+            --border: #cccccc; 
+        }
+        
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        
+        body { 
+            background-color: var(--bg); 
+            display: flex; 
+            height: 100vh; 
+            overflow: hidden; 
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+        
+        #toolbar { 
+            width: 320px; 
+            background-color: var(--panel-bg); 
+            border-right: 1px solid var(--border); 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        h2 { font-size: 1.3rem; color: #333; }
+        .section-title { font-size: 0.8rem; text-transform: uppercase; color: #777; font-weight: bold; margin-top: 5px; }
+        
+        .btn-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+        }
+        
+        button { 
+            padding: 10px; 
+            background-color: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 0.85rem; 
+            font-weight: 500;
+        }
+        button:hover { background-color: #3b5a84; }
+        button.automation { background-color: #28a745; }
+        button.automation:hover { background-color: #218838; }
         button.danger { background-color: #d9534f; }
-        #canvas-container { flex-grow: 1; position: relative; overflow: auto; background-color: #e5e5e5; padding: 50px; }
-        #classroom-canvas { width: 1000px; height: 700px; background-color: white; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .movable-element { position: absolute; border: 2px solid #333; background-color: #a3cef1; display: flex; align-items: center; justify-content: center; cursor: move; font-size: 0.8rem; resize: both; overflow: hidden; min-width: 40px; min-height: 40px; padding: 5px; text-align: center; }
-        .movable-element.selected { outline: 3px solid #007bff; }
+        button.danger:hover { background-color: #c9302c; }
+        
+        #canvas-container { 
+            flex-grow: 1; 
+            position: relative; 
+            overflow: auto; 
+            background-color: #e5e5e5; 
+            padding: 40px; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #classroom-canvas { 
+            width: 1000px; 
+            height: 700px; 
+            background-color: white; 
+            position: relative; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+            background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .movable-element { 
+            position: absolute; 
+            border: 2px solid #333; 
+            background-color: #a3cef1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: move; 
+            resize: both; 
+            overflow: hidden; 
+            min-width: 40px; 
+            min-height: 35px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; z-index: 5; }
+        
+        .elem-txt {
+            pointer-events: none;
+            word-wrap: break-word;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            padding: 4px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .elem-teacher { border-width: 3px; border-radius: 2px; }
+        .elem-door { border-right: 6px double #333; background-color: #e0d0b0; }
+        .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important; }
+        .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
+
+        input[type="text"], input[type="color"] { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            margin: 5px 0 10px 0;
+        }
+        input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
+        label { font-size: 0.8rem; font-weight: bold; color: #555; }
     </style>
 </head>
 <body>
+
     <div id="toolbar">
         <h2>Classroom Designer</h2>
         
-        <div class="section-title">Spawn Items</div>
+        <div class="section-title">Spawn Manual Items</div>
         <div class="btn-grid">
             <button onclick="spawnItem('student')">Student Desk</button>
             <button onclick="spawnItem('teacher')">Teacher Desk</button>
@@ -30,78 +146,261 @@
             <button onclick="spawnItem('arrow')">Arrow</button>
         </div>
 
-        <div class="section-title">Automation</div>
-        <button onclick="addRow()" style="width: 100%;">Add Row of Seats</button>
-        <button onclick="generateRandomPlan()" style="width: 100%; background-color: #28a745;">Generate Random Plan</button>
+        <div class="section-title">Automated Tools</div>
+        <button onclick="addRow()">+ Add Empty Row of Seats</button>
+        <button class="automation" onclick="generateRandomPlan()">🎲 Generate Random Seating Plan</button>
 
-        <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 10px;">
-            <label style="font-size: 0.8rem;">Label:</label>
-            <input type="text" id="prop-label" oninput="updateLabel()" style="width:100%; padding:5px; margin: 5px 0 10px 0;">
-            <button class="danger" style="width:100%" onclick="deleteItem()">Delete Item</button>
+        <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 5px;">
+            <div class="section-title" style="margin-bottom: 10px;">Item Properties</div>
+            
+            <label>Text Label:</label>
+            <input type="text" id="prop-label" oninput="updateLabel()">
+            
+            <label>Fill/Object Color:</label>
+            <input type="color" id="prop-color" oninput="updateColor()">
+            
+            <button class="danger" style="width:100%; margin-top: 10px;" onclick="deleteItem()">Delete Item (Del)</button>
         </div>
     </div>
-    <div id="canvas-container"><div id="classroom-canvas" onclick="deselect()"></div></div>
+    
+    <div id="canvas-container">
+        <div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div>
+    </div>
 
     <script>
-        var canvas = document.getElementById('classroom-canvas'), selectedEl = null;
+        var canvas = document.getElementById('classroom-canvas');
+        var selectedEl = null;
+        var isDragging = false;
+        var dragOffsetX = 0;
+        var dragOffsetY = 0;
 
-        function addRow() {
-            let count = prompt("How many seats in this row? (Max 8)", "4");
-            count = Math.min(parseInt(count) || 1, 8);
-            for(let i = 0; i < count; i++) { spawnItem('student', 50 + (i * 90), 50); }
-        }
+        // Establish Global Event Frameworks
+        document.addEventListener('mousemove', handleGlobalMouseMove);
+        document.addEventListener('mouseup', handleGlobalMouseUp);
+        document.addEventListener('keydown', handleGlobalKeyDown);
 
-        function generateRandomPlan() {
-            let namesInput = prompt("Enter student names (comma separated):");
-            if (!namesInput) return;
-            let names = namesInput.split(',').map(n => n.trim()).sort(() => Math.random() - 0.5);
-            let mode = prompt("Choose layout: 'rows', 'table4', 'table5', 'table6'");
-            
-            canvas.innerHTML = '';
-            
-            names.forEach((name, i) => {
-                let x, y;
-                if (mode === 'rows') {
-                    x = 50 + (i % 8) * 100;
-                    y = 50 + Math.floor(i / 8) * 70;
-                } else if (mode.startsWith('table')) {
-                    let seatsPerTable = parseInt(mode.replace('table', ''));
-                    let tableIdx = Math.floor(i / seatsPerTable);
-                    let seatInTable = i % seatsPerTable;
-                    x = 100 + (tableIdx % 4) * 200 + (seatInTable % 2) * 90;
-                    y = 100 + Math.floor(tableIdx / 4) * 200 + Math.floor(seatInTable / 2) * 60;
-                } else {
-                    x = 50 + (i % 5) * 100;
-                    y = 50 + Math.floor(i / 5) * 70;
-                }
-                spawnItem('student', x, y, name);
-            });
-        }
-
-        function spawnItem(type, x = 50, y = 50, text = null) {
-            let el = document.createElement('div');
-            el.className = 'movable-element';
-            el.setAttribute('data-type', type);
-            el.innerText = text ? text : (type.charAt(0).toUpperCase() + type.slice(1));
-            el.style.left = x + 'px'; el.style.top = y + 'px'; 
-            el.style.width = '80px'; el.style.height = '50px';
-            el.onmousedown = function(e) { e.stopPropagation(); selectItem(el); };
-            canvas.appendChild(el);
-            selectItem(el);
+        // --- MANAGE SELECTION / DESELECTION ---
+        function canvasMouseDown(e) {
+            if (e.target === canvas) {
+                deselectAll();
+            }
         }
 
         function selectItem(el) {
             if (selectedEl) selectedEl.classList.remove('selected');
             selectedEl = el;
             selectedEl.classList.add('selected');
+            
             document.getElementById('inspector').style.display = 'block';
-            document.getElementById('prop-label').value = el.innerText;
+            var type = el.getAttribute('data-type');
+            
+            if (type === 'arrow') {
+                var textNode = el.querySelector('text');
+                document.getElementById('prop-label').value = textNode ? textNode.textContent : '';
+                var lineNode = el.querySelector('line');
+                document.getElementById('prop-color').value = lineNode ? lineNode.getAttribute('stroke') : '#333333';
+            } else {
+                var txtSpan = el.querySelector('.elem-txt');
+                document.getElementById('prop-label').value = txtSpan ? txtSpan.innerText : '';
+                document.getElementById('prop-color').value = rgbToHex(el.style.backgroundColor);
+            }
         }
 
-        function deselect() { if(selectedEl) { selectedEl.classList.remove('selected'); selectedEl = null; document.getElementById('inspector').style.display = 'none'; } }
-        function updateLabel() { if(selectedEl) selectedEl.innerText = document.getElementById('prop-label').value; }
-        function deleteItem() { if(selectedEl) { selectedEl.remove(); deselect(); } }
-        document.addEventListener('keydown', (e) => { if((e.key === 'Delete' || e.key === 'Backspace') && selectedEl && document.activeElement.tagName !== 'INPUT') deleteItem(); });
+        function deselectAll() {
+            if (selectedEl) selectedEl.classList.remove('selected');
+            selectedEl = null;
+            document.getElementById('inspector').style.display = 'none';
+        }
+
+        // --- CORE DRAG MOTOR MECHANICS ---
+        function itemMouseDown(e, el) {
+            e.stopPropagation();
+            selectItem(el);
+            
+            var rect = el.getBoundingClientRect();
+            var clickX = e.clientX - rect.left;
+            var clickY = e.clientY - rect.top;
+
+            // Protection zone check: If they are hitting the native resize corner, bypass drag loops
+            if (clickX > rect.width - 20 && clickY > rect.height - 20) {
+                return; 
+            }
+
+            isDragging = true;
+            dragOffsetX = e.clientX - el.offsetLeft;
+            dragOffsetY = e.clientY - el.offsetTop;
+        }
+
+        function handleGlobalMouseMove(e) {
+            if (isDragging && selectedEl) {
+                var x = e.clientX - dragOffsetX;
+                var y = e.clientY - dragOffsetY;
+
+                // Simple 10px snap grid alignment
+                x = Math.round(x / 10) * 10;
+                y = Math.round(y / 10) * 10;
+
+                // Strict canvas containment barriers
+                var maxLeft = canvas.clientWidth - selectedEl.offsetWidth;
+                var maxTop = canvas.clientHeight - selectedEl.offsetHeight;
+                x = Math.max(0, Math.min(x, maxLeft));
+                y = Math.max(0, Math.min(y, maxTop));
+
+                selectedEl.style.left = x + 'px';
+                selectedEl.style.top = y + 'px';
+            }
+        }
+
+        function handleGlobalMouseUp() {
+            isDragging = false;
+        }
+
+        // --- PROPERTIES UPDATER LOOPS ---
+        function updateLabel() {
+            if (!selectedEl) return;
+            var type = selectedEl.getAttribute('data-type');
+            var val = document.getElementById('prop-label').value;
+            
+            if (type === 'arrow') {
+                var textNode = selectedEl.querySelector('text');
+                if (textNode) textNode.textContent = val;
+            } else {
+                var txtSpan = selectedEl.querySelector('.elem-txt');
+                if (txtSpan) txtSpan.innerText = val;
+            }
+        }
+
+        function updateColor() {
+            if (!selectedEl) return;
+            var type = selectedEl.getAttribute('data-type');
+            var val = document.getElementById('prop-color').value;
+            
+            if (type === 'arrow') {
+                var line = selectedEl.querySelector('line');
+                var poly = selectedEl.querySelector('polygon');
+                if (line) line.setAttribute('stroke', val);
+                if (poly) poly.setAttribute('fill', val);
+            } else {
+                selectedEl.style.backgroundColor = val;
+            }
+        }
+
+        function deleteItem() {
+            if (selectedEl) {
+                selectedEl.remove();
+                deselectAll();
+            }
+        }
+
+        function handleGlobalKeyDown(e) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEl) {
+                if (document.activeElement.tagName === 'INPUT') return;
+                deleteItem();
+            }
+        }
+
+        // --- OBJECT SPAWNING ENGINE ---
+        function spawnItem(type, x = 60, y = 60, text = null) {
+            var el = document.createElement('div');
+            el.className = 'movable-element elem-' + type;
+            el.setAttribute('data-type', type);
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+
+            if (type === 'arrow') {
+                el.style.width = '120px';
+                el.style.height = '40px';
+                el.style.backgroundColor = 'transparent';
+                drawArrowSVG(el, '#333333', text || 'Direction');
+            } else {
+                el.style.width = (type === 'teacher') ? '130px' : ((type === 'door') ? '70px' : '85px');
+                el.style.height = (type === 'teacher') ? '65px' : ((type === 'door') ? '20px' : '50px');
+                el.style.backgroundColor = (type === 'student') ? '#a3cef1' : ((type === 'teacher') ? '#84a59d' : '#e0d0b0');
+                
+                var span = document.createElement('span');
+                span.className = 'elem-txt';
+                span.innerText = text || (type.charAt(0).toUpperCase() + type.slice(1));
+                el.appendChild(span);
+            }
+
+            el.onmousedown = function(e) { itemMouseDown(e, el); };
+            canvas.appendChild(el);
+            selectItem(el);
+            return el;
+        }
+
+        // --- AUTOMATION LAYOUT FUNCTIONS ---
+        function addRow() {
+            var count = prompt("How many empty seats in this row? (Max 8)", "5");
+            var num = Math.min(parseInt(count) || 1, 8);
+            for (var i = 0; i < num; i++) {
+                spawnItem('student', 60 + (i * 100), 100);
+            }
+        }
+
+        function generateRandomPlan() {
+            var rosterInput = prompt("Paste student names directly here (Accepts spreadsheets columns, lines, or commas):");
+            if (!rosterInput) return;
+
+            // Split seamlessly on newlines or commas, dropping empty slots
+            var students = rosterInput.split(/[\n\r,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            if (students.length === 0) return;
+
+            // Built-in array randomizer shuffle
+            students.sort(() => Math.random() - 0.5);
+
+            var layoutType = prompt("Choose Layout Format Type:\nType 'rows' for traditional layout lines\nType '4' for groups of 4\nType '5' for groups of 5\nType '6' for groups of 6", "rows");
+            
+            canvas.innerHTML = ''; 
+            deselectAll();
+
+            students.forEach((student, index) => {
+                var posX, posY;
+
+                if (layoutType === 'rows' || !['4', '5', '6'].includes(layoutType)) {
+                    // Clean row lines grid array (8 seats wide maximum)
+                    posX = 60 + (index % 8) * 110;
+                    posY = 80 + Math.floor(index / 8) * 80;
+                } else {
+                    // Cluster configuration mechanics
+                    var groupSize = parseInt(layoutType);
+                    var tableIndex = Math.floor(index / groupSize);
+                    var seatIndex = index % groupSize;
+                    
+                    var columnsPerCanvasRow = 3;
+                    var baseClusterX = 60 + (tableIndex % columnsPerCanvasRow) * 290;
+                    var baseClusterY = 80 + Math.floor(tableIndex / columnsPerCanvasRow) * 190;
+
+                    // Geometric placement around a common table node point
+                    posX = baseClusterX + (seatIndex % 2) * 95;
+                    posY = baseClusterY + Math.floor(seatIndex / 2) * 55;
+                }
+
+                spawnItem('student', posX, posY, student);
+            });
+        }
+
+        // --- RENDERING SVG ARCHITECTURES ---
+        function drawArrowSVG(el, color, text) {
+            el.innerHTML = 
+                '<svg class="arrow-svg" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">' +
+                    '<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+                        '<polygon points="0 0, 6 3, 0 6" fill="' + color + '"/>' +
+                    '</marker></defs>' +
+                    '<line x1="5" y1="20" x2="85" y2="20" stroke="' + color + '" stroke-width="4" marker-end="url(#arrowhead)" />' +
+                    '<text x="45" y="14" font-size="11" fill="' + color + '" text-anchor="middle" font-weight="bold">' + text + '</text>' +
+                '</svg>';
+        }
+
+        function rgbToHex(rgb) {
+            if (!rgb || rgb.indexOf('rgb') === -1) return rgb || '#ffffff';
+            var colors = rgb.match(/\d+/g);
+            if (!colors || colors.length < 3) return '#ffffff';
+            var r = parseInt(colors[0]).toString(16).padStart(2, '0');
+            var g = parseInt(colors[1]).toString(16).padStart(2, '0');
+            var b = parseInt(colors[2]).toString(16).padStart(2, '0');
+            return '#' + r + g + b;
+        }
     </script>
 </body>
 </html>
