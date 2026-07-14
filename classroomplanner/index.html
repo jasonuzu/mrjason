@@ -35,7 +35,7 @@
             padding: 20px; 
             display: flex; 
             flex-direction: column; 
-            gap: 15px; 
+            gap: 12px; 
             box-shadow: 2px 0 5px rgba(0,0,0,0.05);
             overflow-y: auto;
             z-index: 10;
@@ -65,6 +65,8 @@
         button.automation:hover { background-color: #218838; }
         button.shuffle-btn { background-color: #17a2b8; }
         button.shuffle-btn:hover { background-color: #138496; }
+        button.export-btn { background-color: #6c757d; }
+        button.export-btn:hover { background-color: #5a6268; }
         button.danger { background-color: #d9534f; }
         button.danger:hover { background-color: #c9302c; }
         
@@ -163,6 +165,12 @@
         <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
         <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
 
+        <div class="section-title">File Operations</div>
+        <div class="btn-grid">
+            <button class="export-btn" onclick="exportLayoutAsImage()">💾 Export Image</button>
+            <button class="danger" onclick="resetEntireCanvas()">⚠️ Clear All</button>
+        </div>
+
         <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 5px;">
             <div class="section-title" id="inspector-title" style="margin-bottom: 10px;">Item Properties</div>
             
@@ -178,10 +186,7 @@
         </div>
 
         <div class="hint-box">
-            <strong>Selection Controls:</strong><br>
-            • Click and drag space on the canvas to multi-select items with a bounding box.<br>
-            • Hold <strong>Shift</strong> to toggle items.<br>
-            • Drag any selected item to move all.
+            <strong>System Status:</strong> Layout updates save to your browser automatically.
         </div>
     </div>
     
@@ -196,20 +201,99 @@
         var dragStartX = 0, dragStartY = 0;
         var initialPositions = [];
 
-        // Box select systems track
         var isBoxSelecting = false;
         var boxStartLeft = 0, boxStartTop = 0;
         var selectBoxEl = null;
 
-        // Current Roster Data Memory Cache
         var currentStudents = [];
         var lastLayoutType = "r5";
 
+        // Global Event Triggers Setup
         document.addEventListener('mousemove', handleGlobalMouseMove);
         document.addEventListener('mouseup', handleGlobalMouseUp);
         document.addEventListener('keydown', handleGlobalKeyDown);
+        window.addEventListener('DOMContentLoaded', loadCanvasStateFromBrowser);
 
-        // --- MANAGE BOUNDING SELECTION DRAG ENGINE ---
+        // --- BROWSER LOCAL STORAGE PERSISTENCE SYSTEMS ---
+        function saveCanvasStateToBrowser() {
+            var items = [];
+            var elements = canvas.querySelectorAll('.movable-element');
+            
+            elements.forEach(el => {
+                var type = el.getAttribute('data-type');
+                var text = "";
+                var color = rgbToHex(el.style.backgroundColor);
+                
+                if (type === 'arrow') {
+                    var textNode = el.querySelector('text');
+                    text = textNode ? textNode.textContent : '';
+                    var lineNode = el.querySelector('line');
+                    color = lineNode ? lineNode.getAttribute('stroke') : '#333333';
+                } else {
+                    var txtSpan = el.querySelector('.elem-txt');
+                    text = txtSpan ? txtSpan.innerText : '';
+                }
+
+                items.push({
+                    type: type,
+                    left: el.style.left,
+                    top: el.style.top,
+                    width: el.style.width || el.offsetWidth + 'px',
+                    height: el.style.height || el.offsetHeight + 'px',
+                    text: text,
+                    color: color
+                });
+            });
+
+            var payload = {
+                items: items,
+                currentStudents: currentStudents,
+                lastLayoutType: lastLayoutType
+            };
+            localStorage.setItem('classroom_designer_state', JSON.stringify(payload));
+        }
+
+        function loadCanvasStateFromBrowser() {
+            var raw = localStorage.getItem('classroom_designer_state');
+            if (!raw) return;
+            try {
+                var payload = JSON.parse(raw);
+                currentStudents = payload.currentStudents || [];
+                lastLayoutType = payload.lastLayoutType || "r5";
+                
+                canvas.innerHTML = ''; 
+                deselectAll();
+
+                if (payload.items && payload.items.length > 0) {
+                    payload.items.forEach(item => {
+                        var el = spawnItem(item.type, parseInt(item.left), parseInt(item.top), item.text);
+                        el.style.width = item.width;
+                        el.style.height = item.height;
+                        
+                        if (item.type === 'arrow') {
+                            drawArrowSVG(el, item.color, item.text);
+                        } else {
+                            el.style.backgroundColor = item.color;
+                        }
+                    });
+                }
+                deselectAll();
+            } catch(e) {
+                console.error("Auto-load loop fault recovery triggered.", e);
+            }
+        }
+
+        function resetEntireCanvas() {
+            if (confirm("Are you sure you want to delete everything and start completely over?")) {
+                localStorage.removeItem('classroom_designer_state');
+                currentStudents = [];
+                lastLayoutType = "r5";
+                canvas.innerHTML = '';
+                deselectAll();
+            }
+        }
+
+        // --- BOX GRAPHICS INTERACTIVE SELECTION LOOPS ---
         function canvasMouseDown(e) {
             if (e.target === canvas) {
                 if (!e.shiftKey) deselectAll();
@@ -232,10 +316,8 @@
             }
         }
 
-        // --- MANAGE SELECTION / DESELECTION ---
         function itemMouseDown(e, el) {
             e.stopPropagation();
-            
             var rect = el.getBoundingClientRect();
             var clickX = e.clientX - rect.left;
             var clickY = e.clientY - rect.top;
@@ -270,7 +352,6 @@
                     top: parseInt(item.style.top) || 0
                 }));
             }
-            
             updateInspectorUI();
         }
 
@@ -285,7 +366,6 @@
                 document.getElementById('inspector').style.display = 'none';
                 return;
             }
-            
             document.getElementById('inspector').style.display = 'block';
             
             if (selectedEls.length > 1) {
@@ -312,7 +392,6 @@
             }
         }
 
-        // --- RELATIVE GROUP DRAGGING & DRAG SELECT MECHANICS ---
         function handleGlobalMouseMove(e) {
             var rect = canvas.getBoundingClientRect();
             
@@ -377,14 +456,18 @@
         }
 
         function handleGlobalMouseUp() {
-            isDragging = false;
+            if (isDragging) {
+                isDragging = false;
+                saveCanvasStateToBrowser();
+            }
             if (isBoxSelecting) {
                 isBoxSelecting = false;
                 if (selectBoxEl) selectBoxEl.style.display = 'none';
+                saveCanvasStateToBrowser();
             }
         }
 
-        // --- COMPONENT ATTRIBUTES ENGINE ---
+        // --- ATTRIBUTES MUTATION CONTROLLERS ---
         function updateLabel() {
             if (selectedEls.length !== 1) return;
             var el = selectedEls[0];
@@ -398,6 +481,7 @@
                 var txtSpan = el.querySelector('.elem-txt');
                 if (txtSpan) txtSpan.innerText = val;
             }
+            saveCanvasStateToBrowser();
         }
 
         function updateColor() {
@@ -413,12 +497,14 @@
                     el.style.backgroundColor = val;
                 }
             });
+            saveCanvasStateToBrowser();
         }
 
         function deleteSelectedItems() {
             selectedEls.forEach(el => el.remove());
             selectedEls = [];
             document.getElementById('inspector').style.display = 'none';
+            saveCanvasStateToBrowser();
         }
 
         function handleGlobalKeyDown(e) {
@@ -455,33 +541,30 @@
             canvas.appendChild(el);
             
             if (!selectedEls.includes(el)) {
-                if (!window.event || !window.event.shiftKey) {
-                    deselectAll();
-                }
+                if (!window.event || !window.event.shiftKey) deselectAll();
                 el.classList.add('selected');
                 selectedEls.push(el);
                 updateInspectorUI();
             }
-            
+            saveCanvasStateToBrowser();
             return el;
         }
 
-        // --- AUTOMATION LAYOUT MOTOR ENGINES ---
+        // --- GRID AUTO GENERATION MOTOR LOOP LOGICS ---
         function addRow() {
             var count = prompt("How many empty seats in this vertical column row? (Max 8)", "5");
             var num = Math.min(parseInt(count) || 1, 8);
             for (var i = 0; i < num; i++) {
                 spawnItem('student', 120, 60 + (i * 70));
             }
+            saveCanvasStateToBrowser();
         }
 
         function parseRosterInput(inputStr) {
             if (!inputStr) return [];
-            // If the user uses lines or commas, keep multi-word full names completely grouped together
             if (inputStr.includes(',') || inputStr.includes('\n')) {
                 return inputStr.split(/[\n\r,]+/).map(s => s.trim()).filter(s => s.length > 0);
             } else {
-                // Fallback: If spaces or tabs are the only structural break down, parse individual names item by item
                 return inputStr.split(/[\s\t]+/).map(s => s.trim()).filter(s => s.length > 0);
             }
         }
@@ -489,7 +572,7 @@
         function generateRandomPlan() {
             var rosterInput = prompt(
                 "Paste student list here:\n\n" +
-                "• Surnames / Full names: Keep them together by separating each student with a comma or new line.\n" +
+                "• Surnames / Full names: Keep them together by separating each student with a comma or newline.\n" +
                 "• Individual names: Can be separated cleanly using spaces, commas, or lines."
             );
             if (!rosterInput) return;
@@ -505,8 +588,6 @@
             );
             
             lastLayoutType = layoutType ? layoutType.toLowerCase().trim() : "r5";
-            
-            // Random Shuffle
             currentStudents.sort(() => Math.random() - 0.5);
             buildLayoutPlacement(currentStudents, lastLayoutType);
         }
@@ -538,13 +619,11 @@
             if (!layoutType) return;
             lastLayoutType = layoutType.toLowerCase().trim();
 
-            // Shuffle array variables
             currentStudents.sort(() => Math.random() - 0.5);
             buildLayoutPlacement(currentStudents, lastLayoutType);
         }
 
         function buildLayoutPlacement(students, layoutType) {
-            // Selectively clear old student desks only. Structural teacher desks and doors remain completely safe.
             var oldDesks = canvas.querySelectorAll('.elem-student');
             oldDesks.forEach(el => {
                 selectedEls = selectedEls.filter(item => item !== el);
@@ -565,14 +644,12 @@
                 var posX, posY;
 
                 if (!isTableLayout) {
-                    // --- ROW BASED SYSTEM ARRAYS ---
                     var maxFullRows = Math.floor(students.length / sizeParam);
                     var currentBoxRow = Math.floor(index / sizeParam);
                     var currentBoxCol = index % sizeParam;
                     var isLeftover = currentBoxRow >= maxFullRows;
 
                     if (isLeftover) {
-                        // Place remaining leftover elements at the back row with balancing offset centering rules
                         var leftoverCount = students.length % sizeParam;
                         var centeringOffset = ((sizeParam - leftoverCount) * 110) / 2;
                         posX = 80 + (currentBoxCol * 110) + centeringOffset;
@@ -582,7 +659,6 @@
                         posY = 80 + (currentBoxRow * 80);
                     }
                 } else {
-                    // --- TABLE BASED CLUSTER CONFIGURATIONS ---
                     var tableIndex = Math.floor(index / sizeParam);
                     var seatIndex = index % sizeParam;
                     var fullTablesCount = Math.floor(students.length / sizeParam);
@@ -595,7 +671,6 @@
                     var baseClusterX = 60 + tableColIdx * 310;
                     var baseClusterY = 80 + tableRowIdx * 210;
 
-                    // If it is a leftover odd structure table block, drop it smoothly toward the back
                     if (isLeftoverTable) {
                         baseClusterY += 30; 
                     }
@@ -616,9 +691,97 @@
                         posY = baseClusterY + Math.floor(seatIndex / 2) * 60;
                     }
                 }
-
                 spawnItem('student', posX, posY, student);
             });
+            saveCanvasStateToBrowser();
+        }
+
+        // --- NATIVE GRAPHICS EXPORT CANVAS RENDERING ENGINE ---
+        function exportLayoutAsImage() {
+            deselectAll(); // Strips outline borders cleanly prior to capturing image
+            
+            var expCanvas = document.createElement('canvas');
+            expCanvas.width = 1000;
+            expCanvas.height = 700;
+            var ctx = expCanvas.getContext('2d');
+            
+            // Draw pure layout background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 1000, 700);
+            
+            // Draw engineering background alignment grids lines
+            ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+            ctx.lineWidth = 1;
+            for(var x = 0; x < 1000; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 700); ctx.stroke(); }
+            for(var y = 0; y < 700; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1000, y); ctx.stroke(); }
+            
+            var items = canvas.querySelectorAll('.movable-element');
+            items.forEach(el => {
+                var type = el.getAttribute('data-type');
+                var left = parseInt(el.style.left) || 0;
+                var top = parseInt(el.style.top) || 0;
+                var w = el.offsetWidth;
+                var h = el.offsetHeight;
+                var bg = el.style.backgroundColor;
+                
+                if (type === 'arrow') {
+                    var textNode = el.querySelector('text');
+                    var text = textNode ? textNode.textContent : 'Direction';
+                    var lineNode = el.querySelector('line');
+                    var strokeColor = lineNode ? lineNode.getAttribute('stroke') : '#333333';
+                    
+                    ctx.strokeStyle = strokeColor;
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.moveTo(left + 5, top + h/2);
+                    ctx.lineTo(left + w - 18, top + h/2);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = strokeColor;
+                    ctx.beginPath();
+                    ctx.moveTo(left + w - 18, top + h/2 - 6);
+                    ctx.lineTo(left + w - 3, top + h/2);
+                    ctx.lineTo(left + w - 18, top + h/2 + 6);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = strokeColor;
+                    ctx.font = 'bold 11px "Segoe UI", Tahoma, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(text, left + w/2, top + h/2 - 4);
+                } else {
+                    ctx.fillStyle = bg || '#ffffff';
+                    ctx.lineWidth = (type === 'teacher') ? 3 : 2;
+                    ctx.strokeStyle = '#333333';
+                    
+                    ctx.fillRect(left, top, w, h);
+                    ctx.strokeRect(left, top, w, h);
+                    
+                    if (type === 'door') {
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(left + w - 5, top);
+                        ctx.lineTo(left + w - 5, top + h);
+                        ctx.stroke();
+                    }
+                    
+                    var txtSpan = el.querySelector('.elem-txt');
+                    var txt = txtSpan ? txtSpan.innerText : '';
+                    ctx.fillStyle = '#333333';
+                    ctx.font = 'bold 12px "Segoe UI", Tahoma, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Center and render text variables labels securely
+                    ctx.fillText(txt, left + w/2, top + h/2);
+                }
+            });
+            
+            // Build and trigger pipeline downloads stream
+            var link = document.createElement('a');
+            link.download = 'classroom-layout-plan.png';
+            link.href = expCanvas.toDataURL('image/png');
+            link.click();
         }
 
         function drawArrowSVG(el, color, text) {
@@ -644,5 +807,3 @@
     </script>
 </body>
 </html>
-
-```
