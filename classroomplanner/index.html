@@ -1,3 +1,12 @@
+Here is the fully upgraded version of your Classroom Designer script.
+
+### What is added:
+
+* **Click-and-Drag Bounding Box Select:** You can now click on an empty spot on the canvas and drag a dashed selection box. Any items wrapped inside or touched by this box will automatically be added to your selection stack so you can move or delete them together.
+* **Intelligent Roster Separation Parsing:** The prompt instructions have been optimized. The engine automatically detects formatting: if it detects commas or lines, it keeps full names (surnames included) safely unified. If it detects a list of single names separated only by spaces, it breaks them out cleanly into individual desks.
+* **"Automatically Change Seating Plan" Button:** A new tool has been added to instantly shuffle your layout. You can hit this button repeatedly to randomize your current class configuration instantly, change the row length or table cluster metrics dynamically, or switch to an entirely new roster on the fly. It preserves structural objects like doors and teacher desks when shuffling.
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,6 +72,8 @@
         button:hover { background-color: #3b5a84; }
         button.automation { background-color: #28a745; }
         button.automation:hover { background-color: #218838; }
+        button.shuffle-btn { background-color: #17a2b8; }
+        button.shuffle-btn:hover { background-color: #138496; }
         button.danger { background-color: #d9534f; }
         button.danger:hover { background-color: #c9302c; }
         
@@ -122,6 +133,15 @@
         .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important; }
         .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
 
+        .selection-box {
+            position: absolute;
+            border: 1px dashed #007bff;
+            background: rgba(0, 123, 255, 0.15);
+            pointer-events: none;
+            display: none;
+            z-index: 100;
+        }
+
         input[type="text"], input[type="color"] { 
             width: 100%; 
             padding: 8px; 
@@ -149,7 +169,8 @@
 
         <div class="section-title">Automated Tools</div>
         <button onclick="addRow()">↓ Add Empty Vertical Row</button>
-        <button class="automation" onclick="generateRandomPlan()">🎲 Generate Random Seating Plan</button>
+        <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
+        <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
 
         <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 5px;">
             <div class="section-title" id="inspector-title" style="margin-bottom: 10px;">Item Properties</div>
@@ -166,7 +187,10 @@
         </div>
 
         <div class="hint-box">
-            <strong>Multi-Select Tip:</strong> Hold down the <strong>Shift</strong> key while clicking items to select and drag/delete them together.
+            <strong>Selection Controls:</strong><br>
+            • Click and drag space on the canvas to multi-select items with a bounding box.<br>
+            • Hold <strong>Shift</strong> to toggle items.<br>
+            • Drag any selected item to move all.
         </div>
     </div>
     
@@ -178,21 +202,46 @@
         var canvas = document.getElementById('classroom-canvas');
         var selectedEls = [];
         var isDragging = false;
-        var dragStartX = 0;
-        var dragStartY = 0;
+        var dragStartX = 0, dragStartY = 0;
         var initialPositions = [];
+
+        // Box select systems track
+        var isBoxSelecting = false;
+        var boxStartLeft = 0, boxStartTop = 0;
+        var selectBoxEl = null;
+
+        // Current Roster Data Memory Cache
+        var currentStudents = [];
+        var lastLayoutType = "r5";
 
         document.addEventListener('mousemove', handleGlobalMouseMove);
         document.addEventListener('mouseup', handleGlobalMouseUp);
         document.addEventListener('keydown', handleGlobalKeyDown);
 
+        // --- MANAGE BOUNDING SELECTION DRAG ENGINE ---
         function canvasMouseDown(e) {
             if (e.target === canvas) {
-                deselectAll();
+                if (!e.shiftKey) deselectAll();
+                
+                isBoxSelecting = true;
+                var rect = canvas.getBoundingClientRect();
+                boxStartLeft = e.clientX - rect.left;
+                boxStartTop = e.clientY - rect.top;
+                
+                if (!selectBoxEl) {
+                    selectBoxEl = document.createElement('div');
+                    selectBoxEl.className = 'selection-box';
+                    canvas.appendChild(selectBoxEl);
+                }
+                selectBoxEl.style.left = boxStartLeft + 'px';
+                selectBoxEl.style.top = boxStartTop + 'px';
+                selectBoxEl.style.width = '0px';
+                selectBoxEl.style.height = '0px';
+                selectBoxEl.style.display = 'block';
             }
         }
 
-        // --- MULTI-SELECT INTERACTION SELECTION LOOPS ---
+        // --- MANAGE SELECTION / DESELECTION ---
         function itemMouseDown(e, el) {
             e.stopPropagation();
             
@@ -200,13 +249,11 @@
             var clickX = e.clientX - rect.left;
             var clickY = e.clientY - rect.top;
 
-            // Handle browser native resize handles
             if (clickX > rect.width - 20 && clickY > rect.height - 20) {
                 return; 
             }
 
             if (e.shiftKey) {
-                // Toggle element in multi-select stack
                 if (selectedEls.includes(el)) {
                     el.classList.remove('selected');
                     selectedEls = selectedEls.filter(item => item !== el);
@@ -215,7 +262,6 @@
                     selectedEls.push(el);
                 }
             } else {
-                // Normal standard click selection tracking
                 if (!selectedEls.includes(el)) {
                     deselectAll();
                     el.classList.add('selected');
@@ -275,13 +321,52 @@
             }
         }
 
-        // --- RELATIVE GROUP DRAGGING MOTOR ---
+        // --- RELATIVE GROUP DRAGGING & DRAG SELECT MECHANICS ---
         function handleGlobalMouseMove(e) {
-            if (isDragging && selectedEls.length > 0) {
+            var rect = canvas.getBoundingClientRect();
+            
+            if (isBoxSelecting && selectBoxEl) {
+                var curLeft = e.clientX - rect.left;
+                var curTop = e.clientY - rect.top;
+                
+                var x = Math.min(boxStartLeft, curLeft);
+                var y = Math.min(boxStartTop, curTop);
+                var w = Math.abs(boxStartLeft - curLeft);
+                var h = Math.abs(boxStartTop - curTop);
+                
+                selectBoxEl.style.left = x + 'px';
+                selectBoxEl.style.top = y + 'px';
+                selectBoxEl.style.width = w + 'px';
+                selectBoxEl.style.height = h + 'px';
+                
+                var items = canvas.querySelectorAll('.movable-element');
+                items.forEach(el => {
+                    var itemLeft = parseInt(el.style.left) || 0;
+                    var itemTop = parseInt(el.style.top) || 0;
+                    var itemWidth = el.offsetWidth;
+                    var itemHeight = el.offsetHeight;
+                    
+                    var overlap = (x < itemLeft + itemWidth && x + w > itemLeft &&
+                                   y < itemTop + itemHeight && y + h > itemTop);
+                                   
+                    if (overlap) {
+                        if (!selectedEls.includes(el)) {
+                            el.classList.add('selected');
+                            selectedEls.push(el);
+                        }
+                    } else {
+                        if (!e.shiftKey) {
+                            el.classList.remove('selected');
+                            selectedEls = selectedEls.filter(item => item !== el);
+                        }
+                    }
+                });
+                updateInspectorUI();
+            }
+            else if (isDragging && selectedEls.length > 0) {
                 var dx = e.clientX - dragStartX;
                 var dy = e.clientY - dragStartY;
 
-                // Simple 10px snap calculations
                 dx = Math.round(dx / 10) * 10;
                 dy = Math.round(dy / 10) * 10;
 
@@ -302,9 +387,13 @@
 
         function handleGlobalMouseUp() {
             isDragging = false;
+            if (isBoxSelecting) {
+                isBoxSelecting = false;
+                if (selectBoxEl) selectBoxEl.style.display = 'none';
+            }
         }
 
-        // --- COMPONENT PROPERTIES MODIFIERS ---
+        // --- COMPONENT ATTRIBUTES ENGINE ---
         function updateLabel() {
             if (selectedEls.length !== 1) return;
             var el = selectedEls[0];
@@ -348,7 +437,6 @@
             }
         }
 
-        // --- OBJECT CREATION SPAWNER ENGINE ---
         function spawnItem(type, x = 60, y = 60, text = null) {
             var el = document.createElement('div');
             el.className = 'movable-element elem-' + type;
@@ -375,7 +463,6 @@
             el.onmousedown = function(e) { itemMouseDown(e, el); };
             canvas.appendChild(el);
             
-            // Push into select tracking stack safely
             if (!selectedEls.includes(el)) {
                 if (!window.event || !window.event.shiftKey) {
                     deselectAll();
@@ -388,41 +475,95 @@
             return el;
         }
 
-        // --- AUTOMATION COMPILATION ENGINES ---
+        // --- AUTOMATION LAYOUT MOTOR ENGINES ---
         function addRow() {
             var count = prompt("How many empty seats in this vertical column row? (Max 8)", "5");
             var num = Math.min(parseInt(count) || 1, 8);
-            // Generates items running top-to-bottom vertically (Y axes increases)
             for (var i = 0; i < num; i++) {
                 spawnItem('student', 120, 60 + (i * 70));
             }
         }
 
+        function parseRosterInput(inputStr) {
+            if (!inputStr) return [];
+            // If the user uses lines or commas, keep multi-word full names completely grouped together
+            if (inputStr.includes(',') || inputStr.includes('\n')) {
+                return inputStr.split(/[\n\r,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            } else {
+                // Fallback: If spaces or tabs are the only structural break down, parse individual names item by item
+                return inputStr.split(/[\s\t]+/).map(s => s.trim()).filter(s => s.length > 0);
+            }
+        }
+
         function generateRandomPlan() {
-            var rosterInput = prompt("Paste your student roster here (Accepts spreadsheet lists, lines, tabs or commas):");
+            var rosterInput = prompt(
+                "Paste student list here:\n\n" +
+                "• Surnames / Full names: Keep them together by separating each student with a comma or new line.\n" +
+                "• Individual names: Can be separated cleanly using spaces, commas, or lines."
+            );
             if (!rosterInput) return;
 
-            var students = rosterInput.split(/[\n\r, \t]+/).map(s => s.trim()).filter(s => s.length > 0);
-            if (students.length === 0) return;
-
-            // Secure shuffle
-            students.sort(() => Math.random() - 0.5);
+            currentStudents = parseRosterInput(rosterInput);
+            if (currentStudents.length === 0) return;
 
             var layoutType = prompt(
                 "Choose Seating Format Type Option:\n\n" +
-                "For Tables enter: t4, t5, or t6\n" +
-                "For Rows enter: r4, r5, r6, or r7", 
+                "For Tables configuration enter: t4, t5, or t6\n" +
+                "For Grid Rows configuration enter: r4, r5, r6, or r7", 
                 "r5"
             );
             
-            layoutType = layoutType ? layoutType.toLowerCase().trim() : "r5";
-            canvas.innerHTML = ''; 
-            deselectAll();
+            lastLayoutType = layoutType ? layoutType.toLowerCase().trim() : "r5";
+            
+            // Random Shuffle
+            currentStudents.sort(() => Math.random() - 0.5);
+            buildLayoutPlacement(currentStudents, lastLayoutType);
+        }
+
+        function automaticallyShuffleOrMix() {
+            if (currentStudents.length === 0) {
+                alert("No seating plan currently exists to change! Please click 'New Plan From Roster' first.");
+                return;
+            }
+
+            var choice = prompt(
+                "To shuffle existing students, type 'existing'.\n" +
+                "Otherwise, paste or type a completely new list of student names below:", 
+                "existing"
+            );
+            if (!choice) return;
+
+            if (choice.trim().toLowerCase() !== 'existing') {
+                currentStudents = parseRosterInput(choice);
+                if (currentStudents.length === 0) return;
+            }
+
+            var layoutType = prompt(
+                "Mix Layout Format Configuration:\n\n" +
+                "Enter: t4, t5, or t6 (for tables clusters)\n" +
+                "Enter: r4, r5, r6, or r7 (for row structures)", 
+                lastLayoutType
+            );
+            if (!layoutType) return;
+            lastLayoutType = layoutType.toLowerCase().trim();
+
+            // Shuffle array variables
+            currentStudents.sort(() => Math.random() - 0.5);
+            buildLayoutPlacement(currentStudents, lastLayoutType);
+        }
+
+        function buildLayoutPlacement(students, layoutType) {
+            // Selectively clear old student desks only. Structural teacher desks and doors remain completely safe.
+            var oldDesks = canvas.querySelectorAll('.elem-student');
+            oldDesks.forEach(el => {
+                selectedEls = selectedEls.filter(item => item !== el);
+                el.remove();
+            });
+            updateInspectorUI();
 
             var isTableLayout = layoutType.startsWith('t');
             var sizeParam = parseInt(layoutType.replace(/[^0-9]/g, ''));
             
-            // Apply standard boundaries fallbacks if parameter reading fails
             if (isTableLayout) {
                 if (![4, 5, 6].includes(sizeParam)) sizeParam = 4;
             } else {
@@ -433,16 +574,14 @@
                 var posX, posY;
 
                 if (!isTableLayout) {
-                    // --- ROW CALCULATIONS GRID ARRANGEMENT ---
+                    // --- ROW BASED SYSTEM ARRAYS ---
                     var maxFullRows = Math.floor(students.length / sizeParam);
                     var currentBoxRow = Math.floor(index / sizeParam);
                     var currentBoxCol = index % sizeParam;
-
-                    // Detect if student is part of an incomplete leftover group
                     var isLeftover = currentBoxRow >= maxFullRows;
 
                     if (isLeftover) {
-                        // Place leftover elements at the back row with custom centering logic offsets
+                        // Place remaining leftover elements at the back row with balancing offset centering rules
                         var leftoverCount = students.length % sizeParam;
                         var centeringOffset = ((sizeParam - leftoverCount) * 110) / 2;
                         posX = 80 + (currentBoxCol * 110) + centeringOffset;
@@ -452,11 +591,9 @@
                         posY = 80 + (currentBoxRow * 80);
                     }
                 } else {
-                    // --- CLUSTER BLOCK TABLE CALCULATIONS ARRANGEMENT ---
+                    // --- TABLE BASED CLUSTER CONFIGURATIONS ---
                     var tableIndex = Math.floor(index / sizeParam);
                     var seatIndex = index % sizeParam;
-                    
-                    var totalTablesCount = Math.ceil(students.length / sizeParam);
                     var fullTablesCount = Math.floor(students.length / sizeParam);
                     var isLeftoverTable = tableIndex >= fullTablesCount;
 
@@ -464,16 +601,14 @@
                     var tableRowIdx = Math.floor(tableIndex / tablesPerRow);
                     var tableColIdx = tableIndex % tablesPerRow;
 
-                    // Handle baseline cluster positions coordinates
                     var baseClusterX = 60 + tableColIdx * 310;
                     var baseClusterY = 80 + tableRowIdx * 210;
 
-                    // If it's a trailing leftover structure, shift coordinates downward/backward
+                    // If it is a leftover odd structure table block, drop it smoothly toward the back
                     if (isLeftoverTable) {
                         baseClusterY += 30; 
                     }
 
-                    // Geometry matrix coordinates inside clusters
                     if (sizeParam === 4) {
                         posX = baseClusterX + (seatIndex % 2) * 95;
                         posY = baseClusterY + Math.floor(seatIndex / 2) * 60;
@@ -518,3 +653,5 @@
     </script>
 </body>
 </html>
+
+```
