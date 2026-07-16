@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradebook — Online Class Grade Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef2f7; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+  --line:#e2e8f0; --accent:#4f46e5; --radius:14px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;
+}
+.muted{color:var(--muted)}
+
+/* ---------- top bar ---------- */
+header.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1440px;margin:0 auto;padding:13px 20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.brand h1{font-size:19px;margin:0;letter-spacing:-0.02em;display:flex;align-items:center;gap:9px}
+.logo{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,#6366f1,#a855f7);display:inline-block;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.toolbar{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ---------- buttons & inputs ---------- */
+.btn{font:inherit;font-size:13px;font-weight:600;padding:8px 13px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;transition:background .15s,border-color .15s,color .15s;white-space:nowrap}
+.btn:hover{border-color:#c7d2fe;background:#f8fafc}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#4338ca;border-color:#4338ca}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:#e9edf3;border-color:transparent}
+.btn.danger{color:#dc2626}
+.btn.danger:hover{background:#fef2f2}
+.btn.xs{padding:5px 10px;font-size:12px;border-radius:8px}
+.inp{font:inherit;font-size:13px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.inp:focus{outline:2px solid #c7d2fe;outline-offset:0;border-color:var(--accent)}
+textarea.inp{resize:vertical;line-height:1.5}
+.mini{width:20px;height:20px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:11px;line-height:1;display:grid;place-items:center;color:var(--muted);padding:0}
+.mini:hover{color:var(--ink);border-color:#cbd5e1}
+.dotbtn{border-radius:50%;width:13px;height:13px;border:1px solid rgba(15,23,42,.2)}
+
+/* ---------- main layout ---------- */
+main{max-width:1440px;margin:16px auto 60px;padding:0 20px;display:flex;flex-direction:column;gap:12px}
+.legend{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.legend-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;background:#fff}
+.chip .dot{width:12px;height:12px;border-radius:50%;border:1px solid rgba(15,23,42,.15);flex:none}
+.chip.static{color:var(--muted);background:#f8fafc;border-style:dashed}
+.chip.toggle{cursor:pointer;font:inherit}
+.chip.toggle:hover{border-color:#c7d2fe}
+#hint{font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;padding:9px 13px;border-radius:10px}
+.empty{border:2px dashed var(--line);border-radius:var(--radius);background:#fff;padding:52px 20px;text-align:center;color:var(--muted)}
+.empty h2{color:var(--ink);margin:0 0 6px;font-size:19px}
+.empty .row{display:flex;gap:10px;justify-content:center;margin-top:18px}
+.foot-hint{font-size:12px;color:var(--muted);text-align:center;margin:4px 0 0}
+
+/* ---------- table ---------- */
+.table-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.table-wrap{overflow:auto;max-height:calc(100vh - 255px)}
+table{border-collapse:separate;border-spacing:0;min-width:100%}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:8px 10px;font-size:13px}
+thead th{position:sticky;top:0;z-index:5;background:#f8fafc;text-align:left;vertical-align:top}
+.sticky-col{position:sticky;left:0;z-index:4;background:#fff}
+thead .sticky-col{z-index:8;background:#f8fafc}
+tfoot td{position:sticky;bottom:0;background:#f8fafc;z-index:5;font-weight:600}
+tfoot .sticky-col{z-index:7}
+.avg-col{position:sticky;right:0;z-index:4;background:#fff;border-left:2px solid var(--line);text-align:center;min-width:96px}
+thead .avg-col{z-index:8;background:#f8fafc}
+tfoot .avg-col{z-index:7;background:#f8fafc}
+.corner-a{font-weight:700;font-size:13px}
+.corner-b{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px;white-space:nowrap}
+.no-stu{padding:26px 14px;color:var(--muted)}
+
+/* assignment header */
+th.ah{position:relative;min-width:132px;padding:10px 10px 9px}
+.ah-tools{position:absolute;top:5px;right:5px;display:flex;gap:3px;opacity:0;transition:opacity .15s}
+th.ah:hover .ah-tools{opacity:1}
+.ah-title{font-weight:600;font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:52px}
+.ah-meta{display:flex;gap:6px;align-items:center;margin-top:7px}
+.type{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;color:#fff;letter-spacing:.01em}
+.max{font-size:11px;color:var(--muted)}
+.ah-date{font-size:11px;color:var(--muted);margin-top:5px;font-weight:500}
+
+/* student cell */
+td.sn{min-width:180px}
+.sn-in{display:flex;align-items:center;gap:8px}
+.s-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.sn-tools{margin-left:auto;display:flex;gap:3px;opacity:0;transition:opacity .15s;flex:none}
+td.sn:hover .sn-tools{opacity:1}
+tbody tr:hover td.sn{background:#f8fafc}
+
+/* grade cells */
+td.grade{min-width:98px;height:54px;text-align:center;cursor:cell;vertical-align:middle;position:relative;transition:box-shadow .12s}
+td.grade:hover{box-shadow:inset 0 0 0 2px #c7d2fe}
+td.grade.blank:hover::after{content:'+';color:#94a3b8;font-weight:700;font-size:16px}
+.score{font-weight:650;font-size:14px;line-height:1.25}
+.pct{font-size:11px;color:var(--muted)}
+td.grade.tinted .pct{color:rgba(15,23,42,.62)}
+.mark{position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:rgba(15,23,42,.5)}
+.is-missing{background:#fef2f2}
+.tag-missing{font-size:10px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.is-excused{background:#f8fafc}
+.tag-ex{font-size:13px;font-weight:800;color:#94a3b8;letter-spacing:.04em}
+td.avg{font-size:13px}
+.ltr{font-size:11px;color:var(--muted);font-weight:700;margin-left:3px}
+tfoot td.grade{cursor:default}
+tfoot td.grade:hover{box-shadow:none}
+
+/* ---------- modal ---------- */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px 16px;backdrop-filter:blur(2px)}
+.modal{background:#fff;border-radius:16px;box-shadow:0 24px 64px rgba(15,23,42,.3);width:min(560px,94vw);max-height:86vh;overflow:auto;padding:22px}
+.modal h3{margin:0 0 4px;font-size:17px;letter-spacing:-0.01em}
+.modal .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px;line-height:1.5}
+.form-row{margin-bottom:12px}
+.f-2col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.m-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.switch{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;margin-bottom:16px;cursor:pointer}
+.switch input{width:16px;height:16px;accent-color:var(--accent)}
+.rule-head{display:grid;grid-template-columns:40px 1fr 74px 74px 26px;gap:8px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:6px 0}
+.rule{display:grid;grid-template-columns:40px 1fr 74px 74px 26px;gap:8px;align-items:center;margin-bottom:8px}
+.rule input[type=color]{width:40px;height:35px;border:1px solid var(--line);border-radius:9px;padding:2px;background:#fff;cursor:pointer}
+.rule .inp{padding:7px 9px;font-size:12.5px}
+.rule .mini{width:22px;height:22px}
+
+/* ---------- popover ---------- */
+.popover{position:fixed;z-index:130;width:252px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(15,23,42,.22);padding:13px}
+.pp-title{font-size:12.5px;font-weight:700;margin-bottom:11px;line-height:1.4}
+.pp-row{margin-bottom:11px}
+.pp-row label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.pp-actions{display:flex;gap:6px;align-items:center}
+.swatches{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.sw{width:26px;height:26px;border-radius:8px;border:2px solid rgba(15,23,42,.12);padding:0;cursor:pointer}
+.sw.sel{border-color:#0f172a;box-shadow:inset 0 0 0 2px #fff}
+.sw.auto{width:auto;height:26px;padding:0 9px;font:inherit;font-size:11px;font-weight:700;color:var(--muted);background:#fff}
+.sw.custom{position:relative;overflow:hidden;display:grid;place-items:center;background:conic-gradient(#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171)}
+.sw.custom input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.sw.custom span{font-size:15px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);pointer-events:none}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(8px);background:#0f172a;color:#fff;font-size:13px;font-weight:600;padding:9px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200;box-shadow:0 8px 24px rgba(15,23,42,.25)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:720px){
+  .toolbar{margin-left:0}
+  td.sn{min-width:140px}
+  .s-name{max-width:120px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1><span class="logo"></span>Gradebook</h1>
+      <p id="stats"></p>
+    </div>
+    <div class="toolbar">
+      <button class="btn primary" id="btnAddStudents">+ Students</button>
+      <button class="btn primary" id="btnAddAsg">+ Assignment</button>
+      <button class="btn" id="btnColors">Color key</button>
+      <button class="btn ghost" id="btnCSV">Export CSV</button>
+      <button class="btn ghost" id="btnBackup">Backup</button>
+      <button class="btn ghost" id="btnImport">Import</button>
+      <button class="btn ghost danger" id="btnReset">Reset</button>
+      <input type="file" id="fileImport" accept="application/json,.json" hidden>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="legend" id="legend"></div>
+  <div id="hint" hidden></div>
+  <div id="empty" class="empty" hidden>
+    <h2>Start your gradebook</h2>
+    <p>Add your class namelist and your first assignment — or load a demo class to explore.</p>
+    <div class="row">
+      <button class="btn primary" id="btnEmptyAdd">+ Add students</button>
+      <button class="btn" id="btnDemo">Load demo class</button>
+    </div>
+  </div>
+  <div class="table-card" id="tableCard" hidden>
+    <div class="table-wrap" id="tableWrap">
+      <table id="grid"></table>
+    </div>
+  </div>
+  <p class="foot-hint">Click any cell to enter a score, mark it missing/excused, or set a color &nbsp;·&nbsp; double-click a name or title to rename it &nbsp;·&nbsp; everything saves automatically in this browser.</p>
+</main>
+
+<div class="overlay" id="overlay" hidden><div class="modal" id="modal"></div></div>
+<div class="popover" id="popover" hidden></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,9);
+const clamp = (v,lo,hi) => Math.min(hi, Math.max(lo, v));
+const fmtPct = p => (Math.round(p*10)/10) + '%';
+
+const TYPES = {
+  assessment:   {label:'Assessment',    color:'#6366f1'},
+  quiz:         {label:'Quiz',          color:'#f59e0b'},
+  homework:     {label:'Homework',      color:'#10b981'},
+  project:      {label:'Project',       color:'#8b5cf6'},
+  participation:{label:'Participation', color:'#0ea5e9'},
+  lab:          {label:'Lab',           color:'#ec4899'},
+  other:        {label:'Other',         color:'#64748b'}
+};
+const typeInfo = a => a.type === 'custom'
+  ? {label: a.typeLabel || 'Other', color: '#64748b'}
+  : (TYPES[a.type] || TYPES.other);
+
+/* ================= state ================= */
+const LS_KEY = 'gradebook.v1';
+let state = load();
+
+function defaultRules(){
+  return [
+    {id:uid(), color:'#22c55e', label:'Excellent',  min:90, max:100},
+    {id:uid(), color:'#eab308', label:'Good',        min:80, max:89.9},
+    {id:uid(), color:'#f97316', label:'Needs work',  min:70, max:79.9},
+    {id:uid(), color:'#ef4444', label:'At risk',     min:0,  max:69.9}
+  ];
+}
+function emptyState(){ return {students:[], assignments:[], grades:{}, rules:defaultRules(), autoColor:true}; }
+function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if(s && Array.isArray(s.students) && Array.isArray(s.assignments) && s.grades && Array.isArray(s.rules)) return s;
+  }catch(e){}
+  return null;
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+function seedDemo(){
+  const s = emptyState();
+  ['Amara Okafor','Ben Carter','Chloe Nguyen','Diego Ramírez','Ella Johansson','Finn O’Brien','Grace Liu','Henry Patel']
+    .forEach(n => s.students.push({id:uid(), name:n, color:null}));
+  const A = (title,type,maxPoints,date) => ({id:uid(), title, type, typeLabel:null, maxPoints, date:date||'', color:null});
+  s.assignments = [
+    A('Unit 1 Test','assessment',100,'2026-06-02'),
+    A('Ch. 3 Homework','homework',20,'2026-06-05'),
+    A('Quiz: Fractions','quiz',25,'2026-06-09'),
+    A('Science Project','project',50,'2026-06-12'),
+    A('Reading Log Wk 4','homework',30,'2026-06-15'),
+    A('Participation','participation',10,'')
+  ];
+  s.students.forEach(st => {
+    s.assignments.forEach(a => {
+      const r = Math.random(), key = st.id + '::' + a.id;
+      if(r < 0.06)      s.grades[key] = {missing:true};
+      else if(r < 0.09) s.grades[key] = {excused:true};
+      else if(r < 0.93) s.grades[key] = {score: Math.round(a.maxPoints * (0.55 + Math.random()*0.45))};
+    });
+  });
+  return s;
+}
+if(!state){ state = seedDemo(); save(); }
+
+/* ================= lookups & math ================= */
+const stuById = id => state.students.find(s => s.id === id);
+const asgById = id => state.assignments.find(a => a.id === id);
+const gkey = (sid,aid) => sid + '::' + aid;
+const gradeFor = (sid,aid) => state.grades[gkey(sid,aid)];
+
+function ruleForPct(p){
+  let best = null;
+  for(const r of state.rules){
+    if(r.min === '' || r.min == null || r.max === '' || r.max == null) continue;
+    const lo = Number(r.min), hi = Number(r.max);
+    if(isNaN(lo) || isNaN(hi)) continue;
+    if(p >= lo && p <= hi) return r;
+    if(lo <= p && (best === null || lo > Number(best.min))) best = r;
+  }
+  return best;
+}
+function letter(p){ return p >= 90 ? 'A' : p >= 80 ? 'B' : p >= 70 ? 'C' : p >= 60 ? 'D' : 'F'; }
+
+function studentAvg(sid){
+  let earned = 0, possible = 0;
+  for(const a of state.assignments){
+    const g = gradeFor(sid, a.id);
+    if(!g || a.maxPoints <= 0) continue;
+    if(typeof g.score === 'number'){ earned += g.score; possible += a.maxPoints; }
+    else if(g.missing){ possible += a.maxPoints; }   // missing counts as zero
+  }
+  return possible > 0 ? earned / possible * 100 : null;
+}
+function asgAvg(aid){
+  const a = asgById(aid);
+  if(!a || a.maxPoints <= 0) return null;
+  let sum = 0, n = 0;
+  for(const s of state.students){
+    const g = gradeFor(s.id, aid);
+    if(g && typeof g.score === 'number'){ sum += g.score / a.maxPoints * 100; n++; }
+  }
+  return n ? sum / n : null;
+}
+function overallAvg(){
+  const avgs = state.students.map(s => studentAvg(s.id)).filter(v => v != null);
+  return avgs.length ? avgs.reduce((x,y) => x + y, 0) / avgs.length : null;
+}
+</script>
+<script>
+'use strict';
+/* ================= rendering ================= */
+function render(){ renderStats(); renderLegend(); renderMain(); }
+
+function renderStats(){
+  const ov = overallAvg();
+  $('#stats').textContent =
+    state.students.length + ' students · ' + state.assignments.length + ' assignments' +
+    (ov != null ? ' · class avg ' + fmtPct(ov) : '');
+}
+
+function rangeText(r){
+  const has = r.min !== '' && r.min != null && r.max !== '' && r.max != null;
+  return has ? ' <span class="muted">' + r.min + '–' + r.max + '%</span>' : '';
+}
+function renderLegend(){
+  const L = $('#legend');
+  let html = '<span class="legend-label">Color key</span>';
+  html += state.rules.map(r =>
+    '<span class="chip" title="' + esc(r.label || r.color) + '">' +
+      '<span class="dot" style="background:' + esc(r.color) + '"></span>' +
+      (esc(r.label) || '<span class="muted">(no label)</span>') + rangeText(r) +
+    '</span>').join('');
+  html += '<span class="chip static">missing = counts as 0</span><span class="chip static">EX = excused</span>';
+  html += '<button class="chip toggle" id="autoToggle" title="Automatically shade cells by score range">Auto-color: <b>' + (state.autoColor ? 'on' : 'off') + '</b></button>';
+  html += '<button class="btn xs" id="editKey" style="margin-left:auto">Edit key</button>';
+  L.innerHTML = html;
+  $('#autoToggle').onclick = () => { state.autoColor = !state.autoColor; save(); render(); };
+  $('#editKey').onclick = openColorKeyModal;
+}
+
+function renderMain(){
+  const hasS = state.students.length > 0, hasA = state.assignments.length > 0;
+  $('#empty').hidden = hasS || hasA;
+  $('#tableCard').hidden = !(hasS || hasA);
+  const hint = $('#hint');
+  if(hasS && !hasA){ hint.hidden = false; hint.textContent = 'Your namelist is ready — add an assignment (assessment, homework, quiz, project…) to start grading.'; }
+  else if(!hasS && hasA){ hint.hidden = false; hint.textContent = 'Assignments are set — add students to your namelist to start grading.'; }
+  else hint.hidden = true;
+  if(hasS || hasA) renderGrid();
+}
+
+function renderGrid(){
+  const t = $('#grid');
+  let html = '<thead><tr>';
+  html += '<th class="sticky-col corner"><div class="corner-a">Students</div><div class="corner-b">' +
+          state.students.length + ' names · ' + state.assignments.length + ' columns</div></th>';
+  for(const a of state.assignments) html += asgHeaderHtml(a);
+  html += '<th class="avg-col"><div class="corner-a">Average</div><div class="corner-b">earned ÷ possible</div></th></tr></thead><tbody>';
+  if(!state.students.length){
+    html += '<tr><td class="no-stu" colspan="' + (state.assignments.length + 2) + '">No students yet — click “+ Students” to build your namelist.</td></tr>';
+  }
+  for(const s of state.students) html += rowHtml(s);
+  html += '</tbody>';
+  if(state.assignments.length){
+    html += '<tfoot><tr><td class="sticky-col">Class average</td>';
+    for(const a of state.assignments){
+      const p = asgAvg(a.id);
+      html += '<td class="grade avg">' + (p == null ? '<span class="muted">—</span>' : fmtPct(p)) + '</td>';
+    }
+    const ov = overallAvg();
+    html += '<td class="avg-col">' + (ov == null ? '<span class="muted">—</span>' : fmtPct(ov)) + '</td></tr></tfoot>';
+  }
+  t.innerHTML = html;
+}
+
+function asgHeaderHtml(a){
+  const ti = typeInfo(a);
+  const date = a.date ? new Date(a.date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric'}) : '';
+  return '<th class="ah" data-aid="' + a.id + '">' +
+    '<div class="ah-tools">' +
+      '<button class="mini dotbtn paint-col" title="Set column color" style="background:' + (a.color || '#e2e8f0') + '"></button>' +
+      '<button class="mini edit-asg" title="Edit assignment">✎</button>' +
+      '<button class="mini del-asg" title="Delete assignment">×</button>' +
+    '</div>' +
+    '<div class="ah-title" title="' + esc(a.title) + ' — double-click to rename">' + esc(a.title) + '</div>' +
+    '<div class="ah-meta"><span class="type" style="background:' + ti.color + '">' + esc(ti.label) + '</span><span class="max">/ ' + a.maxPoints + '</span></div>' +
+    (date ? '<div class="ah-date">' + date + '</div>' : '') +
+  '</th>';
+}
+
+function rowHtml(s){
+  let html = '<tr data-sid="' + s.id + '">';
+  html += '<td class="sticky-col sn"><div class="sn-in">' +
+      '<span class="s-name" title="' + esc(s.name) + ' — double-click to rename">' + esc(s.name) + '</span>' +
+      '<span class="sn-tools">' +
+        '<button class="mini dotbtn paint-row" title="Set row color" style="background:' + (s.color || '#e2e8f0') + '"></button>' +
+        '<button class="mini del-stu" title="Remove student">×</button>' +
+      '</span>' +
+    '</div></td>';
+  for(const a of state.assignments) html += cellHtml(s, a);
+  const p = studentAvg(s.id);
+  const r = p != null ? ruleForPct(p) : null;
+  const style = (state.autoColor && r) ? ' style="background:' + r.color + '26"' : '';
+  html += '<td class="avg-col avg"' + style + '>' +
+    (p == null ? '<span class="muted">—</span>' : '<b>' + fmtPct(p) + '</b><span class="ltr">' + letter(p) + '</span>') +
+    '</td></tr>';
+  return html;
+}
+
+function cellHtml(s, a){
+  const g = gradeFor(s.id, a.id);
+  const pct = (g && typeof g.score === 'number' && a.maxPoints > 0) ? g.score / a.maxPoints * 100 : null;
+  let bg = null, alpha = '2b', manual = false;
+  if(g && g.color){ bg = g.color; manual = true; }
+  else if(state.autoColor && pct != null){ const r = ruleForPct(pct); if(r) bg = r.color; }
+  if(!bg && s.color){ bg = s.color; alpha = '1c'; }
+  if(!bg && a.color){ bg = a.color; alpha = '14'; }
+  const style = bg ? ' style="background:' + bg + alpha + '"' : '';
+  let inner = '', cls = 'grade';
+  if(g && g.missing){
+    inner = '<div class="score muted">—</div><div class="tag-missing">missing</div>';
+    if(!bg) cls += ' is-missing';
+  } else if(g && g.excused){
+    inner = '<div class="tag-ex">EX</div><div class="pct">excused</div>';
+    if(!bg) cls += ' is-excused';
+  } else if(pct != null){
+    inner = '<div class="score">' + g.score + '</div><div class="pct">' + fmtPct(pct) + '</div>';
+  } else {
+    cls += ' blank';
+  }
+  if(bg) cls += ' tinted';
+  return '<td class="' + cls + '" data-sid="' + s.id + '" data-aid="' + a.id + '"' + style + '>' +
+         inner + (manual ? '<span class="mark" title="Manually colored"></span>' : '') + '</td>';
+}
+</script>
+<script>
+'use strict';
+/* ================= popover (cell editor & color picker) ================= */
+const pop = $('#popover');
+let popCtx = null, pendingColor = null;
+
+function closePopover(){ pop.hidden = true; popCtx = null; }
+
+function positionPop(anchor){
+  const r = anchor.getBoundingClientRect();
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  const left = clamp(r.left, 8, window.innerWidth - w - 8);
+  let top = r.bottom + 6;
+  if(top + h > window.innerHeight - 8) top = r.top - h - 6;
+  pop.style.left = left + 'px';
+  pop.style.top = Math.max(8, top) + 'px';
+}
+
+function swatchHtml(current, autoText){
+  let h = '<button class="sw auto' + (!current ? ' sel' : '') + '" data-c="">' + (autoText || 'Auto') + '</button>';
+  for(const r of state.rules){
+    h += '<button class="sw' + (current === r.color ? ' sel' : '') + '" data-c="' + r.color + '" style="background:' + r.color + '" title="' + esc(r.label || r.color) + '"></button>';
+  }
+  h += '<label class="sw custom" title="Custom color"><span>+</span><input type="color" id="pp-custom" value="' + (current || '#94a3b8') + '"></label>';
+  return h;
+}
+function wireSwatches(){
+  pop.querySelectorAll('.sw[data-c]').forEach(b => {
+    b.onclick = () => {
+      pendingColor = b.dataset.c || null;
+      pop.querySelectorAll('.sw').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+  });
+  const ci = pop.querySelector('#pp-custom');
+  if(ci) ci.oninput = () => {
+    pendingColor = ci.value;
+    pop.querySelectorAll('.sw').forEach(x => x.classList.remove('sel'));
+    ci.closest('.sw').classList.add('sel');
+  };
+}
+
+function openCellPopover(sid, aid, anchor){
+  const s = stuById(sid), a = asgById(aid);
+  if(!s || !a) return;
+  const g = gradeFor(sid, aid) || {};
+  popCtx = {kind:'cell', sid, aid};
+  pendingColor = g.color || null;
+  pop.innerHTML =
+    '<div class="pp-title">' + esc(s.name) + ' <span class="muted">·</span> ' + esc(a.title) + ' <span class="muted">/ ' + a.maxPoints + '</span></div>' +
+    '<div class="pp-row"><label for="pp-score">Score</label>' +
+      '<input class="inp" id="pp-score" type="number" min="0" max="' + a.maxPoints + '" step="0.5" placeholder="0–' + a.maxPoints + '" value="' + (typeof g.score === 'number' ? g.score : '') + '"></div>' +
+    '<div class="pp-row"><label>Cell color</label><div class="swatches">' + swatchHtml(g.color || null) + '</div></div>' +
+    '<div class="pp-actions">' +
+      '<button class="btn xs" id="pp-missing" title="Counts as zero in averages">Missing</button>' +
+      '<button class="btn xs" id="pp-excused" title="Excluded from averages">Excuse</button>' +
+      '<button class="btn xs danger" id="pp-clear">Clear</button>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn xs primary" id="pp-save">Save</button>' +
+    '</div>';
+  pop.hidden = false;
+  positionPop(anchor);
+  wireSwatches();
+  const inp = pop.querySelector('#pp-score');
+  inp.focus(); inp.select();
+
+  const commit = advance => {
+    const raw = inp.value.trim(), key = gkey(sid, aid);
+    if(raw === ''){
+      if(pendingColor) state.grades[key] = {color: pendingColor};
+      else delete state.grades[key];
+    } else {
+      const v = parseFloat(raw);
+      if(isNaN(v)) return;
+      state.grades[key] = {score: clamp(v, 0, a.maxPoints)};
+      if(pendingColor) state.grades[key].color = pendingColor;
+    }
+    save(); render();
+    if(advance){
+      const idx = state.students.findIndex(x => x.id === sid);
+      const next = state.students[idx + 1];
+      const cell = next && document.querySelector('td.grade[data-sid="' + next.id + '"][data-aid="' + aid + '"]');
+      if(cell){ openCellPopover(next.id, aid, cell); return; }
+    }
+    closePopover();
+  };
+  inp.onkeydown = e => {
+    if(e.key === 'Enter'){ e.preventDefault(); commit(true); }
+    else if(e.key === 'Escape'){ closePopover(); }
+  };
+  pop.querySelector('#pp-save').onclick = () => commit(false);
+  pop.querySelector('#pp-missing').onclick = () => {
+    state.grades[gkey(sid, aid)] = pendingColor ? {missing:true, color:pendingColor} : {missing:true};
+    save(); render(); closePopover();
+  };
+  pop.querySelector('#pp-excused').onclick = () => {
+    state.grades[gkey(sid, aid)] = pendingColor ? {excused:true, color:pendingColor} : {excused:true};
+    save(); render(); closePopover();
+  };
+  pop.querySelector('#pp-clear').onclick = () => {
+    delete state.grades[gkey(sid, aid)];
+    save(); render(); closePopover();
+  };
+}
+
+function openPaintPopover(kind, id, anchor){
+  const obj = kind === 'row' ? stuById(id) : asgById(id);
+  if(!obj) return;
+  popCtx = {kind, id};
+  pendingColor = obj.color || null;
+  pop.innerHTML =
+    '<div class="pp-title">' + (kind === 'row' ? 'Row' : 'Column') + ' color — ' + esc(obj.name || obj.title) + '</div>' +
+    '<div class="pp-row"><div class="swatches">' + swatchHtml(obj.color || null, 'None') + '</div></div>' +
+    '<div class="pp-actions">' +
+      '<button class="btn xs danger" id="pp-none">Remove</button>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn xs primary" id="pp-apply">Apply</button>' +
+    '</div>';
+  pop.hidden = false;
+  positionPop(anchor);
+  wireSwatches();
+  pop.querySelector('#pp-apply').onclick = () => { obj.color = pendingColor; save(); render(); closePopover(); };
+  pop.querySelector('#pp-none').onclick  = () => { obj.color = null; save(); render(); closePopover(); };
+}
+
+/* ================= modals ================= */
+const overlay = $('#overlay'), modal = $('#modal');
+function openModal(html){ overlay.hidden = false; modal.innerHTML = html; }
+function closeModal(){ overlay.hidden = true; modal.innerHTML = ''; }
+overlay.addEventListener('mousedown', e => { if(e.target === overlay) closeModal(); });
+modal.addEventListener('click', e => { if(e.target.closest('[data-close]')) closeModal(); });
+
+function openStudentsModal(){
+  openModal(
+    '<h3>Add students</h3>' +
+    '<p class="sub">Enter one name per line — you can paste a whole namelist at once.</p>' +
+    '<textarea class="inp" id="m-names" rows="7" placeholder="Ada Lovelace&#10;Alan Turing&#10;Katherine Johnson"></textarea>' +
+    '<div class="m-actions"><button class="btn" data-close>Cancel</button>' +
+    '<button class="btn primary" id="m-add">Add to namelist</button></div>');
+  const ta = modal.querySelector('#m-names');
+  ta.focus();
+  modal.querySelector('#m-add').onclick = () => {
+    const names = ta.value.split('\n').map(x => x.trim()).filter(Boolean);
+    if(!names.length){ closeModal(); return; }
+    names.forEach(n => state.students.push({id:uid(), name:n, color:null}));
+    save(); render(); closeModal();
+    toast(names.length + ' student' + (names.length > 1 ? 's' : '') + ' added');
+  };
+}
+
+function openAssignmentModal(a){
+  const editing = !!a;
+  a = a || {title:'', type:'homework', typeLabel:'', maxPoints:100, date:''};
+  const opts = Object.entries(TYPES).map(([k,v]) =>
+    '<option value="' + k + '"' + (a.type === k ? ' selected' : '') + '>' + v.label + '</option>').join('') +
+    '<option value="custom"' + (a.type === 'custom' ? ' selected' : '') + '>Custom…</option>';
+  openModal(
+    '<h3>' + (editing ? 'Edit assignment' : 'New assignment') + '</h3>' +
+    '<p class="sub">Assessments, homework, projects, participation — anything you grade.</p>' +
+    '<div class="form-row"><label class="f">Title</label><input class="inp" id="m-title" value="' + esc(a.title) + '" placeholder="e.g. Chapter 5 Test"></div>' +
+    '<div class="f-2col">' +
+      '<div class="form-row"><label class="f">Type</label><select class="inp" id="m-type">' + opts + '</select></div>' +
+      '<div class="form-row" id="m-custom-wrap" hidden><label class="f">Custom type</label><input class="inp" id="m-custom" value="' + esc(a.typeLabel || '') + '" placeholder="e.g. Field work"></div>' +
+    '</div>' +
+    '<div class="f-2col">' +
+      '<div class="form-row"><label class="f">Max points</label><input class="inp" id="m-max" type="number" min="1" step="1" value="' + a.maxPoints + '"></div>' +
+      '<div class="form-row"><label class="f">Date (optional)</label><input class="inp" id="m-date" type="date" value="' + (a.date || '') + '"></div>' +
+    '</div>' +
+    '<div class="m-actions"><button class="btn" data-close>Cancel</button>' +
+    '<button class="btn primary" id="m-save">' + (editing ? 'Save changes' : 'Add assignment') + '</button></div>');
+  const typeSel = modal.querySelector('#m-type'), cw = modal.querySelector('#m-custom-wrap');
+  const syncCustom = () => { cw.hidden = typeSel.value !== 'custom'; };
+  typeSel.onchange = syncCustom; syncCustom();
+  modal.querySelector('#m-title').focus();
+  modal.querySelector('#m-save').onclick = () => {
+    const title = modal.querySelector('#m-title').value.trim();
+    const max = Math.max(1, parseFloat(modal.querySelector('#m-max').value) || 100);
+    const type = typeSel.value;
+    const typeLabel = type === 'custom' ? (modal.querySelector('#m-custom').value.trim() || 'Custom') : null;
+    const date = modal.querySelector('#m-date').value;
+    if(!title){ modal.querySelector('#m-title').focus(); return; }
+    if(editing) Object.assign(a, {title, maxPoints:max, type, typeLabel, date});
+    else state.assignments.push({id:uid(), title, type, typeLabel, maxPoints:max, date, color:null});
+    save(); render(); closeModal();
+    toast(editing ? 'Assignment updated' : 'Assignment added');
+  };
+}
+
+/* ---------- color key editor ---------- */
+function ruleRowHtml(r){
+  return '<div class="rule" data-id="' + r.id + '">' +
+    '<input type="color" class="r-color" value="' + r.color + '">' +
+    '<input type="text" class="inp r-label" placeholder="Label (e.g. Excellent)" value="' + esc(r.label) + '">' +
+    '<input type="number" class="inp r-min" placeholder="min %" value="' + (r.min === '' || r.min == null ? '' : r.min) + '">' +
+    '<input type="number" class="inp r-max" placeholder="max %" value="' + (r.max === '' || r.max == null ? '' : r.max) + '">' +
+    '<button class="mini r-del" title="Remove color">×</button>' +
+  '</div>';
+}
+function openColorKeyModal(){
+  openModal(
+    '<h3>Color key</h3>' +
+    '<p class="sub">Define what each color means. Colors with a range shade cells automatically; colors without a range are manual tags you can apply to any cell, row, or column. The key stays visible above the sheet so anyone viewing it knows the codes.</p>' +
+    '<label class="switch"><input type="checkbox" id="m-auto"' + (state.autoColor ? ' checked' : '') + '> Auto-color cells by score range</label>' +
+    '<div class="rule-head"><span></span><span>Meaning</span><span>Min %</span><span>Max %</span><span></span></div>' +
+    '<div id="m-rules">' + state.rules.map(ruleRowHtml).join('') + '</div>' +
+    '<button class="btn xs" id="m-addrule">+ Add color</button>' +
+    '<div class="m-actions"><button class="btn primary" data-close>Done</button></div>');
+  const wrap = modal.querySelector('#m-rules');
+  const readRules = () => {
+    state.rules = [...wrap.querySelectorAll('.rule')].map(row => {
+      const minV = row.querySelector('.r-min').value, maxV = row.querySelector('.r-max').value;
+      return {
+        id: row.dataset.id,
+        color: row.querySelector('.r-color').value,
+        label: row.querySelector('.r-label').value.trim(),
+        min: minV === '' ? '' : Number(minV),
+        max: maxV === '' ? '' : Number(maxV)
+      };
+    });
+  };
+  modal.querySelector('#m-auto').onchange = e => { state.autoColor = e.target.checked; save(); render(); };
+  wrap.addEventListener('input', () => { readRules(); save(); render(); });
+  wrap.addEventListener('click', e => {
+    const del = e.target.closest('.r-del');
+    if(del){ del.closest('.rule').remove(); readRules(); save(); render(); }
+  });
+  modal.querySelector('#m-addrule').onclick = () => {
+    wrap.insertAdjacentHTML('beforeend', ruleRowHtml({id:uid(), color:'#60a5fa', label:'', min:'', max:''}));
+    readRules(); save(); render();
+    wrap.lastElementChild.querySelector('.r-label').focus();
+  };
+}
+
+/* ================= import / export / reset ================= */
+function download(name, text, mime){
+  const blob = new Blob([text], {type: mime || 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+function exportCSV(){
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const head = ['Student', ...state.assignments.map(a => a.title), 'Average'];
+  const maxRow = ['', ...state.assignments.map(a => '/ ' + a.maxPoints), ''];
+  const rows = state.students.map(s => {
+    const cells = state.assignments.map(a => {
+      const g = gradeFor(s.id, a.id);
+      if(!g) return '';
+      if(g.missing) return 'M';
+      if(g.excused) return 'EX';
+      return typeof g.score === 'number' ? g.score : '';
+    });
+    const p = studentAvg(s.id);
+    return [s.name, ...cells, p == null ? '' : fmtPct(p)];
+  });
+  download('gradebook.csv', '﻿' + [head, maxRow, ...rows].map(r => r.map(q).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+  toast('CSV exported');
+}
+function exportJSON(){
+  download('gradebook-backup.json', JSON.stringify(state, null, 2), 'application/json');
+  toast('Backup downloaded');
+}
+function importJSON(file){
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      const s = JSON.parse(rd.result);
+      if(!s || !Array.isArray(s.students) || !Array.isArray(s.assignments) || typeof s.grades !== 'object' || !Array.isArray(s.rules)) throw new Error('bad');
+      s.autoColor = s.autoColor !== false;
+      state = s; save(); closePopover(); closeModal(); render();
+      toast('Gradebook imported');
+    }catch(e){ alert('That file does not look like a gradebook backup.'); }
+  };
+  rd.readAsText(file);
+}
+function resetAll(){
+  if(!confirm('Delete ALL students, assignments and grades? This cannot be undone.')) return;
+  state = emptyState(); save(); closePopover(); render();
+  toast('Gradebook cleared');
+}
+function loadDemo(){
+  state = seedDemo(); save(); render();
+  toast('Demo class loaded');
+}
+
+/* ================= toast ================= */
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* ================= events ================= */
+$('#grid').addEventListener('click', e => {
+  const delS = e.target.closest('.del-stu');
+  if(delS){
+    const s = stuById(delS.closest('tr').dataset.sid);
+    if(s && confirm('Remove ' + s.name + ' and all their grades?')){
+      state.students = state.students.filter(x => x.id !== s.id);
+      for(const k of Object.keys(state.grades)) if(k.startsWith(s.id + '::')) delete state.grades[k];
+      save(); render(); toast('Student removed');
+    }
+    return;
+  }
+  const delA = e.target.closest('.del-asg');
+  if(delA){
+    const a = asgById(delA.closest('th').dataset.aid);
+    if(a && confirm('Delete "' + a.title + '" and all its grades?')){
+      state.assignments = state.assignments.filter(x => x.id !== a.id);
+      for(const k of Object.keys(state.grades)) if(k.endsWith('::' + a.id)) delete state.grades[k];
+      save(); render(); toast('Assignment deleted');
+    }
+    return;
+  }
+  const edA = e.target.closest('.edit-asg');
+  if(edA){ openAssignmentModal(asgById(edA.closest('th').dataset.aid)); return; }
+  const pr = e.target.closest('.paint-row');
+  if(pr){ openPaintPopover('row', pr.closest('tr').dataset.sid, pr); return; }
+  const pc = e.target.closest('.paint-col');
+  if(pc){ openPaintPopover('col', pc.closest('th').dataset.aid, pc); return; }
+  const td = e.target.closest('td.grade');
+  if(td && td.dataset.sid && td.dataset.aid) openCellPopover(td.dataset.sid, td.dataset.aid, td);
+});
+
+$('#grid').addEventListener('dblclick', e => {
+  const sn = e.target.closest('.s-name');
+  if(sn){
+    const s = stuById(sn.closest('tr').dataset.sid);
+    const name = prompt('Rename student:', s.name);
+    if(name && name.trim()){ s.name = name.trim(); save(); render(); }
+    return;
+  }
+  const at = e.target.closest('.ah-title');
+  if(at){
+    const a = asgById(at.closest('th').dataset.aid);
+    const title = prompt('Rename assignment:', a.title);
+    if(title && title.trim()){ a.title = title.trim(); save(); render(); }
+  }
+});
+
+document.addEventListener('mousedown', e => {
+  if(!pop.hidden && !pop.contains(e.target) &&
+     !e.target.closest('td.grade') && !e.target.closest('.paint-row') && !e.target.closest('.paint-col'))
+    closePopover();
+});
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
+    if(!pop.hidden) closePopover();
+    else if(!overlay.hidden) closeModal();
+  }
+});
+$('#tableWrap').addEventListener('scroll', closePopover);
+
+$('#btnAddStudents').onclick = openStudentsModal;
+$('#btnAddAsg').onclick = () => openAssignmentModal(null);
+$('#btnColors').onclick = openColorKeyModal;
+$('#btnCSV').onclick = exportCSV;
+$('#btnBackup').onclick = exportJSON;
+$('#btnImport').onclick = () => $('#fileImport').click();
+$('#fileImport').addEventListener('change', e => { if(e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ''; });
+$('#btnReset').onclick = resetAll;
+$('#btnEmptyAdd').onclick = openStudentsModal;
+$('#btnDemo').onclick = loadDemo;
+
+render();
+</script>
+</body>
+</html>
