@@ -3,64 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Classroom Layout & Seating Designer</title>
+    <title>Classroom Layout & Live Classroom</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        :root { 
-            --primary: #4a6fa5; 
-            --bg: #f8f9fa; 
-            --panel-bg: #ffffff; 
-            --border: #cccccc; 
+        :root {
+            --primary: #4a6fa5;
+            --bg: #f8f9fa;
+            --panel-bg: #ffffff;
+            --border: #cccccc;
+            --tab-h: 48px;
         }
-        
-        * { 
-            box-sizing: border-box; 
-            margin: 0; 
-            padding: 0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        body { 
-            background-color: var(--bg); 
-            display: flex; 
-            height: 100vh; 
-            overflow: hidden; 
-            user-select: none; 
+
+        html, body {
+            background-color: var(--bg);
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
             -webkit-user-select: none;
         }
-        
-        #toolbar { 
-            width: 320px; 
-            background-color: var(--panel-bg); 
-            border-right: 1px solid var(--border); 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
+
+        body { display: flex; flex-direction: column; }
+
+        /* --- TAB BAR --- */
+        #tab-bar {
+            height: var(--tab-h);
+            background: #2c3e50;
+            display: flex;
+            align-items: stretch;
+            flex-shrink: 0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        .tab-btn {
+            padding: 0 28px;
+            background: transparent;
+            color: #cbd5e0;
+            border: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border-right: 1px solid rgba(255,255,255,0.08);
+            transition: background 0.15s;
+        }
+        .tab-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .tab-btn.active {
+            background: var(--bg);
+            color: #2c3e50;
+        }
+        #tab-brand {
+            margin-left: auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+        }
+
+        /* --- VIEWS --- */
+        .view {
+            flex: 1;
+            display: none;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .view.active { display: flex; }
+
+        /* ============= DESIGNER VIEW ============= */
+        #designer-view { flex-direction: row; }
+
+        #toolbar {
+            width: 320px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
             box-shadow: 2px 0 5px rgba(0,0,0,0.05);
             overflow-y: auto;
             z-index: 10;
+            flex-shrink: 0;
         }
 
         h2 { font-size: 1.3rem; color: #333; }
         .section-title { font-size: 0.8rem; text-transform: uppercase; color: #777; font-weight: bold; margin-top: 5px; }
-        
-        .btn-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 10px; 
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
-        
-        button { 
-            padding: 10px; 
-            background-color: var(--primary); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            font-size: 0.85rem; 
+
+        button {
+            padding: 10px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
             font-weight: 500;
         }
         button:hover { background-color: #3b5a84; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         button.automation { background-color: #28a745; }
         button.automation:hover { background-color: #218838; }
         button.shuffle-btn { background-color: #17a2b8; }
@@ -69,44 +123,47 @@
         button.export-btn:hover { background-color: #5a6268; }
         button.danger { background-color: #d9534f; }
         button.danger:hover { background-color: #c9302c; }
-        
-        #canvas-container { 
-            flex-grow: 1; 
-            position: relative; 
-            overflow: auto; 
-            background-color: #e5e5e5; 
-            padding: 40px; 
+        button.warn { background-color: #f39c12; }
+        button.warn:hover { background-color: #d68910; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: auto;
+            background-color: #e5e5e5;
+            padding: 40px;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        
-        #classroom-canvas { 
-            width: 1000px; 
-            height: 700px; 
-            background-color: white; 
-            position: relative; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+
+        #classroom-canvas {
+            width: 1000px;
+            height: 700px;
+            background-color: white;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
             background-size: 20px 20px;
+            flex-shrink: 0;
         }
-        
-        .movable-element { 
-            position: absolute; 
-            border: 2px solid #333; 
-            background-color: #a3cef1; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: move; 
-            resize: both; 
-            overflow: hidden; 
-            min-width: 40px; 
-            min-height: 35px; 
+
+        .movable-element {
+            position: absolute;
+            border: 2px solid #333;
+            background-color: #a3cef1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            resize: both;
+            overflow: hidden;
+            min-width: 40px;
+            min-height: 35px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; z-index: 5; }
-        
+
         .elem-txt {
             pointer-events: none;
             word-wrap: break-word;
@@ -135,66 +192,1524 @@
             z-index: 100;
         }
 
-        input[type="text"], input[type="color"] { 
-            width: 100%; 
-            padding: 8px; 
-            border: 1px solid var(--border); 
-            border-radius: 4px; 
+        input[type="text"], input[type="color"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
             margin: 5px 0 10px 0;
+            font-size: 0.9rem;
         }
         input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
         label { font-size: 0.8rem; font-weight: bold; color: #555; }
         .hint-box { font-size: 0.75rem; color: #666; background: #eef2f7; padding: 8px; border-radius: 4px; margin-top: auto; line-height: 1.3; }
+
+        /* ============= LIVE CLASSROOM VIEW ============= */
+        #live-view { flex-direction: column; background: #eef2f7; }
+
+        #live-header {
+            padding: 12px 24px;
+            background: white;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        #class-name-input {
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 6px 10px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            background: transparent;
+            margin: 0;
+            flex: 1;
+            max-width: 500px;
+            color: #2c3e50;
+        }
+        #class-name-input:focus, #class-name-input:hover {
+            border-color: var(--border);
+            background: white;
+            outline: none;
+        }
+        #session-stats {
+            margin-left: auto;
+            font-size: 0.8rem;
+            color: #64748b;
+            display: flex;
+            gap: 18px;
+        }
+        #session-stats strong { color: #2c3e50; }
+
+        #live-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        #live-canvas-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow: auto;
+        }
+
+        #live-canvas {
+            width: 1000px;
+            height: 700px;
+            background-color: white;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+            flex-shrink: 0;
+            border-radius: 4px;
+        }
+
+        .live-elem {
+            position: absolute;
+            border: 2px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 4px;
+            transition: box-shadow 0.15s, transform 0.15s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .live-elem.live-student {
+            cursor: pointer;
+        }
+        .live-elem.live-student:hover {
+            box-shadow: 0 0 0 3px #4a6fa5, 0 4px 8px rgba(0,0,0,0.2);
+            transform: translateY(-1px);
+        }
+        .live-elem.live-teacher { border-width: 3px; }
+        .live-elem.live-door { border-right: 6px double #333; }
+        .live-elem.live-arrow { border: none; background: transparent !important; box-shadow: none; }
+
+        .live-student .stu-name {
+            width: 100%;
+            font-size: 0.75rem;
+            line-height: 1.1;
+            pointer-events: none;
+        }
+        .live-student .stu-points {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            background: rgba(255,255,255,0.9);
+            color: #2c3e50;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 1px 5px;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .live-student .stu-note-badge {
+            position: absolute;
+            bottom: 2px;
+            left: 4px;
+            font-size: 0.7rem;
+            pointer-events: none;
+        }
+
+        /* Highlight animation for random selection */
+        .live-student.picking {
+            box-shadow: 0 0 0 4px #f1c40f, 0 0 20px rgba(241, 196, 15, 0.8);
+            transform: scale(1.08);
+            z-index: 10;
+        }
+        .live-student.winner {
+            animation: winnerPulse 0.6s ease-in-out 3;
+            z-index: 11;
+        }
+        @keyframes winnerPulse {
+            0%, 100% { box-shadow: 0 0 0 4px #27ae60, 0 0 20px rgba(39, 174, 96, 0.9); transform: scale(1.15); }
+            50% { box-shadow: 0 0 0 8px #27ae60, 0 0 40px rgba(39, 174, 96, 1); transform: scale(1.22); }
+        }
+
+        /* --- Groups panel (right side) --- */
+        #groups-panel {
+            width: 340px;
+            background: white;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            box-shadow: -2px 0 6px rgba(0,0,0,0.04);
+        }
+        #groups-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        #groups-header h3 { font-size: 1rem; color: #2c3e50; }
+        #groups-header button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
+        #groups-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        #groups-list-empty {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .group-card {
+            background: #f8f9fa;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: border-color 0.15s;
+        }
+        .group-card.drag-over {
+            border-color: #4a6fa5;
+            background: #edf2f9;
+        }
+        .group-card-header {
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            color: white;
+        }
+        .group-card-header .grp-name {
+            flex: 1;
+            font-size: 0.9rem;
+            background: transparent;
+            border: 1px solid transparent;
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin: 0;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        .group-card-header .grp-name:focus, .group-card-header .grp-name:hover {
+            border-color: rgba(255,255,255,0.5);
+            outline: none;
+        }
+        .group-card-header .grp-total {
+            font-size: 0.8rem;
+            background: rgba(0,0,0,0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .group-card-header input[type=color] {
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: none;
+            margin: 0;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .group-card-header .icon-btn {
+            background: rgba(0,0,0,0.15);
+            color: white;
+            border: none;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .group-card-header .icon-btn:hover { background: rgba(0,0,0,0.35); }
+
+        .group-members {
+            padding: 8px;
+            min-height: 44px;
+            background: white;
+        }
+        .group-member {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 0.85rem;
+            cursor: grab;
+        }
+        .group-member:active { cursor: grabbing; }
+        .group-member.dragging { opacity: 0.5; }
+        .group-member .m-name { flex: 1; color: #2c3e50; }
+        .group-member .m-pts {
+            font-weight: 700;
+            color: #4a6fa5;
+            margin-right: 6px;
+            min-width: 32px;
+            text-align: right;
+        }
+        .group-member .m-pt-btn {
+            background: #e2e8f0;
+            color: #2c3e50;
+            border: none;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            font-size: 0.9rem;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 3px;
+            font-weight: 700;
+        }
+        .group-member .m-pt-btn.plus { background: #d1fae5; color: #065f46; }
+        .group-member .m-pt-btn.plus:hover { background: #a7f3d0; }
+        .group-member .m-pt-btn.minus { background: #fee2e2; color: #991b1b; }
+        .group-member .m-pt-btn.minus:hover { background: #fecaca; }
+
+        .unassigned-header {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+            padding: 8px 4px 4px;
+            letter-spacing: 0.5px;
+        }
+        #unassigned-list {
+            background: #f8f9fa;
+            border: 2px dashed #cbd5e0;
+            border-radius: 6px;
+            padding: 8px;
+            min-height: 60px;
+        }
+        #unassigned-list.drag-over {
+            border-color: #4a6fa5;
+            background: #edf2f9;
+        }
+
+        /* --- Bottom action bar --- */
+        #action-bar {
+            background: white;
+            border-top: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            box-shadow: 0 -2px 6px rgba(0,0,0,0.04);
+            flex-shrink: 0;
+        }
+        .ab-group {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            padding: 0 10px;
+            border-right: 1px solid #e2e8f0;
+        }
+        .ab-group:last-child { border-right: none; }
+        .ab-group .ab-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 700;
+            margin-right: 4px;
+        }
+        .ab-btn {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .ab-btn:hover { background: #3b5a84; }
+        .ab-btn.big { padding: 10px 18px; }
+        .ab-btn.timer { background: #f39c12; }
+        .ab-btn.timer:hover { background: #d68910; }
+        .ab-btn.export { background: #6c757d; }
+        .ab-btn.export:hover { background: #5a6268; }
+        .ab-btn.pick { background: #27ae60; }
+        .ab-btn.pick:hover { background: #219653; }
+        .ab-btn.reset { background: #d9534f; }
+        .ab-btn.reset:hover { background: #c9302c; }
+
+        /* --- Modal --- */
+        #modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15,23,42,0.55);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+        }
+        #modal-backdrop.show { display: flex; }
+        .modal-box {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            min-width: 320px;
+            max-width: 560px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 14px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+        .modal-actions button { padding: 8px 16px; }
+        textarea.modal-input {
+            width: 100%;
+            min-height: 90px;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+        .note-entry {
+            background: #f8f9fa;
+            border-left: 3px solid #4a6fa5;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+        }
+        .note-entry .note-ts {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        /* --- Timer pip (bottom-right, non-blocking) --- */
+        #timer-pip {
+            position: fixed;
+            right: 24px;
+            bottom: 88px;
+            background: #2c3e50;
+            color: white;
+            padding: 10px 14px 10px 18px;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.05);
+            z-index: 800;
+            display: none;
+            align-items: center;
+            gap: 14px;
+            min-width: 170px;
+            animation: pipIn 0.25s ease-out;
+        }
+        #timer-pip.show { display: flex; }
+        @keyframes pipIn {
+            from { transform: translateY(20px) scale(0.9); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        #timer-pip .tp-body { display: flex; flex-direction: column; }
+        #timer-pip .tp-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            opacity: 0.55;
+            letter-spacing: 1.2px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        #timer-pip .tp-display {
+            font-size: 1.9rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 1px;
+            line-height: 1;
+        }
+        #timer-pip .tp-close {
+            background: rgba(255,255,255,0.12);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #timer-pip .tp-close:hover { background: rgba(255,255,255,0.28); }
+        #timer-pip.ending { background: #b8721f; }
+        #timer-pip.ending .tp-display { animation: pipPulse 1s ease-in-out infinite; }
+        #timer-pip.done { background: #c0392b; }
+        #timer-pip.done .tp-display { animation: pipPulse 0.5s ease-in-out infinite; }
+        #timer-pip.done .tp-label { opacity: 0.9; font-weight: 700; }
+        @keyframes pipPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        /* --- Class Tools popover menu --- */
+        .ab-btn.tools { background: #8b5cf6; }
+        .ab-btn.tools:hover { background: #7c3aed; }
+        .ct-menu {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%) translateY(6px);
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+            min-width: 260px;
+            display: none;
+            opacity: 0;
+            padding: 6px;
+            z-index: 850;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .ct-menu.show {
+            display: block;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .ct-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            color: #2c3e50;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .ct-menu-item:hover { background: #f1f5f9; }
+        .ct-menu-item .ct-icon { font-size: 1.3rem; flex-shrink: 0; }
+        .ct-menu-item .ct-title { font-weight: 700; font-size: 0.9rem; line-height: 1.2; }
+        .ct-menu-item .ct-sub { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+
+        /* --- Left panel (stacked: to-do lists above call list) --- */
+        #left-panel {
+            width: 300px;
+            background: white;
+            border-right: 1px solid var(--border);
+            display: none;
+            flex-direction: column;
+            flex-shrink: 0;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+        #left-panel.show { display: flex; }
+
+        /* To-do panel section (top of left panel) */
+        #todo-panel-wrapper {
+            display: none;
+            flex-direction: column;
+            min-height: 120px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #todo-panel-wrapper.show { display: flex; }
+        /* When both sections show, cap todo panel and let call-list fill the rest */
+        #left-panel.both-showing #todo-panel-wrapper {
+            max-height: 50%;
+            border-bottom: 6px solid #eef2f7;
+        }
+        /* When only todo panel is showing, let it grow to fill */
+        #left-panel:not(.both-showing) #todo-panel-wrapper { flex: 1; max-height: none; }
+
+        #todo-panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            flex-shrink: 0;
+        }
+        #todo-panel-header h3 { font-size: 1rem; color: #2c3e50; }
+        #todo-panel-header button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
+        #todo-lists-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* Call list section (bottom of left panel) — cards for each active list */
+        #call-panel-wrapper {
+            display: none;
+            flex-direction: column;
+            min-height: 140px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        #call-panel-wrapper.show { display: flex; }
+        #left-panel.both-showing #call-panel-wrapper {
+            border-top: 6px solid #eef2f7;
+        }
+        #left-panel:not(.both-showing) #call-panel-wrapper { flex: 1; }
+        #left-panel.both-showing #call-panel-wrapper { flex: 1; }
+
+        #call-panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            flex-shrink: 0;
+        }
+        #call-panel-header h3 { font-size: 1rem; color: #2c3e50; }
+        #call-panel-header button {
+            padding: 6px 12px;
+            font-size: 0.75rem;
+        }
+        #call-lists-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* Individual call list card (matches to-do card visual language with blue tint) */
+        .call-card {
+            background: #e0f2fe;
+            border: 2px solid #7dd3fc;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .call-card.collapsed .call-body { display: none; }
+        .call-card.completed { background: #f0fdf4; border-color: #86efac; }
+        .call-card.completed .call-name { color: #166534; }
+
+        .call-card .call-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.6);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .call-card.collapsed .call-header { border-bottom: none; }
+        .call-card .call-caret {
+            color: #075985;
+            font-size: 0.7rem;
+            width: 12px;
+            display: flex;
+            justify-content: center;
+            transition: transform 0.15s;
+        }
+        .call-card .call-name {
+            flex: 1;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #075985;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        .call-card .call-count {
+            background: rgba(0,0,0,0.08);
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            color: #075985;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .call-card.completed .call-count {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .call-card .call-body { padding: 6px 8px 8px; }
+        .call-card .call-progress {
+            background: rgba(0,0,0,0.06);
+            height: 5px;
+            border-radius: 999px;
+            margin: 0 6px 6px;
+            overflow: hidden;
+        }
+        .call-card .call-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0284c7, #10b981);
+            transition: width 0.3s;
+        }
+        .call-card .call-progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: #64748b;
+            padding: 0 8px;
+            margin-bottom: 6px;
+        }
+        .call-card .cl-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 10px;
+            margin-bottom: 3px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .call-card .cl-item:hover { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.06); }
+        .call-card .cl-item.called {
+            background: #ecfdf5;
+            color: #64748b;
+            border-color: #a7f3d0;
+        }
+        .call-card .cl-item.called .cl-name {
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+        .call-card .cl-item .cl-num {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            min-width: 20px;
+            text-align: right;
+        }
+        .call-card .cl-item .cl-check {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 2px solid #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: white;
+            flex-shrink: 0;
+        }
+        .call-card .cl-item.called .cl-check {
+            background: #10b981;
+            border-color: #10b981;
+        }
+        .call-card .cl-item .cl-name { flex: 1; word-wrap: break-word; }
+
+        .call-actions {
+            display: flex;
+            gap: 4px;
+            padding: 6px 10px 4px;
+            border-top: 1px dashed rgba(0,0,0,0.1);
+            margin-top: 4px;
+        }
+        .call-actions button {
+            flex: 1;
+            padding: 5px;
+            font-size: 0.72rem;
+            background: rgba(255,255,255,0.7);
+            color: #075985;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .call-actions button:hover { background: rgba(255,255,255,1); }
+        .call-actions button.call-finish { background: #10b981; color: white; border-color: #10b981; }
+        .call-actions button.call-finish:hover { background: #059669; }
+
+        /* Point-award animation on desk */
+        @keyframes pointEarned {
+            0%   { transform: scale(1); }
+            25%  { transform: scale(1.18); box-shadow: 0 0 0 6px #fbbf24, 0 0 24px rgba(251,191,36,0.9); }
+            50%  { transform: scale(1.1) translateX(-3px); box-shadow: 0 0 0 6px #fbbf24, 0 0 24px rgba(251,191,36,0.9); }
+            70%  { transform: scale(1.1) translateX(3px); box-shadow: 0 0 0 6px #fbbf24, 0 0 20px rgba(251,191,36,0.75); }
+            100% { transform: scale(1) translateX(0); }
+        }
+        .live-student.point-earned {
+            animation: pointEarned 0.75s ease-out;
+            z-index: 12;
+        }
+        @keyframes pointEarnedNeg {
+            0%   { transform: scale(1); }
+            30%  { transform: scale(0.92); box-shadow: 0 0 0 5px #ef4444, 0 0 18px rgba(239,68,68,0.7); }
+            50%  { transform: scale(0.94) translateX(-4px); }
+            70%  { transform: scale(0.94) translateX(4px); }
+            100% { transform: scale(1) translateX(0); }
+        }
+        .live-student.point-lost {
+            animation: pointEarnedNeg 0.6s ease-out;
+            z-index: 12;
+        }
+
+        /* Floating +N text bubble that rises from the desk */
+        .point-float {
+            position: absolute;
+            font-weight: 900;
+            font-size: 1.7rem;
+            color: #f59e0b;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 12px rgba(251,191,36,0.7);
+            pointer-events: none;
+            animation: pointFloat 1.1s ease-out forwards;
+            z-index: 20;
+            transform: translate(-50%, 0);
+            white-space: nowrap;
+        }
+        .point-float.neg {
+            color: #ef4444;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 12px rgba(239,68,68,0.6);
+        }
+        @keyframes pointFloat {
+            0%   { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+            15%  { opacity: 1; transform: translate(-50%, -8px) scale(1.15); }
+            100% { opacity: 0; transform: translate(-50%, -70px) scale(1); }
+        }
+        .cl-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .cl-title {
+            flex: 1;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #2c3e50;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .cl-icon-btn {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .cl-icon-btn:hover { background: #f1f5f9; color: #2c3e50; }
+        .cl-progress-wrap {
+            background: #f1f5f9;
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .cl-progress-bar {
+            background: linear-gradient(90deg, #4a6fa5, #27ae60);
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .cl-progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 6px;
+        }
+        .cl-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+        .cl-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            margin-bottom: 4px;
+            background: #f8fafc;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .cl-item:hover { background: #edf2f9; border-color: #cbd5e0; }
+        .cl-item.called {
+            background: #ecfdf5;
+            color: #64748b;
+            border-color: #a7f3d0;
+        }
+        .cl-item.called .cl-name {
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+        .cl-item .cl-num {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #64748b;
+            min-width: 22px;
+            text-align: right;
+        }
+        .cl-item .cl-check {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 2px solid #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: white;
+            flex-shrink: 0;
+        }
+        .cl-item.called .cl-check {
+            background: #27ae60;
+            border-color: #27ae60;
+        }
+        .cl-item .cl-name { flex: 1; }
+        .cl-footer {
+            padding: 10px 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .cl-footer button {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.8rem;
+        }
+
+        /* --- Shuffle overlay (order list animation) --- */
+        #shuffle-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, rgba(26,42,108,0.95), rgba(178,31,31,0.92), rgba(253,187,45,0.9));
+            z-index: 1100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+        #shuffle-overlay.show { display: flex; }
+        .sh-container {
+            background: rgba(0,0,0,0.75);
+            color: white;
+            border-radius: 15px;
+            padding: 26px 30px;
+            width: 100%;
+            max-width: 760px;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .sh-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .sh-title {
+            flex: 1;
+            font-size: 1.6rem;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .sh-close {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .sh-close:hover { background: rgba(255,255,255,0.3); }
+        .sh-anim {
+            min-height: 220px;
+            border: 2px dashed rgba(255,255,255,0.3);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+        .sh-name-tag {
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+            opacity: 0;
+            position: absolute;
+            white-space: nowrap;
+        }
+        .sh-name-tag.flashing { animation: shFlash 0.5s ease-in-out; }
+        @keyframes shFlash {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0; transform: scale(0.8); }
+        }
+        .sh-reveal {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 16px;
+            display: none;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .sh-reveal.show { display: block; }
+        .sh-reveal h3 {
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sh-reveal-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .sh-reveal-item {
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: shSlide 0.4s ease;
+            font-size: 0.9rem;
+        }
+        @keyframes shSlide {
+            from { opacity: 0; transform: translateX(-16px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .sh-reveal-num {
+            background: #4a90e2;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .sh-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .sh-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+            transition: transform 0.15s;
+        }
+        .sh-btn:hover { transform: translateY(-2px); }
+        .sh-btn-primary { background: linear-gradient(to right, #00b09b, #96c93d); }
+        .sh-btn-save { background: linear-gradient(to right, #ff5e62, #ff9966); }
+        .sh-btn-alt { background: linear-gradient(to right, #667eea, #764ba2); }
+
+        /* Saved lists / archives modal list styles */
+        .saved-list-row {
+            padding: 10px 12px;
+            background: #f8fafc;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .saved-list-row .sl-name { flex: 1; font-weight: 600; color: #2c3e50; }
+        .saved-list-row .sl-meta { font-size: 0.75rem; color: #64748b; }
+
+        /* --- Shuffle launcher (pre-animation state) --- */
+        .sh-launcher {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 10px 0 20px;
+        }
+        .sh-generate-btn {
+            padding: 22px;
+            background: linear-gradient(135deg, #ff5e62, #ff9966);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            transition: transform 0.15s;
+            letter-spacing: 0.5px;
+        }
+        .sh-generate-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,0.4); }
+        .sh-launcher-section {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .sh-launcher-section h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+            font-weight: 700;
+        }
+        .sh-launcher-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        .sh-launcher-row .sh-lr-info { flex: 1; }
+        .sh-launcher-row .sh-lr-name { font-weight: 600; font-size: 0.9rem; }
+        .sh-launcher-row .sh-lr-meta { font-size: 0.72rem; opacity: 0.6; margin-top: 2px; }
+        .sh-launcher-row button {
+            padding: 5px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+        }
+        .sh-lr-load { background: linear-gradient(to right, #00b09b, #96c93d); }
+        .sh-lr-view { background: linear-gradient(to right, #667eea, #764ba2); }
+        .sh-lr-del { background: rgba(217,83,79,0.7); padding: 5px 8px !important; }
+        .sh-lr-del:hover { background: rgba(217,83,79,1); }
+
+        .todo-card {
+            background: #fff8e6;
+            border: 2px solid #f0d888;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .todo-card.collapsed .todo-body { display: none; }
+        .todo-card.completed { background: #f0fdf4; border-color: #86efac; }
+        .todo-card.completed .todo-name { color: #166534; }
+
+        .todo-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.5);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .todo-card.collapsed .todo-header { border-bottom: none; }
+        .todo-header .todo-caret {
+            color: #78716c;
+            font-size: 0.7rem;
+            width: 12px;
+            display: flex;
+            justify-content: center;
+            transition: transform 0.15s;
+        }
+        .todo-card:not(.collapsed) .todo-caret { transform: rotate(90deg); }
+        .todo-header .todo-name {
+            flex: 1;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #78350f;
+            line-height: 1.3;
+            word-wrap: break-word;
+            min-width: 0;
+        }
+        .todo-header .todo-count {
+            background: rgba(0,0,0,0.08);
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            color: #78350f;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .todo-header .todo-menu-btn {
+            background: transparent;
+            border: none;
+            color: #78716c;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .todo-header .todo-menu-btn:hover { background: rgba(0,0,0,0.08); }
+
+        .todo-body { padding: 6px 8px 10px; }
+        .todo-progress {
+            background: rgba(0,0,0,0.06);
+            height: 5px;
+            border-radius: 999px;
+            margin: 0 6px 8px;
+            overflow: hidden;
+        }
+        .todo-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #10b981);
+            transition: width 0.3s;
+        }
+        .todo-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            transition: background 0.15s;
+        }
+        .todo-item:hover { background: rgba(0,0,0,0.04); }
+        .todo-item.done { color: #64748b; }
+        .todo-item.done .todo-item-text { text-decoration: line-through; opacity: 0.7; }
+        .todo-item .todo-check {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 2px solid #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: white;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .todo-item.done .todo-check { background: #10b981; border-color: #10b981; }
+        .todo-item-text { flex: 1; word-wrap: break-word; min-width: 0; }
+        .todo-actions {
+            display: flex;
+            gap: 4px;
+            padding: 6px 10px 4px;
+            border-top: 1px dashed rgba(0,0,0,0.1);
+            margin-top: 4px;
+        }
+        .todo-actions button {
+            flex: 1;
+            padding: 5px;
+            font-size: 0.72rem;
+            background: rgba(255,255,255,0.6);
+            color: #78350f;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .todo-actions button:hover { background: rgba(255,255,255,0.9); }
+        .todo-actions button.todo-danger { color: #991b1b; border-color: rgba(153,27,27,0.2); }
+        .todo-actions button.todo-danger:hover { background: #fee2e2; }
+
+        /* Create/edit to-do modal */
+        .todo-items-input {
+            width: 100%;
+            min-height: 180px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: vertical;
+        }
+
+        /* Winner banner shown after random pick */
+        #winner-banner {
+            position: fixed;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 24px 40px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #2c3e50;
+            z-index: 950;
+            display: none;
+            border-top: 6px solid #27ae60;
+            text-align: center;
+        }
+        #winner-banner .wb-list {
+            font-size: 1.1rem;
+            margin-top: 8px;
+            color: #4a6fa5;
+        }
+        #winner-banner .wb-actions {
+            margin-top: 14px;
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        #winner-banner .wb-actions button {
+            padding: 6px 14px;
+            font-size: 0.85rem;
+        }
+        #winner-banner .wb-actions .wb-all-btn {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 3px 8px rgba(245,158,11,0.35);
+        }
+        #winner-banner .wb-actions .wb-all-btn:hover {
+            background: linear-gradient(135deg, #d97706, #b45309);
+        }
+
+        /* Empty state for live view when no layout */
+        #live-empty {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 40px;
+            color: #64748b;
+            text-align: center;
+        }
+        #live-empty h2 { color: #2c3e50; margin-bottom: 10px; }
+        #live-empty p { margin-bottom: 16px; max-width: 400px; line-height: 1.5; }
     </style>
 </head>
 <body>
 
-    <div id="toolbar">
-        <h2>Classroom Designer</h2>
-        
-        <div class="section-title">Spawn Manual Items</div>
-        <div class="btn-grid">
-            <button onclick="spawnItem('student')">Student Desk</button>
-            <button onclick="spawnItem('teacher')">Teacher Desk</button>
-            <button onclick="spawnItem('door')">Door</button>
-            <button onclick="spawnItem('arrow')">Arrow</button>
-        </div>
+    <!-- ================= TAB BAR ================= -->
+    <div id="tab-bar">
+        <button class="tab-btn active" id="tab-designer" onclick="switchView('designer')">DESIGNER</button>
+        <button class="tab-btn" id="tab-live" onclick="switchView('live')">LIVE CLASSROOM</button>
+        <div id="tab-brand">CLASSROOM TOOLKIT</div>
+    </div>
 
-        <div class="section-title">Automated Tools</div>
-        <button onclick="addRow()">↓ Add Empty Vertical Row</button>
-        <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
-        <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
+    <!-- ================= DESIGNER VIEW ================= -->
+    <div id="designer-view" class="view active">
+        <div id="toolbar">
+            <h2>Classroom Designer</h2>
 
-        <div class="section-title">File Operations</div>
-        <div class="btn-grid">
-            <button class="export-btn" onclick="exportLayoutAsImage()">💾 Export Image</button>
-            <button class="danger" onclick="resetEntireCanvas()">⚠️ Clear All</button>
-        </div>
+            <div class="section-title">Classroom Name</div>
+            <input type="text" id="designer-class-name" placeholder="e.g., Grade 8 English" oninput="onDesignerClassNameChange()" style="margin-top:2px;">
 
-        <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 5px;">
-            <div class="section-title" id="inspector-title" style="margin-bottom: 10px;">Item Properties</div>
-            
-            <div id="label-field-container">
-                <label>Text Label:</label>
-                <input type="text" id="prop-label" oninput="updateLabel()">
+            <div class="section-title">Spawn Manual Items</div>
+            <div class="btn-grid">
+                <button onclick="spawnItem('student')">Student Desk</button>
+                <button onclick="spawnItem('teacher')">Teacher Desk</button>
+                <button onclick="spawnItem('door')">Door</button>
+                <button onclick="spawnItem('arrow')">Arrow</button>
             </div>
-            
-            <label>Fill/Object Color:</label>
-            <input type="color" id="prop-color" oninput="updateColor()">
-            
-            <button class="danger" style="width:100%; margin-top: 10px;" onclick="deleteSelectedItems()">Delete Selection (Del)</button>
+
+            <div class="section-title">Automated Tools</div>
+            <button onclick="addRow()">↓ Add Empty Vertical Row</button>
+            <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
+            <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
+
+            <div class="section-title">File Operations</div>
+            <div class="btn-grid">
+                <button class="export-btn" onclick="exportLayoutAsImage()">💾 Export Image</button>
+                <button class="danger" onclick="resetEntireCanvas()">⚠️ Clear All</button>
+            </div>
+
+            <div id="inspector" style="display:none; border-top: 1px solid #ccc; padding-top:15px; margin-top: 5px;">
+                <div class="section-title" id="inspector-title" style="margin-bottom: 10px;">Item Properties</div>
+
+                <div id="label-field-container">
+                    <label>Text Label:</label>
+                    <input type="text" id="prop-label" oninput="updateLabel()">
+                </div>
+
+                <label>Fill/Object Color:</label>
+                <input type="color" id="prop-color" oninput="updateColor()">
+
+                <button class="danger" style="width:100%; margin-top: 10px;" onclick="deleteSelectedItems()">Delete Selection (Del)</button>
+            </div>
+
+            <div class="hint-box">
+                <strong>System Status:</strong> Layout and classroom name save automatically. Switch to <strong>LIVE CLASSROOM</strong> when ready — the name carries over.
+            </div>
         </div>
 
-        <div class="hint-box">
-            <strong>System Status:</strong> Layout updates save to your browser automatically.
+        <div id="canvas-container">
+            <div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div>
         </div>
     </div>
-    
-    <div id="canvas-container">
-        <div id="classroom-canvas" onmousedown="canvasMouseDown(event)"></div>
+
+    <!-- ================= LIVE CLASSROOM VIEW ================= -->
+    <div id="live-view" class="view">
+        <div id="live-header">
+            <input type="text" id="class-name-input" placeholder="Class Name" oninput="onClassNameChange()">
+            <div id="session-stats">
+                <span>Students: <strong id="stat-students">0</strong></span>
+                <span>Groups: <strong id="stat-groups">0</strong></span>
+                <span>Session: <strong id="stat-session">0m</strong></span>
+            </div>
+        </div>
+
+        <div id="live-main">
+            <div id="left-panel">
+                <div id="todo-panel-wrapper">
+                    <div id="todo-panel-header">
+                        <h3>To-Do Lists</h3>
+                        <button onclick="openCreateTodoModal()">+ New</button>
+                    </div>
+                    <div id="todo-lists-container"></div>
+                </div>
+                <div id="call-panel-wrapper">
+                    <div id="call-panel-header">
+                        <h3>Call Order Lists</h3>
+                        <button onclick="openOrderListLauncher()">+ New</button>
+                    </div>
+                    <div id="call-lists-container"></div>
+                </div>
+            </div>
+
+            <div id="live-canvas-wrap">
+                <div id="live-canvas"></div>
+            </div>
+
+            <div id="groups-panel">
+                <div id="groups-header">
+                    <h3>Groups</h3>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="openAutoSortModal()" title="Randomly distribute all students into groups">⚡ Auto-Sort</button>
+                        <button onclick="createGroup()">+ New Group</button>
+                    </div>
+                </div>
+                <div id="groups-list"></div>
+            </div>
+        </div>
+
+        <div id="action-bar">
+            <div class="ab-group">
+                <span class="ab-label">Pick</span>
+                <button class="ab-btn pick big" onclick="pickRandom(1)">🎲 Random Student</button>
+                <button class="ab-btn pick" onclick="pickRandom(2)">Pair</button>
+                <button class="ab-btn pick" onclick="pickRandom(3)">3</button>
+                <button class="ab-btn pick" onclick="pickRandom(4)">4</button>
+                <button class="ab-btn pick" onclick="pickRandom(5)">5</button>
+            </div>
+            <div class="ab-group" style="position:relative;">
+                <button class="ab-btn tools" onclick="toggleClassToolsMenu(event)" id="class-tools-btn">🧰 Class Tools ▾</button>
+                <div id="class-tools-menu" class="ct-menu">
+                    <button class="ct-menu-item" onclick="openOrderListLauncher()">
+                        <span class="ct-icon">🎲</span>
+                        <div><div class="ct-title">Generate Order List</div><div class="ct-sub" id="ct-saved-count">Shuffle roster into a call order</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="openCreateTodoModal()">
+                        <span class="ct-icon">☑</span>
+                        <div><div class="ct-title">Create Class To-Do List</div><div class="ct-sub" id="ct-todo-count">Your own list of tasks or reminders</div></div>
+                    </button>
+                </div>
+            </div>
+            <div class="ab-group">
+                <span class="ab-label">Timer</span>
+                <button class="ab-btn timer" onclick="startTimer(2*60)">2m</button>
+                <button class="ab-btn timer" onclick="startTimer(3*60)">3m</button>
+                <button class="ab-btn timer" onclick="startTimer(5*60)">5m</button>
+                <button class="ab-btn timer" onclick="promptCustomTimer()">Custom</button>
+            </div>
+            <div class="ab-group">
+                <span class="ab-label">Export</span>
+                <button class="ab-btn export" onclick="exportCSV()">📊 CSV</button>
+                <button class="ab-btn export" onclick="exportPDF()">📄 PDF</button>
+            </div>
+            <div class="ab-group">
+                <button class="ab-btn" onclick="refreshLayoutFromDesigner()">🔄 Reload Layout</button>
+                <button class="ab-btn reset" onclick="resetLiveSession()">Reset Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals & overlays -->
+    <div id="modal-backdrop" onclick="closeModalIfBackdrop(event)">
+        <div class="modal-box" id="modal-box" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <div id="timer-pip">
+        <div class="tp-body">
+            <div class="tp-label" id="tp-label">Timer</div>
+            <div class="tp-display" id="tp-display">00:00</div>
+        </div>
+        <button class="tp-close" onclick="cancelTimer()" id="tp-close-btn" title="Cancel timer">✕</button>
+    </div>
+
+    <div id="winner-banner"></div>
+
+    <!-- Order-list shuffle overlay (game-show style animation) -->
+    <div id="shuffle-overlay">
+        <div class="sh-container">
+            <div class="sh-header">
+                <div class="sh-title" id="sh-title">🎲 Call Order</div>
+                <button class="sh-close" onclick="cancelShuffle()">✕</button>
+            </div>
+
+            <!-- Launcher state: shows before an animation runs -->
+            <div class="sh-launcher" id="sh-launcher">
+                <button class="sh-generate-btn" onclick="beginShuffleAnimation()">
+                    🎲 Generate New Random Order
+                </button>
+                <div id="sh-launcher-saved"></div>
+                <div id="sh-launcher-archives"></div>
+            </div>
+
+            <div class="sh-anim" id="sh-anim" style="display:none;"></div>
+            <div class="sh-reveal" id="sh-reveal"></div>
+            <div class="sh-actions" id="sh-actions" style="display:none;">
+                <button class="sh-btn sh-btn-primary" onclick="saveAndUseShuffled()">💾 Save &amp; Use</button>
+                <button class="sh-btn sh-btn-alt" onclick="beginShuffleAnimation()">🔄 Reshuffle</button>
+                <button class="sh-btn sh-btn-alt" onclick="cancelShuffle()">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <script>
+        // ============================================================
+        //  DESIGNER LOGIC (existing, minimally touched)
+        // ============================================================
         var canvas = document.getElementById('classroom-canvas');
         var selectedEls = [];
         var isDragging = false;
@@ -208,22 +1723,21 @@
         var currentStudents = [];
         var lastLayoutType = "r5";
 
-        // Global Event Triggers Setup
         document.addEventListener('mousemove', handleGlobalMouseMove);
         document.addEventListener('mouseup', handleGlobalMouseUp);
         document.addEventListener('keydown', handleGlobalKeyDown);
-        window.addEventListener('DOMContentLoaded', loadCanvasStateFromBrowser);
+        window.addEventListener('DOMContentLoaded', function() {
+            loadCanvasStateFromBrowser();
+            loadLiveState();
+        });
 
-        // --- BROWSER LOCAL STORAGE PERSISTENCE SYSTEMS ---
         function saveCanvasStateToBrowser() {
             var items = [];
             var elements = canvas.querySelectorAll('.movable-element');
-            
             elements.forEach(el => {
                 var type = el.getAttribute('data-type');
                 var text = "";
                 var color = rgbToHex(el.style.backgroundColor);
-                
                 if (type === 'arrow') {
                     var textNode = el.querySelector('text');
                     text = textNode ? textNode.textContent : '';
@@ -233,7 +1747,6 @@
                     var txtSpan = el.querySelector('.elem-txt');
                     text = txtSpan ? txtSpan.innerText : '';
                 }
-
                 items.push({
                     type: type,
                     left: el.style.left,
@@ -244,7 +1757,6 @@
                     color: color
                 });
             });
-
             var payload = {
                 items: items,
                 currentStudents: currentStudents,
@@ -260,16 +1772,13 @@
                 var payload = JSON.parse(raw);
                 currentStudents = payload.currentStudents || [];
                 lastLayoutType = payload.lastLayoutType || "r5";
-                
-                canvas.innerHTML = ''; 
+                canvas.innerHTML = '';
                 deselectAll();
-
                 if (payload.items && payload.items.length > 0) {
                     payload.items.forEach(item => {
                         var el = spawnItem(item.type, parseInt(item.left), parseInt(item.top), item.text);
                         el.style.width = item.width;
                         el.style.height = item.height;
-                        
                         if (item.type === 'arrow') {
                             drawArrowSVG(el, item.color, item.text);
                         } else {
@@ -279,7 +1788,7 @@
                 }
                 deselectAll();
             } catch(e) {
-                console.error("Auto-load loop fault recovery triggered.", e);
+                console.error("Auto-load fault recovery triggered.", e);
             }
         }
 
@@ -293,16 +1802,13 @@
             }
         }
 
-        // --- BOX GRAPHICS INTERACTIVE SELECTION LOOPS ---
         function canvasMouseDown(e) {
             if (e.target === canvas) {
                 if (!e.shiftKey) deselectAll();
-                
                 isBoxSelecting = true;
                 var rect = canvas.getBoundingClientRect();
                 boxStartLeft = e.clientX - rect.left;
                 boxStartTop = e.clientY - rect.top;
-                
                 if (!selectBoxEl) {
                     selectBoxEl = document.createElement('div');
                     selectBoxEl.className = 'selection-box';
@@ -321,11 +1827,7 @@
             var rect = el.getBoundingClientRect();
             var clickX = e.clientX - rect.left;
             var clickY = e.clientY - rect.top;
-
-            if (clickX > rect.width - 20 && clickY > rect.height - 20) {
-                return; 
-            }
-
+            if (clickX > rect.width - 20 && clickY > rect.height - 20) return;
             if (e.shiftKey) {
                 if (selectedEls.includes(el)) {
                     el.classList.remove('selected');
@@ -341,7 +1843,6 @@
                     selectedEls = [el];
                 }
             }
-
             if (selectedEls.length > 0) {
                 isDragging = true;
                 dragStartX = e.clientX;
@@ -367,7 +1868,6 @@
                 return;
             }
             document.getElementById('inspector').style.display = 'block';
-            
             if (selectedEls.length > 1) {
                 document.getElementById('inspector-title').innerText = "Properties (" + selectedEls.length + " Items)";
                 document.getElementById('label-field-container').style.display = 'none';
@@ -375,10 +1875,8 @@
             } else {
                 document.getElementById('inspector-title').innerText = "Item Properties";
                 document.getElementById('label-field-container').style.display = 'block';
-                
                 var el = selectedEls[0];
                 var type = el.getAttribute('data-type');
-                
                 if (type === 'arrow') {
                     var textNode = el.querySelector('text');
                     document.getElementById('prop-label').value = textNode ? textNode.textContent : '';
@@ -394,31 +1892,25 @@
 
         function handleGlobalMouseMove(e) {
             var rect = canvas.getBoundingClientRect();
-            
             if (isBoxSelecting && selectBoxEl) {
                 var curLeft = e.clientX - rect.left;
                 var curTop = e.clientY - rect.top;
-                
                 var x = Math.min(boxStartLeft, curLeft);
                 var y = Math.min(boxStartTop, curTop);
                 var w = Math.abs(boxStartLeft - curLeft);
                 var h = Math.abs(boxStartTop - curTop);
-                
                 selectBoxEl.style.left = x + 'px';
                 selectBoxEl.style.top = y + 'px';
                 selectBoxEl.style.width = w + 'px';
                 selectBoxEl.style.height = h + 'px';
-                
                 var items = canvas.querySelectorAll('.movable-element');
                 items.forEach(el => {
                     var itemLeft = parseInt(el.style.left) || 0;
                     var itemTop = parseInt(el.style.top) || 0;
                     var itemWidth = el.offsetWidth;
                     var itemHeight = el.offsetHeight;
-                    
                     var overlap = (x < itemLeft + itemWidth && x + w > itemLeft &&
                                    y < itemTop + itemHeight && y + h > itemTop);
-                                   
                     if (overlap) {
                         if (!selectedEls.includes(el)) {
                             el.classList.add('selected');
@@ -432,23 +1924,18 @@
                     }
                 });
                 updateInspectorUI();
-            }
-            else if (isDragging && selectedEls.length > 0) {
+            } else if (isDragging && selectedEls.length > 0) {
                 var dx = e.clientX - dragStartX;
                 var dy = e.clientY - dragStartY;
-
                 dx = Math.round(dx / 10) * 10;
                 dy = Math.round(dy / 10) * 10;
-
                 initialPositions.forEach(pos => {
                     var x = pos.left + dx;
                     var y = pos.top + dy;
-
                     var maxLeft = canvas.clientWidth - pos.el.offsetWidth;
                     var maxTop = canvas.clientHeight - pos.el.offsetHeight;
                     x = Math.max(0, Math.min(x, maxLeft));
                     y = Math.max(0, Math.min(y, maxTop));
-
                     pos.el.style.left = x + 'px';
                     pos.el.style.top = y + 'px';
                 });
@@ -467,13 +1954,11 @@
             }
         }
 
-        // --- ATTRIBUTES MUTATION CONTROLLERS ---
         function updateLabel() {
             if (selectedEls.length !== 1) return;
             var el = selectedEls[0];
             var type = el.getAttribute('data-type');
             var val = document.getElementById('prop-label').value;
-            
             if (type === 'arrow') {
                 var textNode = el.querySelector('text');
                 if (textNode) textNode.textContent = val;
@@ -509,18 +1994,24 @@
 
         function handleGlobalKeyDown(e) {
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEls.length > 0) {
-                if (document.activeElement.tagName === 'INPUT') return;
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
                 deleteSelectedItems();
+            }
+            if (e.key === 'Escape') {
+                closeModal();
             }
         }
 
-        function spawnItem(type, x = 60, y = 60, text = null) {
+        function spawnItem(type, x, y, text) {
+            if (x === undefined) x = 60;
+            if (y === undefined) y = 60;
+            if (text === undefined) text = null;
+
             var el = document.createElement('div');
             el.className = 'movable-element elem-' + type;
             el.setAttribute('data-type', type);
             el.style.left = x + 'px';
             el.style.top = y + 'px';
-
             if (type === 'arrow') {
                 el.style.width = '120px';
                 el.style.height = '40px';
@@ -530,16 +2021,13 @@
                 el.style.width = (type === 'teacher') ? '130px' : ((type === 'door') ? '70px' : '85px');
                 el.style.height = (type === 'teacher') ? '65px' : ((type === 'door') ? '20px' : '50px');
                 el.style.backgroundColor = (type === 'student') ? '#a3cef1' : ((type === 'teacher') ? '#84a59d' : '#e0d0b0');
-                
                 var span = document.createElement('span');
                 span.className = 'elem-txt';
                 span.innerText = text || (type.charAt(0).toUpperCase() + type.slice(1));
                 el.appendChild(span);
             }
-
             el.onmousedown = function(e) { itemMouseDown(e, el); };
             canvas.appendChild(el);
-            
             if (!selectedEls.includes(el)) {
                 if (!window.event || !window.event.shiftKey) deselectAll();
                 el.classList.add('selected');
@@ -550,7 +2038,6 @@
             return el;
         }
 
-        // --- GRID AUTO GENERATION MOTOR LOOP LOGICS ---
         function addRow() {
             var count = prompt("How many empty seats in this vertical column row? (Max 8)", "5");
             var num = Math.min(parseInt(count) || 1, 8);
@@ -576,17 +2063,14 @@
                 "• Individual names: Can be separated cleanly using spaces, commas, or lines."
             );
             if (!rosterInput) return;
-
             currentStudents = parseRosterInput(rosterInput);
             if (currentStudents.length === 0) return;
-
             var layoutType = prompt(
                 "Choose Seating Format Type Option:\n\n" +
                 "For Tables configuration enter: t4, t5, or t6\n" +
-                "For Grid Rows configuration enter: r4, r5, r6, or r7", 
+                "For Grid Rows configuration enter: r4, r5, r6, or r7",
                 "r5"
             );
-            
             lastLayoutType = layoutType ? layoutType.toLowerCase().trim() : "r5";
             currentStudents.sort(() => Math.random() - 0.5);
             buildLayoutPlacement(currentStudents, lastLayoutType);
@@ -597,28 +2081,24 @@
                 alert("No seating plan currently exists to change! Please click 'New Plan From Roster' first.");
                 return;
             }
-
             var choice = prompt(
                 "To shuffle existing students, type 'existing'.\n" +
-                "Otherwise, paste or type a completely new list of student names below:", 
+                "Otherwise, paste or type a completely new list of student names below:",
                 "existing"
             );
             if (!choice) return;
-
             if (choice.trim().toLowerCase() !== 'existing') {
                 currentStudents = parseRosterInput(choice);
                 if (currentStudents.length === 0) return;
             }
-
             var layoutType = prompt(
                 "Mix Layout Format Configuration:\n\n" +
                 "Enter: t4, t5, or t6 (for tables clusters)\n" +
-                "Enter: r4, r5, r6, or r7 (for row structures)", 
+                "Enter: r4, r5, r6, or r7 (for row structures)",
                 lastLayoutType
             );
             if (!layoutType) return;
             lastLayoutType = layoutType.toLowerCase().trim();
-
             currentStudents.sort(() => Math.random() - 0.5);
             buildLayoutPlacement(currentStudents, lastLayoutType);
         }
@@ -630,25 +2110,20 @@
                 el.remove();
             });
             updateInspectorUI();
-
             var isTableLayout = layoutType.startsWith('t');
             var sizeParam = parseInt(layoutType.replace(/[^0-9]/g, ''));
-            
             if (isTableLayout) {
                 if (![4, 5, 6].includes(sizeParam)) sizeParam = 4;
             } else {
                 if (![4, 5, 6, 7].includes(sizeParam)) sizeParam = 5;
             }
-
             students.forEach((student, index) => {
                 var posX, posY;
-
                 if (!isTableLayout) {
                     var maxFullRows = Math.floor(students.length / sizeParam);
                     var currentBoxRow = Math.floor(index / sizeParam);
                     var currentBoxCol = index % sizeParam;
                     var isLeftover = currentBoxRow >= maxFullRows;
-
                     if (isLeftover) {
                         var leftoverCount = students.length % sizeParam;
                         var centeringOffset = ((sizeParam - leftoverCount) * 110) / 2;
@@ -663,18 +2138,12 @@
                     var seatIndex = index % sizeParam;
                     var fullTablesCount = Math.floor(students.length / sizeParam);
                     var isLeftoverTable = tableIndex >= fullTablesCount;
-
                     var tablesPerRow = 3;
                     var tableRowIdx = Math.floor(tableIndex / tablesPerRow);
                     var tableColIdx = tableIndex % tablesPerRow;
-
                     var baseClusterX = 60 + tableColIdx * 310;
                     var baseClusterY = 80 + tableRowIdx * 210;
-
-                    if (isLeftoverTable) {
-                        baseClusterY += 30; 
-                    }
-
+                    if (isLeftoverTable) baseClusterY += 30;
                     if (sizeParam === 4) {
                         posX = baseClusterX + (seatIndex % 2) * 95;
                         posY = baseClusterY + Math.floor(seatIndex / 2) * 60;
@@ -683,7 +2152,7 @@
                             posX = baseClusterX + (seatIndex % 2) * 95;
                             posY = baseClusterY + Math.floor(seatIndex / 2) * 60;
                         } else {
-                            posX = baseClusterX + 47; 
+                            posX = baseClusterX + 47;
                             posY = baseClusterY + 120;
                         }
                     } else if (sizeParam === 6) {
@@ -696,25 +2165,18 @@
             saveCanvasStateToBrowser();
         }
 
-        // --- NATIVE GRAPHICS EXPORT CANVAS RENDERING ENGINE ---
         function exportLayoutAsImage() {
-            deselectAll(); // Strips outline borders cleanly prior to capturing image
-            
+            deselectAll();
             var expCanvas = document.createElement('canvas');
             expCanvas.width = 1000;
             expCanvas.height = 700;
             var ctx = expCanvas.getContext('2d');
-            
-            // Draw pure layout background
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, 1000, 700);
-            
-            // Draw engineering background alignment grids lines
             ctx.strokeStyle = 'rgba(0,0,0,0.04)';
             ctx.lineWidth = 1;
             for(var x = 0; x < 1000; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 700); ctx.stroke(); }
             for(var y = 0; y < 700; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1000, y); ctx.stroke(); }
-            
             var items = canvas.querySelectorAll('.movable-element');
             items.forEach(el => {
                 var type = el.getAttribute('data-type');
@@ -723,27 +2185,23 @@
                 var w = el.offsetWidth;
                 var h = el.offsetHeight;
                 var bg = el.style.backgroundColor;
-                
                 if (type === 'arrow') {
                     var textNode = el.querySelector('text');
                     var text = textNode ? textNode.textContent : 'Direction';
                     var lineNode = el.querySelector('line');
                     var strokeColor = lineNode ? lineNode.getAttribute('stroke') : '#333333';
-                    
                     ctx.strokeStyle = strokeColor;
                     ctx.lineWidth = 4;
                     ctx.beginPath();
                     ctx.moveTo(left + 5, top + h/2);
                     ctx.lineTo(left + w - 18, top + h/2);
                     ctx.stroke();
-                    
                     ctx.fillStyle = strokeColor;
                     ctx.beginPath();
                     ctx.moveTo(left + w - 18, top + h/2 - 6);
                     ctx.lineTo(left + w - 3, top + h/2);
                     ctx.lineTo(left + w - 18, top + h/2 + 6);
                     ctx.fill();
-                    
                     ctx.fillStyle = strokeColor;
                     ctx.font = 'bold 11px "Segoe UI", Tahoma, sans-serif';
                     ctx.textAlign = 'center';
@@ -753,10 +2211,8 @@
                     ctx.fillStyle = bg || '#ffffff';
                     ctx.lineWidth = (type === 'teacher') ? 3 : 2;
                     ctx.strokeStyle = '#333333';
-                    
                     ctx.fillRect(left, top, w, h);
                     ctx.strokeRect(left, top, w, h);
-                    
                     if (type === 'door') {
                         ctx.lineWidth = 2;
                         ctx.beginPath();
@@ -764,20 +2220,15 @@
                         ctx.lineTo(left + w - 5, top + h);
                         ctx.stroke();
                     }
-                    
                     var txtSpan = el.querySelector('.elem-txt');
                     var txt = txtSpan ? txtSpan.innerText : '';
                     ctx.fillStyle = '#333333';
                     ctx.font = 'bold 12px "Segoe UI", Tahoma, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    
-                    // Center and render text variables labels securely
                     ctx.fillText(txt, left + w/2, top + h/2);
                 }
             });
-            
-            // Build and trigger pipeline downloads stream
             var link = document.createElement('a');
             link.download = 'classroom-layout-plan.png';
             link.href = expCanvas.toDataURL('image/png');
@@ -785,7 +2236,7 @@
         }
 
         function drawArrowSVG(el, color, text) {
-            el.innerHTML = 
+            el.innerHTML =
                 '<svg class="arrow-svg" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">' +
                     '<defs><marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
                         '<polygon points="0 0, 6 3, 0 6" fill="' + color + '"/>' +
@@ -803,6 +2254,2214 @@
             var g = parseInt(colors[1]).toString(16).padStart(2, '0');
             var b = parseInt(colors[2]).toString(16).padStart(2, '0');
             return '#' + r + g + b;
+        }
+
+        // ============================================================
+        //  LIVE CLASSROOM
+        // ============================================================
+        var GROUP_COLORS = ['#e74c3c', '#3498db', '#f39c12', '#27ae60', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+        var liveState = null;
+        var sessionStart = null;
+        var draggedMemberName = null;
+        var pickAnimTimeout = null;
+        var currentWinners = [];
+
+        function defaultLiveState() {
+            return {
+                className: '',
+                groups: [],           // { id, name, color, members: [names] }
+                studentData: {},      // name -> { points, notes: [{text, ts}] }
+                events: [],           // { ts, type, details }
+                sessionStart: Date.now(),
+                activeLists: [],      // [{ id, name, students: [{name, called}], collapsed, createdAt }]
+                savedLists: [],       // [{ id, name, students: [names], createdAt }]
+                archivedLists: [],    // [{ id, name, students, calledNames, createdAt, archivedAt }]
+                todoLists: [],        // [{ id, name, items: [{id, text, done}], collapsed, createdAt }]
+                archivedTodoLists: [] // [{ id, name, items, createdAt, archivedAt }]
+            };
+        }
+
+        function loadLiveState() {
+            var raw = localStorage.getItem('classroom_live_state');
+            if (raw) {
+                try {
+                    liveState = JSON.parse(raw);
+                    if (!liveState.groups) liveState.groups = [];
+                    if (!liveState.studentData) liveState.studentData = {};
+                    if (!liveState.events) liveState.events = [];
+                    if (!liveState.sessionStart) liveState.sessionStart = Date.now();
+                    // Migrate old single-active-list schema to new array-based schema
+                    if (!liveState.activeLists) liveState.activeLists = [];
+                    if (liveState.activeList) {
+                        liveState.activeLists.push(liveState.activeList);
+                        delete liveState.activeList;
+                    }
+                    if (!liveState.savedLists) liveState.savedLists = [];
+                    if (!liveState.archivedLists) liveState.archivedLists = [];
+                    if (!liveState.todoLists) liveState.todoLists = [];
+                    if (!liveState.archivedTodoLists) liveState.archivedTodoLists = [];
+                } catch(e) {
+                    liveState = defaultLiveState();
+                }
+            } else {
+                liveState = defaultLiveState();
+            }
+            document.getElementById('class-name-input').value = liveState.className || '';
+            document.getElementById('designer-class-name').value = liveState.className || '';
+        }
+
+        function saveLiveState() {
+            localStorage.setItem('classroom_live_state', JSON.stringify(liveState));
+        }
+
+        function logEvent(type, details) {
+            liveState.events.push({ ts: Date.now(), type: type, details: details });
+            saveLiveState();
+        }
+
+        function switchView(name) {
+            document.getElementById('designer-view').classList.toggle('active', name === 'designer');
+            document.getElementById('live-view').classList.toggle('active', name === 'live');
+            document.getElementById('tab-designer').classList.toggle('active', name === 'designer');
+            document.getElementById('tab-live').classList.toggle('active', name === 'live');
+            if (name === 'live') {
+                renderLiveView();
+            }
+        }
+
+        function onClassNameChange() {
+            liveState.className = document.getElementById('class-name-input').value;
+            saveLiveState();
+            var designerInput = document.getElementById('designer-class-name');
+            if (designerInput && designerInput.value !== liveState.className) {
+                designerInput.value = liveState.className;
+            }
+        }
+
+        function onDesignerClassNameChange() {
+            liveState.className = document.getElementById('designer-class-name').value;
+            saveLiveState();
+            var liveInput = document.getElementById('class-name-input');
+            if (liveInput && liveInput.value !== liveState.className) {
+                liveInput.value = liveState.className;
+            }
+        }
+
+        function getStudentsFromDesigner() {
+            // Read from the saved designer state — the source of truth for the layout
+            var raw = localStorage.getItem('classroom_designer_state');
+            if (!raw) return { students: [], items: [] };
+            try {
+                var payload = JSON.parse(raw);
+                var items = payload.items || [];
+                var students = items.filter(it => it.type === 'student').map(it => ({
+                    name: it.text || 'Unnamed',
+                    left: parseInt(it.left) || 0,
+                    top: parseInt(it.top) || 0,
+                    width: parseInt(it.width) || 85,
+                    height: parseInt(it.height) || 50
+                }));
+                return { students: students, items: items };
+            } catch(e) {
+                return { students: [], items: [] };
+            }
+        }
+
+        function ensureStudentDataForRoster(students) {
+            // Add records for any new students, drop nothing (so history persists if names change)
+            students.forEach(s => {
+                if (!liveState.studentData[s.name]) {
+                    liveState.studentData[s.name] = { points: 0, notes: [] };
+                }
+            });
+        }
+
+        function renderLiveView() {
+            var wrap = document.getElementById('live-canvas-wrap');
+            var liveCanvas = document.getElementById('live-canvas');
+            var data = getStudentsFromDesigner();
+
+            if (!data.items || data.items.length === 0) {
+                wrap.innerHTML = '<div id="live-empty"><h2>No layout yet</h2><p>Head to the <strong>DESIGNER</strong> tab and build your classroom first. Add student desks (with names) and any other items, then come back.</p><button onclick="switchView(\'designer\')">Go to Designer</button></div>';
+                document.getElementById('stat-students').innerText = '0';
+                document.getElementById('stat-groups').innerText = liveState.groups.length;
+                renderGroupsPanel();
+                return;
+            }
+
+            // Ensure canvas element is present (may have been replaced by empty state)
+            if (!document.getElementById('live-canvas')) {
+                wrap.innerHTML = '<div id="live-canvas"></div>';
+                liveCanvas = document.getElementById('live-canvas');
+            }
+            liveCanvas.innerHTML = '';
+
+            ensureStudentDataForRoster(data.students);
+
+            // Render every item; only students get interactivity
+            data.items.forEach(item => {
+                var el = document.createElement('div');
+                el.className = 'live-elem live-' + item.type;
+                el.style.left = item.left;
+                el.style.top = item.top;
+                el.style.width = item.width;
+                el.style.height = item.height;
+
+                if (item.type === 'arrow') {
+                    el.style.background = 'transparent';
+                    el.innerHTML =
+                        '<svg viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+                            '<line x1="5" y1="20" x2="85" y2="20" stroke="' + (item.color || '#333') + '" stroke-width="4" />' +
+                            '<polygon points="85,14 100,20 85,26" fill="' + (item.color || '#333') + '"/>' +
+                            '<text x="45" y="14" font-size="11" fill="' + (item.color || '#333') + '" text-anchor="middle" font-weight="bold">' + escapeHtml(item.text || '') + '</text>' +
+                        '</svg>';
+                } else if (item.type === 'student') {
+                    var name = item.text || 'Unnamed';
+                    var grp = findGroupForStudent(name);
+                    var bg = grp ? grp.color : (item.color || '#a3cef1');
+                    el.style.backgroundColor = bg;
+                    el.setAttribute('data-name', name);
+                    el.style.color = pickTextColor(bg);
+                    var pts = (liveState.studentData[name] && liveState.studentData[name].points) || 0;
+                    var noteCount = (liveState.studentData[name] && liveState.studentData[name].notes) ? liveState.studentData[name].notes.length : 0;
+                    el.innerHTML =
+                        '<span class="stu-name">' + escapeHtml(name) + '</span>' +
+                        '<span class="stu-points">' + pts + '</span>' +
+                        (noteCount > 0 ? '<span class="stu-note-badge">📝' + noteCount + '</span>' : '');
+                    el.onclick = function() { openStudentModal(name); };
+                } else {
+                    el.style.backgroundColor = item.color || '#e0d0b0';
+                    el.style.color = pickTextColor(item.color || '#e0d0b0');
+                    el.innerHTML = '<span class="stu-name">' + escapeHtml(item.text || '') + '</span>';
+                }
+
+                liveCanvas.appendChild(el);
+            });
+
+            document.getElementById('stat-students').innerText = data.students.length;
+            document.getElementById('stat-groups').innerText = liveState.groups.length;
+            updateSessionTime();
+
+            renderGroupsPanel();
+            renderCallLists();
+            renderTodoLists();
+            updateClassToolsMenuBadges();
+        }
+
+        function updateSessionTime() {
+            if (!liveState.sessionStart) liveState.sessionStart = Date.now();
+            var mins = Math.floor((Date.now() - liveState.sessionStart) / 60000);
+            document.getElementById('stat-session').innerText = mins + 'm';
+        }
+        setInterval(function() {
+            if (document.getElementById('live-view').classList.contains('active')) {
+                updateSessionTime();
+            }
+        }, 30000);
+
+        function pickTextColor(bg) {
+            var hex = rgbToHex(bg).replace('#','');
+            if (hex.length !== 6) return '#2c3e50';
+            var r = parseInt(hex.substr(0,2), 16);
+            var g = parseInt(hex.substr(2,2), 16);
+            var b = parseInt(hex.substr(4,2), 16);
+            var lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+            return lum > 0.6 ? '#2c3e50' : '#ffffff';
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(c) {
+                return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+            });
+        }
+
+        function refreshLayoutFromDesigner() {
+            renderLiveView();
+        }
+
+        // --- Groups ---
+        function findGroupForStudent(name) {
+            for (var i = 0; i < liveState.groups.length; i++) {
+                if (liveState.groups[i].members.indexOf(name) !== -1) return liveState.groups[i];
+            }
+            return null;
+        }
+
+        function createGroup() {
+            var name = prompt("Group name?", "Group " + (liveState.groups.length + 1));
+            if (!name) return;
+            var color = GROUP_COLORS[liveState.groups.length % GROUP_COLORS.length];
+            var g = {
+                id: 'g_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+                name: name.trim(),
+                color: color,
+                members: []
+            };
+            liveState.groups.push(g);
+            logEvent('group_created', { name: g.name });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        // --- Auto-sort students into groups ---
+        function openAutoSortModal() {
+            var data = getStudentsFromDesigner();
+            if (data.students.length === 0) {
+                alert("Add students on the layout in the Designer tab first.");
+                return;
+            }
+            var n = data.students.length;
+            var html =
+                '<div class="modal-title">⚡ Auto-Sort into Groups</div>' +
+                '<div style="color:#64748b;font-size:0.9rem;margin-bottom:16px;">' +
+                    '<strong>' + n + ' students</strong> will be shuffled and distributed. ' +
+                    'Enter the number of students <em>per group</em> — the total number of groups is calculated automatically.' +
+                '</div>' +
+                '<label>Students per group</label>' +
+                '<div style="display:flex;gap:6px;margin:6px 0 14px 0;flex-wrap:wrap;">' +
+                    '<button class="automation" onclick="doAutoSort(2)">2</button>' +
+                    '<button class="automation" onclick="doAutoSort(3)">3</button>' +
+                    '<button class="automation" onclick="doAutoSort(4)">4</button>' +
+                    '<button class="automation" onclick="doAutoSort(5)">5</button>' +
+                '</div>' +
+                '<label>Or type a custom size</label>' +
+                '<div style="display:flex;gap:6px;align-items:center;">' +
+                    '<input type="number" id="autosort-custom" value="4" min="1" max="' + n + '" style="flex:1;margin:0;">' +
+                    '<button class="automation" onclick="doAutoSortCustom()" style="white-space:nowrap;">Sort</button>' +
+                '</div>' +
+                '<div id="autosort-preview" style="margin-top:12px;font-size:0.85rem;color:#64748b;"></div>' +
+                '<div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:12px;">' +
+                    '<label style="display:flex;align-items:center;gap:8px;font-weight:normal;font-size:0.85rem;cursor:pointer;">' +
+                        '<input type="checkbox" id="autosort-replace" checked style="width:auto;margin:0;height:auto;"> ' +
+                        'Replace existing groups (uncheck to add new groups alongside)' +
+                    '</label>' +
+                '</div>' +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                '</div>';
+            openModal(html);
+            // Live preview as user types
+            var inp = document.getElementById('autosort-custom');
+            var prev = document.getElementById('autosort-preview');
+            function updatePreview() {
+                var v = parseInt(inp.value);
+                if (!v || v < 1) { prev.innerText = ''; return; }
+                var g = Math.ceil(n / v);
+                prev.innerHTML = '→ <strong>' + g + '</strong> group' + (g===1?'':'s') + ' of about ' + v + ' student' + (v===1?'':'s') + ' each.';
+            }
+            if (inp) { inp.oninput = updatePreview; updatePreview(); }
+        }
+
+        function doAutoSort(size) {
+            var replace = document.getElementById('autosort-replace').checked;
+            closeModal();
+            performAutoSort(size, replace);
+        }
+        function doAutoSortCustom() {
+            var val = parseInt(document.getElementById('autosort-custom').value);
+            if (!val || val < 1) { alert("Please enter a group size of 1 or more."); return; }
+            var replace = document.getElementById('autosort-replace').checked;
+            closeModal();
+            performAutoSort(val, replace);
+        }
+        function performAutoSort(size, replace) {
+            var data = getStudentsFromDesigner();
+            if (data.students.length === 0) return;
+            ensureStudentDataForRoster(data.students);
+
+            // Shuffle student names (Fisher–Yates)
+            var names = data.students.map(s => s.name);
+            for (var i = names.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = names[i]; names[i] = names[j]; names[j] = tmp;
+            }
+
+            if (replace) {
+                liveState.groups = [];
+            }
+
+            var numGroups = Math.ceil(names.length / size);
+            var startIndex = liveState.groups.length;
+            // Round-robin distribution keeps group sizes as balanced as possible
+            // (e.g. 23 students, size 4 → 6 groups of 4,4,4,4,4,3 rather than 5,5,5,5,3,0)
+            var buckets = [];
+            for (var g = 0; g < numGroups; g++) buckets.push([]);
+            names.forEach(function(name, idx) {
+                buckets[idx % numGroups].push(name);
+            });
+
+            buckets.forEach(function(members, gi) {
+                liveState.groups.push({
+                    id: 'g_' + Date.now() + '_' + gi + '_' + Math.floor(Math.random()*1000),
+                    name: 'Group ' + (startIndex + gi + 1),
+                    color: GROUP_COLORS[(startIndex + gi) % GROUP_COLORS.length],
+                    members: members
+                });
+            });
+
+            logEvent('auto_sort', { size: size, numGroups: numGroups, replace: replace, total: names.length });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function deleteGroup(gid) {
+            if (!confirm("Delete this group? Students will become unassigned.")) return;
+            var g = liveState.groups.find(x => x.id === gid);
+            if (!g) return;
+            logEvent('group_deleted', { name: g.name, members: g.members.slice() });
+            liveState.groups = liveState.groups.filter(x => x.id !== gid);
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function renameGroup(gid, newName) {
+            var g = liveState.groups.find(x => x.id === gid);
+            if (!g) return;
+            g.name = newName.trim() || g.name;
+            saveLiveState();
+            // Just update the stat, no full re-render needed to preserve focus
+        }
+
+        function recolorGroup(gid, newColor) {
+            var g = liveState.groups.find(x => x.id === gid);
+            if (!g) return;
+            g.color = newColor;
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function moveStudentToGroup(name, targetGroupId) {
+            // Remove from any existing group
+            liveState.groups.forEach(g => {
+                g.members = g.members.filter(m => m !== name);
+            });
+            if (targetGroupId) {
+                var tg = liveState.groups.find(x => x.id === targetGroupId);
+                if (tg && tg.members.indexOf(name) === -1) tg.members.push(name);
+            }
+            logEvent('student_moved', { student: name, group: targetGroupId });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function renderGroupsPanel() {
+            var list = document.getElementById('groups-list');
+            var data = getStudentsFromDesigner();
+            var allStudentNames = data.students.map(s => s.name);
+            var assigned = new Set();
+            liveState.groups.forEach(g => g.members.forEach(m => assigned.add(m)));
+            var unassigned = allStudentNames.filter(n => !assigned.has(n));
+
+            if (liveState.groups.length === 0 && allStudentNames.length === 0) {
+                list.innerHTML = '<div id="groups-list-empty">Add students in the Designer tab first, then create groups here.</div>';
+                return;
+            }
+
+            var html = '';
+            liveState.groups.forEach(g => {
+                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
+                html += '<div class="group-card" data-gid="' + g.id + '" ondragover="grpDragOver(event, \'' + g.id + '\')" ondragleave="grpDragLeave(event)" ondrop="grpDrop(event, \'' + g.id + '\')">';
+                html += '<div class="group-card-header" style="background:' + g.color + ';">';
+                html += '<input type="color" value="' + g.color + '" onchange="recolorGroup(\'' + g.id + '\', this.value)" title="Group color">';
+                html += '<input type="text" class="grp-name" value="' + escapeHtml(g.name) + '" onchange="renameGroup(\'' + g.id + '\', this.value)">';
+                html += '<span class="grp-total" title="Group total points">' + total + ' pts</span>';
+                html += '<button class="icon-btn" onclick="pickFromGroup(\'' + g.id + '\')" title="Pick random from this group">🎲</button>';
+                html += '<button class="icon-btn" onclick="deleteGroup(\'' + g.id + '\')" title="Delete group">✕</button>';
+                html += '</div>';
+                html += '<div class="group-members">';
+                if (g.members.length === 0) {
+                    html += '<div style="font-size:0.8rem;color:#94a3b8;padding:4px;text-align:center;">Drag students here</div>';
+                } else {
+                    g.members.forEach(m => {
+                        var pts = (liveState.studentData[m] && liveState.studentData[m].points) || 0;
+                        html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
+                        html += '<span class="m-name">' + escapeHtml(m) + '</span>';
+                        html += '<span class="m-pts">' + pts + '</span>';
+                        html += '<button class="m-pt-btn minus" onclick="addPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
+                        html += '<button class="m-pt-btn plus" onclick="addPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
+                        html += '</div>';
+                    });
+                }
+                html += '</div></div>';
+            });
+
+            if (unassigned.length > 0) {
+                html += '<div class="unassigned-header">Unassigned</div>';
+                html += '<div id="unassigned-list" ondragover="grpDragOver(event, null)" ondragleave="grpDragLeave(event)" ondrop="grpDrop(event, null)">';
+                unassigned.forEach(m => {
+                    var pts = (liveState.studentData[m] && liveState.studentData[m].points) || 0;
+                    html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
+                    html += '<span class="m-name">' + escapeHtml(m) + '</span>';
+                    html += '<span class="m-pts">' + pts + '</span>';
+                    html += '<button class="m-pt-btn minus" onclick="addPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
+                    html += '<button class="m-pt-btn plus" onclick="addPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            list.innerHTML = html;
+        }
+
+        function escapeAttr(s) {
+            return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        // --- Drag & drop between groups ---
+        function memberDragStart(e, name) {
+            draggedMemberName = name;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', name);
+            e.currentTarget.classList.add('dragging');
+        }
+        function memberDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+        }
+        function grpDragOver(e, gid) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            var target = e.currentTarget;
+            target.classList.add('drag-over');
+        }
+        function grpDragLeave(e) {
+            e.currentTarget.classList.remove('drag-over');
+        }
+        function grpDrop(e, gid) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            if (draggedMemberName) {
+                moveStudentToGroup(draggedMemberName, gid);
+                draggedMemberName = null;
+            }
+        }
+
+        // --- Points ---
+        function addPoints(name, delta, animate) {
+            if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+            liveState.studentData[name].points += delta;
+            logEvent(delta > 0 ? 'points_added' : 'points_removed', { student: name, delta: delta, total: liveState.studentData[name].points });
+            saveLiveState();
+            if (animate) {
+                // Surgical desk update + animation (skips full re-render so the animation isn't destroyed)
+                updateStudentPointBadgeDOM(name);
+                animatePointAdd(name, delta);
+                renderGroupsPanel(); // group totals are separate DOM
+            } else {
+                renderLiveView();
+            }
+        }
+
+        // Surgical update of just the point badge on a desk (used by animated flow)
+        function updateStudentPointBadgeDOM(name) {
+            var deskEl = null;
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                if (el.getAttribute('data-name') === name) deskEl = el;
+            });
+            if (!deskEl) return;
+            var pts = (liveState.studentData[name] && liveState.studentData[name].points) || 0;
+            var badge = deskEl.querySelector('.stu-points');
+            if (badge) badge.textContent = pts;
+        }
+
+        // Visual + audio point-award feedback: desk pulses gold + "+N" bubble floats up + chime
+        function animatePointAdd(name, delta) {
+            var deskEl = null;
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                if (el.getAttribute('data-name') === name) deskEl = el;
+            });
+            if (!deskEl) return;
+
+            var animClass = delta >= 0 ? 'point-earned' : 'point-lost';
+            deskEl.classList.remove(animClass);
+            void deskEl.offsetWidth; // force reflow so rapid clicks restart the animation
+            deskEl.classList.add(animClass);
+            setTimeout(function() { deskEl.classList.remove(animClass); }, 800);
+
+            // Floating "+N" text bubble above the desk
+            var canvas = document.getElementById('live-canvas');
+            if (canvas) {
+                var bubble = document.createElement('div');
+                bubble.className = 'point-float' + (delta < 0 ? ' neg' : '');
+                bubble.textContent = (delta > 0 ? '+' : '') + delta;
+                var left = (parseInt(deskEl.style.left) || 0) + (deskEl.offsetWidth / 2);
+                var top  = (parseInt(deskEl.style.top)  || 0) - 4;
+                bubble.style.left = left + 'px';
+                bubble.style.top = top + 'px';
+                canvas.appendChild(bubble);
+                setTimeout(function() { if (bubble.parentNode) bubble.remove(); }, 1200);
+            }
+
+            playPointSound(delta);
+        }
+
+        // Bright rewarding chime for +points; short descending buzz for -points
+        function playPointSound(delta) {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var t = ctx.currentTime;
+            if (delta >= 0) {
+                // Two-note rising ding (C5 → G5) with a sparkle above
+                [523.25, 783.99].forEach(function(freq, i) {
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    var start = t + i * 0.06;
+                    gain.gain.setValueAtTime(0.001, start);
+                    gain.gain.exponentialRampToValueAtTime(0.28, start + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(start);
+                    osc.stop(start + 0.45);
+                });
+                // Sparkle on top
+                var sp = ctx.createOscillator();
+                var spg = ctx.createGain();
+                sp.type = 'sine';
+                sp.frequency.value = 1568;
+                spg.gain.setValueAtTime(0.001, t + 0.12);
+                spg.gain.exponentialRampToValueAtTime(0.12, t + 0.13);
+                spg.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                sp.connect(spg);
+                spg.connect(ctx.destination);
+                sp.start(t + 0.12);
+                sp.stop(t + 0.55);
+            } else {
+                // Descending buzz for negative
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320, t);
+                osc.frequency.exponentialRampToValueAtTime(120, t + 0.32);
+                gain.gain.setValueAtTime(0.15, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.36);
+                var filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.4);
+            }
+        }
+
+        // --- Modal utilities ---
+        function openModal(html) {
+            document.getElementById('modal-box').innerHTML = html;
+            document.getElementById('modal-backdrop').classList.add('show');
+        }
+        function closeModal() {
+            document.getElementById('modal-backdrop').classList.remove('show');
+        }
+        function closeModalIfBackdrop(e) {
+            if (e.target.id === 'modal-backdrop') closeModal();
+        }
+
+        // --- Student modal (notes + points) ---
+        function openStudentModal(name) {
+            if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+            var d = liveState.studentData[name];
+            var grp = findGroupForStudent(name);
+            var notesHtml = '';
+            if (d.notes.length === 0) {
+                notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">No notes yet.</div>';
+            } else {
+                d.notes.slice().reverse().forEach(function(n) {
+                    notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + '</span>' + escapeHtml(n.text) + '</div>';
+                });
+            }
+            var html =
+                '<div class="modal-title">' + escapeHtml(name) + '</div>' +
+                '<div style="color:#64748b;font-size:0.85rem;margin-bottom:14px;">' +
+                    'Points: <strong style="color:#2c3e50;font-size:1.1rem;">' + d.points + '</strong>' +
+                    (grp ? ' &nbsp;·&nbsp; Group: <strong style="color:' + grp.color + ';">' + escapeHtml(grp.name) + '</strong>' : ' &nbsp;·&nbsp; Unassigned') +
+                '</div>' +
+                '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' +
+                    '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">+1 point</button>' +
+                    '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">+2 points</button>' +
+                    '<button class="warn" onclick="addPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">−1 point</button>' +
+                    '<button class="danger" onclick="resetStudentPoints(\'' + escapeAttr(name) + '\');openStudentModal(\'' + escapeAttr(name) + '\')">Reset</button>' +
+                '</div>' +
+                '<label style="display:block;margin-bottom:4px;">Add a note</label>' +
+                '<textarea class="modal-input" id="stu-note-input" placeholder="Observation, participation, behavior, etc."></textarea>' +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Close</button>' +
+                    '<button onclick="saveStudentNote(\'' + escapeAttr(name) + '\')">Save Note</button>' +
+                '</div>' +
+                '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:10px;">' +
+                    '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">Note history (' + d.notes.length + ')</div>' +
+                    notesHtml +
+                '</div>';
+            openModal(html);
+        }
+        function saveStudentNote(name) {
+            var val = document.getElementById('stu-note-input').value.trim();
+            if (!val) { closeModal(); return; }
+            if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+            liveState.studentData[name].notes.push({ text: val, ts: Date.now() });
+            logEvent('note_added', { student: name, text: val });
+            saveLiveState();
+            renderLiveView();
+            openStudentModal(name); // refresh
+        }
+        function resetStudentPoints(name) {
+            if (!confirm("Reset points to 0 for " + name + "?")) return;
+            if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+            liveState.studentData[name].points = 0;
+            logEvent('points_reset', { student: name });
+            saveLiveState();
+            renderLiveView();
+        }
+        function formatTs(ts) {
+            var d = new Date(ts);
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // ============================================================
+        //  RANDOM PICK ANIMATION + SOUND
+        // ============================================================
+        var audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) {
+                try {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                } catch(e) { audioCtx = null; }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().catch(function(){});
+            }
+            return audioCtx;
+        }
+
+        // Game-show style pick sound: rising-pitch ticks (like a spinning wheel slowing to a stop),
+        // with a tension-building noise sweep underneath. Ticks share the same ease-out cubic
+        // curve as the visual frames, so audio and highlights stay in cadence.
+        function playPickRoll(totalMs) {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var start = ctx.currentTime;
+            var durSec = totalMs / 1000;
+
+            // Tension riser — bandpass-filtered noise sweeping upward, swelling near the end
+            var bufSize = Math.floor(ctx.sampleRate * (durSec + 0.1));
+            var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+            var d = buf.getChannelData(0);
+            for (var i = 0; i < bufSize; i++) d[i] = Math.random() * 2 - 1;
+            var noiseSrc = ctx.createBufferSource();
+            noiseSrc.buffer = buf;
+            var bp = ctx.createBiquadFilter();
+            bp.type = 'bandpass';
+            bp.Q.value = 5;
+            bp.frequency.setValueAtTime(300, start);
+            bp.frequency.exponentialRampToValueAtTime(2800, start + durSec);
+            var noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(0.0001, start);
+            noiseGain.gain.exponentialRampToValueAtTime(0.05, start + durSec * 0.6);
+            noiseGain.gain.exponentialRampToValueAtTime(0.14, start + durSec * 0.95);
+            noiseGain.gain.exponentialRampToValueAtTime(0.0001, start + durSec + 0.05);
+            noiseSrc.connect(bp);
+            bp.connect(noiseGain);
+            noiseGain.connect(ctx.destination);
+            noiseSrc.start(start);
+            noiseSrc.stop(start + durSec + 0.1);
+
+            // Sub bass pulse that builds — adds weight/anticipation
+            var subOsc = ctx.createOscillator();
+            var subGain = ctx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(55, start);
+            subOsc.frequency.exponentialRampToValueAtTime(110, start + durSec);
+            subGain.gain.setValueAtTime(0.0001, start);
+            subGain.gain.exponentialRampToValueAtTime(0.08, start + durSec * 0.85);
+            subGain.gain.exponentialRampToValueAtTime(0.18, start + durSec * 0.98);
+            subGain.gain.exponentialRampToValueAtTime(0.0001, start + durSec + 0.05);
+            subOsc.connect(subGain);
+            subGain.connect(ctx.destination);
+            subOsc.start(start);
+            subOsc.stop(start + durSec + 0.1);
+
+            // Ticks — same ease-out cubic as visual frames; pitch and volume rise as it slows
+            var frameCount = Math.max(20, Math.floor(totalMs / 70));
+            for (var f = 0; f < frameCount; f++) {
+                var frac = f / frameCount;
+                var t = start + durSec * (1 - Math.pow(1 - frac, 3));
+                var pitch = 500 + frac * 900;         // 500 Hz → 1400 Hz across the roll
+                var vol = 0.12 + frac * 0.18;
+                schedulePickTick(ctx, t, pitch, vol);
+            }
+        }
+
+        function schedulePickTick(ctx, t, pitch, volume) {
+            // Bright plucky tick — square wave with fast pitch drop + fast decay
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            var filter = ctx.createBiquadFilter();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(pitch, t);
+            osc.frequency.exponentialRampToValueAtTime(pitch * 0.35, t + 0.05);
+            filter.type = 'lowpass';
+            filter.frequency.value = 4000;
+            filter.Q.value = 2;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(volume, t + 0.003);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.09);
+        }
+
+        // Triumphant fanfare on reveal: quick C-major arpeggio → sustained chord + high sparkle bells
+        function playFanfare() {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var t = ctx.currentTime;
+            var arpNotes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+            arpNotes.forEach(function(freq, i) {
+                scheduleBrassNote(ctx, t + i * 0.075, freq, 0.16, 0.18);
+            });
+            var chordT = t + arpNotes.length * 0.075;
+            // Sustained triumphant chord
+            [523.25, 659.25, 783.99, 1046.5].forEach(function(freq) {
+                scheduleBrassNote(ctx, chordT, freq, 1.2, 0.14);
+            });
+            // Sparkle bells on top — cascading high sines
+            [1568, 1975.5, 2637].forEach(function(freq, i) {
+                scheduleSparkle(ctx, chordT + 0.06 + i * 0.04, freq, 0.7);
+            });
+        }
+
+        function scheduleBrassNote(ctx, t, freq, dur, peakGain) {
+            // Two detuned oscillators through a lowpass = warm brass timbre
+            var osc1 = ctx.createOscillator();
+            var osc2 = ctx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc2.type = 'square';
+            osc1.frequency.value = freq;
+            osc2.frequency.value = freq;
+            osc2.detune.value = 7;
+            var filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(freq * 2, t);
+            filter.frequency.exponentialRampToValueAtTime(freq * 5, t + 0.06);
+            filter.Q.value = 2;
+            var gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(peakGain, t + 0.02);
+            gain.gain.setTargetAtTime(peakGain * 0.7, t + 0.06, 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            osc1.connect(filter);
+            osc2.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+            osc1.start(t);
+            osc2.start(t);
+            osc1.stop(t + dur + 0.05);
+            osc2.stop(t + dur + 0.05);
+        }
+
+        function scheduleSparkle(ctx, t, freq, dur) {
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.exponentialRampToValueAtTime(0.11, t + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + dur + 0.05);
+        }
+
+        // Bell for end of timer (longer, warmer)
+        function playBell() {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var t = ctx.currentTime;
+            [523.25, 659.25, 783.99].forEach(function(freq, i) {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.001, t);
+                gain.gain.exponentialRampToValueAtTime(0.3, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2.5);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 2.6);
+            });
+            // Repeat for a ringing feel
+            setTimeout(playBell2, 700);
+        }
+        function playBell2() {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var t = ctx.currentTime;
+            [523.25, 659.25, 783.99].forEach(function(freq) {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.001, t);
+                gain.gain.exponentialRampToValueAtTime(0.25, t + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 2);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 2.1);
+            });
+        }
+
+        function pickRandom(count) {
+            pickRandomFromPool(null, count);
+        }
+        function pickFromGroup(gid) {
+            var g = liveState.groups.find(x => x.id === gid);
+            if (!g) return;
+            if (g.members.length === 0) { alert("This group has no students yet."); return; }
+            pickRandomFromPool(g.members, 1);
+        }
+        function pickRandomFromPool(pool, count) {
+            var deskEls = Array.from(document.querySelectorAll('#live-canvas .live-student'));
+            if (deskEls.length === 0) { alert("No students on the layout yet."); return; }
+
+            // Filter to pool if provided
+            var eligible = deskEls;
+            if (pool) {
+                eligible = deskEls.filter(el => pool.indexOf(el.getAttribute('data-name')) !== -1);
+                if (eligible.length === 0) return;
+            }
+            if (count > eligible.length) count = eligible.length;
+
+            // Clear any prior highlight
+            deskEls.forEach(el => { el.classList.remove('picking'); el.classList.remove('winner'); });
+            document.getElementById('winner-banner').style.display = 'none';
+
+            // Shuffle eligible for the "cycling" order; pick winners at the end
+            var winnerSet = new Set();
+            var shuffled = eligible.slice().sort(() => Math.random() - 0.5);
+            for (var i = 0; i < count; i++) winnerSet.add(shuffled[i]);
+
+            // Build the animation sequence: ~2.8s total, easing out
+            var totalMs = 2800 + Math.min(2000, count * 200);
+            var frames = [];
+            var frameCount = Math.max(20, Math.floor(totalMs / 70));
+            for (var f = 0; f < frameCount; f++) {
+                var frac = f / frameCount;
+                // ease-out cubic — delay between frames grows
+                var t = totalMs * (1 - Math.pow(1 - frac, 3));
+                var idx = Math.floor(Math.random() * eligible.length);
+                frames.push({ time: t, el: eligible[idx] });
+            }
+            // At the very end, land on winners
+            var winners = Array.from(winnerSet);
+            var landHold = 400;
+
+            playPickRoll(totalMs);
+
+            var lastLit = null;
+            frames.forEach(function(fr) {
+                setTimeout(function() {
+                    if (lastLit) lastLit.classList.remove('picking');
+                    fr.el.classList.add('picking');
+                    lastLit = fr.el;
+                }, fr.time);
+            });
+
+            // Final: strip picking, apply winner to selected desks
+            pickAnimTimeout = setTimeout(function() {
+                if (lastLit) lastLit.classList.remove('picking');
+                deskEls.forEach(el => el.classList.remove('picking'));
+                winners.forEach(el => el.classList.add('winner'));
+                playFanfare();
+                showWinnerBanner(winners.map(el => el.getAttribute('data-name')));
+                logEvent('random_pick', { count: count, winners: winners.map(el => el.getAttribute('data-name')), pool: pool ? 'group' : 'all' });
+                saveLiveState();
+            }, totalMs + landHold);
+        }
+
+        function showWinnerBanner(names) {
+            var b = document.getElementById('winner-banner');
+            currentWinners = names.slice();
+            var label = names.length === 1 ? 'Selected' : 'Selected (' + names.length + ')';
+            var html = '<div>🎯 ' + label + '</div>';
+            html += '<div class="wb-list">' + names.map(escapeHtml).join(' &nbsp;·&nbsp; ') + '</div>';
+            html += '<div class="wb-actions">';
+
+            // "+1 All" — only makes sense when there is more than one winner
+            if (names.length > 1) {
+                html += '<button class="automation wb-all-btn" onclick="addPointToAllWinners()">⭐ +1 All</button>';
+            }
+            // One +1 button per winner (individual — desk shakes + sound)
+            names.forEach(function(n, idx) {
+                html += '<button class="automation" onclick="addPointToWinner(' + idx + ')">+1 ' + escapeHtml(n) + '</button>';
+            });
+            // Profile shortcut for the single-winner case
+            if (names.length === 1) {
+                html += '<button onclick="openStudentModal(\'' + escapeAttr(names[0]) + '\');hideWinnerBanner()">Open Profile</button>';
+            }
+            html += '<button class="export-btn" onclick="hideWinnerBanner()">Dismiss</button>';
+            html += '</div>';
+            b.innerHTML = html;
+            b.style.display = 'block';
+        }
+        function hideWinnerBanner() {
+            document.getElementById('winner-banner').style.display = 'none';
+            document.querySelectorAll('#live-canvas .live-student.winner').forEach(el => el.classList.remove('winner'));
+            currentWinners = [];
+        }
+
+        function addPointToWinner(idx) {
+            var name = currentWinners[idx];
+            if (!name) return;
+            addPoints(name, 1, true);
+        }
+
+        function addPointToAllWinners() {
+            if (currentWinners.length === 0) return;
+            // Stagger by ~140ms per student so animations cascade rather than piling up
+            currentWinners.forEach(function(name, i) {
+                setTimeout(function() { addPoints(name, 1, true); }, i * 140);
+            });
+        }
+
+        // ============================================================
+        //  CLASS TOOLS: order-list generation, save/load, archives, live call list
+        // ============================================================
+
+        // --- Popover menu toggle ---
+        function toggleClassToolsMenu(e) {
+            if (e) e.stopPropagation();
+            var menu = document.getElementById('class-tools-menu');
+            menu.classList.toggle('show');
+            updateClassToolsMenuBadges();
+        }
+        document.addEventListener('click', function(e) {
+            var menu = document.getElementById('class-tools-menu');
+            var btn = document.getElementById('class-tools-btn');
+            if (!menu || !menu.classList.contains('show')) return;
+            if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+            menu.classList.remove('show');
+        });
+        function closeClassToolsMenu() {
+            var menu = document.getElementById('class-tools-menu');
+            if (menu) menu.classList.remove('show');
+        }
+        function updateClassToolsMenuBadges() {
+            var s = document.getElementById('ct-saved-count');
+            var t = document.getElementById('ct-todo-count');
+            if (s) {
+                var savedCount = (liveState.savedLists || []).length;
+                var archCount = (liveState.archivedLists || []).length;
+                if (savedCount === 0 && archCount === 0) {
+                    s.innerText = 'Shuffle roster into a call order';
+                } else {
+                    var parts = [];
+                    if (savedCount > 0) parts.push(savedCount + ' saved');
+                    if (archCount > 0) parts.push(archCount + ' archived');
+                    s.innerText = parts.join(' · ');
+                }
+            }
+            if (t) {
+                var todoCount = (liveState.todoLists || []).length;
+                var todoArchCount = (liveState.archivedTodoLists || []).length;
+                if (todoCount === 0 && todoArchCount === 0) {
+                    t.innerText = 'Your own list of tasks or reminders';
+                } else {
+                    var parts = [];
+                    if (todoCount > 0) parts.push(todoCount + ' active');
+                    if (todoArchCount > 0) parts.push(todoArchCount + ' archived');
+                    t.innerText = parts.join(' · ');
+                }
+            }
+        }
+
+        // --- Sounds modeled on the reference randomizer ---
+        var shuffleBeepInterval = null;
+        function playShuffleBeep() {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var freq = 600 + Math.random() * 400;
+            var waveType = Math.random() > 0.7 ? 'square' : 'sine';
+            var t = ctx.currentTime;
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = waveType;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.11);
+        }
+        function startShuffleBeeping() {
+            playShuffleBeep();
+            shuffleBeepInterval = setInterval(playShuffleBeep, 200);
+        }
+        function stopShuffleBeeping() {
+            if (shuffleBeepInterval) { clearInterval(shuffleBeepInterval); shuffleBeepInterval = null; }
+        }
+        function playRevealNote() {
+            var ctx = getAudioCtx();
+            if (!ctx) return;
+            var octave = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+            var freq = octave[Math.floor(Math.random() * octave.length)];
+            var waveTypes = ['sine', 'square', 'triangle'];
+            var wave = waveTypes[Math.floor(Math.random() * waveTypes.length)];
+            var dur = 0.2 + Math.random() * 0.2;
+            var t = ctx.currentTime;
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = wave;
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.35, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + dur + 0.02);
+        }
+
+        // --- Fisher-Yates shuffle (using crypto for better randomness when available) ---
+        function shuffleNames(arr) {
+            var out = arr.slice();
+            var rnd = null;
+            try {
+                rnd = new Uint32Array(out.length);
+                crypto.getRandomValues(rnd);
+            } catch(e) {}
+            for (var i = out.length - 1; i > 0; i--) {
+                var j = rnd ? Math.floor(rnd[i] / (0xFFFFFFFF + 1) * (i + 1)) : Math.floor(Math.random() * (i + 1));
+                var tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+            }
+            return out;
+        }
+
+        // --- Shuffle overlay logic ---
+        var currentShuffledList = null;
+        var shuffleFlashInterval = null;
+        var shuffleRevealInterval = null;
+        var shuffleTimeouts = [];
+
+        // Entry point from the Class Tools menu — shows the launcher (Generate button + saved lists + archives)
+        function openOrderListLauncher() {
+            closeClassToolsMenu();
+            var overlay = document.getElementById('shuffle-overlay');
+            overlay.classList.add('show');
+            document.getElementById('sh-title').innerHTML = '🎲 Call Order';
+            document.getElementById('sh-launcher').style.display = 'flex';
+            document.getElementById('sh-anim').style.display = 'none';
+            document.getElementById('sh-reveal').classList.remove('show');
+            document.getElementById('sh-reveal').innerHTML = '';
+            document.getElementById('sh-actions').style.display = 'none';
+            clearShuffleTimers();
+            currentShuffledList = null;
+            renderShuffleLauncher();
+        }
+
+        function renderShuffleLauncher() {
+            var savedHost = document.getElementById('sh-launcher-saved');
+            var archivedHost = document.getElementById('sh-launcher-archives');
+            var saved = liveState.savedLists || [];
+            var archived = liveState.archivedLists || [];
+
+            // Saved lists section
+            if (saved.length > 0) {
+                var html = '<div class="sh-launcher-section"><h4>📂 Saved Lists</h4>';
+                saved.slice().reverse().forEach(function(sl) {
+                    html += '<div class="sh-launcher-row">';
+                    html += '<div class="sh-lr-info">';
+                    html += '<div class="sh-lr-name">' + escapeHtml(sl.name) + '</div>';
+                    html += '<div class="sh-lr-meta">' + sl.students.length + ' students · Saved ' + formatTs(sl.createdAt) + '</div>';
+                    html += '</div>';
+                    html += '<button class="sh-lr-load" onclick="loadSavedList(\'' + sl.id + '\')">Load</button>';
+                    html += '<button class="sh-lr-del" onclick="deleteSavedListFromLauncher(\'' + sl.id + '\')" title="Delete">✕</button>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                savedHost.innerHTML = html;
+            } else {
+                savedHost.innerHTML = '';
+            }
+
+            // Archives section
+            if (archived.length > 0) {
+                var html2 = '<div class="sh-launcher-section"><h4>📁 Archived Lists</h4>';
+                archived.slice().reverse().forEach(function(ar) {
+                    var pct = ar.students.length > 0 ? Math.round((ar.calledNames.length / ar.students.length) * 100) : 0;
+                    html2 += '<div class="sh-launcher-row">';
+                    html2 += '<div class="sh-lr-info">';
+                    html2 += '<div class="sh-lr-name">' + escapeHtml(ar.name) + '</div>';
+                    html2 += '<div class="sh-lr-meta">' + ar.calledNames.length + '/' + ar.students.length + ' called (' + pct + '%) · ' + formatTs(ar.archivedAt) + '</div>';
+                    html2 += '</div>';
+                    html2 += '<button class="sh-lr-view" onclick="viewArchive(\'' + ar.id + '\')">View</button>';
+                    html2 += '<button class="sh-lr-del" onclick="deleteArchiveFromLauncher(\'' + ar.id + '\')" title="Delete">✕</button>';
+                    html2 += '</div>';
+                });
+                html2 += '</div>';
+                archivedHost.innerHTML = html2;
+            } else {
+                archivedHost.innerHTML = '';
+            }
+        }
+
+        // Wrappers so delete buttons in the launcher refresh the launcher instead of a modal
+        function deleteSavedListFromLauncher(id) {
+            if (!confirm("Delete this saved list? This cannot be undone.")) return;
+            liveState.savedLists = (liveState.savedLists || []).filter(function(x) { return x.id !== id; });
+            saveLiveState();
+            renderShuffleLauncher();
+        }
+        function deleteArchiveFromLauncher(id) {
+            if (!confirm("Delete this archived list? This cannot be undone.")) return;
+            liveState.archivedLists = (liveState.archivedLists || []).filter(function(x) { return x.id !== id; });
+            saveLiveState();
+            renderShuffleLauncher();
+        }
+
+        // Actually run the animation
+        function beginShuffleAnimation() {
+            var data = getStudentsFromDesigner();
+            if (data.students.length === 0) {
+                alert("Add students on the layout in the Designer tab first.");
+                return;
+            }
+            var names = data.students.map(s => s.name);
+
+            // Make sure overlay is visible; hide launcher
+            var overlay = document.getElementById('shuffle-overlay');
+            overlay.classList.add('show');
+            document.getElementById('sh-title').innerHTML = '🎲 Generating Call Order';
+            document.getElementById('sh-launcher').style.display = 'none';
+            var anim = document.getElementById('sh-anim');
+            var reveal = document.getElementById('sh-reveal');
+            var actions = document.getElementById('sh-actions');
+            anim.style.display = 'flex';
+            anim.innerHTML = '';
+            reveal.innerHTML = '';
+            reveal.classList.remove('show');
+            actions.style.display = 'none';
+            clearShuffleTimers();
+
+            var flashColors = ['#FF5733','#33FF57','#3357FF','#F333FF','#FF33A1','#33FFF6','#FFD733','#8D33FF'];
+            var tags = names.map(function(name) {
+                var t = document.createElement('div');
+                t.className = 'sh-name-tag';
+                t.textContent = name;
+                anim.appendChild(t);
+                return t;
+            });
+
+            startShuffleBeeping();
+
+            shuffleFlashInterval = setInterval(function() {
+                var tag = tags[Math.floor(Math.random() * tags.length)];
+                var maxX = Math.max(20, anim.offsetWidth - tag.offsetWidth - 40);
+                var maxY = Math.max(20, anim.offsetHeight - tag.offsetHeight - 40);
+                tag.style.left = Math.floor(Math.random() * maxX) + 'px';
+                tag.style.top = Math.floor(Math.random() * maxY) + 'px';
+                tag.style.backgroundColor = flashColors[Math.floor(Math.random() * flashColors.length)];
+                tag.style.color = '#fff';
+                tag.classList.add('flashing');
+                var to = setTimeout(function() {
+                    tag.classList.remove('flashing');
+                    tag.style.opacity = '0';
+                }, 500);
+                shuffleTimeouts.push(to);
+            }, 100);
+
+            // Multi-pass shuffle for good randomness
+            var shuffled = shuffleNames(names);
+            for (var k = 0; k < 2; k++) shuffled = shuffleNames(shuffled);
+            currentShuffledList = shuffled;
+
+            // Phase 2: after 2s of flashing, reveal names ONE PER SECOND — tension-inducing
+            var toEnd = setTimeout(function() {
+                clearInterval(shuffleFlashInterval);
+                shuffleFlashInterval = null;
+                stopShuffleBeeping();
+                anim.innerHTML = '<div style="color:rgba(255,255,255,0.6);align-self:center;margin:auto;font-size:1rem;font-weight:600;letter-spacing:1px;">🥁 Revealing call order…</div>';
+
+                reveal.classList.add('show');
+                reveal.innerHTML = '<h3><span>📋 Call Order</span><span style="font-size:0.85rem;font-weight:400;opacity:0.7;" id="sh-reveal-count">0 / ' + shuffled.length + '</span></h3><div class="sh-reveal-list" id="sh-reveal-list"></div>';
+                var list = document.getElementById('sh-reveal-list');
+                var counter = document.getElementById('sh-reveal-count');
+
+                // One reveal per SECOND — dramatic pacing as requested
+                var perStep = 1000;
+                var idx = 0;
+                shuffleRevealInterval = setInterval(function() {
+                    if (idx >= shuffled.length) {
+                        clearInterval(shuffleRevealInterval);
+                        shuffleRevealInterval = null;
+                        actions.style.display = 'flex';
+                        return;
+                    }
+                    var item = document.createElement('div');
+                    item.className = 'sh-reveal-item';
+                    var num = document.createElement('div');
+                    num.className = 'sh-reveal-num';
+                    num.textContent = idx + 1;
+                    var nm = document.createElement('div');
+                    nm.textContent = shuffled[idx];
+                    item.appendChild(num);
+                    item.appendChild(nm);
+                    list.appendChild(item);
+                    list.scrollTop = list.scrollHeight;
+                    counter.textContent = (idx + 1) + ' / ' + shuffled.length;
+                    playRevealNote();
+                    idx++;
+                }, perStep);
+            }, 2000);
+            shuffleTimeouts.push(toEnd);
+        }
+
+        function clearShuffleTimers() {
+            if (shuffleFlashInterval) { clearInterval(shuffleFlashInterval); shuffleFlashInterval = null; }
+            if (shuffleRevealInterval) { clearInterval(shuffleRevealInterval); shuffleRevealInterval = null; }
+            shuffleTimeouts.forEach(function(t) { clearTimeout(t); });
+            shuffleTimeouts = [];
+            stopShuffleBeeping();
+        }
+
+        function cancelShuffle() {
+            clearShuffleTimers();
+            document.getElementById('shuffle-overlay').classList.remove('show');
+            currentShuffledList = null;
+        }
+
+        // Save & Use: only path forward — every generated list becomes a named saved list AND the active list
+        function saveAndUseShuffled() {
+            if (!currentShuffledList || currentShuffledList.length === 0) return;
+            var name = prompt("Name this list (so you can reload it later):", "List " + ((liveState.savedLists || []).length + 1));
+            if (!name) return;
+            name = name.trim();
+            if (!name) return;
+            var saved = {
+                id: 'sl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: name,
+                students: currentShuffledList.slice(),
+                createdAt: Date.now()
+            };
+            liveState.savedLists.push(saved);
+            logEvent('list_saved', { name: name, count: saved.students.length });
+            makeActiveList(name, currentShuffledList, saved.id);
+            saveLiveState();
+            cancelShuffle();
+        }
+
+        // --- Active call lists on the left ---
+        function makeActiveList(name, orderedNames, sourceId) {
+            var newList = {
+                id: 'al_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                sourceId: sourceId || null,
+                name: name || 'Untitled Order',
+                students: orderedNames.map(function(n) { return { name: n, called: false }; }),
+                collapsed: false,
+                createdAt: Date.now()
+            };
+            // Collapse any previously active lists so the newest one is the visible one on top
+            (liveState.activeLists || []).forEach(function(l) { l.collapsed = true; });
+            liveState.activeLists.push(newList);
+            logEvent('list_active', { name: name, count: orderedNames.length });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function findActiveList(listId) {
+            return (liveState.activeLists || []).find(function(x) { return x.id === listId; });
+        }
+
+        function toggleCallCollapse(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            al.collapsed = !al.collapsed;
+            saveLiveState();
+            var card = document.querySelector('.call-card[data-alid="' + listId + '"]');
+            if (card) {
+                card.classList.toggle('collapsed', al.collapsed);
+                var caret = card.querySelector('.call-caret');
+                if (caret) caret.textContent = al.collapsed ? '▶' : '▼';
+            }
+        }
+
+        function toggleCalled(listId, index) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var s = al.students[index];
+            if (!s) return;
+            s.called = !s.called;
+            logEvent(s.called ? 'call_marked' : 'call_unmarked', { list: al.name, student: s.name, position: index + 1 });
+            saveLiveState();
+            // Surgical update — mutate only the affected item + this card's progress, keeping scroll in place
+            updateCallItemDOM(listId, index);
+            updateCallCardMetaDOM(listId);
+        }
+
+        function updateCallItemDOM(listId, index) {
+            var card = document.querySelector('.call-card[data-alid="' + listId + '"]');
+            if (!card) return;
+            var itemEl = card.querySelector('.cl-item[data-idx="' + index + '"]');
+            if (!itemEl) return;
+            var al = findActiveList(listId);
+            if (!al) return;
+            var s = al.students[index];
+            if (!s) return;
+            itemEl.classList.toggle('called', s.called);
+            var check = itemEl.querySelector('.cl-check');
+            if (check) check.textContent = s.called ? '✓' : '';
+        }
+
+        function updateCallCardMetaDOM(listId) {
+            var card = document.querySelector('.call-card[data-alid="' + listId + '"]');
+            if (!card) return;
+            var al = findActiveList(listId);
+            if (!al) return;
+            var called = al.students.filter(function(s) { return s.called; }).length;
+            var total = al.students.length;
+            var pct = total > 0 ? Math.round((called / total) * 100) : 0;
+            var isCompleted = called === total && total > 0;
+            var countBadge = card.querySelector('.call-count');
+            if (countBadge) countBadge.textContent = called + '/' + total;
+            var bar = card.querySelector('.call-progress-bar');
+            if (bar) bar.style.width = pct + '%';
+            var txt = card.querySelector('.call-progress-text');
+            if (txt) txt.innerHTML = '<span>' + called + ' / ' + total + ' called</span><span>' + pct + '%</span>';
+            card.classList.toggle('completed', isCompleted);
+        }
+
+        function resetCallList(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            if (!confirm("Uncheck all names in '" + al.name + "'?")) return;
+            al.students.forEach(function(s) { s.called = false; });
+            logEvent('list_reset', { list: al.name });
+            saveLiveState();
+            // Bulk surgical update — every item in this card back to unchecked, progress to 0
+            var card = document.querySelector('.call-card[data-alid="' + listId + '"]');
+            if (card) {
+                card.querySelectorAll('.cl-item').forEach(function(el) {
+                    el.classList.remove('called');
+                    var check = el.querySelector('.cl-check');
+                    if (check) check.textContent = '';
+                });
+                updateCallCardMetaDOM(listId);
+            }
+        }
+
+        function finishCallList(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var called = al.students.filter(function(s) { return s.called; });
+            var uncalled = al.students.filter(function(s) { return !s.called; });
+            var msg = "Archive '" + al.name + "'?\n\n" +
+                called.length + " of " + al.students.length + " called.";
+            if (uncalled.length > 0) msg += "\n" + uncalled.length + " never called.";
+            if (!confirm(msg)) return;
+
+            liveState.archivedLists.push({
+                id: 'ar_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: al.name,
+                students: al.students.map(function(s) { return s.name; }),
+                calledNames: called.map(function(s) { return s.name; }),
+                uncalledNames: uncalled.map(function(s) { return s.name; }),
+                createdAt: al.createdAt,
+                archivedAt: Date.now()
+            });
+            liveState.activeLists = liveState.activeLists.filter(function(x) { return x.id !== listId; });
+            logEvent('list_archived', { name: al.name, calledCount: called.length, total: al.students.length });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function renderCallLists() {
+            var host = document.getElementById('call-lists-container');
+            if (!host) return;
+            var lists = liveState.activeLists || [];
+            if (lists.length === 0) {
+                host.innerHTML = '';
+                updateLeftPanelVisibility();
+                return;
+            }
+            var html = '';
+            // Newest at top so a fresh generation is immediately visible
+            lists.slice().reverse().forEach(function(al) {
+                var called = al.students.filter(function(s) { return s.called; }).length;
+                var total = al.students.length;
+                var pct = total > 0 ? Math.round((called / total) * 100) : 0;
+                var isCompleted = called === total && total > 0;
+                var isCollapsed = al.collapsed === true;
+                var caret = isCollapsed ? '▶' : '▼';
+
+                html += '<div class="call-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') + '" data-alid="' + al.id + '">';
+                html += '<div class="call-header" onclick="toggleCallCollapse(\'' + al.id + '\')">';
+                html += '<span class="call-caret">' + caret + '</span>';
+                html += '<div class="call-name" title="' + escapeAttrHtml(al.name) + '">📋 ' + escapeHtml(al.name) + '</div>';
+                html += '<span class="call-count">' + called + '/' + total + '</span>';
+                html += '</div>';
+                html += '<div class="call-body">';
+                html += '<div class="call-progress"><div class="call-progress-bar" style="width:' + pct + '%;"></div></div>';
+                html += '<div class="call-progress-text"><span>' + called + ' / ' + total + ' called</span><span>' + pct + '%</span></div>';
+                al.students.forEach(function(s, i) {
+                    html += '<div class="cl-item ' + (s.called ? 'called' : '') + '" data-idx="' + i + '" onclick="toggleCalled(\'' + al.id + '\',' + i + ')">';
+                    html += '<span class="cl-num">' + (i + 1) + '.</span>';
+                    html += '<span class="cl-check">' + (s.called ? '✓' : '') + '</span>';
+                    html += '<span class="cl-name">' + escapeHtml(s.name) + '</span>';
+                    html += '</div>';
+                });
+                html += '<div class="call-actions">';
+                html += '<button onclick="resetCallList(\'' + al.id + '\')" title="Uncheck all">Reset</button>';
+                html += '<button class="call-finish" onclick="finishCallList(\'' + al.id + '\')" title="Archive this list">✓ Finish</button>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            host.innerHTML = html;
+            updateLeftPanelVisibility();
+        }
+
+        // Coordinate visibility of the whole left panel wrapper based on its two children
+        function updateLeftPanelVisibility() {
+            var left = document.getElementById('left-panel');
+            var todoWrap = document.getElementById('todo-panel-wrapper');
+            var callWrap = document.getElementById('call-panel-wrapper');
+            if (!left) return;
+            var todoShown = (liveState.todoLists || []).length > 0;
+            var callShown = (liveState.activeLists || []).length > 0;
+            if (todoWrap) todoWrap.classList.toggle('show', todoShown);
+            if (callWrap) callWrap.classList.toggle('show', callShown);
+            left.classList.toggle('show', todoShown || callShown);
+            left.classList.toggle('both-showing', todoShown && callShown);
+        }
+
+        function escapeAttrHtml(s) {
+            // For titles/aria — plain HTML escape sufficient
+            return escapeHtml(s);
+        }
+
+        // --- Saved lists modal ---
+        function openSavedListsModal() {
+            closeClassToolsMenu();
+            var lists = liveState.savedLists || [];
+            var html = '<div class="modal-title">📂 Saved Lists</div>';
+            if (lists.length === 0) {
+                html += '<div style="color:#94a3b8;font-style:italic;padding:12px 0;">No saved lists yet. Generate an order list and click "Save & Use" to save one.</div>';
+            } else {
+                html += '<div style="font-size:0.85rem;color:#64748b;margin-bottom:12px;">Click a list to load it as your active call list.</div>';
+                lists.slice().reverse().forEach(function(sl) {
+                    html += '<div class="saved-list-row">';
+                    html += '<div style="flex:1;">';
+                    html += '<div class="sl-name">' + escapeHtml(sl.name) + '</div>';
+                    html += '<div class="sl-meta">' + sl.students.length + ' students · Saved ' + formatTs(sl.createdAt) + '</div>';
+                    html += '</div>';
+                    html += '<button class="automation" onclick="loadSavedList(\'' + sl.id + '\')">Load</button>';
+                    html += '<button class="danger" onclick="deleteSavedList(\'' + sl.id + '\')" title="Delete">✕</button>';
+                    html += '</div>';
+                });
+            }
+            html += '<div class="modal-actions"><button class="export-btn" onclick="closeModal()">Close</button></div>';
+            openModal(html);
+        }
+        function loadSavedList(id) {
+            var sl = (liveState.savedLists || []).find(function(x) { return x.id === id; });
+            if (!sl) return;
+            // New list adds to the stack rather than replacing anything
+            makeActiveList(sl.name, sl.students, sl.id);
+            closeModal();
+            if (document.getElementById('shuffle-overlay').classList.contains('show')) {
+                cancelShuffle();
+            }
+        }
+        function deleteSavedList(id) {
+            if (!confirm("Delete this saved list? This cannot be undone.")) return;
+            liveState.savedLists = (liveState.savedLists || []).filter(function(x) { return x.id !== id; });
+            saveLiveState();
+            openSavedListsModal(); // refresh
+        }
+
+        // --- Archives modal ---
+        function openArchivesModal() {
+            closeClassToolsMenu();
+            var lists = liveState.archivedLists || [];
+            var html = '<div class="modal-title">📁 Archived Lists</div>';
+            if (lists.length === 0) {
+                html += '<div style="color:#94a3b8;font-style:italic;padding:12px 0;">No archived lists yet. Finished call lists are archived here.</div>';
+            } else {
+                html += '<div style="font-size:0.85rem;color:#64748b;margin-bottom:12px;">' + lists.length + ' archived list' + (lists.length === 1 ? '' : 's') + ', newest first.</div>';
+                lists.slice().reverse().forEach(function(ar) {
+                    var pct = ar.students.length > 0 ? Math.round((ar.calledNames.length / ar.students.length) * 100) : 0;
+                    html += '<div class="saved-list-row">';
+                    html += '<div style="flex:1;">';
+                    html += '<div class="sl-name">' + escapeHtml(ar.name) + '</div>';
+                    html += '<div class="sl-meta">' + ar.calledNames.length + '/' + ar.students.length + ' called (' + pct + '%) · Archived ' + formatTs(ar.archivedAt) + '</div>';
+                    html += '</div>';
+                    html += '<button onclick="viewArchive(\'' + ar.id + '\')">View</button>';
+                    html += '<button class="danger" onclick="deleteArchive(\'' + ar.id + '\')" title="Delete">✕</button>';
+                    html += '</div>';
+                });
+            }
+            html += '<div class="modal-actions"><button class="export-btn" onclick="closeModal()">Close</button></div>';
+            openModal(html);
+        }
+        function viewArchive(id) {
+            var ar = (liveState.archivedLists || []).find(function(x) { return x.id === id; });
+            if (!ar) return;
+            var pct = ar.students.length > 0 ? Math.round((ar.calledNames.length / ar.students.length) * 100) : 0;
+            var cameFromLauncher = document.getElementById('shuffle-overlay').classList.contains('show');
+            var html = '<div class="modal-title">📁 ' + escapeHtml(ar.name) + '</div>';
+            html += '<div style="font-size:0.85rem;color:#64748b;margin-bottom:14px;">';
+            html += ar.calledNames.length + ' of ' + ar.students.length + ' called (' + pct + '%) · ';
+            html += 'Archived ' + formatTs(ar.archivedAt);
+            html += '</div>';
+            html += '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin:12px 0 6px;">Order</div>';
+            html += '<div style="max-height:40vh;overflow-y:auto;">';
+            ar.students.forEach(function(name, i) {
+                var wasCalled = ar.calledNames.indexOf(name) !== -1;
+                html += '<div style="padding:6px 10px;margin-bottom:3px;background:' + (wasCalled ? '#ecfdf5' : '#fef2f2') + ';border-radius:4px;font-size:0.9rem;display:flex;gap:8px;align-items:center;">';
+                html += '<span style="color:#64748b;font-size:0.75rem;min-width:24px;">' + (i + 1) + '.</span>';
+                html += '<span style="flex:1;' + (wasCalled ? 'text-decoration:line-through;color:#64748b;' : '') + '">' + escapeHtml(name) + '</span>';
+                html += '<span style="font-size:0.75rem;color:' + (wasCalled ? '#10b981' : '#ef4444') + ';">' + (wasCalled ? '✓ called' : '— not called') + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+            html += '<div class="modal-actions">';
+            html += '<button class="export-btn" onclick="closeModal()">' + (cameFromLauncher ? 'Close' : 'Back') + '</button>';
+            html += '<button onclick="reactivateArchive(\'' + ar.id + '\')">Reactivate</button>';
+            html += '</div>';
+            openModal(html);
+        }
+        function reactivateArchive(id) {
+            var ar = (liveState.archivedLists || []).find(function(x) { return x.id === id; });
+            if (!ar) return;
+            // Push to the stack (previously active lists coexist)
+            var restored = {
+                id: 'al_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                sourceId: null,
+                name: ar.name + ' (restored)',
+                students: ar.students.map(function(n) {
+                    return { name: n, called: ar.calledNames.indexOf(n) !== -1 };
+                }),
+                collapsed: false,
+                createdAt: Date.now()
+            };
+            (liveState.activeLists || []).forEach(function(l) { l.collapsed = true; });
+            liveState.activeLists.push(restored);
+            logEvent('list_reactivated', { name: ar.name });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+        function deleteArchive(id) {
+            if (!confirm("Delete this archived list? This cannot be undone.")) return;
+            liveState.archivedLists = (liveState.archivedLists || []).filter(function(x) { return x.id !== id; });
+            saveLiveState();
+            openArchivesModal();
+        }
+
+        // ============================================================
+        //  CLASS TO-DO LISTS (right-side collapsible cards)
+        // ============================================================
+
+        // Create/edit modal — items entered as one per line (each may be a sentence)
+        function openCreateTodoModal(editId) {
+            closeClassToolsMenu();
+            var editing = null;
+            if (editId) {
+                editing = (liveState.todoLists || []).find(function(x) { return x.id === editId; });
+                if (!editing) editId = null;
+            }
+            var savedArchivedCount = (liveState.archivedTodoLists || []).length;
+            var archived = liveState.archivedTodoLists || [];
+
+            var itemsText = '';
+            if (editing) {
+                itemsText = editing.items.map(function(it) { return it.text; }).join('\n');
+            }
+
+            var html = '<div class="modal-title">' + (editing ? '✏️ Edit To-Do List' : '☑ New Class To-Do List') + '</div>';
+            html += '<label>List name</label>';
+            html += '<input type="text" id="todo-name-input" placeholder="e.g., Prep for Monday, Chapter 5 homework" value="' + (editing ? escapeAttrHtml(editing.name) : '') + '">';
+            html += '<label>Items (one per line — each can be up to a full sentence)</label>';
+            html += '<textarea class="todo-items-input" id="todo-items-input" placeholder="Set up the projector and test the HDMI connection.&#10;Print handouts for chapter 5.&#10;Return graded quizzes to students.">' + escapeHtml(itemsText) + '</textarea>';
+            html += '<div style="font-size:0.75rem;color:#64748b;margin-top:4px;">Empty lines are ignored. Existing checked items are preserved when editing.</div>';
+
+            if (!editing && archived.length > 0) {
+                html += '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;">';
+                html += '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">📁 Archived To-Do Lists</div>';
+                archived.slice().reverse().forEach(function(al) {
+                    var doneCount = al.items.filter(function(it) { return it.done; }).length;
+                    html += '<div style="padding:8px 10px;background:#f8fafc;border-radius:5px;margin-bottom:6px;display:flex;align-items:center;gap:8px;border:1px solid #e2e8f0;">';
+                    html += '<div style="flex:1;font-size:0.85rem;">';
+                    html += '<div style="font-weight:600;color:#2c3e50;">' + escapeHtml(al.name) + '</div>';
+                    html += '<div style="font-size:0.72rem;color:#64748b;">' + doneCount + '/' + al.items.length + ' done · ' + formatTs(al.archivedAt) + '</div>';
+                    html += '</div>';
+                    html += '<button class="automation" style="padding:5px 10px;font-size:0.75rem;" onclick="restoreTodoList(\'' + al.id + '\')">Restore</button>';
+                    html += '<button class="danger" style="padding:5px 8px;font-size:0.75rem;" onclick="deleteArchivedTodo(\'' + al.id + '\')">✕</button>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '<div class="modal-actions">';
+            html += '<button class="export-btn" onclick="closeModal()">Cancel</button>';
+            if (editing) {
+                html += '<button class="automation" onclick="saveTodoEdit(\'' + editing.id + '\')">Save Changes</button>';
+            } else {
+                html += '<button class="automation" onclick="createTodoList()">Create List</button>';
+            }
+            html += '</div>';
+            openModal(html);
+            setTimeout(function() {
+                var inp = document.getElementById('todo-name-input');
+                if (inp) inp.focus();
+            }, 100);
+        }
+
+        function parseTodoItems(text) {
+            return text.split(/\r?\n/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+        }
+
+        function createTodoList() {
+            var name = (document.getElementById('todo-name-input').value || '').trim();
+            var itemsText = document.getElementById('todo-items-input').value || '';
+            if (!name) { alert("Please give the list a name."); return; }
+            var items = parseTodoItems(itemsText);
+            if (items.length === 0) { alert("Add at least one item."); return; }
+            var list = {
+                id: 'tl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: name,
+                items: items.map(function(t, i) {
+                    return { id: 'ti_' + Date.now() + '_' + i, text: t, done: false };
+                }),
+                collapsed: false,
+                createdAt: Date.now()
+            };
+            liveState.todoLists.push(list);
+            logEvent('todo_created', { name: name, itemCount: items.length });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+
+        function saveTodoEdit(id) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === id; });
+            if (!list) return;
+            var name = (document.getElementById('todo-name-input').value || '').trim();
+            var itemsText = document.getElementById('todo-items-input').value || '';
+            if (!name) { alert("Please give the list a name."); return; }
+            var newItems = parseTodoItems(itemsText);
+            if (newItems.length === 0) { alert("The list needs at least one item."); return; }
+            // Preserve done state for items whose text is unchanged
+            var oldDoneMap = {};
+            list.items.forEach(function(it) { if (it.done) oldDoneMap[it.text] = true; });
+            list.name = name;
+            list.items = newItems.map(function(t, i) {
+                return { id: 'ti_' + Date.now() + '_' + i, text: t, done: !!oldDoneMap[t] };
+            });
+            logEvent('todo_edited', { name: name, itemCount: newItems.length });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+
+        function renderTodoLists() {
+            var host = document.getElementById('todo-lists-container');
+            if (!host) return;
+            var lists = liveState.todoLists || [];
+            if (lists.length === 0) {
+                host.innerHTML = '';
+                updateLeftPanelVisibility();
+                return;
+            }
+            var html = '';
+            lists.forEach(function(list) {
+                var doneCount = list.items.filter(function(it) { return it.done; }).length;
+                var pct = list.items.length > 0 ? Math.round((doneCount / list.items.length) * 100) : 0;
+                var isCompleted = doneCount === list.items.length && list.items.length > 0;
+                var isCollapsed = list.collapsed === true;
+                var caret = isCollapsed ? '▶' : '▼';
+
+                html += '<div class="todo-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') + '" data-tlid="' + list.id + '">';
+                html += '<div class="todo-header" onclick="toggleTodoCollapse(\'' + list.id + '\')">';
+                html += '<span class="todo-caret">' + caret + '</span>';
+                html += '<div class="todo-name">' + escapeHtml(list.name) + '</div>';
+                html += '<span class="todo-count">' + doneCount + '/' + list.items.length + '</span>';
+                html += '<button class="todo-menu-btn" onclick="event.stopPropagation();openCreateTodoModal(\'' + list.id + '\')" title="Edit list">✏️</button>';
+                html += '</div>';
+                html += '<div class="todo-body">';
+                html += '<div class="todo-progress"><div class="todo-progress-bar" style="width:' + pct + '%;"></div></div>';
+                list.items.forEach(function(it) {
+                    html += '<div class="todo-item ' + (it.done ? 'done' : '') + '" data-tiid="' + it.id + '" onclick="toggleTodoItem(\'' + list.id + '\',\'' + it.id + '\')">';
+                    html += '<span class="todo-check">' + (it.done ? '✓' : '') + '</span>';
+                    html += '<span class="todo-item-text">' + escapeHtml(it.text) + '</span>';
+                    html += '</div>';
+                });
+                html += '<div class="todo-actions">';
+                html += '<button onclick="resetTodoList(\'' + list.id + '\')">Reset</button>';
+                html += '<button onclick="archiveTodoList(\'' + list.id + '\')">📁 Archive</button>';
+                html += '<button class="todo-danger" onclick="deleteTodoList(\'' + list.id + '\')">Delete</button>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            host.innerHTML = html;
+            updateLeftPanelVisibility();
+        }
+
+        function toggleTodoCollapse(listId) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            list.collapsed = !list.collapsed;
+            saveLiveState();
+            // Surgical update — no need to re-render the whole panel
+            var card = document.querySelector('.todo-card[data-tlid="' + listId + '"]');
+            if (card) {
+                card.classList.toggle('collapsed', list.collapsed);
+                var caret = card.querySelector('.todo-caret');
+                if (caret) caret.textContent = list.collapsed ? '▶' : '▼';
+            }
+        }
+
+        function toggleTodoItem(listId, itemId) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            var item = list.items.find(function(x) { return x.id === itemId; });
+            if (!item) return;
+            item.done = !item.done;
+            logEvent(item.done ? 'todo_item_checked' : 'todo_item_unchecked', { list: list.name, item: item.text });
+            saveLiveState();
+            // Surgical update — mutate only this item + this card's progress/count/completed state
+            updateTodoItemDOM(listId, itemId);
+            updateTodoCardMetaDOM(listId);
+        }
+
+        function updateTodoItemDOM(listId, itemId) {
+            var itemEl = document.querySelector('.todo-card[data-tlid="' + listId + '"] .todo-item[data-tiid="' + itemId + '"]');
+            if (!itemEl) return;
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            var item = list.items.find(function(x) { return x.id === itemId; });
+            if (!item) return;
+            itemEl.classList.toggle('done', item.done);
+            var check = itemEl.querySelector('.todo-check');
+            if (check) check.textContent = item.done ? '✓' : '';
+        }
+
+        function updateTodoCardMetaDOM(listId) {
+            var card = document.querySelector('.todo-card[data-tlid="' + listId + '"]');
+            if (!card) return;
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            var doneCount = list.items.filter(function(it) { return it.done; }).length;
+            var total = list.items.length;
+            var pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+            var isCompleted = doneCount === total && total > 0;
+            var countBadge = card.querySelector('.todo-count');
+            if (countBadge) countBadge.textContent = doneCount + '/' + total;
+            var progressBar = card.querySelector('.todo-progress-bar');
+            if (progressBar) progressBar.style.width = pct + '%';
+            card.classList.toggle('completed', isCompleted);
+        }
+
+        function resetTodoList(listId) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            if (!confirm("Uncheck all items in '" + list.name + "'?")) return;
+            list.items.forEach(function(it) { it.done = false; });
+            saveLiveState();
+            // Bulk surgical update — every item in this card back to unchecked, progress to 0
+            var card = document.querySelector('.todo-card[data-tlid="' + listId + '"]');
+            if (card) {
+                card.querySelectorAll('.todo-item').forEach(function(el) {
+                    el.classList.remove('done');
+                    var check = el.querySelector('.todo-check');
+                    if (check) check.textContent = '';
+                });
+                updateTodoCardMetaDOM(listId);
+            }
+        }
+
+        function deleteTodoList(listId) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            if (!confirm("Delete '" + list.name + "'? This cannot be undone. Use Archive instead if you want to keep it.")) return;
+            liveState.todoLists = liveState.todoLists.filter(function(x) { return x.id !== listId; });
+            logEvent('todo_deleted', { name: list.name });
+            saveLiveState();
+            renderTodoLists();
+            updateClassToolsMenuBadges();
+        }
+
+        function archiveTodoList(listId) {
+            var list = (liveState.todoLists || []).find(function(x) { return x.id === listId; });
+            if (!list) return;
+            var doneCount = list.items.filter(function(it) { return it.done; }).length;
+            if (!confirm("Archive '" + list.name + "'?\n\n" + doneCount + " of " + list.items.length + " items completed.")) return;
+            liveState.archivedTodoLists.push({
+                id: 'atl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: list.name,
+                items: list.items.map(function(it) { return { text: it.text, done: it.done }; }),
+                createdAt: list.createdAt,
+                archivedAt: Date.now()
+            });
+            liveState.todoLists = liveState.todoLists.filter(function(x) { return x.id !== listId; });
+            logEvent('todo_archived', { name: list.name, doneCount: doneCount, total: list.items.length });
+            saveLiveState();
+            renderTodoLists();
+            updateClassToolsMenuBadges();
+        }
+
+        function restoreTodoList(archivedId) {
+            var ar = (liveState.archivedTodoLists || []).find(function(x) { return x.id === archivedId; });
+            if (!ar) return;
+            var restored = {
+                id: 'tl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: ar.name,
+                items: ar.items.map(function(it, i) {
+                    return { id: 'ti_' + Date.now() + '_' + i, text: it.text, done: !!it.done };
+                }),
+                collapsed: false,
+                createdAt: Date.now()
+            };
+            liveState.todoLists.push(restored);
+            liveState.archivedTodoLists = liveState.archivedTodoLists.filter(function(x) { return x.id !== archivedId; });
+            logEvent('todo_restored', { name: ar.name });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+
+        function deleteArchivedTodo(archivedId) {
+            var ar = (liveState.archivedTodoLists || []).find(function(x) { return x.id === archivedId; });
+            if (!ar) return;
+            if (!confirm("Permanently delete archived list '" + ar.name + "'?")) return;
+            liveState.archivedTodoLists = liveState.archivedTodoLists.filter(function(x) { return x.id !== archivedId; });
+            saveLiveState();
+            openCreateTodoModal(); // refresh
+        }
+
+        // ============================================================
+        //  TIMER (unchanged)
+        // ============================================================
+        var timerInterval = null;
+        var timerEndTs = null;
+
+        function startTimer(seconds) {
+            if (timerInterval) clearInterval(timerInterval);
+            timerEndTs = Date.now() + seconds * 1000;
+            var pip = document.getElementById('timer-pip');
+            pip.classList.add('show');
+            pip.classList.remove('ending', 'done');
+            document.getElementById('tp-close-btn').title = 'Cancel timer';
+            document.getElementById('tp-label').innerText = formatMinLabel(seconds);
+            updateTimerTick();
+            timerInterval = setInterval(updateTimerTick, 200);
+            logEvent('timer_start', { seconds: seconds });
+        }
+        function formatMinLabel(seconds) {
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            if (s === 0) return m + ' min';
+            return m + 'm ' + s + 's';
+        }
+        function updateTimerTick() {
+            var remainMs = timerEndTs - Date.now();
+            var pip = document.getElementById('timer-pip');
+            var disp = document.getElementById('tp-display');
+            if (remainMs <= 0) {
+                disp.innerText = '00:00';
+                pip.classList.remove('ending');
+                pip.classList.add('done');
+                document.getElementById('tp-label').innerText = "Time's up!";
+                document.getElementById('tp-close-btn').title = 'Dismiss';
+                clearInterval(timerInterval);
+                timerInterval = null;
+                playBell();
+                logEvent('timer_end', {});
+                return;
+            }
+            var totalSec = Math.ceil(remainMs / 1000);
+            var mm = Math.floor(totalSec / 60).toString().padStart(2, '0');
+            var ss = (totalSec % 60).toString().padStart(2, '0');
+            disp.innerText = mm + ':' + ss;
+            if (totalSec <= 10) pip.classList.add('ending');
+            else pip.classList.remove('ending');
+        }
+        function cancelTimer() {
+            // Serves as both "cancel" (while running) and "dismiss" (after done)
+            var wasRunning = timerInterval !== null;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = null;
+            timerEndTs = null;
+            document.getElementById('timer-pip').classList.remove('show', 'ending', 'done');
+            if (wasRunning) logEvent('timer_cancel', {});
+        }
+        function promptCustomTimer() {
+            var html =
+                '<div class="modal-title">Custom Timer</div>' +
+                '<label>Minutes</label>' +
+                '<input type="number" id="ct-min" value="10" min="0" max="120" step="1">' +
+                '<label>Seconds</label>' +
+                '<input type="number" id="ct-sec" value="0" min="0" max="59" step="1">' +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                    '<button class="automation" onclick="startCustomTimer()">Start Timer</button>' +
+                '</div>';
+            openModal(html);
+        }
+        function startCustomTimer() {
+            var m = parseInt(document.getElementById('ct-min').value) || 0;
+            var s = parseInt(document.getElementById('ct-sec').value) || 0;
+            var total = m * 60 + s;
+            if (total <= 0) { alert("Enter a duration greater than 0."); return; }
+            closeModal();
+            startTimer(total);
+        }
+
+        // ============================================================
+        //  RESET SESSION
+        // ============================================================
+        function resetLiveSession() {
+            var msg = "Reset the live session?\n\n" +
+                "This clears: groups, points, notes, active call lists, and event history.\n" +
+                "Saved lists, archives, and to-do lists are kept. Your classroom layout in the Designer is not touched.\n\n" +
+                "Consider exporting to CSV or PDF first.";
+            if (!confirm(msg)) return;
+            var keepSaved = liveState.savedLists || [];
+            var keepArchived = liveState.archivedLists || [];
+            var keepTodo = liveState.todoLists || [];
+            var keepArchivedTodo = liveState.archivedTodoLists || [];
+            liveState = defaultLiveState();
+            liveState.className = document.getElementById('class-name-input').value;
+            liveState.savedLists = keepSaved;
+            liveState.archivedLists = keepArchived;
+            liveState.todoLists = keepTodo;
+            liveState.archivedTodoLists = keepArchivedTodo;
+            saveLiveState();
+            renderLiveView();
+        }
+
+        // ============================================================
+        //  EXPORT (CSV + PDF)
+        // ============================================================
+        function exportCSV() {
+            var data = getStudentsFromDesigner();
+            var className = liveState.className || 'Class';
+            var rows = [];
+
+            // Header sheet: class metadata
+            rows.push(['Class Name', className]);
+            rows.push(['Session Start', formatTs(liveState.sessionStart || Date.now())]);
+            rows.push(['Exported', formatTs(Date.now())]);
+            rows.push([]);
+
+            // Roster
+            rows.push(['STUDENT', 'GROUP', 'POINTS', 'NOTE COUNT', 'NOTES']);
+            data.students.forEach(s => {
+                var d = liveState.studentData[s.name] || { points: 0, notes: [] };
+                var grp = findGroupForStudent(s.name);
+                var notes = d.notes.map(n => '[' + formatTs(n.ts) + '] ' + n.text).join(' | ');
+                rows.push([s.name, grp ? grp.name : '(unassigned)', d.points, d.notes.length, notes]);
+            });
+            rows.push([]);
+
+            // Groups summary
+            rows.push(['GROUPS SUMMARY']);
+            rows.push(['GROUP', 'COLOR', 'MEMBER COUNT', 'TOTAL POINTS', 'MEMBERS']);
+            liveState.groups.forEach(g => {
+                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
+                rows.push([g.name, g.color, g.members.length, total, g.members.join(' | ')]);
+            });
+            rows.push([]);
+
+            // Event log
+            rows.push(['SESSION EVENTS']);
+            rows.push(['TIMESTAMP', 'TYPE', 'DETAILS']);
+            liveState.events.forEach(e => {
+                rows.push([formatTs(e.ts), e.type, JSON.stringify(e.details)]);
+            });
+
+            var csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+            downloadBlob(csv, sanitizeFile(className) + '_session.csv', 'text/csv');
+            logEvent('export_csv', {});
+            saveLiveState();
+        }
+        function csvEscape(v) {
+            if (v === null || v === undefined) return '';
+            var s = String(v);
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+                return '"' + s.replace(/"/g, '""') + '"';
+            }
+            return s;
+        }
+        function sanitizeFile(s) {
+            return String(s || 'class').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'class';
+        }
+        function downloadBlob(content, filename, mime) {
+            var blob = new Blob([content], { type: mime });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 500);
+        }
+
+        function exportPDF() {
+            var data = getStudentsFromDesigner();
+            var className = liveState.className || 'Class';
+
+            // Prefer jsPDF if loaded; fall back to a print-friendly HTML doc
+            var jspdf = window.jspdf;
+            if (!jspdf || !jspdf.jsPDF) {
+                exportPDFViaPrint(className, data);
+                return;
+            }
+
+            var doc = new jspdf.jsPDF({ unit: 'pt', format: 'letter' });
+            var margin = 40;
+            var y = margin;
+            var pageW = doc.internal.pageSize.getWidth();
+            var pageH = doc.internal.pageSize.getHeight();
+
+            function checkPage(needed) {
+                if (y + needed > pageH - margin) {
+                    doc.addPage();
+                    y = margin;
+                }
+            }
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(18);
+            doc.text(className, margin, y); y += 22;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text('Session Start: ' + formatTs(liveState.sessionStart || Date.now()), margin, y); y += 14;
+            doc.text('Exported: ' + formatTs(Date.now()), margin, y); y += 20;
+            doc.setTextColor(0);
+
+            // Roster
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.text('Students', margin, y); y += 16;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+
+            data.students.forEach(s => {
+                var d = liveState.studentData[s.name] || { points: 0, notes: [] };
+                var grp = findGroupForStudent(s.name);
+                var line = s.name + '  •  ' + (grp ? grp.name : 'Unassigned') + '  •  ' + d.points + ' pts  •  ' + d.notes.length + ' note(s)';
+                checkPage(14);
+                doc.text(line, margin, y);
+                y += 14;
+                if (d.notes.length > 0) {
+                    doc.setTextColor(80);
+                    d.notes.forEach(n => {
+                        var noteLine = '   – [' + formatTs(n.ts) + '] ' + n.text;
+                        var wrapped = doc.splitTextToSize(noteLine, pageW - margin * 2);
+                        wrapped.forEach(wl => {
+                            checkPage(12);
+                            doc.text(wl, margin, y);
+                            y += 12;
+                        });
+                    });
+                    doc.setTextColor(0);
+                    y += 4;
+                }
+            });
+
+            // Groups
+            y += 10;
+            checkPage(30);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.text('Groups', margin, y); y += 16;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            liveState.groups.forEach(g => {
+                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
+                checkPage(28);
+                doc.setFont('helvetica', 'bold');
+                doc.text(g.name + '  (' + total + ' pts, ' + g.members.length + ' member' + (g.members.length===1?'':'s') + ')', margin, y);
+                y += 14;
+                doc.setFont('helvetica', 'normal');
+                var mList = g.members.join(', ') || '(no members)';
+                var wrapped = doc.splitTextToSize(mList, pageW - margin * 2);
+                wrapped.forEach(wl => {
+                    checkPage(12);
+                    doc.text(wl, margin, y);
+                    y += 12;
+                });
+                y += 6;
+            });
+
+            // Event log
+            y += 10;
+            checkPage(30);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.text('Session Events (' + liveState.events.length + ')', margin, y); y += 16;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            liveState.events.forEach(e => {
+                var line = '[' + formatTs(e.ts) + '] ' + e.type + ' — ' + JSON.stringify(e.details);
+                var wrapped = doc.splitTextToSize(line, pageW - margin * 2);
+                wrapped.forEach(wl => {
+                    checkPage(11);
+                    doc.text(wl, margin, y);
+                    y += 11;
+                });
+            });
+
+            doc.save(sanitizeFile(className) + '_session.pdf');
+            logEvent('export_pdf', {});
+            saveLiveState();
+        }
+
+        function exportPDFViaPrint(className, data) {
+            // Fallback if jsPDF failed to load: open a printable HTML window
+            var w = window.open('', '_blank');
+            if (!w) { alert("Please allow pop-ups so the printable report can open."); return; }
+            var html = '<html><head><title>' + escapeHtml(className) + ' — Session Report</title>' +
+                '<style>body{font-family:Segoe UI,Tahoma,sans-serif;padding:30px;color:#1a202c;}h1{margin-bottom:4px;}h2{margin-top:24px;border-bottom:2px solid #2c3e50;padding-bottom:4px;}.meta{color:#64748b;font-size:0.85rem;margin-bottom:16px;}table{width:100%;border-collapse:collapse;margin:10px 0;}th,td{padding:6px 10px;border:1px solid #e2e8f0;text-align:left;font-size:0.9rem;}th{background:#f1f5f9;}.note{color:#475569;font-size:0.85rem;padding-left:14px;}.grp{background:#f8fafc;padding:8px 12px;margin:6px 0;border-left:4px solid #4a6fa5;}</style>' +
+                '</head><body>';
+            html += '<h1>' + escapeHtml(className) + '</h1>';
+            html += '<div class="meta">Session Start: ' + formatTs(liveState.sessionStart || Date.now()) + ' &nbsp;·&nbsp; Exported: ' + formatTs(Date.now()) + '</div>';
+
+            html += '<h2>Students</h2><table><tr><th>Name</th><th>Group</th><th>Points</th><th>Notes</th></tr>';
+            data.students.forEach(s => {
+                var d = liveState.studentData[s.name] || { points: 0, notes: [] };
+                var grp = findGroupForStudent(s.name);
+                var notes = d.notes.map(n => '<div class="note">[' + formatTs(n.ts) + '] ' + escapeHtml(n.text) + '</div>').join('');
+                html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + (grp ? escapeHtml(grp.name) : '<em>Unassigned</em>') + '</td><td>' + d.points + '</td><td>' + (notes || '—') + '</td></tr>';
+            });
+            html += '</table>';
+
+            html += '<h2>Groups</h2>';
+            liveState.groups.forEach(g => {
+                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
+                html += '<div class="grp" style="border-left-color:' + g.color + ';"><strong>' + escapeHtml(g.name) + '</strong> — ' + total + ' pts — ' + g.members.length + ' members<br>' + g.members.map(escapeHtml).join(', ') + '</div>';
+            });
+
+            html += '<h2>Session Events</h2><table><tr><th>Time</th><th>Type</th><th>Details</th></tr>';
+            liveState.events.forEach(e => {
+                html += '<tr><td>' + formatTs(e.ts) + '</td><td>' + escapeHtml(e.type) + '</td><td>' + escapeHtml(JSON.stringify(e.details)) + '</td></tr>';
+            });
+            html += '</table><script>window.onload=function(){setTimeout(function(){window.print();},300);};<' + '/script></body></html>';
+            w.document.write(html);
+            w.document.close();
+            logEvent('export_pdf_print', {});
+            saveLiveState();
         }
     </script>
 </body>
