@@ -242,6 +242,165 @@
         }
         #session-stats strong { color: #2c3e50; }
 
+        /* Start/End Lesson button */
+        #lesson-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+            color: white;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(39, 174, 96, 0.35);
+            margin: 0;
+            flex-shrink: 0;
+        }
+        #lesson-btn:hover { background: linear-gradient(135deg, #1e8449, #145a32); }
+        #lesson-btn.in-lesson {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.35);
+        }
+        #lesson-btn.in-lesson:hover { background: linear-gradient(135deg, #c0392b, #922b1e); }
+        #lesson-btn.in-lesson::before {
+            content: '● ';
+            animation: lessonDot 1.5s ease-in-out infinite;
+        }
+        @keyframes lessonDot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* System clock (top-right of live header) */
+        #live-clock {
+            font-family: 'SF Mono', Menlo, Consolas, monospace;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #2c3e50;
+            padding: 6px 12px;
+            background: #f1f5f9;
+            border-radius: 6px;
+            letter-spacing: 1px;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+
+        /* Attendance banner (sits between header and live-main) */
+        #attendance-banner {
+            display: none;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 12px 20px;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+            border-bottom: 2px solid rgba(0,0,0,0.1);
+        }
+        #attendance-banner.show { display: flex; }
+        #attendance-banner .ab-info { flex: 1; min-width: 0; }
+        #attendance-banner .ab-title {
+            font-weight: 800;
+            font-size: 1rem;
+            margin-bottom: 2px;
+            letter-spacing: 0.3px;
+        }
+        #attendance-banner .ab-hint {
+            font-size: 0.8rem;
+            opacity: 0.95;
+            line-height: 1.4;
+        }
+        #attendance-banner .ab-swatch {
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.72rem;
+            margin: 0 3px;
+        }
+        #attendance-banner .ab-swatch.present { background: rgba(16,185,129,0.9); }
+        #attendance-banner .ab-swatch.absent { background: rgba(220,38,38,0.9); }
+        #attendance-banner .ab-swatch.late { background: rgba(146,64,14,0.9); }
+        #attendance-banner .ab-controls {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        #attendance-banner .ab-mini {
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+        #attendance-banner .ab-mini:hover { background: rgba(255,255,255,0.35); }
+        #attendance-banner .ab-done {
+            padding: 8px 16px;
+            background: white;
+            color: #92400e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 800;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        #attendance-banner .ab-done:hover { background: #fef3c7; }
+
+        /* Desk attendance state */
+        .live-student.att-absent {
+            opacity: 0.45;
+            border-color: #dc2626 !important;
+            border-style: dashed !important;
+            filter: grayscale(60%);
+        }
+        .live-student.att-late {
+            border-color: #d97706 !important;
+            box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.35), 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .live-student .stu-attendance {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 1px 5px;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+            color: white;
+            line-height: 1.2;
+        }
+        .stu-attendance.att-present-badge { background: #10b981; }
+        .stu-attendance.att-absent-badge { background: #dc2626; }
+        .stu-attendance.att-late-badge { background: #d97706; }
+
+        /* Reset Points button style — less alarming than Reset Session */
+        .ab-btn.reset-pts { background: #f39c12; }
+        .ab-btn.reset-pts:hover { background: #d68910; }
+
+        /* Attendance option buttons inside the profile modal */
+        .att-opt {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            flex: 1;
+            min-width: 90px;
+        }
+        .att-opt.att-present-btn { background: #10b981; }
+        .att-opt.att-present-btn:hover { background: #059669; }
+        .att-opt.att-absent-btn { background: #dc2626; }
+        .att-opt.att-absent-btn:hover { background: #b91c1c; }
+        .att-opt.att-late-btn { background: #d97706; }
+        .att-opt.att-late-btn:hover { background: #b45309; }
+
         #live-main {
             flex: 1;
             display: flex;
@@ -1660,10 +1819,24 @@
     <div id="live-view" class="view">
         <div id="live-header">
             <input type="text" id="class-name-input" placeholder="Class Name" oninput="onClassNameChange()">
+            <button id="lesson-btn" onclick="toggleLesson()" title="Start a lesson to take attendance">▶ Start Lesson</button>
             <div id="session-stats">
                 <span>Students: <strong id="stat-students">0</strong></span>
                 <span>Groups: <strong id="stat-groups">0</strong></span>
-                <span>Session: <strong id="stat-session">0m</strong></span>
+                <span id="stat-lesson-wrap" style="display:none;">Lesson: <strong id="stat-lesson">—</strong></span>
+            </div>
+            <div id="live-clock" title="System time">--:--</div>
+        </div>
+
+        <div id="attendance-banner">
+            <div class="ab-info">
+                <div class="ab-title">📋 Taking Attendance</div>
+                <div class="ab-hint">Click each desk to cycle its status: <span class="ab-swatch present">✓ Present</span> → <span class="ab-swatch absent">✗ Absent</span> → <span class="ab-swatch late">⏰ Late</span></div>
+            </div>
+            <div class="ab-controls">
+                <button class="ab-mini" onclick="markAllAttendance('present')" title="Mark everyone present">All Present</button>
+                <button class="ab-mini" onclick="markAllAttendance('absent')" title="Mark everyone absent">All Absent</button>
+                <button class="ab-done" onclick="finishAttendance()">✓ Done Taking Attendance</button>
             </div>
         </div>
 
@@ -1738,6 +1911,7 @@
             </div>
             <div class="ab-group">
                 <button class="ab-btn" onclick="refreshLayoutFromDesigner()">🔄 Reload Layout</button>
+                <button class="ab-btn reset-pts" onclick="resetAllPoints()">⭐ Reset Points</button>
                 <button class="ab-btn reset" onclick="resetLiveSession()">Reset Session</button>
             </div>
         </div>
@@ -2729,7 +2903,9 @@
                 savedLists: [],       // [{ id, name, students: [names], createdAt }]
                 archivedLists: [],    // [{ id, name, students, calledNames, createdAt, archivedAt }]
                 todoLists: [],        // [{ id, name, items: [{id, text, done}], collapsed, createdAt }]
-                archivedTodoLists: [] // [{ id, name, items, createdAt, archivedAt }]
+                archivedTodoLists: [],// [{ id, name, items, createdAt, archivedAt }]
+                activeLesson: null,   // { id, startedAt, attendance: { name -> 'present'|'absent'|'late' }, attendanceTakenAt }
+                completedLessons: []  // [{ id, startedAt, endedAt, durationMs, attendance, attendanceTakenAt }]
             };
         }
 
@@ -2753,6 +2929,8 @@
                     if (!liveState.archivedLists) liveState.archivedLists = [];
                     if (!liveState.todoLists) liveState.todoLists = [];
                     if (!liveState.archivedTodoLists) liveState.archivedTodoLists = [];
+                    if (liveState.activeLesson === undefined) liveState.activeLesson = null;
+                    if (!liveState.completedLessons) liveState.completedLessons = [];
                 } catch(e) {
                     liveState = defaultLiveState();
                 }
@@ -2879,11 +3057,21 @@
                     el.style.color = pickTextColor(bg);
                     var pts = (liveState.studentData[name] && liveState.studentData[name].points) || 0;
                     var noteCount = (liveState.studentData[name] && liveState.studentData[name].notes) ? liveState.studentData[name].notes.length : 0;
+                    var attStatus = getAttendance(name);
+                    if (attStatus === 'absent') el.classList.add('att-absent');
+                    else if (attStatus === 'late') el.classList.add('att-late');
+                    var attBadgeHtml = getAttendanceBadge(attStatus, isInAttendanceMode());
                     el.innerHTML =
                         '<span class="stu-name">' + escapeHtml(name) + '</span>' +
                         '<span class="stu-points">' + pts + '</span>' +
+                        attBadgeHtml +
                         (noteCount > 0 ? '<span class="stu-note-badge">📝' + noteCount + '</span>' : '');
-                    el.onclick = function() { openStudentModal(name); };
+                    el.onclick = (function(n) {
+                        return function() {
+                            if (isInAttendanceMode()) cycleAttendance(n);
+                            else openStudentModal(n);
+                        };
+                    })(name);
                 } else {
                     el.style.backgroundColor = item.color || '#e0d0b0';
                     el.style.color = pickTextColor(item.color || '#e0d0b0');
@@ -2901,18 +3089,54 @@
             renderCallLists();
             renderTodoLists();
             updateClassToolsMenuBadges();
+            updateLessonButtonUI();
+            updateAttendanceBannerUI();
         }
 
         function updateSessionTime() {
-            if (!liveState.sessionStart) liveState.sessionStart = Date.now();
-            var mins = Math.floor((Date.now() - liveState.sessionStart) / 60000);
-            document.getElementById('stat-session').innerText = mins + 'm';
-        }
-        setInterval(function() {
-            if (document.getElementById('live-view').classList.contains('active')) {
-                updateSessionTime();
+            var wrap = document.getElementById('stat-lesson-wrap');
+            var el = document.getElementById('stat-lesson');
+            if (!wrap || !el) return;
+            if (liveState.activeLesson) {
+                wrap.style.display = '';
+                var elapsedMs = Date.now() - liveState.activeLesson.startedAt;
+                el.innerText = formatLessonDuration(elapsedMs);
+            } else {
+                wrap.style.display = 'none';
             }
-        }, 30000);
+        }
+
+        function formatLessonDuration(ms) {
+            var s = Math.floor(ms / 1000);
+            var m = Math.floor(s / 60);
+            var h = Math.floor(m / 60);
+            var mm = m % 60;
+            var ss = s % 60;
+            if (h > 0) return h + 'h ' + (mm < 10 ? '0' : '') + mm + 'm';
+            if (mm > 0) return mm + 'm ' + (ss < 10 ? '0' : '') + ss + 's';
+            return ss + 's';
+        }
+        // Update lesson-elapsed frequently while a lesson is active, sparingly otherwise
+        setInterval(function() {
+            if (!document.getElementById('live-view').classList.contains('active')) return;
+            updateSessionTime();
+        }, 1000);
+
+        // Live system clock in the top-right of the live header
+        function updateLiveClock() {
+            var el = document.getElementById('live-clock');
+            if (!el) return;
+            var d = new Date();
+            var opts = { hour: '2-digit', minute: '2-digit' };
+            el.textContent = d.toLocaleTimeString([], opts);
+        }
+        updateLiveClock();
+        setInterval(updateLiveClock, 15000);
+        // Also update on the second when the minute rolls over — small vanity, keeps clock crisp
+        setTimeout(function initClockAlign() {
+            updateLiveClock();
+            setInterval(updateLiveClock, 60000);
+        }, (60 - new Date().getSeconds()) * 1000);
 
         function pickTextColor(bg) {
             var hex = rgbToHex(bg).replace('#','');
@@ -3302,7 +3526,206 @@
             }
         }
 
-        // --- Modal utilities ---
+        // ============================================================
+        //  LESSONS & ATTENDANCE
+        // ============================================================
+
+        function toggleLesson() {
+            if (liveState.activeLesson) endLesson();
+            else startLesson();
+        }
+
+        function startLesson() {
+            if (liveState.activeLesson) return;
+            var students = getStudentsFromDesigner().students;
+            if (students.length === 0) {
+                alert("Add students on the layout in the Designer tab first.");
+                return;
+            }
+            // Everyone starts as present; teacher clicks desks to change to absent/late during attendance mode
+            var attendance = {};
+            students.forEach(function(s) { attendance[s.name] = 'present'; });
+            liveState.activeLesson = {
+                id: 'les_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                startedAt: Date.now(),
+                attendance: attendance,
+                attendanceTakenAt: null // null = still in attendance-taking mode
+            };
+            logEvent('lesson_started', { studentCount: students.length });
+            saveLiveState();
+            updateLessonButtonUI();
+            updateAttendanceBannerUI();
+            renderLiveView();
+        }
+
+        function endLesson() {
+            if (!liveState.activeLesson) return;
+            var al = liveState.activeLesson;
+            var durationMs = Date.now() - al.startedAt;
+            var completed = {
+                id: al.id,
+                startedAt: al.startedAt,
+                endedAt: Date.now(),
+                durationMs: durationMs,
+                attendance: JSON.parse(JSON.stringify(al.attendance || {})),
+                attendanceTakenAt: al.attendanceTakenAt
+            };
+            liveState.completedLessons = liveState.completedLessons || [];
+            liveState.completedLessons.push(completed);
+            liveState.activeLesson = null;
+            logEvent('lesson_ended', {
+                durationMs: durationMs,
+                present: countAttendance(completed.attendance, 'present'),
+                absent: countAttendance(completed.attendance, 'absent'),
+                late: countAttendance(completed.attendance, 'late')
+            });
+            saveLiveState();
+            updateLessonButtonUI();
+            updateAttendanceBannerUI();
+            renderLiveView();
+
+            // Show a short summary so the teacher knows it was recorded
+            var summary = 'Lesson ended.\n\nDuration: ' + formatLessonDuration(durationMs) +
+                '\nPresent: ' + countAttendance(completed.attendance, 'present') +
+                '\nAbsent: ' + countAttendance(completed.attendance, 'absent') +
+                '\nLate: ' + countAttendance(completed.attendance, 'late') +
+                '\n\nThis lesson (with attendance) is now included in your CSV/PDF/JSON exports.';
+            alert(summary);
+        }
+
+        function countAttendance(att, status) {
+            var n = 0;
+            Object.keys(att || {}).forEach(function(k) { if (att[k] === status) n += 1; });
+            return n;
+        }
+
+        function updateLessonButtonUI() {
+            var btn = document.getElementById('lesson-btn');
+            if (!btn) return;
+            if (liveState.activeLesson) {
+                btn.textContent = 'End Lesson';
+                btn.classList.add('in-lesson');
+                btn.title = 'End the lesson and record duration';
+            } else {
+                btn.textContent = '▶ Start Lesson';
+                btn.classList.remove('in-lesson');
+                btn.title = 'Start a lesson to take attendance';
+            }
+        }
+
+        function updateAttendanceBannerUI() {
+            var banner = document.getElementById('attendance-banner');
+            if (!banner) return;
+            banner.classList.toggle('show', isInAttendanceMode());
+        }
+
+        function isInAttendanceMode() {
+            return !!(liveState.activeLesson && !liveState.activeLesson.attendanceTakenAt);
+        }
+
+        function getAttendance(name) {
+            if (!liveState.activeLesson) return null;
+            var v = liveState.activeLesson.attendance[name];
+            return v || 'present';
+        }
+
+        function setAttendance(name, status) {
+            if (!liveState.activeLesson) return;
+            var prev = liveState.activeLesson.attendance[name];
+            liveState.activeLesson.attendance[name] = status;
+            logEvent('attendance_set', { student: name, status: status, previous: prev || null });
+            saveLiveState();
+            updateStudentAttendanceDOM(name);
+        }
+
+        function cycleAttendance(name) {
+            if (!liveState.activeLesson) return;
+            var order = ['present', 'absent', 'late'];
+            var cur = getAttendance(name);
+            var next = order[(order.indexOf(cur) + 1) % order.length];
+            setAttendance(name, next);
+        }
+
+        function markAllAttendance(status) {
+            if (!liveState.activeLesson) return;
+            if (status === 'absent' && !confirm("Mark every student as absent? You can then click individual desks to mark them present.")) return;
+            var students = getStudentsFromDesigner().students;
+            students.forEach(function(s) {
+                liveState.activeLesson.attendance[s.name] = status;
+            });
+            logEvent('attendance_bulk', { status: status, count: students.length });
+            saveLiveState();
+            renderLiveView();
+        }
+
+        function finishAttendance() {
+            if (!liveState.activeLesson) return;
+            liveState.activeLesson.attendanceTakenAt = Date.now();
+            logEvent('attendance_complete', {
+                present: countAttendance(liveState.activeLesson.attendance, 'present'),
+                absent: countAttendance(liveState.activeLesson.attendance, 'absent'),
+                late: countAttendance(liveState.activeLesson.attendance, 'late')
+            });
+            saveLiveState();
+            updateAttendanceBannerUI();
+            renderLiveView(); // Re-render to drop "present" badges but keep absent/late visible
+        }
+
+        function getAttendanceBadge(status, showPresent) {
+            if (!status) return '';
+            if (status === 'present' && !showPresent) return '';
+            var label = { present: '✓', absent: '✗', late: '⏰' }[status] || '';
+            var cls = { present: 'att-present-badge', absent: 'att-absent-badge', late: 'att-late-badge' }[status] || '';
+            return '<span class="stu-attendance ' + cls + '">' + label + '</span>';
+        }
+
+        // Surgical update of one desk's attendance visuals
+        function updateStudentAttendanceDOM(name) {
+            var deskEl = null;
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                if (el.getAttribute('data-name') === name) deskEl = el;
+            });
+            if (!deskEl) return;
+            var status = getAttendance(name);
+            deskEl.classList.remove('att-absent', 'att-late');
+            if (status === 'absent') deskEl.classList.add('att-absent');
+            else if (status === 'late') deskEl.classList.add('att-late');
+            var oldBadge = deskEl.querySelector('.stu-attendance');
+            if (oldBadge) oldBadge.remove();
+            var badgeHtml = getAttendanceBadge(status, isInAttendanceMode());
+            if (badgeHtml) {
+                var tmp = document.createElement('div');
+                tmp.innerHTML = badgeHtml;
+                deskEl.appendChild(tmp.firstChild);
+            }
+        }
+
+        // ============================================================
+        //  RESET POINTS
+        // ============================================================
+        function resetAllPoints() {
+            var names = Object.keys(liveState.studentData || {});
+            var totalPts = 0;
+            names.forEach(function(n) { totalPts += (liveState.studentData[n].points || 0); });
+            var msg = "Reset all student points to 0?\n\n" +
+                names.length + " student" + (names.length === 1 ? '' : 's') + " affected. " +
+                "Current total: " + totalPts + " points.\n\n" +
+                "Notes, groups, lists, and attendance are NOT touched. This cannot be undone.";
+            if (!confirm(msg)) return;
+
+            names.forEach(function(n) {
+                if (liveState.studentData[n]) liveState.studentData[n].points = 0;
+            });
+            logEvent('points_reset_all', { studentCount: names.length, previousTotal: totalPts });
+            saveLiveState();
+
+            // Surgical update — every desk's badge, every group total, no full re-render
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(deskEl) {
+                var badge = deskEl.querySelector('.stu-points');
+                if (badge) badge.textContent = '0';
+            });
+            renderGroupsPanel();
+        }
         function openModal(html) {
             document.getElementById('modal-box').innerHTML = html;
             document.getElementById('modal-backdrop').classList.add('show');
@@ -3327,12 +3750,31 @@
                     notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + '</span>' + escapeHtml(n.text) + '</div>';
                 });
             }
+            // Attendance section — only shown when a lesson is active
+            var attHtml = '';
+            if (liveState.activeLesson) {
+                var curAtt = getAttendance(name);
+                var opt = function(status, label, cls) {
+                    var sel = curAtt === status ? ' style="outline:3px solid #2c3e50;outline-offset:1px;"' : '';
+                    return '<button class="att-opt ' + cls + '"' + sel + ' onclick="setAttendanceFromModal(\'' + escapeAttr(name) + '\',\'' + status + '\')">' + label + '</button>';
+                };
+                attHtml =
+                    '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px 12px;margin-bottom:14px;">' +
+                    '<div style="font-size:0.72rem;text-transform:uppercase;color:#92400e;font-weight:800;margin-bottom:6px;letter-spacing:0.5px;">📋 Attendance</div>' +
+                    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+                        opt('present', '✓ Present', 'att-present-btn') +
+                        opt('absent', '✗ Absent', 'att-absent-btn') +
+                        opt('late', '⏰ Late', 'att-late-btn') +
+                    '</div>' +
+                    '</div>';
+            }
             var html =
                 '<div class="modal-title">' + escapeHtml(name) + '</div>' +
                 '<div style="color:#64748b;font-size:0.85rem;margin-bottom:14px;">' +
                     'Points: <strong style="color:#2c3e50;font-size:1.1rem;">' + d.points + '</strong>' +
                     (grp ? ' &nbsp;·&nbsp; Group: <strong style="color:' + grp.color + ';">' + escapeHtml(grp.name) + '</strong>' : ' &nbsp;·&nbsp; Unassigned') +
                 '</div>' +
+                attHtml +
                 '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' +
                     '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">+1 point</button>' +
                     '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">+2 points</button>' +
@@ -3350,6 +3792,10 @@
                     notesHtml +
                 '</div>';
             openModal(html);
+        }
+        function setAttendanceFromModal(name, status) {
+            setAttendance(name, status);
+            openStudentModal(name); // refresh to update the selected button outline
         }
         function saveStudentNote(name) {
             var val = document.getElementById('stu-note-input').value.trim();
@@ -4684,7 +5130,7 @@
         // ============================================================
         function resetLiveSession() {
             var msg = "Reset the live session?\n\n" +
-                "This clears: groups, points, notes, active call lists, and event history.\n" +
+                "This clears: groups, points, notes, active call lists, active lesson & attendance, completed lesson history, and event history.\n" +
                 "Saved lists, archives, and to-do lists are kept. Your classroom layout in the Designer is not touched.\n\n" +
                 "Consider exporting to CSV or PDF first.";
             if (!confirm(msg)) return;
@@ -4723,6 +5169,34 @@
                 if (e.type === 'timer_start') timersStarted += 1;
                 if (e.type === 'note_added') notesTotal += 1;
             });
+
+            // Build lesson summaries (both any active lesson and completed ones)
+            function summarizeLesson(l, isActive) {
+                var att = l.attendance || {};
+                return {
+                    id: l.id,
+                    startedAt: l.startedAt,
+                    endedAt: isActive ? null : l.endedAt,
+                    durationMs: isActive ? (Date.now() - l.startedAt) : (l.durationMs || ((l.endedAt || Date.now()) - l.startedAt)),
+                    isActive: !!isActive,
+                    attendanceTakenAt: l.attendanceTakenAt || null,
+                    counts: {
+                        present: countAttendance(att, 'present'),
+                        absent: countAttendance(att, 'absent'),
+                        late: countAttendance(att, 'late')
+                    },
+                    attendance: Object.keys(att).sort().map(function(name) {
+                        return { name: name, status: att[name] };
+                    })
+                };
+            }
+            var lessonSummaries = (liveState.completedLessons || []).map(function(l) { return summarizeLesson(l, false); });
+            if (liveState.activeLesson) {
+                lessonSummaries.push(summarizeLesson(liveState.activeLesson, true));
+            }
+            var totalLessonTimeMs = 0;
+            (liveState.completedLessons || []).forEach(function(l) { totalLessonTimeMs += (l.durationMs || 0); });
+            if (liveState.activeLesson) totalLessonTimeMs += (Date.now() - liveState.activeLesson.startedAt);
 
             // Per-student roll-up including "times called across every list"
             var studentInfo = students.map(function(s) {
@@ -4769,8 +5243,12 @@
                     archivedCallLists: (liveState.archivedLists || []).length,
                     savedCallLists: (liveState.savedLists || []).length,
                     activeTodoLists: (liveState.todoLists || []).length,
-                    archivedTodoLists: (liveState.archivedTodoLists || []).length
+                    archivedTodoLists: (liveState.archivedTodoLists || []).length,
+                    lessonsCompleted: (liveState.completedLessons || []).length,
+                    lessonActive: !!liveState.activeLesson,
+                    totalLessonTimeMs: totalLessonTimeMs
                 },
+                lessons: lessonSummaries,
                 students: studentInfo,
                 groups: (liveState.groups || []).map(function(g) {
                     var totalPoints = g.members.reduce(function(sum, n) {
@@ -4903,6 +5381,12 @@
                 case 'export_pdf':          return 'Exported a PDF report';
                 case 'export_pdf_print':    return 'Exported a printable report';
                 case 'export_json':         return 'Exported JSON data';
+                case 'lesson_started':      return 'Lesson started (' + (d.studentCount || 0) + ' students on roster)';
+                case 'lesson_ended':        return 'Lesson ended — Duration ' + formatLessonDuration(d.durationMs || 0) + ' · Present ' + (d.present || 0) + ', Absent ' + (d.absent || 0) + ', Late ' + (d.late || 0);
+                case 'attendance_set':      return 'Attendance: ' + d.student + ' → ' + (d.status || 'unknown') + (d.previous && d.previous !== d.status ? ' (was ' + d.previous + ')' : '');
+                case 'attendance_bulk':     return 'Attendance: marked ' + (d.count || 0) + ' students as ' + d.status;
+                case 'attendance_complete': return 'Attendance completed — Present ' + (d.present || 0) + ', Absent ' + (d.absent || 0) + ', Late ' + (d.late || 0);
+                case 'points_reset_all':    return 'Reset all points to 0 (' + (d.studentCount || 0) + ' students, was ' + (d.previousTotal || 0) + ' total)';
                 default:                    return e.type.replace(/_/g, ' ');
             }
         }
@@ -4987,11 +5471,38 @@
             push('Random Picks Made', r.stats.randomPicksMade);
             push('Timers Used', r.stats.timersStarted);
             push('Notes Recorded', r.stats.notesRecorded);
+            push('Lessons Completed', r.stats.lessonsCompleted);
+            push('Lesson Currently Active', r.stats.lessonActive ? 'Yes' : 'No');
+            push('Total Lesson Time', formatDurationHuman(r.stats.totalLessonTimeMs));
             push('Call Order Lists (Active)', r.stats.activeCallLists);
             push('Call Order Lists (Archived)', r.stats.archivedCallLists);
             push('Call Order Lists (Saved)', r.stats.savedCallLists);
             push('To-Do Lists (Active)', r.stats.activeTodoLists);
             push('To-Do Lists (Archived)', r.stats.archivedTodoLists);
+
+            // --- Lessons & Attendance ---
+            if (r.lessons.length > 0) {
+                section('Lessons & Attendance');
+                r.lessons.forEach(function(l, idx) {
+                    var title = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
+                    if (l.isActive) title += ' → (in progress)';
+                    else if (l.endedAt) title += ' → ' + formatTimeShort(l.endedAt);
+                    title += ' · Duration ' + formatLessonDuration(l.durationMs);
+                    push(title);
+                    push('  Present', l.counts.present, 'Absent', l.counts.absent, 'Late', l.counts.late);
+                    if (l.attendanceTakenAt) push('  Attendance taken at', formatDateFull(l.attendanceTakenAt));
+                    push('  Name', 'Status');
+                    if (l.attendance.length === 0) {
+                        push('  (no attendance recorded)');
+                    } else {
+                        l.attendance.forEach(function(a) {
+                            var lbl = a.status.charAt(0).toUpperCase() + a.status.slice(1);
+                            push('  ' + a.name, lbl);
+                        });
+                    }
+                    blank();
+                });
+            }
 
             // --- Students table ---
             section('Students — Points & Participation');
@@ -5291,12 +5802,14 @@
                 ['Total Students', r.stats.totalStudents],
                 ['Groups Formed', r.stats.totalGroups],
                 ['Random Picks Made', r.stats.randomPicksMade],
-                ['Timers Used', r.stats.timersStarted]
+                ['Timers Used', r.stats.timersStarted],
+                ['Lessons Completed', r.stats.lessonsCompleted + (r.stats.lessonActive ? ' (+1 active)' : '')]
             ];
             var summaryRight = [
                 ['Net Points Awarded', r.stats.pointsNet],
                 ['  Added / Removed', r.stats.pointsAdded + ' / ' + r.stats.pointsRemoved],
                 ['Notes Recorded', r.stats.notesRecorded],
+                ['Total Lesson Time', formatDurationHuman(r.stats.totalLessonTimeMs)],
                 ['Lists (Active/Archived)',
                     'Call ' + r.stats.activeCallLists + '/' + r.stats.archivedCallLists +
                     ' · To-Do ' + r.stats.activeTodoLists + '/' + r.stats.archivedTodoLists]
@@ -5339,6 +5852,31 @@
                     ], stuWidths, { zebra: i % 2 === 1 });
                 });
                 spacer(6);
+            }
+
+            // ============ Lessons & Attendance ============
+            if (r.lessons.length > 0) {
+                sectionHeader('Lessons & Attendance');
+                r.lessons.forEach(function(l, idx) {
+                    var meta = 'Duration ' + formatLessonDuration(l.durationMs) +
+                        ' · Present ' + l.counts.present + ' · Absent ' + l.counts.absent + ' · Late ' + l.counts.late;
+                    var head = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
+                    if (l.isActive) head += ' → (in progress)';
+                    else if (l.endedAt) head += ' → ' + formatTimeShort(l.endedAt);
+                    subHeader(head, meta);
+                    if (l.attendance.length === 0) {
+                        paragraph('(no attendance recorded)', C_MUTED);
+                    } else {
+                        var aW = [contentW * 0.7, contentW * 0.3];
+                        tableHeader(['Name', 'Status'], aW);
+                        l.attendance.forEach(function(a, i) {
+                            var color = a.status === 'present' ? C_GREEN : (a.status === 'absent' ? C_RED : [217, 119, 6]);
+                            var label = { present: '✓ Present', absent: '✗ Absent', late: '⏰ Late' }[a.status] || a.status;
+                            tableRow([a.name, label], aW, { zebra: i % 2 === 1, color: color });
+                        });
+                    }
+                    spacer(6);
+                });
             }
 
             // ============ Groups ============
@@ -5505,6 +6043,8 @@
             html += '<div><strong>Timers Used:</strong> ' + r.stats.timersStarted + '</div>';
             html += '<div><strong>Call Order Lists:</strong> ' + r.stats.activeCallLists + ' active · ' + r.stats.archivedCallLists + ' archived</div>';
             html += '<div><strong>To-Do Lists:</strong> ' + r.stats.activeTodoLists + ' active · ' + r.stats.archivedTodoLists + ' archived</div>';
+            html += '<div><strong>Lessons Completed:</strong> ' + r.stats.lessonsCompleted + (r.stats.lessonActive ? ' (+1 active)' : '') + '</div>';
+            html += '<div><strong>Total Lesson Time:</strong> ' + formatDurationHuman(r.stats.totalLessonTimeMs) + '</div>';
             html += '</div>';
 
             if (r.students.length > 0) {
@@ -5513,6 +6053,30 @@
                     html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + (s.group ? escapeHtml(s.group) : '<em>unassigned</em>') + '</td><td>' + s.points + '</td><td>' + s.noteCount + '</td><td>' + s.timesCalled + '</td></tr>';
                 });
                 html += '</table>';
+            }
+
+            // Lessons & Attendance
+            if (r.lessons.length > 0) {
+                html += '<h2>Lessons &amp; Attendance</h2>';
+                r.lessons.forEach(function(l, idx) {
+                    var head = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
+                    if (l.isActive) head += ' → (in progress)';
+                    else if (l.endedAt) head += ' → ' + formatTimeShort(l.endedAt);
+                    var meta = 'Duration ' + formatLessonDuration(l.durationMs) +
+                        ' · Present ' + l.counts.present + ' · Absent ' + l.counts.absent + ' · Late ' + l.counts.late;
+                    html += '<h3><span>' + escapeHtml(head) + '</span><span>' + meta + '</span></h3>';
+                    if (l.attendance.length > 0) {
+                        html += '<table><tr><th>Name</th><th>Status</th></tr>';
+                        l.attendance.forEach(function(a) {
+                            var cls = a.status === 'present' ? 'done' : (a.status === 'absent' ? 'notcalled' : '');
+                            var label = { present: '✓ Present', absent: '✗ Absent', late: '⏰ Late' }[a.status] || a.status;
+                            html += '<tr><td>' + escapeHtml(a.name) + '</td><td class="' + cls + '">' + label + '</td></tr>';
+                        });
+                        html += '</table>';
+                    } else {
+                        html += '<div style="color:#94a3b8;font-style:italic;padding:6px 0;">(no attendance recorded)</div>';
+                    }
+                });
             }
 
             if (r.groups.length > 0) {
