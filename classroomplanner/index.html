@@ -607,6 +607,80 @@
             margin-bottom: 3px;
         }
 
+        /* Layouts manager modal rows */
+        .layout-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .layout-row.current {
+            background: #eef4ff;
+            border-color: #4a6fa5;
+            border-left: 4px solid #4a6fa5;
+        }
+        .layout-row-info { flex: 1; min-width: 0; }
+        .layout-row-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #2c3e50;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .layout-current-badge {
+            background: #4a6fa5;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+        .layout-row-meta {
+            font-size: 0.75rem;
+            color: #64748b;
+            line-height: 1.4;
+        }
+        .layout-row-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .layout-row-actions button {
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .layout-row-actions .lr-load {
+            background: linear-gradient(to right, #4a6fa5, #3b5a84);
+            color: white;
+        }
+        .layout-row-actions .lr-load:hover { background: linear-gradient(to right, #3b5a84, #2c4a70); }
+        .layout-row-actions .lr-rename,
+        .layout-row-actions .lr-dup {
+            background: #e2e8f0;
+            color: #2c3e50;
+            padding: 5px 8px;
+        }
+        .layout-row-actions .lr-rename:hover,
+        .layout-row-actions .lr-dup:hover { background: #cbd5e0; }
+        .layout-row-actions .lr-del {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 5px 8px;
+        }
+        .layout-row-actions .lr-del:hover { background: #fecaca; }
+
         /* --- Timer pip (bottom-right, non-blocking) --- */
         #timer-pip {
             position: fixed;
@@ -1534,6 +1608,10 @@
 
             <div class="section-title">Classroom Name</div>
             <input type="text" id="designer-class-name" placeholder="e.g., Grade 8 English" oninput="onDesignerClassNameChange()" style="margin-top:2px;">
+            <div class="btn-grid" style="margin-top:0;">
+                <button onclick="openLayoutsModal()">📂 My Layouts</button>
+                <button onclick="createAndSwitchToNewLayout()">➕ New Layout</button>
+            </div>
 
             <div class="section-title">Spawn Manual Items</div>
             <div class="btn-grid">
@@ -1569,7 +1647,7 @@
             </div>
 
             <div class="hint-box">
-                <strong>System Status:</strong> Layout and classroom name save automatically. Switch to <strong>LIVE CLASSROOM</strong> when ready — the name carries over.
+                <strong>Auto-saves as you work.</strong> Each layout is its own class — separate seating, roster, points, and lists. Use <strong>📂 My Layouts</strong> to switch between classes.
             </div>
         </div>
 
@@ -1728,14 +1806,138 @@
         document.addEventListener('mouseup', handleGlobalMouseUp);
         document.addEventListener('keydown', handleGlobalKeyDown);
         window.addEventListener('DOMContentLoaded', function() {
+            hydrateLayouts();
             loadCanvasStateFromBrowser();
             loadLiveState();
         });
 
+        // ============================================================
+        //  MULTI-LAYOUT STORAGE
+        //  Each layout is a full "class file": physical arrangement + roster
+        //  + its own live-session data (points, groups, notes, lists).
+        //  Two localStorage keys:
+        //    classroom_designer_data — layout list + which one is current
+        //    classroom_live_data     — live sessions keyed by layout id
+        //  Auto-migrates from the older single-layout keys on first load.
+        // ============================================================
+        var STORAGE_DESIGNER_KEY = 'classroom_designer_data';
+        var STORAGE_LIVE_KEY = 'classroom_live_data';
+        var STORAGE_DESIGNER_LEGACY = 'classroom_designer_state';
+        var STORAGE_LIVE_LEGACY = 'classroom_live_state';
+
+        var layouts = [];             // [{ id, name, items, currentStudents, lastLayoutType, createdAt, updatedAt }]
+        var currentLayoutId = null;   // which layout is being edited / active
+
+        function newLayoutId() {
+            return 'lay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        }
+
+        // Called ONCE on page load. Hydrates layouts + current id, handling legacy migration.
+        function hydrateLayouts() {
+            var raw = localStorage.getItem(STORAGE_DESIGNER_KEY);
+            if (raw) {
+                try {
+                    var payload = JSON.parse(raw);
+                    if (Array.isArray(payload.layouts)) {
+                        layouts = payload.layouts;
+                        currentLayoutId = payload.currentLayoutId || (layouts[0] && layouts[0].id) || null;
+                    }
+                } catch(e) {
+                    layouts = [];
+                    currentLayoutId = null;
+                }
+            }
+            // Legacy migration: convert old single-layout state into layouts[0]
+            var legacy = localStorage.getItem(STORAGE_DESIGNER_LEGACY);
+            if (!layouts.length && legacy) {
+                try {
+                    var oldPayload = JSON.parse(legacy);
+                    // Try to preserve the old className if the legacy live-state exists
+                    var oldName = 'Untitled Layout';
+                    var legacyLive = localStorage.getItem(STORAGE_LIVE_LEGACY);
+                    if (legacyLive) {
+                        try {
+                            var oldLive = JSON.parse(legacyLive);
+                            if (oldLive.className) oldName = oldLive.className;
+                        } catch(e) {}
+                    }
+                    var migrated = {
+                        id: newLayoutId(),
+                        name: oldName,
+                        items: oldPayload.items || [],
+                        currentStudents: oldPayload.currentStudents || [],
+                        lastLayoutType: oldPayload.lastLayoutType || 'r5',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now()
+                    };
+                    layouts = [migrated];
+                    currentLayoutId = migrated.id;
+                    persistLayouts();
+                    // Migrate live state under the new layout id
+                    if (legacyLive) {
+                        try {
+                            var oldLive = JSON.parse(legacyLive);
+                            var liveWrap = { sessions: {} };
+                            liveWrap.sessions[migrated.id] = oldLive;
+                            localStorage.setItem(STORAGE_LIVE_KEY, JSON.stringify(liveWrap));
+                        } catch(e) {}
+                    }
+                    // Clean up old keys
+                    localStorage.removeItem(STORAGE_DESIGNER_LEGACY);
+                    localStorage.removeItem(STORAGE_LIVE_LEGACY);
+                } catch(e) {}
+            }
+            // If still no layouts, create a starter one
+            if (!layouts.length) {
+                var starter = {
+                    id: newLayoutId(),
+                    name: 'Untitled Layout',
+                    items: [],
+                    currentStudents: [],
+                    lastLayoutType: 'r5',
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                };
+                layouts.push(starter);
+                currentLayoutId = starter.id;
+                persistLayouts();
+            }
+            // If currentLayoutId points at nothing (deleted?), fall back to first
+            if (!getCurrentLayout()) currentLayoutId = layouts[0].id;
+        }
+
+        function getCurrentLayout() {
+            return layouts.find(function(l) { return l.id === currentLayoutId; }) || null;
+        }
+
+        function persistLayouts() {
+            var payload = { version: 1, currentLayoutId: currentLayoutId, layouts: layouts };
+            localStorage.setItem(STORAGE_DESIGNER_KEY, JSON.stringify(payload));
+        }
+
+        function readSessionsWrapper() {
+            var raw = localStorage.getItem(STORAGE_LIVE_KEY);
+            if (!raw) return { sessions: {} };
+            try {
+                var payload = JSON.parse(raw);
+                if (!payload.sessions) payload.sessions = {};
+                return payload;
+            } catch(e) {
+                return { sessions: {} };
+            }
+        }
+
+        function persistSessionsWrapper(wrap) {
+            localStorage.setItem(STORAGE_LIVE_KEY, JSON.stringify(wrap));
+        }
+
+        // Auto-save the current canvas into the current layout's slot
         function saveCanvasStateToBrowser() {
+            var layout = getCurrentLayout();
+            if (!layout) return;
             var items = [];
             var elements = canvas.querySelectorAll('.movable-element');
-            elements.forEach(el => {
+            elements.forEach(function(el) {
                 var type = el.getAttribute('data-type');
                 var text = "";
                 var color = rgbToHex(el.style.backgroundColor);
@@ -1758,49 +1960,298 @@
                     color: color
                 });
             });
-            var payload = {
-                items: items,
-                currentStudents: currentStudents,
-                lastLayoutType: lastLayoutType
-            };
-            localStorage.setItem('classroom_designer_state', JSON.stringify(payload));
+            layout.items = items;
+            layout.currentStudents = currentStudents.slice();
+            layout.lastLayoutType = lastLayoutType;
+            layout.updatedAt = Date.now();
+            persistLayouts();
         }
 
+        // Populate the canvas from the current layout
         function loadCanvasStateFromBrowser() {
-            var raw = localStorage.getItem('classroom_designer_state');
-            if (!raw) return;
-            try {
-                var payload = JSON.parse(raw);
-                currentStudents = payload.currentStudents || [];
-                lastLayoutType = payload.lastLayoutType || "r5";
-                canvas.innerHTML = '';
-                deselectAll();
-                if (payload.items && payload.items.length > 0) {
-                    payload.items.forEach(item => {
-                        var el = spawnItem(item.type, parseInt(item.left), parseInt(item.top), item.text);
-                        el.style.width = item.width;
-                        el.style.height = item.height;
-                        if (item.type === 'arrow') {
-                            drawArrowSVG(el, item.color, item.text);
-                        } else {
-                            el.style.backgroundColor = item.color;
-                        }
-                    });
+            var layout = getCurrentLayout();
+            if (!layout) return;
+            currentStudents = (layout.currentStudents || []).slice();
+            lastLayoutType = layout.lastLayoutType || 'r5';
+            canvas.innerHTML = '';
+            deselectAll();
+            (layout.items || []).forEach(function(item) {
+                var el = spawnItem(item.type, parseInt(item.left), parseInt(item.top), item.text);
+                el.style.width = item.width;
+                el.style.height = item.height;
+                if (item.type === 'arrow') {
+                    drawArrowSVG(el, item.color, item.text);
+                } else {
+                    el.style.backgroundColor = item.color;
                 }
-                deselectAll();
-            } catch(e) {
-                console.error("Auto-load fault recovery triggered.", e);
+            });
+            deselectAll();
+            // Sync classroom name inputs to this layout's name
+            var d = document.getElementById('designer-class-name');
+            if (d) d.value = layout.name || '';
+        }
+
+        // "Clear All" wipes the CURRENT layout's items, but the layout entry stays.
+        function resetEntireCanvas() {
+            var layout = getCurrentLayout();
+            if (!layout) return;
+            if (!confirm("Clear all items from \"" + (layout.name || 'this layout') + "\"?\n\nThis empties the canvas but keeps the layout in your list. To remove the layout entirely, use My Layouts → Delete.")) return;
+            currentStudents = [];
+            lastLayoutType = 'r5';
+            layout.items = [];
+            layout.currentStudents = [];
+            layout.lastLayoutType = 'r5';
+            layout.updatedAt = Date.now();
+            persistLayouts();
+            canvas.innerHTML = '';
+            deselectAll();
+        }
+
+        // ============================================================
+        //  LAYOUT MANAGEMENT
+        // ============================================================
+
+        // Save current live session under the current layout id.
+        // Called before switching layouts so the outgoing session is preserved.
+        function saveCurrentSessionToCurrentLayout() {
+            if (!currentLayoutId) return;
+            var wrap = readSessionsWrapper();
+            wrap.sessions[currentLayoutId] = liveState;
+            persistSessionsWrapper(wrap);
+        }
+
+        function createLayout(name) {
+            var layout = {
+                id: newLayoutId(),
+                name: name || 'Untitled Layout',
+                items: [],
+                currentStudents: [],
+                lastLayoutType: 'r5',
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            };
+            layouts.push(layout);
+            persistLayouts();
+            return layout;
+        }
+
+        function switchToLayout(id) {
+            if (id === currentLayoutId) return;
+            var target = layouts.find(function(l) { return l.id === id; });
+            if (!target) return;
+            // Persist current designer + live state under the outgoing layout id
+            saveCanvasStateToBrowser();
+            saveCurrentSessionToCurrentLayout();
+            currentLayoutId = id;
+            persistLayouts();
+            // Load new
+            loadCanvasStateFromBrowser();
+            loadLiveState();
+            // Refresh live view if it's currently showing
+            if (document.getElementById('live-view').classList.contains('active')) {
+                renderLiveView();
             }
         }
 
-        function resetEntireCanvas() {
-            if (confirm("Are you sure you want to delete everything and start completely over?")) {
-                localStorage.removeItem('classroom_designer_state');
-                currentStudents = [];
-                lastLayoutType = "r5";
-                canvas.innerHTML = '';
-                deselectAll();
+        function renameLayout(id, newName) {
+            var layout = layouts.find(function(l) { return l.id === id; });
+            if (!layout) return;
+            var trimmed = (newName || '').trim();
+            if (!trimmed) return;
+            layout.name = trimmed;
+            layout.updatedAt = Date.now();
+            persistLayouts();
+            // If it's the current one, keep className in sync too
+            if (id === currentLayoutId) {
+                liveState.className = trimmed;
+                saveLiveState();
+                var d = document.getElementById('designer-class-name');
+                if (d && d.value !== trimmed) d.value = trimmed;
+                var l = document.getElementById('class-name-input');
+                if (l && l.value !== trimmed) l.value = trimmed;
             }
+        }
+
+        function duplicateLayout(id) {
+            var src = layouts.find(function(l) { return l.id === id; });
+            if (!src) return null;
+            var copy = JSON.parse(JSON.stringify(src));
+            copy.id = newLayoutId();
+            copy.name = src.name + ' (copy)';
+            copy.createdAt = Date.now();
+            copy.updatedAt = Date.now();
+            layouts.push(copy);
+            persistLayouts();
+            // Duplicate the associated live session too, so points/notes/lists carry over
+            var wrap = readSessionsWrapper();
+            if (wrap.sessions[id]) {
+                wrap.sessions[copy.id] = JSON.parse(JSON.stringify(wrap.sessions[id]));
+                if (wrap.sessions[copy.id]) wrap.sessions[copy.id].className = copy.name;
+                persistSessionsWrapper(wrap);
+            }
+            return copy;
+        }
+
+        function deleteLayout(id) {
+            var idx = layouts.findIndex(function(l) { return l.id === id; });
+            if (idx === -1) return;
+            var wasCurrent = (id === currentLayoutId);
+            layouts.splice(idx, 1);
+            // Also drop its live session
+            var wrap = readSessionsWrapper();
+            delete wrap.sessions[id];
+            persistSessionsWrapper(wrap);
+            if (layouts.length === 0) {
+                // Always keep at least one layout — create a fresh one
+                var starter = createLayout('Untitled Layout');
+                currentLayoutId = starter.id;
+                persistLayouts();
+                if (wasCurrent) {
+                    loadCanvasStateFromBrowser();
+                    loadLiveState();
+                    if (document.getElementById('live-view').classList.contains('active')) {
+                        renderLiveView();
+                    }
+                }
+                return;
+            }
+            if (wasCurrent) {
+                // Fall back to the first remaining layout
+                currentLayoutId = layouts[0].id;
+                persistLayouts();
+                loadCanvasStateFromBrowser();
+                loadLiveState();
+                if (document.getElementById('live-view').classList.contains('active')) {
+                    renderLiveView();
+                }
+            } else {
+                persistLayouts();
+            }
+        }
+
+        // Compact stats for a layout — how many students, other items, and (if it has a session) points
+        function layoutStats(l) {
+            var studentCount = 0, otherCount = 0;
+            (l.items || []).forEach(function(it) {
+                if (it.type === 'student') studentCount += 1; else otherCount += 1;
+            });
+            return { studentCount: studentCount, otherCount: otherCount };
+        }
+
+        function createAndSwitchToNewLayout() {
+            var name = prompt("Name for the new layout:", "Layout " + (layouts.length + 1));
+            if (!name) return;
+            name = name.trim();
+            if (!name) return;
+            // Save whatever's in the current layout right now, then switch to the new one
+            saveCanvasStateToBrowser();
+            saveCurrentSessionToCurrentLayout();
+            var l = createLayout(name);
+            switchToLayout(l.id);
+        }
+
+        function openLayoutsModal() {
+            var wrap = readSessionsWrapper();
+            // Sort layouts by updatedAt desc so the most-recently-used is on top
+            var sorted = layouts.slice().sort(function(a, b) {
+                return (b.updatedAt || 0) - (a.updatedAt || 0);
+            });
+
+            var html = '<div class="modal-title">📂 My Classroom Layouts</div>';
+            html += '<div style="font-size:0.85rem;color:#64748b;margin-bottom:14px;">Each layout is its own class — separate seating, roster, points, groups, and lists. Auto-saves as you work.</div>';
+
+            if (sorted.length === 0) {
+                html += '<div style="color:#94a3b8;font-style:italic;padding:20px;text-align:center;">No layouts yet.</div>';
+            } else {
+                sorted.forEach(function(l) {
+                    var isCurrent = l.id === currentLayoutId;
+                    var st = layoutStats(l);
+                    var sess = wrap.sessions[l.id];
+                    var sessionSummary = '';
+                    if (sess) {
+                        var totalPts = 0;
+                        Object.keys(sess.studentData || {}).forEach(function(n) {
+                            totalPts += (sess.studentData[n].points || 0);
+                        });
+                        var noteCount = 0;
+                        Object.keys(sess.studentData || {}).forEach(function(n) {
+                            noteCount += ((sess.studentData[n].notes || []).length);
+                        });
+                        var pieces = [];
+                        if ((sess.groups || []).length) pieces.push((sess.groups || []).length + ' groups');
+                        if (totalPts !== 0) pieces.push(totalPts + ' pts');
+                        if (noteCount) pieces.push(noteCount + ' notes');
+                        if ((sess.activeLists || []).length) pieces.push((sess.activeLists || []).length + ' call lists');
+                        if ((sess.todoLists || []).length) pieces.push((sess.todoLists || []).length + ' to-dos');
+                        if (pieces.length) sessionSummary = ' · ' + pieces.join(', ');
+                    }
+
+                    html += '<div class="layout-row' + (isCurrent ? ' current' : '') + '">';
+                    html += '<div class="layout-row-info">';
+                    html += '<div class="layout-row-name">';
+                    html += (isCurrent ? '<span class="layout-current-badge">CURRENT</span> ' : '') + escapeHtml(l.name || 'Untitled');
+                    html += '</div>';
+                    html += '<div class="layout-row-meta">';
+                    html += st.studentCount + ' student' + (st.studentCount === 1 ? '' : 's');
+                    if (st.otherCount) html += ' · ' + st.otherCount + ' other item' + (st.otherCount === 1 ? '' : 's');
+                    if (l.updatedAt) html += ' · Updated ' + formatDateFull(l.updatedAt);
+                    html += sessionSummary;
+                    html += '</div>';
+                    html += '</div>';
+                    html += '<div class="layout-row-actions">';
+                    if (!isCurrent) {
+                        html += '<button class="lr-load" onclick="loadLayoutFromModal(\'' + l.id + '\')" title="Switch to this layout">Load</button>';
+                    }
+                    html += '<button class="lr-rename" onclick="renameLayoutFromModal(\'' + l.id + '\')" title="Rename">✏️</button>';
+                    html += '<button class="lr-dup" onclick="duplicateLayoutFromModal(\'' + l.id + '\')" title="Duplicate">📄</button>';
+                    html += '<button class="lr-del" onclick="deleteLayoutFromModal(\'' + l.id + '\')" title="Delete">🗑</button>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+            }
+
+            html += '<div class="modal-actions">';
+            html += '<button class="export-btn" onclick="closeModal()">Close</button>';
+            html += '<button class="automation" onclick="createLayoutFromModal()">➕ Create New Layout</button>';
+            html += '</div>';
+            openModal(html);
+        }
+
+        function loadLayoutFromModal(id) {
+            switchToLayout(id);
+            closeModal();
+        }
+        function renameLayoutFromModal(id) {
+            var layout = layouts.find(function(l) { return l.id === id; });
+            if (!layout) return;
+            var newName = prompt("New name for this layout:", layout.name || '');
+            if (newName === null) return;
+            newName = newName.trim();
+            if (!newName) { alert("Layout name can't be empty."); return; }
+            renameLayout(id, newName);
+            openLayoutsModal(); // refresh
+        }
+        function duplicateLayoutFromModal(id) {
+            var copy = duplicateLayout(id);
+            if (copy) openLayoutsModal();
+        }
+        function deleteLayoutFromModal(id) {
+            var layout = layouts.find(function(l) { return l.id === id; });
+            if (!layout) return;
+            if (!confirm("Delete layout \"" + (layout.name || 'Untitled') + "\"?\n\nThis removes the seating arrangement AND all of its session data (groups, points, notes, lists). Cannot be undone.")) return;
+            deleteLayout(id);
+            openLayoutsModal(); // refresh
+        }
+        function createLayoutFromModal() {
+            var name = prompt("Name for the new layout:", "Layout " + (layouts.length + 1));
+            if (!name) return;
+            name = name.trim();
+            if (!name) return;
+            saveCanvasStateToBrowser();
+            saveCurrentSessionToCurrentLayout();
+            var l = createLayout(name);
+            switchToLayout(l.id);
+            closeModal();
         }
 
         function canvasMouseDown(e) {
@@ -2283,10 +2734,11 @@
         }
 
         function loadLiveState() {
-            var raw = localStorage.getItem('classroom_live_state');
+            var wrap = readSessionsWrapper();
+            var raw = currentLayoutId ? wrap.sessions[currentLayoutId] : null;
             if (raw) {
                 try {
-                    liveState = JSON.parse(raw);
+                    liveState = raw;
                     if (!liveState.groups) liveState.groups = [];
                     if (!liveState.studentData) liveState.studentData = {};
                     if (!liveState.events) liveState.events = [];
@@ -2307,12 +2759,20 @@
             } else {
                 liveState = defaultLiveState();
             }
+            // Keep className aligned with the current layout's name
+            var curLayout = getCurrentLayout();
+            if (curLayout && !liveState.className) {
+                liveState.className = curLayout.name || '';
+            }
             document.getElementById('class-name-input').value = liveState.className || '';
-            document.getElementById('designer-class-name').value = liveState.className || '';
+            document.getElementById('designer-class-name').value = liveState.className || (curLayout ? curLayout.name : '');
         }
 
         function saveLiveState() {
-            localStorage.setItem('classroom_live_state', JSON.stringify(liveState));
+            if (!currentLayoutId) return;
+            var wrap = readSessionsWrapper();
+            wrap.sessions[currentLayoutId] = liveState;
+            persistSessionsWrapper(wrap);
         }
 
         function logEvent(type, details) {
@@ -2331,41 +2791,35 @@
         }
 
         function onClassNameChange() {
-            liveState.className = document.getElementById('class-name-input').value;
+            var val = document.getElementById('class-name-input').value;
+            liveState.className = val;
             saveLiveState();
-            var designerInput = document.getElementById('designer-class-name');
-            if (designerInput && designerInput.value !== liveState.className) {
-                designerInput.value = liveState.className;
-            }
+            // Renaming from the live view also renames the current layout
+            if (currentLayoutId) renameLayout(currentLayoutId, val);
         }
 
         function onDesignerClassNameChange() {
-            liveState.className = document.getElementById('designer-class-name').value;
+            var val = document.getElementById('designer-class-name').value;
+            liveState.className = val;
             saveLiveState();
-            var liveInput = document.getElementById('class-name-input');
-            if (liveInput && liveInput.value !== liveState.className) {
-                liveInput.value = liveState.className;
-            }
+            if (currentLayoutId) renameLayout(currentLayoutId, val);
         }
 
         function getStudentsFromDesigner() {
-            // Read from the saved designer state — the source of truth for the layout
-            var raw = localStorage.getItem('classroom_designer_state');
-            if (!raw) return { students: [], items: [] };
-            try {
-                var payload = JSON.parse(raw);
-                var items = payload.items || [];
-                var students = items.filter(it => it.type === 'student').map(it => ({
+            // Read from the current in-memory layout, which is the source of truth
+            var layout = getCurrentLayout();
+            if (!layout) return { students: [], items: [] };
+            var items = layout.items || [];
+            var students = items.filter(function(it) { return it.type === 'student'; }).map(function(it) {
+                return {
                     name: it.text || 'Unnamed',
                     left: parseInt(it.left) || 0,
                     top: parseInt(it.top) || 0,
                     width: parseInt(it.width) || 85,
                     height: parseInt(it.height) || 50
-                }));
-                return { students: students, items: items };
-            } catch(e) {
-                return { students: [], items: [] };
-            }
+                };
+            });
+            return { students: students, items: items };
         }
 
         function ensureStudentDataForRoster(students) {
