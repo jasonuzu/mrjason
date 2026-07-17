@@ -4093,7 +4093,7 @@
             // Final: strip picking, apply winner to selected desks
             pickAnimTimeout = setTimeout(function() {
                 if (lastLit) lastLit.classList.remove('picking');
-                deskEls.forEach(el => el.classList.remove('picking'));
+                allDeskEls.forEach(el => el.classList.remove('picking'));
                 winners.forEach(el => el.classList.add('winner'));
                 playFanfare();
                 showWinnerBanner(winners.map(el => el.getAttribute('data-name')));
