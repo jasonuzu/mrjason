@@ -1654,8 +1654,9 @@
             </div>
             <div class="ab-group">
                 <span class="ab-label">Export</span>
-                <button class="ab-btn export" onclick="exportCSV()">📊 CSV</button>
-                <button class="ab-btn export" onclick="exportPDF()">📄 PDF</button>
+                <button class="ab-btn export" onclick="exportCSV()" title="Human-readable spreadsheet, opens in Excel or Sheets">📊 CSV</button>
+                <button class="ab-btn export" onclick="exportPDF()" title="Formatted printable report">📄 PDF</button>
+                <button class="ab-btn export" onclick="exportJSON()" title="Structured data for import into other systems">{ } JSON</button>
             </div>
             <div class="ab-group">
                 <button class="ab-btn" onclick="refreshLayoutFromDesigner()">🔄 Reload Layout</button>
@@ -4248,54 +4249,236 @@
         }
 
         // ============================================================
-        //  EXPORT (CSV + PDF)
+        //  EXPORT: CSV + PDF + JSON — all built from a single unified
+        //  session report so they stay in sync.
         // ============================================================
-        function exportCSV() {
-            var data = getStudentsFromDesigner();
-            var className = liveState.className || 'Class';
-            var rows = [];
 
-            // Header sheet: class metadata
-            rows.push(['Class Name', className]);
-            rows.push(['Session Start', formatTs(liveState.sessionStart || Date.now())]);
-            rows.push(['Exported', formatTs(Date.now())]);
-            rows.push([]);
+        // Build one comprehensive, human-readable snapshot of the session.
+        // Every export format reads from this — so they're consistent.
+        function buildSessionReport() {
+            var students = getStudentsFromDesigner().students;
+            var events = liveState.events || [];
 
-            // Roster
-            rows.push(['STUDENT', 'GROUP', 'POINTS', 'NOTE COUNT', 'NOTES']);
-            data.students.forEach(s => {
+            var pointsAdded = 0, pointsRemoved = 0, picksCount = 0,
+                timersStarted = 0, notesTotal = 0;
+            events.forEach(function(e) {
+                var d = e.details || {};
+                if (e.type === 'points_added') pointsAdded += Math.abs(d.delta || 0);
+                if (e.type === 'points_removed') pointsRemoved += Math.abs(d.delta || 0);
+                if (e.type === 'random_pick') picksCount += 1;
+                if (e.type === 'timer_start') timersStarted += 1;
+                if (e.type === 'note_added') notesTotal += 1;
+            });
+
+            // Per-student roll-up including "times called across every list"
+            var studentInfo = students.map(function(s) {
                 var d = liveState.studentData[s.name] || { points: 0, notes: [] };
-                var grp = findGroupForStudent(s.name);
-                var notes = d.notes.map(n => '[' + formatTs(n.ts) + '] ' + n.text).join(' | ');
-                rows.push([s.name, grp ? grp.name : '(unassigned)', d.points, d.notes.length, notes]);
+                var group = findGroupForStudent(s.name);
+                var timesCalled = 0;
+                (liveState.activeLists || []).forEach(function(al) {
+                    al.students.forEach(function(x) {
+                        if (x.name === s.name && x.called) timesCalled += 1;
+                    });
+                });
+                (liveState.archivedLists || []).forEach(function(ar) {
+                    (ar.calledNames || []).forEach(function(n) {
+                        if (n === s.name) timesCalled += 1;
+                    });
+                });
+                return {
+                    name: s.name,
+                    group: group ? group.name : null,
+                    groupColor: group ? group.color : null,
+                    points: d.points,
+                    noteCount: d.notes.length,
+                    notes: d.notes.slice(),
+                    timesCalled: timesCalled
+                };
             });
-            rows.push([]);
 
-            // Groups summary
-            rows.push(['GROUPS SUMMARY']);
-            rows.push(['GROUP', 'COLOR', 'MEMBER COUNT', 'TOTAL POINTS', 'MEMBERS']);
-            liveState.groups.forEach(g => {
-                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
-                rows.push([g.name, g.color, g.members.length, total, g.members.join(' | ')]);
-            });
-            rows.push([]);
-
-            // Event log
-            rows.push(['SESSION EVENTS']);
-            rows.push(['TIMESTAMP', 'TYPE', 'DETAILS']);
-            liveState.events.forEach(e => {
-                rows.push([formatTs(e.ts), e.type, JSON.stringify(e.details)]);
-            });
-
-            var csv = rows.map(r => r.map(csvEscape).join(',')).join('\n');
-            downloadBlob(csv, sanitizeFile(className) + '_session.csv', 'text/csv');
-            logEvent('export_csv', {});
-            saveLiveState();
+            return {
+                schemaVersion: 1,
+                className: liveState.className || 'Untitled Class',
+                sessionStart: liveState.sessionStart,
+                exportedAt: Date.now(),
+                durationMs: Date.now() - (liveState.sessionStart || Date.now()),
+                stats: {
+                    totalStudents: students.length,
+                    totalGroups: (liveState.groups || []).length,
+                    pointsAdded: pointsAdded,
+                    pointsRemoved: pointsRemoved,
+                    pointsNet: pointsAdded - pointsRemoved,
+                    randomPicksMade: picksCount,
+                    timersStarted: timersStarted,
+                    notesRecorded: notesTotal,
+                    activeCallLists: (liveState.activeLists || []).length,
+                    archivedCallLists: (liveState.archivedLists || []).length,
+                    savedCallLists: (liveState.savedLists || []).length,
+                    activeTodoLists: (liveState.todoLists || []).length,
+                    archivedTodoLists: (liveState.archivedTodoLists || []).length
+                },
+                students: studentInfo,
+                groups: (liveState.groups || []).map(function(g) {
+                    var totalPoints = g.members.reduce(function(sum, n) {
+                        return sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0);
+                    }, 0);
+                    return {
+                        name: g.name,
+                        color: g.color,
+                        memberCount: g.members.length,
+                        totalPoints: totalPoints,
+                        members: g.members.map(function(n) {
+                            return { name: n, points: (liveState.studentData[n] && liveState.studentData[n].points) || 0 };
+                        })
+                    };
+                }),
+                callOrderLists: {
+                    active: (liveState.activeLists || []).map(function(al) {
+                        var called = al.students.filter(function(s) { return s.called; });
+                        var uncalled = al.students.filter(function(s) { return !s.called; });
+                        return {
+                            name: al.name,
+                            createdAt: al.createdAt,
+                            total: al.students.length,
+                            calledCount: called.length,
+                            uncalledCount: uncalled.length,
+                            percentCalled: al.students.length > 0 ? Math.round((called.length / al.students.length) * 100) : 0,
+                            order: al.students.map(function(s, i) {
+                                return { position: i + 1, name: s.name, called: s.called };
+                            })
+                        };
+                    }),
+                    archived: (liveState.archivedLists || []).map(function(ar) {
+                        return {
+                            name: ar.name,
+                            createdAt: ar.createdAt,
+                            archivedAt: ar.archivedAt,
+                            total: ar.students.length,
+                            calledCount: (ar.calledNames || []).length,
+                            uncalledCount: (ar.uncalledNames || []).length,
+                            percentCalled: ar.students.length > 0 ? Math.round(((ar.calledNames || []).length / ar.students.length) * 100) : 0,
+                            order: ar.students.map(function(name, i) {
+                                return { position: i + 1, name: name, called: (ar.calledNames || []).indexOf(name) !== -1 };
+                            })
+                        };
+                    }),
+                    saved: (liveState.savedLists || []).map(function(sl) {
+                        return {
+                            name: sl.name,
+                            createdAt: sl.createdAt,
+                            studentCount: sl.students.length,
+                            order: sl.students.map(function(n, i) { return { position: i + 1, name: n }; })
+                        };
+                    })
+                },
+                todoLists: {
+                    active: (liveState.todoLists || []).map(function(tl) {
+                        var done = tl.items.filter(function(it) { return it.done; }).length;
+                        return {
+                            name: tl.name,
+                            createdAt: tl.createdAt,
+                            totalItems: tl.items.length,
+                            completedItems: done,
+                            percentComplete: tl.items.length > 0 ? Math.round((done / tl.items.length) * 100) : 0,
+                            items: tl.items.map(function(it) { return { text: it.text, done: !!it.done }; })
+                        };
+                    }),
+                    archived: (liveState.archivedTodoLists || []).map(function(ar) {
+                        var done = ar.items.filter(function(it) { return it.done; }).length;
+                        return {
+                            name: ar.name,
+                            createdAt: ar.createdAt,
+                            archivedAt: ar.archivedAt,
+                            totalItems: ar.items.length,
+                            completedItems: done,
+                            percentComplete: ar.items.length > 0 ? Math.round((done / ar.items.length) * 100) : 0,
+                            items: ar.items.map(function(it) { return { text: it.text, done: !!it.done }; })
+                        };
+                    })
+                },
+                notes: studentInfo.filter(function(s) { return s.noteCount > 0; }).map(function(s) {
+                    return {
+                        studentName: s.name,
+                        notes: s.notes.map(function(n) {
+                            return { at: n.ts, text: n.text };
+                        })
+                    };
+                }),
+                timeline: events.map(function(e) {
+                    return {
+                        at: e.ts,
+                        type: e.type,
+                        description: humanizeEvent(e),
+                        details: e.details
+                    };
+                })
+            };
         }
+
+        // Turn a stored event into a plain-English sentence for the timeline.
+        function humanizeEvent(e) {
+            var d = e.details || {};
+            switch (e.type) {
+                case 'group_created':       return 'Created group "' + d.name + '"';
+                case 'group_deleted':       return 'Deleted group "' + d.name + '"';
+                case 'student_moved':       return 'Moved ' + d.student + ' to another group';
+                case 'auto_sort':           return 'Auto-sorted ' + d.total + ' students into ' + d.numGroups + ' groups (target size ' + d.size + ')';
+                case 'points_added':        return d.student + ': +' + d.delta + ' point' + (Math.abs(d.delta) === 1 ? '' : 's') + ' (now ' + d.total + ')';
+                case 'points_removed':      return d.student + ': ' + d.delta + ' point' + (Math.abs(d.delta) === 1 ? '' : 's') + ' (now ' + d.total + ')';
+                case 'points_reset':        return d.student + ": reset points to 0";
+                case 'random_pick':         return 'Random pick (' + (d.count || 1) + '): ' + ((d.winners && d.winners.length) ? d.winners.join(', ') : '?') + (d.pool === 'group' ? ' — from a group' : '');
+                case 'note_added':          var t = (d.text || ''); return 'Note for ' + d.student + ': "' + (t.length > 80 ? t.substring(0, 77) + '...' : t) + '"';
+                case 'timer_start':         var m = Math.floor((d.seconds || 0) / 60), s = (d.seconds || 0) % 60; return 'Timer started (' + m + 'm' + (s ? ' ' + s + 's' : '') + ')';
+                case 'timer_end':           return 'Timer finished (rang)';
+                case 'timer_cancel':        return 'Timer canceled';
+                case 'list_saved':          return 'Saved call order "' + d.name + '" (' + d.count + ' students)';
+                case 'list_active':         return 'Activated call order "' + d.name + '" (' + d.count + ' students)';
+                case 'list_archived':       return 'Archived call order "' + d.name + '" — ' + d.calledCount + '/' + d.total + ' called';
+                case 'list_reactivated':    return 'Reactivated call order "' + d.name + '" from archive';
+                case 'list_reset':          return 'Reset call order' + (d.list ? ' "' + d.list + '"' : '');
+                case 'call_marked':         return d.student + ' marked as called' + (d.list ? ' (in "' + d.list + '", #' + d.position + ')' : '');
+                case 'call_unmarked':       return d.student + ' unmarked' + (d.list ? ' (in "' + d.list + '", #' + d.position + ')' : '');
+                case 'todo_created':        return 'Created to-do "' + d.name + '" (' + d.itemCount + ' items)';
+                case 'todo_edited':         return 'Edited to-do "' + d.name + '"';
+                case 'todo_deleted':        return 'Deleted to-do "' + d.name + '"';
+                case 'todo_archived':       return 'Archived to-do "' + d.name + '" — ' + d.doneCount + '/' + d.total + ' done';
+                case 'todo_restored':       return 'Restored to-do "' + d.name + '" from archive';
+                case 'todo_item_checked':   return 'Completed a to-do item in "' + d.list + '": ' + (d.item || '').substring(0, 80);
+                case 'todo_item_unchecked': return 'Un-completed a to-do item in "' + d.list + '": ' + (d.item || '').substring(0, 80);
+                case 'export_csv':          return 'Exported a CSV report';
+                case 'export_pdf':          return 'Exported a PDF report';
+                case 'export_pdf_print':    return 'Exported a printable report';
+                case 'export_json':         return 'Exported JSON data';
+                default:                    return e.type.replace(/_/g, ' ');
+            }
+        }
+
+        // --- Formatting helpers ---
+        function formatDurationHuman(ms) {
+            var s = Math.floor(ms / 1000);
+            if (s < 60) return s + ' second' + (s === 1 ? '' : 's');
+            var m = Math.floor(s / 60);
+            if (m < 60) return m + ' minute' + (m === 1 ? '' : 's');
+            var h = Math.floor(m / 60);
+            var mm = m % 60;
+            return h + 'h ' + mm + 'm';
+        }
+        function formatDateFull(ts) {
+            if (!ts) return '';
+            var d = new Date(ts);
+            var opts = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+            return d.toLocaleDateString(undefined, opts) + ' · ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        function formatTimeShort(ts) {
+            if (!ts) return '';
+            return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // --- Shared utility funcs ---
         function csvEscape(v) {
             if (v === null || v === undefined) return '';
             var s = String(v);
-            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1) {
+            if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1 || s.indexOf('\r') !== -1) {
                 return '"' + s.replace(/"/g, '""') + '"';
             }
             return s;
@@ -4312,152 +4495,647 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 500);
+            setTimeout(function() { URL.revokeObjectURL(url); }, 500);
+        }
+        function fileTimestamp() {
+            var d = new Date();
+            var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+            return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes());
         }
 
-        function exportPDF() {
-            var data = getStudentsFromDesigner();
-            var className = liveState.className || 'Class';
+        // ============================================================
+        //  CSV EXPORT — multi-section, human-readable, opens cleanly in
+        //  Excel / Google Sheets. Blank rows separate sections.
+        // ============================================================
+        function exportCSV() {
+            var r = buildSessionReport();
+            var rows = [];
+            var push = function() { rows.push(Array.prototype.slice.call(arguments)); };
+            var blank = function() { rows.push([]); };
+            var section = function(title) { blank(); push('=== ' + title.toUpperCase() + ' ==='); };
 
-            // Prefer jsPDF if loaded; fall back to a print-friendly HTML doc
+            // --- Cover ---
+            push('CLASSROOM SESSION REPORT');
+            push(r.className);
+            blank();
+            push('Class Name', r.className);
+            push('Session Start', formatDateFull(r.sessionStart));
+            push('Exported', formatDateFull(r.exportedAt));
+            push('Duration', formatDurationHuman(r.durationMs));
+
+            // --- Summary ---
+            section('Summary');
+            push('Total Students', r.stats.totalStudents);
+            push('Groups Formed', r.stats.totalGroups);
+            push('Net Points Awarded', r.stats.pointsNet);
+            push('  Points Added', r.stats.pointsAdded);
+            push('  Points Removed', r.stats.pointsRemoved);
+            push('Random Picks Made', r.stats.randomPicksMade);
+            push('Timers Used', r.stats.timersStarted);
+            push('Notes Recorded', r.stats.notesRecorded);
+            push('Call Order Lists (Active)', r.stats.activeCallLists);
+            push('Call Order Lists (Archived)', r.stats.archivedCallLists);
+            push('Call Order Lists (Saved)', r.stats.savedCallLists);
+            push('To-Do Lists (Active)', r.stats.activeTodoLists);
+            push('To-Do Lists (Archived)', r.stats.archivedTodoLists);
+
+            // --- Students table ---
+            section('Students — Points & Participation');
+            push('Name', 'Group', 'Points', 'Notes', 'Times Called');
+            r.students.forEach(function(s) {
+                push(s.name, s.group || '(unassigned)', s.points, s.noteCount, s.timesCalled);
+            });
+
+            // --- Groups ---
+            if (r.groups.length > 0) {
+                section('Groups');
+                r.groups.forEach(function(g) {
+                    push(g.name + ' — ' + g.memberCount + ' members — ' + g.totalPoints + ' total points');
+                    push('  Name', 'Points');
+                    if (g.members.length === 0) {
+                        push('  (empty group)');
+                    } else {
+                        g.members.forEach(function(m) { push('  ' + m.name, m.points); });
+                    }
+                    blank();
+                });
+            }
+
+            // --- Active call lists ---
+            if (r.callOrderLists.active.length > 0) {
+                section('Active Call Order Lists');
+                r.callOrderLists.active.forEach(function(al) {
+                    push(al.name + ' — ' + al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
+                    push('  Position', 'Name', 'Called?');
+                    al.order.forEach(function(o) {
+                        push('  #' + o.position, o.name, o.called ? 'YES' : 'no');
+                    });
+                    blank();
+                });
+            }
+
+            // --- Archived call lists ---
+            if (r.callOrderLists.archived.length > 0) {
+                section('Archived Call Order Lists');
+                r.callOrderLists.archived.forEach(function(al) {
+                    push(al.name + ' — Archived ' + formatDateFull(al.archivedAt) + ' — ' + al.calledCount + '/' + al.total + ' called (' + al.percentCalled + '%)');
+                    push('  Position', 'Name', 'Called?');
+                    al.order.forEach(function(o) {
+                        push('  #' + o.position, o.name, o.called ? 'YES' : 'no');
+                    });
+                    blank();
+                });
+            }
+
+            // --- To-do lists (active) ---
+            if (r.todoLists.active.length > 0) {
+                section('Active To-Do Lists');
+                r.todoLists.active.forEach(function(tl) {
+                    push(tl.name + ' — ' + tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+                    push('  Status', 'Item');
+                    tl.items.forEach(function(it) {
+                        push('  ' + (it.done ? 'DONE' : 'pending'), it.text);
+                    });
+                    blank();
+                });
+            }
+
+            // --- To-do lists (archived) ---
+            if (r.todoLists.archived.length > 0) {
+                section('Archived To-Do Lists');
+                r.todoLists.archived.forEach(function(tl) {
+                    push(tl.name + ' — Archived ' + formatDateFull(tl.archivedAt) + ' — ' + tl.completedItems + '/' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+                    push('  Status', 'Item');
+                    tl.items.forEach(function(it) {
+                        push('  ' + (it.done ? 'DONE' : 'pending'), it.text);
+                    });
+                    blank();
+                });
+            }
+
+            // --- Notes ---
+            if (r.notes.length > 0) {
+                section('Student Notes');
+                r.notes.forEach(function(n) {
+                    push(n.studentName + ' (' + n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's') + ')');
+                    push('  When', 'Note');
+                    n.notes.forEach(function(nt) {
+                        push('  ' + formatDateFull(nt.at), nt.text);
+                    });
+                    blank();
+                });
+            }
+
+            // --- Timeline ---
+            if (r.timeline.length > 0) {
+                section('Session Timeline (What Happened)');
+                push('Time', 'Event');
+                r.timeline.forEach(function(t) {
+                    push(formatDateFull(t.at), t.description);
+                });
+            }
+
+            // Prefix BOM so Excel opens UTF-8 with accented characters correctly.
+            var csv = '\uFEFF' + rows.map(function(row) {
+                return row.map(csvEscape).join(',');
+            }).join('\r\n');
+            downloadBlob(csv, sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.csv', 'text/csv;charset=utf-8;');
+            logEvent('export_csv', {});
+            saveLiveState();
+        }
+
+        // ============================================================
+        //  JSON EXPORT — full structured data for import into other systems
+        // ============================================================
+        function exportJSON() {
+            var r = buildSessionReport();
+            // Convert timestamps to ISO for interoperability
+            var isoify = function(obj) {
+                if (obj && typeof obj === 'object') {
+                    if (Array.isArray(obj)) return obj.map(isoify);
+                    var out = {};
+                    Object.keys(obj).forEach(function(k) {
+                        var v = obj[k];
+                        if ((k === 'at' || k === 'ts' || k === 'sessionStart' || k === 'exportedAt' || k === 'createdAt' || k === 'archivedAt') && typeof v === 'number') {
+                            out[k] = new Date(v).toISOString();
+                        } else {
+                            out[k] = isoify(v);
+                        }
+                    });
+                    return out;
+                }
+                return obj;
+            };
+            var payload = isoify(r);
+            var text = JSON.stringify(payload, null, 2);
+            downloadBlob(text, sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.json', 'application/json;charset=utf-8;');
+            logEvent('export_json', {});
+            saveLiveState();
+        }
+
+        // ============================================================
+        //  PDF EXPORT — laid out with colored section bars, tables,
+        //  and pagination. Falls back to a printable HTML window if
+        //  jsPDF isn't available.
+        // ============================================================
+        function exportPDF() {
+            var r = buildSessionReport();
             var jspdf = window.jspdf;
             if (!jspdf || !jspdf.jsPDF) {
-                exportPDFViaPrint(className, data);
+                exportPDFViaPrint(r);
                 return;
             }
 
             var doc = new jspdf.jsPDF({ unit: 'pt', format: 'letter' });
             var margin = 40;
-            var y = margin;
             var pageW = doc.internal.pageSize.getWidth();
             var pageH = doc.internal.pageSize.getHeight();
+            var contentW = pageW - margin * 2;
+            var y = margin;
+            var pageNum = 1;
+
+            // Palette
+            var C_HEADER = [44, 62, 80];      // dark slate
+            var C_ACCENT = [74, 111, 165];    // blue
+            var C_MUTED  = [120, 120, 120];
+            var C_ZEBRA  = [245, 247, 250];
+            var C_DIVIDE = [220, 226, 232];
+            var C_GREEN  = [39, 174, 96];
+            var C_RED    = [217, 83, 79];
+
+            function addFooter() {
+                doc.setFontSize(8);
+                doc.setTextColor(160, 160, 160);
+                doc.setFont('helvetica', 'normal');
+                doc.text(r.className + ' — page ' + pageNum, margin, pageH - 20);
+                doc.text('Exported ' + formatDateFull(r.exportedAt), pageW - margin, pageH - 20, { align: 'right' });
+                doc.setTextColor(0, 0, 0);
+            }
+            addFooter();
 
             function checkPage(needed) {
-                if (y + needed > pageH - margin) {
+                if (y + needed > pageH - margin - 20) {
                     doc.addPage();
+                    pageNum += 1;
                     y = margin;
+                    addFooter();
                 }
             }
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(18);
-            doc.text(className, margin, y); y += 22;
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text('Session Start: ' + formatTs(liveState.sessionStart || Date.now()), margin, y); y += 14;
-            doc.text('Exported: ' + formatTs(Date.now()), margin, y); y += 20;
-            doc.setTextColor(0);
-
-            // Roster
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(13);
-            doc.text('Students', margin, y); y += 16;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-
-            data.students.forEach(s => {
-                var d = liveState.studentData[s.name] || { points: 0, notes: [] };
-                var grp = findGroupForStudent(s.name);
-                var line = s.name + '  •  ' + (grp ? grp.name : 'Unassigned') + '  •  ' + d.points + ' pts  •  ' + d.notes.length + ' note(s)';
-                checkPage(14);
-                doc.text(line, margin, y);
-                y += 14;
-                if (d.notes.length > 0) {
-                    doc.setTextColor(80);
-                    d.notes.forEach(n => {
-                        var noteLine = '   – [' + formatTs(n.ts) + '] ' + n.text;
-                        var wrapped = doc.splitTextToSize(noteLine, pageW - margin * 2);
-                        wrapped.forEach(wl => {
-                            checkPage(12);
-                            doc.text(wl, margin, y);
-                            y += 12;
-                        });
-                    });
-                    doc.setTextColor(0);
-                    y += 4;
-                }
-            });
-
-            // Groups
-            y += 10;
-            checkPage(30);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(13);
-            doc.text('Groups', margin, y); y += 16;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            liveState.groups.forEach(g => {
-                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
-                checkPage(28);
-                doc.setFont('helvetica', 'bold');
-                doc.text(g.name + '  (' + total + ' pts, ' + g.members.length + ' member' + (g.members.length===1?'':'s') + ')', margin, y);
-                y += 14;
-                doc.setFont('helvetica', 'normal');
-                var mList = g.members.join(', ') || '(no members)';
-                var wrapped = doc.splitTextToSize(mList, pageW - margin * 2);
-                wrapped.forEach(wl => {
-                    checkPage(12);
-                    doc.text(wl, margin, y);
-                    y += 12;
-                });
+            function sectionHeader(title) {
+                checkPage(36);
                 y += 6;
-            });
-
-            // Event log
-            y += 10;
-            checkPage(30);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(13);
-            doc.text('Session Events (' + liveState.events.length + ')', margin, y); y += 16;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            liveState.events.forEach(e => {
-                var line = '[' + formatTs(e.ts) + '] ' + e.type + ' — ' + JSON.stringify(e.details);
-                var wrapped = doc.splitTextToSize(line, pageW - margin * 2);
-                wrapped.forEach(wl => {
+                doc.setFillColor(C_HEADER[0], C_HEADER[1], C_HEADER[2]);
+                doc.rect(margin, y, contentW, 22, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(12);
+                doc.setTextColor(255, 255, 255);
+                doc.text(title, margin + 10, y + 15);
+                doc.setTextColor(0, 0, 0);
+                y += 22 + 10;
+            }
+            function subHeader(title, right) {
+                checkPage(20);
+                doc.setFillColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
+                doc.rect(margin, y, contentW, 16, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.setTextColor(255, 255, 255);
+                doc.text(title, margin + 8, y + 11);
+                if (right) doc.text(right, pageW - margin - 8, y + 11, { align: 'right' });
+                doc.setTextColor(0, 0, 0);
+                y += 16 + 6;
+            }
+            function keyValueRow(k, v) {
+                checkPage(14);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text(k + ':', margin, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(v), margin + 160, y);
+                y += 14;
+            }
+            function tableHeader(cols, widths) {
+                checkPage(20);
+                doc.setFillColor(C_HEADER[0], C_HEADER[1], C_HEADER[2]);
+                doc.rect(margin, y, contentW, 18, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.setTextColor(255, 255, 255);
+                var x = margin + 8;
+                cols.forEach(function(c, i) {
+                    doc.text(c, x, y + 12);
+                    x += widths[i];
+                });
+                doc.setTextColor(0, 0, 0);
+                y += 18;
+            }
+            function tableRow(cells, widths, opts) {
+                opts = opts || {};
+                var rowH = 16;
+                // Pre-wrap long cells to know actual row height
+                var wrappedCells = cells.map(function(c, i) {
+                    return doc.splitTextToSize(String(c), widths[i] - 6);
+                });
+                var maxLines = wrappedCells.reduce(function(m, wc) { return Math.max(m, wc.length); }, 1);
+                rowH = 12 + maxLines * 11;
+                checkPage(rowH + 2);
+                if (opts.zebra) {
+                    doc.setFillColor(C_ZEBRA[0], C_ZEBRA[1], C_ZEBRA[2]);
+                    doc.rect(margin, y, contentW, rowH, 'F');
+                }
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                if (opts.color) doc.setTextColor(opts.color[0], opts.color[1], opts.color[2]);
+                var x = margin + 8;
+                wrappedCells.forEach(function(wc, i) {
+                    doc.text(wc, x, y + 13);
+                    x += widths[i];
+                });
+                doc.setTextColor(0, 0, 0);
+                // Bottom divider
+                doc.setDrawColor(C_DIVIDE[0], C_DIVIDE[1], C_DIVIDE[2]);
+                doc.line(margin, y + rowH, margin + contentW, y + rowH);
+                y += rowH;
+            }
+            function paragraph(text, color) {
+                var wrapped = doc.splitTextToSize(text, contentW);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                if (color) doc.setTextColor(color[0], color[1], color[2]);
+                wrapped.forEach(function(line) {
                     checkPage(11);
-                    doc.text(wl, margin, y);
+                    doc.text(line, margin, y);
                     y += 11;
                 });
-            });
+                if (color) doc.setTextColor(0, 0, 0);
+            }
+            function spacer(h) { y += (h || 8); }
 
-            doc.save(sanitizeFile(className) + '_session.pdf');
+            // ============ Cover ============
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(22);
+            doc.setTextColor(C_HEADER[0], C_HEADER[1], C_HEADER[2]);
+            doc.text('Classroom Session Report', margin, y + 18);
+            y += 26;
+            doc.setFontSize(16);
+            doc.setTextColor(0, 0, 0);
+            doc.text(r.className, margin, y + 18);
+            y += 32;
+            doc.setDrawColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
+            doc.setLineWidth(2);
+            doc.line(margin, y, margin + contentW, y);
+            doc.setLineWidth(1);
+            y += 14;
+            keyValueRow('Session Start', formatDateFull(r.sessionStart));
+            keyValueRow('Exported', formatDateFull(r.exportedAt));
+            keyValueRow('Duration', formatDurationHuman(r.durationMs));
+            spacer(6);
+
+            // ============ Summary ============
+            sectionHeader('Summary');
+            var summaryLeft = [
+                ['Total Students', r.stats.totalStudents],
+                ['Groups Formed', r.stats.totalGroups],
+                ['Random Picks Made', r.stats.randomPicksMade],
+                ['Timers Used', r.stats.timersStarted]
+            ];
+            var summaryRight = [
+                ['Net Points Awarded', r.stats.pointsNet],
+                ['  Added / Removed', r.stats.pointsAdded + ' / ' + r.stats.pointsRemoved],
+                ['Notes Recorded', r.stats.notesRecorded],
+                ['Lists (Active/Archived)',
+                    'Call ' + r.stats.activeCallLists + '/' + r.stats.archivedCallLists +
+                    ' · To-Do ' + r.stats.activeTodoLists + '/' + r.stats.archivedTodoLists]
+            ];
+            var startY = y;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            summaryLeft.forEach(function(row, i) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(row[0] + ':', margin, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(row[1]), margin + 130, y);
+                y += 15;
+            });
+            var summaryEndY = y;
+            y = startY;
+            summaryRight.forEach(function(row) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(row[0] + ':', margin + contentW / 2, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(row[1]), margin + contentW / 2 + 140, y);
+                y += 15;
+            });
+            y = Math.max(y, summaryEndY);
+            spacer(4);
+
+            // ============ Students ============
+            if (r.students.length > 0) {
+                sectionHeader('Students — Points & Participation');
+                var stuCols = ['Name', 'Group', 'Points', 'Notes', 'Times Called'];
+                var stuWidths = [contentW * 0.28, contentW * 0.30, contentW * 0.10, contentW * 0.10, contentW * 0.22];
+                tableHeader(stuCols, stuWidths);
+                r.students.forEach(function(s, i) {
+                    tableRow([
+                        s.name,
+                        s.group || 'unassigned',
+                        String(s.points),
+                        String(s.noteCount),
+                        String(s.timesCalled)
+                    ], stuWidths, { zebra: i % 2 === 1 });
+                });
+                spacer(6);
+            }
+
+            // ============ Groups ============
+            if (r.groups.length > 0) {
+                sectionHeader('Groups');
+                r.groups.forEach(function(g) {
+                    subHeader(g.name, g.memberCount + ' members · ' + g.totalPoints + ' total points');
+                    var grpWidths = [contentW * 0.72, contentW * 0.28];
+                    if (g.members.length === 0) {
+                        paragraph('(empty group)', C_MUTED);
+                    } else {
+                        tableHeader(['Name', 'Points'], grpWidths);
+                        g.members.forEach(function(m, i) {
+                            tableRow([m.name, String(m.points)], grpWidths, { zebra: i % 2 === 1 });
+                        });
+                    }
+                    spacer(6);
+                });
+            }
+
+            // ============ Active call lists ============
+            if (r.callOrderLists.active.length > 0) {
+                sectionHeader('Active Call Order Lists');
+                r.callOrderLists.active.forEach(function(al) {
+                    subHeader('📋 ' + al.name, al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
+                    var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
+                    tableHeader(['#', 'Name', 'Status'], w);
+                    al.order.forEach(function(o, i) {
+                        tableRow(
+                            [String(o.position), o.name, o.called ? '✓ Called' : '— Not called'],
+                            w,
+                            { zebra: i % 2 === 1, color: o.called ? C_GREEN : C_MUTED }
+                        );
+                    });
+                    spacer(6);
+                });
+            }
+
+            // ============ Archived call lists ============
+            if (r.callOrderLists.archived.length > 0) {
+                sectionHeader('Archived Call Order Lists');
+                r.callOrderLists.archived.forEach(function(al) {
+                    subHeader('📁 ' + al.name, al.calledCount + '/' + al.total + ' (' + al.percentCalled + '%) · Archived ' + formatDateFull(al.archivedAt));
+                    var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
+                    tableHeader(['#', 'Name', 'Status'], w);
+                    al.order.forEach(function(o, i) {
+                        tableRow(
+                            [String(o.position), o.name, o.called ? '✓ Called' : '— Not called'],
+                            w,
+                            { zebra: i % 2 === 1, color: o.called ? C_GREEN : C_MUTED }
+                        );
+                    });
+                    spacer(6);
+                });
+            }
+
+            // ============ Active to-do lists ============
+            if (r.todoLists.active.length > 0) {
+                sectionHeader('Active To-Do Lists');
+                r.todoLists.active.forEach(function(tl) {
+                    subHeader('☑ ' + tl.name, tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+                    var w = [contentW * 0.15, contentW * 0.85];
+                    tableHeader(['Status', 'Item'], w);
+                    tl.items.forEach(function(it, i) {
+                        tableRow(
+                            [it.done ? '✓ Done' : '○ Pending', it.text],
+                            w,
+                            { zebra: i % 2 === 1, color: it.done ? C_GREEN : null }
+                        );
+                    });
+                    spacer(6);
+                });
+            }
+
+            // ============ Archived to-do lists ============
+            if (r.todoLists.archived.length > 0) {
+                sectionHeader('Archived To-Do Lists');
+                r.todoLists.archived.forEach(function(tl) {
+                    subHeader('📁 ' + tl.name, tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) · Archived ' + formatDateFull(tl.archivedAt));
+                    var w = [contentW * 0.15, contentW * 0.85];
+                    tableHeader(['Status', 'Item'], w);
+                    tl.items.forEach(function(it, i) {
+                        tableRow(
+                            [it.done ? '✓ Done' : '○ Pending', it.text],
+                            w,
+                            { zebra: i % 2 === 1, color: it.done ? C_GREEN : null }
+                        );
+                    });
+                    spacer(6);
+                });
+            }
+
+            // ============ Notes ============
+            if (r.notes.length > 0) {
+                sectionHeader('Student Notes');
+                r.notes.forEach(function(n) {
+                    subHeader(n.studentName, n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's'));
+                    n.notes.forEach(function(nt) {
+                        checkPage(30);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(9);
+                        doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                        doc.text(formatDateFull(nt.at), margin, y);
+                        y += 12;
+                        doc.setTextColor(0, 0, 0);
+                        paragraph(nt.text);
+                        spacer(4);
+                    });
+                });
+            }
+
+            // ============ Timeline ============
+            if (r.timeline.length > 0) {
+                sectionHeader('Session Timeline — What Happened');
+                var tW = [contentW * 0.22, contentW * 0.78];
+                tableHeader(['Time', 'Event'], tW);
+                r.timeline.forEach(function(t, i) {
+                    tableRow([formatDateFull(t.at), t.description], tW, { zebra: i % 2 === 1 });
+                });
+            }
+
+            doc.save(sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.pdf');
             logEvent('export_pdf', {});
             saveLiveState();
         }
 
-        function exportPDFViaPrint(className, data) {
-            // Fallback if jsPDF failed to load: open a printable HTML window
+        // Fallback: HTML report opened in a new window with print styling.
+        // Matches the PDF's structure so people get a comparable result.
+        function exportPDFViaPrint(r) {
             var w = window.open('', '_blank');
             if (!w) { alert("Please allow pop-ups so the printable report can open."); return; }
-            var html = '<html><head><title>' + escapeHtml(className) + ' — Session Report</title>' +
-                '<style>body{font-family:Segoe UI,Tahoma,sans-serif;padding:30px;color:#1a202c;}h1{margin-bottom:4px;}h2{margin-top:24px;border-bottom:2px solid #2c3e50;padding-bottom:4px;}.meta{color:#64748b;font-size:0.85rem;margin-bottom:16px;}table{width:100%;border-collapse:collapse;margin:10px 0;}th,td{padding:6px 10px;border:1px solid #e2e8f0;text-align:left;font-size:0.9rem;}th{background:#f1f5f9;}.note{color:#475569;font-size:0.85rem;padding-left:14px;}.grp{background:#f8fafc;padding:8px 12px;margin:6px 0;border-left:4px solid #4a6fa5;}</style>' +
-                '</head><body>';
-            html += '<h1>' + escapeHtml(className) + '</h1>';
-            html += '<div class="meta">Session Start: ' + formatTs(liveState.sessionStart || Date.now()) + ' &nbsp;·&nbsp; Exported: ' + formatTs(Date.now()) + '</div>';
 
-            html += '<h2>Students</h2><table><tr><th>Name</th><th>Group</th><th>Points</th><th>Notes</th></tr>';
-            data.students.forEach(s => {
-                var d = liveState.studentData[s.name] || { points: 0, notes: [] };
-                var grp = findGroupForStudent(s.name);
-                var notes = d.notes.map(n => '<div class="note">[' + formatTs(n.ts) + '] ' + escapeHtml(n.text) + '</div>').join('');
-                html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + (grp ? escapeHtml(grp.name) : '<em>Unassigned</em>') + '</td><td>' + d.points + '</td><td>' + (notes || '—') + '</td></tr>';
-            });
-            html += '</table>';
+            var css = 'body{font-family:Segoe UI,Tahoma,sans-serif;padding:40px;color:#1a202c;line-height:1.4;}' +
+                'h1{margin-bottom:2px;font-size:1.6rem;color:#2c3e50;}' +
+                'h1+.subtitle{color:#64748b;margin-bottom:18px;font-size:1rem;}' +
+                'h2{margin-top:28px;background:#2c3e50;color:white;padding:8px 12px;font-size:1rem;border-radius:3px;}' +
+                'h3{margin-top:14px;background:#4a6fa5;color:white;padding:6px 10px;font-size:0.9rem;border-radius:3px;display:flex;justify-content:space-between;}' +
+                '.meta{color:#64748b;font-size:0.85rem;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #4a6fa5;}' +
+                '.summary{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:0.9rem;margin-bottom:20px;}' +
+                '.summary strong{color:#2c3e50;}' +
+                'table{width:100%;border-collapse:collapse;margin:8px 0;font-size:0.85rem;}' +
+                'th,td{padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:left;}' +
+                'th{background:#2c3e50;color:white;font-weight:600;}' +
+                'tr:nth-child(even) td{background:#f8fafc;}' +
+                '.called{color:#059669;}.notcalled{color:#94a3b8;}' +
+                '.done{color:#059669;}.pending{color:#94a3b8;}' +
+                '.note{background:#f8fafc;border-left:3px solid #4a6fa5;padding:8px 12px;margin:6px 0;font-size:0.85rem;}' +
+                '.note-ts{color:#64748b;font-size:0.75rem;margin-bottom:3px;}' +
+                '@media print{h2,h3{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
 
-            html += '<h2>Groups</h2>';
-            liveState.groups.forEach(g => {
-                var total = g.members.reduce((sum, n) => sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0), 0);
-                html += '<div class="grp" style="border-left-color:' + g.color + ';"><strong>' + escapeHtml(g.name) + '</strong> — ' + total + ' pts — ' + g.members.length + ' members<br>' + g.members.map(escapeHtml).join(', ') + '</div>';
-            });
+            var html = '<html><head><title>' + escapeHtml(r.className) + ' — Session Report</title><style>' + css + '</style></head><body>';
+            html += '<h1>Classroom Session Report</h1><div class="subtitle">' + escapeHtml(r.className) + '</div>';
+            html += '<div class="meta"><strong>Session Start:</strong> ' + formatDateFull(r.sessionStart) +
+                ' &nbsp;·&nbsp; <strong>Exported:</strong> ' + formatDateFull(r.exportedAt) +
+                ' &nbsp;·&nbsp; <strong>Duration:</strong> ' + formatDurationHuman(r.durationMs) + '</div>';
 
-            html += '<h2>Session Events</h2><table><tr><th>Time</th><th>Type</th><th>Details</th></tr>';
-            liveState.events.forEach(e => {
-                html += '<tr><td>' + formatTs(e.ts) + '</td><td>' + escapeHtml(e.type) + '</td><td>' + escapeHtml(JSON.stringify(e.details)) + '</td></tr>';
-            });
-            html += '</table><script>window.onload=function(){setTimeout(function(){window.print();},300);};<' + '/script></body></html>';
+            html += '<h2>Summary</h2>';
+            html += '<div class="summary">';
+            html += '<div><strong>Total Students:</strong> ' + r.stats.totalStudents + '</div>';
+            html += '<div><strong>Net Points:</strong> ' + r.stats.pointsNet + ' (+' + r.stats.pointsAdded + ' / −' + r.stats.pointsRemoved + ')</div>';
+            html += '<div><strong>Groups Formed:</strong> ' + r.stats.totalGroups + '</div>';
+            html += '<div><strong>Notes Recorded:</strong> ' + r.stats.notesRecorded + '</div>';
+            html += '<div><strong>Random Picks:</strong> ' + r.stats.randomPicksMade + '</div>';
+            html += '<div><strong>Timers Used:</strong> ' + r.stats.timersStarted + '</div>';
+            html += '<div><strong>Call Order Lists:</strong> ' + r.stats.activeCallLists + ' active · ' + r.stats.archivedCallLists + ' archived</div>';
+            html += '<div><strong>To-Do Lists:</strong> ' + r.stats.activeTodoLists + ' active · ' + r.stats.archivedTodoLists + ' archived</div>';
+            html += '</div>';
+
+            if (r.students.length > 0) {
+                html += '<h2>Students — Points &amp; Participation</h2><table><tr><th>Name</th><th>Group</th><th>Points</th><th>Notes</th><th>Times Called</th></tr>';
+                r.students.forEach(function(s) {
+                    html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + (s.group ? escapeHtml(s.group) : '<em>unassigned</em>') + '</td><td>' + s.points + '</td><td>' + s.noteCount + '</td><td>' + s.timesCalled + '</td></tr>';
+                });
+                html += '</table>';
+            }
+
+            if (r.groups.length > 0) {
+                html += '<h2>Groups</h2>';
+                r.groups.forEach(function(g) {
+                    html += '<h3><span>' + escapeHtml(g.name) + '</span><span>' + g.memberCount + ' members · ' + g.totalPoints + ' total pts</span></h3>';
+                    if (g.members.length === 0) {
+                        html += '<div style="color:#94a3b8;font-style:italic;padding:6px 0;">(empty group)</div>';
+                    } else {
+                        html += '<table><tr><th>Name</th><th>Points</th></tr>';
+                        g.members.forEach(function(m) {
+                            html += '<tr><td>' + escapeHtml(m.name) + '</td><td>' + m.points + '</td></tr>';
+                        });
+                        html += '</table>';
+                    }
+                });
+            }
+
+            function callListSection(title, lists, includeArchivedInfo) {
+                if (lists.length === 0) return '';
+                var out = '<h2>' + title + '</h2>';
+                lists.forEach(function(al) {
+                    var meta = al.calledCount + '/' + al.total + ' called (' + al.percentCalled + '%)';
+                    if (includeArchivedInfo) meta += ' · Archived ' + formatDateFull(al.archivedAt);
+                    out += '<h3><span>📋 ' + escapeHtml(al.name) + '</span><span>' + meta + '</span></h3>';
+                    out += '<table><tr><th>#</th><th>Name</th><th>Status</th></tr>';
+                    al.order.forEach(function(o) {
+                        var cls = o.called ? 'called' : 'notcalled';
+                        var label = o.called ? '✓ Called' : '— Not called';
+                        out += '<tr><td>' + o.position + '</td><td>' + escapeHtml(o.name) + '</td><td class="' + cls + '">' + label + '</td></tr>';
+                    });
+                    out += '</table>';
+                });
+                return out;
+            }
+            html += callListSection('Active Call Order Lists', r.callOrderLists.active, false);
+            html += callListSection('Archived Call Order Lists', r.callOrderLists.archived, true);
+
+            function todoSection(title, lists, includeArchivedInfo) {
+                if (lists.length === 0) return '';
+                var out = '<h2>' + title + '</h2>';
+                lists.forEach(function(tl) {
+                    var meta = tl.completedItems + '/' + tl.totalItems + ' done (' + tl.percentComplete + '%)';
+                    if (includeArchivedInfo) meta += ' · Archived ' + formatDateFull(tl.archivedAt);
+                    out += '<h3><span>☑ ' + escapeHtml(tl.name) + '</span><span>' + meta + '</span></h3>';
+                    out += '<table><tr><th>Status</th><th>Item</th></tr>';
+                    tl.items.forEach(function(it) {
+                        var cls = it.done ? 'done' : 'pending';
+                        var label = it.done ? '✓ Done' : '○ Pending';
+                        out += '<tr><td class="' + cls + '">' + label + '</td><td>' + escapeHtml(it.text) + '</td></tr>';
+                    });
+                    out += '</table>';
+                });
+                return out;
+            }
+            html += todoSection('Active To-Do Lists', r.todoLists.active, false);
+            html += todoSection('Archived To-Do Lists', r.todoLists.archived, true);
+
+            if (r.notes.length > 0) {
+                html += '<h2>Student Notes</h2>';
+                r.notes.forEach(function(n) {
+                    html += '<h3><span>' + escapeHtml(n.studentName) + '</span><span>' + n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's') + '</span></h3>';
+                    n.notes.forEach(function(nt) {
+                        html += '<div class="note"><div class="note-ts">' + formatDateFull(nt.at) + '</div>' + escapeHtml(nt.text) + '</div>';
+                    });
+                });
+            }
+
+            if (r.timeline.length > 0) {
+                html += '<h2>Session Timeline — What Happened</h2><table><tr><th style="width:180px;">Time</th><th>Event</th></tr>';
+                r.timeline.forEach(function(t) {
+                    html += '<tr><td>' + formatDateFull(t.at) + '</td><td>' + escapeHtml(t.description) + '</td></tr>';
+                });
+                html += '</table>';
+            }
+
+            html += '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<' + '/script></body></html>';
             w.document.write(html);
             w.document.close();
             logEvent('export_pdf_print', {});
