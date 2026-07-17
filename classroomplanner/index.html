@@ -4027,39 +4027,55 @@
             if (g.members.length === 0) { alert("This group has no students yet."); return; }
             pickRandomFromPool(g.members, 1);
         }
-        function pickRandomFromPool(pool, count) {
-            var deskEls = Array.from(document.querySelectorAll('#live-canvas .live-student'));
-            if (deskEls.length === 0) { alert("No students on the layout yet."); return; }
 
-            // Filter to pool if provided
-            var eligible = deskEls;
+        // Anyone marked absent during an active lesson is excluded from random picks.
+        // (Late students remain eligible — they're just late, not out.)
+        function isEligibleForPick(name) {
+            if (!liveState.activeLesson) return true;
+            return liveState.activeLesson.attendance[name] !== 'absent';
+        }
+
+        function pickRandomFromPool(pool, count) {
+            var allDeskEls = Array.from(document.querySelectorAll('#live-canvas .live-student'));
+            if (allDeskEls.length === 0) { alert("No students on the layout yet."); return; }
+
+            // Filter to pool if provided, then filter out absent students
+            var eligible = allDeskEls;
             if (pool) {
-                eligible = deskEls.filter(el => pool.indexOf(el.getAttribute('data-name')) !== -1);
-                if (eligible.length === 0) return;
+                eligible = eligible.filter(function(el) { return pool.indexOf(el.getAttribute('data-name')) !== -1; });
+            }
+            var absentCount = 0;
+            eligible = eligible.filter(function(el) {
+                var name = el.getAttribute('data-name');
+                if (!isEligibleForPick(name)) { absentCount += 1; return false; }
+                return true;
+            });
+
+            if (eligible.length === 0) {
+                if (absentCount > 0) alert("Everyone in that pool is marked absent — no one to pick.");
+                return;
             }
             if (count > eligible.length) count = eligible.length;
 
-            // Clear any prior highlight
-            deskEls.forEach(el => { el.classList.remove('picking'); el.classList.remove('winner'); });
+            // Clear any prior highlight (on ALL desks, not just eligible)
+            allDeskEls.forEach(function(el) { el.classList.remove('picking'); el.classList.remove('winner'); });
             document.getElementById('winner-banner').style.display = 'none';
 
             // Shuffle eligible for the "cycling" order; pick winners at the end
             var winnerSet = new Set();
-            var shuffled = eligible.slice().sort(() => Math.random() - 0.5);
+            var shuffled = eligible.slice().sort(function() { return Math.random() - 0.5; });
             for (var i = 0; i < count; i++) winnerSet.add(shuffled[i]);
 
-            // Build the animation sequence: ~2.8s total, easing out
+            // Build the animation sequence: ~2.8s total, easing out. Ticks only cycle through eligible desks.
             var totalMs = 2800 + Math.min(2000, count * 200);
             var frames = [];
             var frameCount = Math.max(20, Math.floor(totalMs / 70));
             for (var f = 0; f < frameCount; f++) {
                 var frac = f / frameCount;
-                // ease-out cubic — delay between frames grows
                 var t = totalMs * (1 - Math.pow(1 - frac, 3));
                 var idx = Math.floor(Math.random() * eligible.length);
                 frames.push({ time: t, el: eligible[idx] });
             }
-            // At the very end, land on winners
             var winners = Array.from(winnerSet);
             var landHold = 400;
 
@@ -5858,23 +5874,122 @@
             if (r.lessons.length > 0) {
                 sectionHeader('Lessons & Attendance');
                 r.lessons.forEach(function(l, idx) {
-                    var meta = 'Duration ' + formatLessonDuration(l.durationMs) +
-                        ' · Present ' + l.counts.present + ' · Absent ' + l.counts.absent + ' · Late ' + l.counts.late;
-                    var head = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
-                    if (l.isActive) head += ' → (in progress)';
-                    else if (l.endedAt) head += ' → ' + formatTimeShort(l.endedAt);
-                    subHeader(head, meta);
-                    if (l.attendance.length === 0) {
-                        paragraph('(no attendance recorded)', C_MUTED);
-                    } else {
-                        var aW = [contentW * 0.7, contentW * 0.3];
-                        tableHeader(['Name', 'Status'], aW);
-                        l.attendance.forEach(function(a, i) {
-                            var color = a.status === 'present' ? C_GREEN : (a.status === 'absent' ? C_RED : [217, 119, 6]);
-                            var label = { present: '✓ Present', absent: '✗ Absent', late: '⏰ Late' }[a.status] || a.status;
-                            tableRow([a.name, label], aW, { zebra: i % 2 === 1, color: color });
-                        });
+                    // Header: just "Lesson N" — details go in a key-value block below
+                    var head = 'Lesson ' + (idx + 1) + (l.isActive ? ' (in progress)' : '');
+                    subHeader(head, formatDateFull(l.startedAt));
+
+                    // Details in a keyed layout — clear, scannable
+                    checkPage(60);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    var labelX = margin + 8;
+                    var valueX = margin + 120;
+                    var lineH = 13;
+
+                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                    doc.text('Started', labelX, y + 9);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(formatDateFull(l.startedAt), valueX, y + 9);
+                    y += lineH;
+
+                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                    doc.text('Ended', labelX, y + 9);
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(l.isActive ? '(in progress)' : formatDateFull(l.endedAt), valueX, y + 9);
+                    y += lineH;
+
+                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                    doc.text('Duration', labelX, y + 9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(formatLessonDuration(l.durationMs), valueX, y + 9);
+                    doc.setFont('helvetica', 'normal');
+                    y += lineH;
+
+                    if (l.attendanceTakenAt) {
+                        doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                        doc.text('Attendance recorded', labelX, y + 9);
+                        doc.setTextColor(0, 0, 0);
+                        doc.text(formatDateFull(l.attendanceTakenAt), valueX, y + 9);
+                        y += lineH;
                     }
+                    spacer(6);
+
+                    // Attendance summary bar — small colored pills
+                    if (l.attendance.length > 0) {
+                        checkPage(30);
+                        var pillY = y;
+                        var pillH = 20;
+                        var pillGap = 8;
+                        var pillWidth = (contentW - pillGap * 2) / 3;
+                        [
+                            { label: 'Present', count: l.counts.present, color: C_GREEN },
+                            { label: 'Late',    count: l.counts.late,    color: [217, 119, 6] },
+                            { label: 'Absent',  count: l.counts.absent,  color: C_RED }
+                        ].forEach(function(p, i) {
+                            var px = margin + i * (pillWidth + pillGap);
+                            doc.setFillColor(p.color[0], p.color[1], p.color[2]);
+                            doc.roundedRect(px, pillY, pillWidth, pillH, 4, 4, 'F');
+                            doc.setTextColor(255, 255, 255);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(10);
+                            doc.text(p.label + ':', px + 10, pillY + 14);
+                            doc.setFontSize(11);
+                            doc.text(String(p.count), px + pillWidth - 12, pillY + 14, { align: 'right' });
+                        });
+                        doc.setTextColor(0, 0, 0);
+                        y += pillH + 12;
+                    } else {
+                        paragraph('(no attendance recorded)', C_MUTED);
+                        spacer(6);
+                        return;
+                    }
+
+                    // Grouped by status — Absent first (what teachers care about most),
+                    // then Late, then Present. Names laid out in columns for compactness.
+                    var byStatus = { present: [], absent: [], late: [] };
+                    l.attendance.forEach(function(a) {
+                        (byStatus[a.status] || byStatus.present).push(a.name);
+                    });
+
+                    var statusBlocks = [
+                        { key: 'absent',  label: 'Absent',  color: C_RED },
+                        { key: 'late',    label: 'Late',    color: [217, 119, 6] },
+                        { key: 'present', label: 'Present', color: C_GREEN }
+                    ];
+                    statusBlocks.forEach(function(sb) {
+                        var list = byStatus[sb.key];
+                        if (list.length === 0) return;
+                        list = list.slice().sort();
+
+                        // Colored strip with label + count
+                        checkPage(28);
+                        doc.setFillColor(sb.color[0], sb.color[1], sb.color[2]);
+                        doc.rect(margin, y, contentW, 15, 'F');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(9);
+                        doc.text(sb.label.toUpperCase() + '  (' + list.length + ')', margin + 8, y + 10);
+                        doc.setTextColor(0, 0, 0);
+                        y += 15 + 4;
+
+                        // Two-column name layout for compactness
+                        doc.setFont('helvetica', 'normal');
+                        doc.setFontSize(9.5);
+                        var cols = list.length > 6 ? 2 : 1;
+                        var rowsN = Math.ceil(list.length / cols);
+                        var colW = contentW / cols;
+                        for (var i = 0; i < rowsN; i++) {
+                            checkPage(13);
+                            for (var c = 0; c < cols; c++) {
+                                var name = list[i + c * rowsN];
+                                if (!name) continue;
+                                doc.text('- ' + name, margin + 10 + c * colW, y + 9);
+                            }
+                            y += 13;
+                        }
+                        spacer(4);
+                    });
                     spacer(6);
                 });
             }
@@ -5901,12 +6016,12 @@
             if (r.callOrderLists.active.length > 0) {
                 sectionHeader('Active Call Order Lists');
                 r.callOrderLists.active.forEach(function(al) {
-                    subHeader('📋 ' + al.name, al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
+                    subHeader(al.name, al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
                     var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
                     tableHeader(['#', 'Name', 'Status'], w);
                     al.order.forEach(function(o, i) {
                         tableRow(
-                            [String(o.position), o.name, o.called ? '✓ Called' : '— Not called'],
+                            [String(o.position), o.name, o.called ? 'Called' : 'Not called'],
                             w,
                             { zebra: i % 2 === 1, color: o.called ? C_GREEN : C_MUTED }
                         );
@@ -5919,12 +6034,12 @@
             if (r.callOrderLists.archived.length > 0) {
                 sectionHeader('Archived Call Order Lists');
                 r.callOrderLists.archived.forEach(function(al) {
-                    subHeader('📁 ' + al.name, al.calledCount + '/' + al.total + ' (' + al.percentCalled + '%) · Archived ' + formatDateFull(al.archivedAt));
+                    subHeader(al.name, al.calledCount + '/' + al.total + ' (' + al.percentCalled + '%) — Archived ' + formatDateFull(al.archivedAt));
                     var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
                     tableHeader(['#', 'Name', 'Status'], w);
                     al.order.forEach(function(o, i) {
                         tableRow(
-                            [String(o.position), o.name, o.called ? '✓ Called' : '— Not called'],
+                            [String(o.position), o.name, o.called ? 'Called' : 'Not called'],
                             w,
                             { zebra: i % 2 === 1, color: o.called ? C_GREEN : C_MUTED }
                         );
@@ -5937,12 +6052,12 @@
             if (r.todoLists.active.length > 0) {
                 sectionHeader('Active To-Do Lists');
                 r.todoLists.active.forEach(function(tl) {
-                    subHeader('☑ ' + tl.name, tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+                    subHeader(tl.name, tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
                     var w = [contentW * 0.15, contentW * 0.85];
                     tableHeader(['Status', 'Item'], w);
                     tl.items.forEach(function(it, i) {
                         tableRow(
-                            [it.done ? '✓ Done' : '○ Pending', it.text],
+                            [it.done ? 'Done' : 'Pending', it.text],
                             w,
                             { zebra: i % 2 === 1, color: it.done ? C_GREEN : null }
                         );
@@ -5955,12 +6070,12 @@
             if (r.todoLists.archived.length > 0) {
                 sectionHeader('Archived To-Do Lists');
                 r.todoLists.archived.forEach(function(tl) {
-                    subHeader('📁 ' + tl.name, tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) · Archived ' + formatDateFull(tl.archivedAt));
+                    subHeader(tl.name, tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) — Archived ' + formatDateFull(tl.archivedAt));
                     var w = [contentW * 0.15, contentW * 0.85];
                     tableHeader(['Status', 'Item'], w);
                     tl.items.forEach(function(it, i) {
                         tableRow(
-                            [it.done ? '✓ Done' : '○ Pending', it.text],
+                            [it.done ? 'Done' : 'Pending', it.text],
                             w,
                             { zebra: i % 2 === 1, color: it.done ? C_GREEN : null }
                         );
