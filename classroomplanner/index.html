@@ -3531,31 +3531,102 @@
         // ============================================================
 
         function toggleLesson() {
-            if (liveState.activeLesson) endLesson();
-            else startLesson();
+            if (liveState.activeLesson) openEndLessonModal();
+            else openStartLessonModal();
         }
 
-        function startLesson() {
-            if (liveState.activeLesson) return;
+        // Dialog before actually starting — asks for a lesson name
+        function openStartLessonModal() {
             var students = getStudentsFromDesigner().students;
             if (students.length === 0) {
                 alert("Add students on the layout in the Designer tab first.");
                 return;
             }
-            // Everyone starts as present; teacher clicks desks to change to absent/late during attendance mode
+            var defaultName = 'Lesson ' + ((liveState.completedLessons || []).length + 1);
+            var html =
+                '<div class="modal-title">▶ Start a New Lesson</div>' +
+                '<div style="font-size:0.9rem;color:#64748b;margin-bottom:14px;line-height:1.5;">' +
+                    'Name this lesson — it will be the title on your PDF report. Examples: <em>"Chapter 5 Introduction"</em>, <em>"Photosynthesis Review"</em>, <em>"Period 3 — Tuesday"</em>.' +
+                '</div>' +
+                '<label>Lesson name</label>' +
+                '<input type="text" id="lesson-name-input" placeholder="e.g., Chapter 5 Introduction" value="' + escapeAttrHtml(defaultName) + '">' +
+                '<div style="margin-top:10px;font-size:0.8rem;color:#64748b;">' +
+                    students.length + ' students on the roster — everyone starts as <strong style="color:#059669;">present</strong>. Click desks during attendance mode to change status.' +
+                '</div>' +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                    '<button class="automation" onclick="confirmStartLesson()">▶ Start Lesson</button>' +
+                '</div>';
+            openModal(html);
+            setTimeout(function() {
+                var inp = document.getElementById('lesson-name-input');
+                if (inp) { inp.focus(); inp.select(); inp.onkeydown = function(e) { if (e.key === 'Enter') confirmStartLesson(); }; }
+            }, 50);
+        }
+
+        function confirmStartLesson() {
+            var name = (document.getElementById('lesson-name-input').value || '').trim();
+            if (!name) { alert("Please give the lesson a name."); return; }
+            closeModal();
+            startLesson(name);
+        }
+
+        function startLesson(name) {
+            if (liveState.activeLesson) return;
+            var students = getStudentsFromDesigner().students;
+            if (students.length === 0) return;
             var attendance = {};
             students.forEach(function(s) { attendance[s.name] = 'present'; });
             liveState.activeLesson = {
                 id: 'les_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: name || 'Untitled Lesson',
                 startedAt: Date.now(),
                 attendance: attendance,
-                attendanceTakenAt: null // null = still in attendance-taking mode
+                attendanceTakenAt: null
             };
-            logEvent('lesson_started', { studentCount: students.length });
+            logEvent('lesson_started', { name: name, studentCount: students.length });
             saveLiveState();
             updateLessonButtonUI();
             updateAttendanceBannerUI();
             renderLiveView();
+        }
+
+        // Dialog before actually ending — reminds to export and offers Export + End as one action
+        function openEndLessonModal() {
+            if (!liveState.activeLesson) return;
+            var al = liveState.activeLesson;
+            var dur = Date.now() - al.startedAt;
+            var p = countAttendance(al.attendance, 'present');
+            var a = countAttendance(al.attendance, 'absent');
+            var l = countAttendance(al.attendance, 'late');
+            var html =
+                '<div class="modal-title">End "' + escapeHtml(al.name || 'Untitled Lesson') + '"?</div>' +
+                '<div style="font-size:0.85rem;color:#64748b;margin-bottom:12px;">Duration so far: <strong style="color:#2c3e50;">' + formatLessonDuration(dur) + '</strong></div>' +
+                '<div style="display:flex;gap:8px;margin-bottom:14px;">' +
+                    '<div style="flex:1;background:#10b981;color:white;padding:10px;border-radius:6px;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">PRESENT</div><div style="font-size:1.4rem;font-weight:800;">' + p + '</div></div>' +
+                    '<div style="flex:1;background:#d97706;color:white;padding:10px;border-radius:6px;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">LATE</div><div style="font-size:1.4rem;font-weight:800;">' + l + '</div></div>' +
+                    '<div style="flex:1;background:#dc2626;color:white;padding:10px;border-radius:6px;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">ABSENT</div><div style="font-size:1.4rem;font-weight:800;">' + a + '</div></div>' +
+                '</div>' +
+                '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:12px;margin-bottom:8px;">' +
+                    '<div style="font-weight:700;color:#92400e;margin-bottom:4px;font-size:0.9rem;">⚠️ Export your PDF now</div>' +
+                    '<div style="font-size:0.82rem;color:#78350f;line-height:1.4;">The next lesson will replace this one in your exports. Save a PDF (or CSV / JSON) before moving on so you have a permanent record.</div>' +
+                '</div>' +
+                '<div class="modal-actions" style="flex-wrap:wrap;">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                    '<button class="warn" onclick="confirmEndLesson(false)">End Without Exporting</button>' +
+                    '<button class="automation" onclick="confirmEndLesson(true)">📄 Export PDF &amp; End</button>' +
+                '</div>';
+            openModal(html);
+        }
+
+        function confirmEndLesson(exportFirst) {
+            if (!liveState.activeLesson) { closeModal(); return; }
+            if (exportFirst) {
+                // Export FIRST (while lesson is still active — report uses the active lesson)
+                exportPDF();
+            }
+            closeModal();
+            endLesson();
         }
 
         function endLesson() {
@@ -3564,6 +3635,7 @@
             var durationMs = Date.now() - al.startedAt;
             var completed = {
                 id: al.id,
+                name: al.name || 'Untitled Lesson',
                 startedAt: al.startedAt,
                 endedAt: Date.now(),
                 durationMs: durationMs,
@@ -3574,6 +3646,7 @@
             liveState.completedLessons.push(completed);
             liveState.activeLesson = null;
             logEvent('lesson_ended', {
+                name: al.name,
                 durationMs: durationMs,
                 present: countAttendance(completed.attendance, 'present'),
                 absent: countAttendance(completed.attendance, 'absent'),
@@ -3583,14 +3656,6 @@
             updateLessonButtonUI();
             updateAttendanceBannerUI();
             renderLiveView();
-
-            // Show a short summary so the teacher knows it was recorded
-            var summary = 'Lesson ended.\n\nDuration: ' + formatLessonDuration(durationMs) +
-                '\nPresent: ' + countAttendance(completed.attendance, 'present') +
-                '\nAbsent: ' + countAttendance(completed.attendance, 'absent') +
-                '\nLate: ' + countAttendance(completed.attendance, 'late') +
-                '\n\nThis lesson (with attendance) is now included in your CSV/PDF/JSON exports.';
-            alert(summary);
         }
 
         function countAttendance(att, status) {
@@ -5171,10 +5236,30 @@
 
         // Build one comprehensive, human-readable snapshot of the session.
         // Every export format reads from this — so they're consistent.
-        function buildSessionReport() {
-            var students = getStudentsFromDesigner().students;
-            var events = liveState.events || [];
+        // Pick the lesson this export represents: active if any, otherwise the most recently ended.
+        function getCurrentReportLesson() {
+            if (liveState.activeLesson) return { lesson: liveState.activeLesson, isActive: true };
+            var completed = liveState.completedLessons || [];
+            if (completed.length > 0) return { lesson: completed[completed.length - 1], isActive: false };
+            return null;
+        }
 
+        function buildSessionReport() {
+            var info = getCurrentReportLesson();
+            if (!info) return null; // caller must handle "no lesson" case
+
+            var lesson = info.lesson;
+            var isActive = info.isActive;
+            var lessonStart = lesson.startedAt;
+            var lessonEnd = isActive ? Date.now() : lesson.endedAt;
+            var lessonAtt = lesson.attendance || {};
+
+            // Every time-based dataset is filtered to this lesson's window
+            var inWindow = function(ts) { return ts >= lessonStart && ts <= lessonEnd; };
+            var allEvents = liveState.events || [];
+            var events = allEvents.filter(function(e) { return inWindow(e.ts); });
+
+            // Stats derived from lesson-scoped events
             var pointsAdded = 0, pointsRemoved = 0, picksCount = 0,
                 timersStarted = 0, notesTotal = 0;
             events.forEach(function(e) {
@@ -5186,179 +5271,186 @@
                 if (e.type === 'note_added') notesTotal += 1;
             });
 
-            // Build lesson summaries (both any active lesson and completed ones)
-            function summarizeLesson(l, isActive) {
-                var att = l.attendance || {};
-                return {
-                    id: l.id,
-                    startedAt: l.startedAt,
-                    endedAt: isActive ? null : l.endedAt,
-                    durationMs: isActive ? (Date.now() - l.startedAt) : (l.durationMs || ((l.endedAt || Date.now()) - l.startedAt)),
-                    isActive: !!isActive,
-                    attendanceTakenAt: l.attendanceTakenAt || null,
-                    counts: {
-                        present: countAttendance(att, 'present'),
-                        absent: countAttendance(att, 'absent'),
-                        late: countAttendance(att, 'late')
-                    },
-                    attendance: Object.keys(att).sort().map(function(name) {
-                        return { name: name, status: att[name] };
-                    })
-                };
-            }
-            var lessonSummaries = (liveState.completedLessons || []).map(function(l) { return summarizeLesson(l, false); });
-            if (liveState.activeLesson) {
-                lessonSummaries.push(summarizeLesson(liveState.activeLesson, true));
-            }
-            var totalLessonTimeMs = 0;
-            (liveState.completedLessons || []).forEach(function(l) { totalLessonTimeMs += (l.durationMs || 0); });
-            if (liveState.activeLesson) totalLessonTimeMs += (Date.now() - liveState.activeLesson.startedAt);
+            var students = getStudentsFromDesigner().students;
 
-            // Per-student roll-up including "times called across every list"
+            // Per-student roll-up: everything lesson-scoped
             var studentInfo = students.map(function(s) {
                 var d = liveState.studentData[s.name] || { points: 0, notes: [] };
                 var group = findGroupForStudent(s.name);
-                var timesCalled = 0;
-                (liveState.activeLists || []).forEach(function(al) {
-                    al.students.forEach(function(x) {
-                        if (x.name === s.name && x.called) timesCalled += 1;
-                    });
+                // Points earned this lesson (from events in window)
+                var pointsThisLesson = 0;
+                events.forEach(function(e) {
+                    if ((e.type === 'points_added' || e.type === 'points_removed') && e.details && e.details.student === s.name) {
+                        pointsThisLesson += (e.details.delta || 0);
+                    }
                 });
-                (liveState.archivedLists || []).forEach(function(ar) {
-                    (ar.calledNames || []).forEach(function(n) {
-                        if (n === s.name) timesCalled += 1;
-                    });
+                // Notes added during lesson
+                var lessonNotes = (d.notes || []).filter(function(n) { return inWindow(n.ts); });
+                // Times called during lesson (from events)
+                var timesCalled = 0;
+                events.forEach(function(e) {
+                    if (e.type === 'call_marked' && e.details && e.details.student === s.name) timesCalled += 1;
                 });
                 return {
                     name: s.name,
                     group: group ? group.name : null,
                     groupColor: group ? group.color : null,
-                    points: d.points,
-                    noteCount: d.notes.length,
-                    notes: d.notes.slice(),
+                    attendance: lessonAtt[s.name] || null,
+                    pointsThisLesson: pointsThisLesson,
+                    currentTotalPoints: d.points,
+                    noteCount: lessonNotes.length,
+                    notes: lessonNotes.map(function(n) { return { at: n.ts, text: n.text }; }),
                     timesCalled: timesCalled
                 };
             });
 
+            // Attendance breakdown grouped by status (alpha-sorted names)
+            var attendanceBreakdown = { present: [], absent: [], late: [] };
+            students.forEach(function(s) {
+                var st = lessonAtt[s.name] || 'present';
+                if (!attendanceBreakdown[st]) attendanceBreakdown[st] = [];
+                attendanceBreakdown[st].push(s.name);
+            });
+            Object.keys(attendanceBreakdown).forEach(function(k) { attendanceBreakdown[k].sort(); });
+
+            // Groups reflect current state, but points shown per member are lesson-scoped
+            var groupsInfo = (liveState.groups || []).map(function(g) {
+                var members = g.members.map(function(n) {
+                    var pts = 0;
+                    events.forEach(function(e) {
+                        if ((e.type === 'points_added' || e.type === 'points_removed') && e.details && e.details.student === n) {
+                            pts += (e.details.delta || 0);
+                        }
+                    });
+                    return { name: n, pointsThisLesson: pts };
+                });
+                var totalPoints = members.reduce(function(a, m) { return a + m.pointsThisLesson; }, 0);
+                return {
+                    name: g.name, color: g.color, memberCount: g.members.length,
+                    totalPoints: totalPoints, members: members
+                };
+            });
+
+            // Call lists / to-do lists: filter to those with activity during this lesson.
+            // A list is "used" if it was activated, marked, checked, or archived within the window.
+            function listHadActivity(listName, eventTypes) {
+                for (var i = 0; i < events.length; i++) {
+                    var e = events[i], d = e.details || {};
+                    if (eventTypes.indexOf(e.type) !== -1 && (d.list === listName || d.name === listName)) return true;
+                }
+                return false;
+            }
+            function callListDetail(al, isArchived) {
+                var order = isArchived
+                    ? al.students.map(function(name, i) { return { position: i + 1, name: name, called: (al.calledNames || []).indexOf(name) !== -1 }; })
+                    : al.students.map(function(s, i) { return { position: i + 1, name: s.name, called: !!s.called }; });
+                // Who was called *during this lesson* specifically
+                var calledThisLesson = [];
+                events.forEach(function(e) {
+                    if (e.type === 'call_marked' && e.details && (e.details.list === al.name)) {
+                        calledThisLesson.push(e.details.student);
+                    }
+                });
+                var calledCount = isArchived ? (al.calledNames || []).length : al.students.filter(function(s) { return s.called; }).length;
+                var total = isArchived ? al.students.length : al.students.length;
+                return {
+                    name: al.name,
+                    isArchived: !!isArchived,
+                    total: total,
+                    calledCount: calledCount,
+                    percentCalled: total > 0 ? Math.round((calledCount / total) * 100) : 0,
+                    order: order,
+                    calledThisLesson: calledThisLesson
+                };
+            }
+            var relevantActiveCallLists = (liveState.activeLists || []).filter(function(al) {
+                if (inWindow(al.createdAt || 0)) return true;
+                return listHadActivity(al.name, ['call_marked', 'call_unmarked', 'list_active', 'list_reset']);
+            }).map(function(al) { return callListDetail(al, false); });
+            var relevantArchivedCallLists = (liveState.archivedLists || []).filter(function(ar) {
+                return inWindow(ar.archivedAt || 0) || inWindow(ar.createdAt || 0);
+            }).map(function(ar) { return callListDetail(ar, true); });
+
+            function todoListDetail(tl, isArchived) {
+                var checkedThisLesson = [];
+                events.forEach(function(e) {
+                    if (e.type === 'todo_item_checked' && e.details && e.details.list === tl.name) {
+                        checkedThisLesson.push(e.details.item);
+                    }
+                });
+                var done = tl.items.filter(function(it) { return it.done; }).length;
+                return {
+                    name: tl.name,
+                    isArchived: !!isArchived,
+                    totalItems: tl.items.length,
+                    completedItems: done,
+                    percentComplete: tl.items.length > 0 ? Math.round((done / tl.items.length) * 100) : 0,
+                    items: tl.items.map(function(it) { return { text: it.text, done: !!it.done }; }),
+                    checkedThisLesson: checkedThisLesson
+                };
+            }
+            var relevantTodoLists = (liveState.todoLists || []).filter(function(tl) {
+                if (inWindow(tl.createdAt || 0)) return true;
+                return listHadActivity(tl.name, ['todo_item_checked', 'todo_item_unchecked', 'todo_created', 'todo_edited']);
+            }).map(function(tl) { return todoListDetail(tl, false); });
+            var relevantArchivedTodoLists = (liveState.archivedTodoLists || []).filter(function(ar) {
+                return inWindow(ar.archivedAt || 0);
+            }).map(function(ar) { return todoListDetail(ar, true); });
+
             return {
-                schemaVersion: 1,
+                schemaVersion: 2,
+                exportKind: 'lesson_report',
                 className: liveState.className || 'Untitled Class',
-                sessionStart: liveState.sessionStart,
                 exportedAt: Date.now(),
-                durationMs: Date.now() - (liveState.sessionStart || Date.now()),
+                lesson: {
+                    id: lesson.id,
+                    name: lesson.name || 'Untitled Lesson',
+                    startedAt: lessonStart,
+                    endedAt: isActive ? null : lessonEnd,
+                    isActive: isActive,
+                    durationMs: lessonEnd - lessonStart,
+                    attendanceTakenAt: lesson.attendanceTakenAt || null,
+                    counts: {
+                        present: countAttendance(lessonAtt, 'present'),
+                        absent: countAttendance(lessonAtt, 'absent'),
+                        late: countAttendance(lessonAtt, 'late')
+                    }
+                },
                 stats: {
                     totalStudents: students.length,
                     totalGroups: (liveState.groups || []).length,
-                    pointsAdded: pointsAdded,
-                    pointsRemoved: pointsRemoved,
-                    pointsNet: pointsAdded - pointsRemoved,
-                    randomPicksMade: picksCount,
-                    timersStarted: timersStarted,
-                    notesRecorded: notesTotal,
-                    activeCallLists: (liveState.activeLists || []).length,
-                    archivedCallLists: (liveState.archivedLists || []).length,
-                    savedCallLists: (liveState.savedLists || []).length,
-                    activeTodoLists: (liveState.todoLists || []).length,
-                    archivedTodoLists: (liveState.archivedTodoLists || []).length,
-                    lessonsCompleted: (liveState.completedLessons || []).length,
-                    lessonActive: !!liveState.activeLesson,
-                    totalLessonTimeMs: totalLessonTimeMs
+                    pointsAddedThisLesson: pointsAdded,
+                    pointsRemovedThisLesson: pointsRemoved,
+                    netPointsThisLesson: pointsAdded - pointsRemoved,
+                    randomPicksThisLesson: picksCount,
+                    timersUsedThisLesson: timersStarted,
+                    notesThisLesson: notesTotal,
+                    attendancePresent: countAttendance(lessonAtt, 'present'),
+                    attendanceAbsent: countAttendance(lessonAtt, 'absent'),
+                    attendanceLate: countAttendance(lessonAtt, 'late'),
+                    callListsUsed: relevantActiveCallLists.length + relevantArchivedCallLists.length,
+                    todoListsWorkedOn: relevantTodoLists.length + relevantArchivedTodoLists.length
                 },
-                lessons: lessonSummaries,
+                attendance: {
+                    present: attendanceBreakdown.present || [],
+                    absent: attendanceBreakdown.absent || [],
+                    late: attendanceBreakdown.late || []
+                },
                 students: studentInfo,
-                groups: (liveState.groups || []).map(function(g) {
-                    var totalPoints = g.members.reduce(function(sum, n) {
-                        return sum + ((liveState.studentData[n] && liveState.studentData[n].points) || 0);
-                    }, 0);
-                    return {
-                        name: g.name,
-                        color: g.color,
-                        memberCount: g.members.length,
-                        totalPoints: totalPoints,
-                        members: g.members.map(function(n) {
-                            return { name: n, points: (liveState.studentData[n] && liveState.studentData[n].points) || 0 };
-                        })
-                    };
-                }),
+                groups: groupsInfo,
                 callOrderLists: {
-                    active: (liveState.activeLists || []).map(function(al) {
-                        var called = al.students.filter(function(s) { return s.called; });
-                        var uncalled = al.students.filter(function(s) { return !s.called; });
-                        return {
-                            name: al.name,
-                            createdAt: al.createdAt,
-                            total: al.students.length,
-                            calledCount: called.length,
-                            uncalledCount: uncalled.length,
-                            percentCalled: al.students.length > 0 ? Math.round((called.length / al.students.length) * 100) : 0,
-                            order: al.students.map(function(s, i) {
-                                return { position: i + 1, name: s.name, called: s.called };
-                            })
-                        };
-                    }),
-                    archived: (liveState.archivedLists || []).map(function(ar) {
-                        return {
-                            name: ar.name,
-                            createdAt: ar.createdAt,
-                            archivedAt: ar.archivedAt,
-                            total: ar.students.length,
-                            calledCount: (ar.calledNames || []).length,
-                            uncalledCount: (ar.uncalledNames || []).length,
-                            percentCalled: ar.students.length > 0 ? Math.round(((ar.calledNames || []).length / ar.students.length) * 100) : 0,
-                            order: ar.students.map(function(name, i) {
-                                return { position: i + 1, name: name, called: (ar.calledNames || []).indexOf(name) !== -1 };
-                            })
-                        };
-                    }),
-                    saved: (liveState.savedLists || []).map(function(sl) {
-                        return {
-                            name: sl.name,
-                            createdAt: sl.createdAt,
-                            studentCount: sl.students.length,
-                            order: sl.students.map(function(n, i) { return { position: i + 1, name: n }; })
-                        };
-                    })
+                    active: relevantActiveCallLists,
+                    archived: relevantArchivedCallLists
                 },
                 todoLists: {
-                    active: (liveState.todoLists || []).map(function(tl) {
-                        var done = tl.items.filter(function(it) { return it.done; }).length;
-                        return {
-                            name: tl.name,
-                            createdAt: tl.createdAt,
-                            totalItems: tl.items.length,
-                            completedItems: done,
-                            percentComplete: tl.items.length > 0 ? Math.round((done / tl.items.length) * 100) : 0,
-                            items: tl.items.map(function(it) { return { text: it.text, done: !!it.done }; })
-                        };
-                    }),
-                    archived: (liveState.archivedTodoLists || []).map(function(ar) {
-                        var done = ar.items.filter(function(it) { return it.done; }).length;
-                        return {
-                            name: ar.name,
-                            createdAt: ar.createdAt,
-                            archivedAt: ar.archivedAt,
-                            totalItems: ar.items.length,
-                            completedItems: done,
-                            percentComplete: ar.items.length > 0 ? Math.round((done / ar.items.length) * 100) : 0,
-                            items: ar.items.map(function(it) { return { text: it.text, done: !!it.done }; })
-                        };
-                    })
+                    active: relevantTodoLists,
+                    archived: relevantArchivedTodoLists
                 },
                 notes: studentInfo.filter(function(s) { return s.noteCount > 0; }).map(function(s) {
-                    return {
-                        studentName: s.name,
-                        notes: s.notes.map(function(n) {
-                            return { at: n.ts, text: n.text };
-                        })
-                    };
+                    return { studentName: s.name, notes: s.notes };
                 }),
                 timeline: events.map(function(e) {
-                    return {
-                        at: e.ts,
-                        type: e.type,
-                        description: humanizeEvent(e),
-                        details: e.details
-                    };
+                    return { at: e.ts, type: e.type, description: humanizeEvent(e), details: e.details };
                 })
             };
         }
@@ -5461,92 +5553,97 @@
         //  CSV EXPORT — multi-section, human-readable, opens cleanly in
         //  Excel / Google Sheets. Blank rows separate sections.
         // ============================================================
+        // Any exporter using the lesson report should call this to bail out gracefully.
+        function alertNoLesson() {
+            alert("No lesson to export.\n\nClick '▶ Start Lesson' at the top to begin recording data. Once you end a lesson, its data will be exportable until you start another one.");
+        }
+
         function exportCSV() {
             var r = buildSessionReport();
+            if (!r) { alertNoLesson(); return; }
+
             var rows = [];
             var push = function() { rows.push(Array.prototype.slice.call(arguments)); };
             var blank = function() { rows.push([]); };
             var section = function(title) { blank(); push('=== ' + title.toUpperCase() + ' ==='); };
 
             // --- Cover ---
-            push('CLASSROOM SESSION REPORT');
-            push(r.className);
+            push('LESSON REPORT');
+            push(r.lesson.name);
             blank();
-            push('Class Name', r.className);
-            push('Session Start', formatDateFull(r.sessionStart));
+            push('Lesson Name', r.lesson.name);
+            push('Class', r.className);
+            push('Started', formatDateFull(r.lesson.startedAt));
+            push('Ended', r.lesson.isActive ? '(in progress at export time)' : formatDateFull(r.lesson.endedAt));
+            push('Duration', formatLessonDuration(r.lesson.durationMs));
+            if (r.lesson.attendanceTakenAt) push('Attendance recorded at', formatDateFull(r.lesson.attendanceTakenAt));
             push('Exported', formatDateFull(r.exportedAt));
-            push('Duration', formatDurationHuman(r.durationMs));
 
             // --- Summary ---
-            section('Summary');
+            section('Summary — This Lesson');
             push('Total Students', r.stats.totalStudents);
-            push('Groups Formed', r.stats.totalGroups);
-            push('Net Points Awarded', r.stats.pointsNet);
-            push('  Points Added', r.stats.pointsAdded);
-            push('  Points Removed', r.stats.pointsRemoved);
-            push('Random Picks Made', r.stats.randomPicksMade);
-            push('Timers Used', r.stats.timersStarted);
-            push('Notes Recorded', r.stats.notesRecorded);
-            push('Lessons Completed', r.stats.lessonsCompleted);
-            push('Lesson Currently Active', r.stats.lessonActive ? 'Yes' : 'No');
-            push('Total Lesson Time', formatDurationHuman(r.stats.totalLessonTimeMs));
-            push('Call Order Lists (Active)', r.stats.activeCallLists);
-            push('Call Order Lists (Archived)', r.stats.archivedCallLists);
-            push('Call Order Lists (Saved)', r.stats.savedCallLists);
-            push('To-Do Lists (Active)', r.stats.activeTodoLists);
-            push('To-Do Lists (Archived)', r.stats.archivedTodoLists);
+            push('Present', r.stats.attendancePresent);
+            push('Late', r.stats.attendanceLate);
+            push('Absent', r.stats.attendanceAbsent);
+            push('Net Points Awarded', r.stats.netPointsThisLesson);
+            push('  Points Added', r.stats.pointsAddedThisLesson);
+            push('  Points Removed', r.stats.pointsRemovedThisLesson);
+            push('Random Picks Made', r.stats.randomPicksThisLesson);
+            push('Timers Used', r.stats.timersUsedThisLesson);
+            push('Notes Recorded', r.stats.notesThisLesson);
+            push('Groups (current)', r.stats.totalGroups);
+            push('Call Lists Used', r.stats.callListsUsed);
+            push('To-Do Lists Worked On', r.stats.todoListsWorkedOn);
 
-            // --- Lessons & Attendance ---
-            if (r.lessons.length > 0) {
-                section('Lessons & Attendance');
-                r.lessons.forEach(function(l, idx) {
-                    var title = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
-                    if (l.isActive) title += ' → (in progress)';
-                    else if (l.endedAt) title += ' → ' + formatTimeShort(l.endedAt);
-                    title += ' · Duration ' + formatLessonDuration(l.durationMs);
-                    push(title);
-                    push('  Present', l.counts.present, 'Absent', l.counts.absent, 'Late', l.counts.late);
-                    if (l.attendanceTakenAt) push('  Attendance taken at', formatDateFull(l.attendanceTakenAt));
-                    push('  Name', 'Status');
-                    if (l.attendance.length === 0) {
-                        push('  (no attendance recorded)');
-                    } else {
-                        l.attendance.forEach(function(a) {
-                            var lbl = a.status.charAt(0).toUpperCase() + a.status.slice(1);
-                            push('  ' + a.name, lbl);
-                        });
-                    }
-                    blank();
-                });
-            }
+            // --- Attendance (grouped by status) ---
+            section('Attendance');
+            var absentNames = r.attendance.absent, lateNames = r.attendance.late, presentNames = r.attendance.present;
+            push('Absent (' + absentNames.length + ')');
+            if (absentNames.length === 0) push('  (none)');
+            else absentNames.forEach(function(n) { push('  ' + n); });
+            blank();
+            push('Late (' + lateNames.length + ')');
+            if (lateNames.length === 0) push('  (none)');
+            else lateNames.forEach(function(n) { push('  ' + n); });
+            blank();
+            push('Present (' + presentNames.length + ')');
+            if (presentNames.length === 0) push('  (none)');
+            else presentNames.forEach(function(n) { push('  ' + n); });
 
-            // --- Students table ---
-            section('Students — Points & Participation');
-            push('Name', 'Group', 'Points', 'Notes', 'Times Called');
+            // --- Students table (lesson-scoped) ---
+            section('Students — This Lesson');
+            push('Name', 'Attendance', 'Group', 'Points This Lesson', 'Notes This Lesson', 'Times Called');
             r.students.forEach(function(s) {
-                push(s.name, s.group || '(unassigned)', s.points, s.noteCount, s.timesCalled);
+                var att = s.attendance ? (s.attendance.charAt(0).toUpperCase() + s.attendance.slice(1)) : 'Present';
+                push(s.name, att, s.group || '(unassigned)', s.pointsThisLesson, s.noteCount, s.timesCalled);
             });
 
-            // --- Groups ---
+            // --- Groups (lesson-scoped points) ---
             if (r.groups.length > 0) {
-                section('Groups');
+                section('Groups — Points Earned This Lesson');
                 r.groups.forEach(function(g) {
-                    push(g.name + ' — ' + g.memberCount + ' members — ' + g.totalPoints + ' total points');
-                    push('  Name', 'Points');
+                    push(g.name + ' — ' + g.memberCount + ' members — ' + g.totalPoints + ' points earned this lesson');
+                    push('  Name', 'Points This Lesson');
                     if (g.members.length === 0) {
                         push('  (empty group)');
                     } else {
-                        g.members.forEach(function(m) { push('  ' + m.name, m.points); });
+                        g.members.forEach(function(m) { push('  ' + m.name, m.pointsThisLesson); });
                     }
                     blank();
                 });
             }
 
-            // --- Active call lists ---
-            if (r.callOrderLists.active.length > 0) {
-                section('Active Call Order Lists');
-                r.callOrderLists.active.forEach(function(al) {
-                    push(al.name + ' — ' + al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
+            // --- Call lists used this lesson ---
+            if (r.callOrderLists.active.length > 0 || r.callOrderLists.archived.length > 0) {
+                section('Call Order Lists Used This Lesson');
+                var allLists = r.callOrderLists.active.concat(r.callOrderLists.archived);
+                allLists.forEach(function(al) {
+                    var status = al.isArchived ? ' (archived)' : ' (active)';
+                    push(al.name + status + ' — ' + al.calledCount + '/' + al.total + ' overall (' + al.percentCalled + '%)');
+                    if (al.calledThisLesson.length > 0) {
+                        push('  Called during this lesson', al.calledThisLesson.length);
+                        al.calledThisLesson.forEach(function(n) { push('    ' + n); });
+                    }
                     push('  Position', 'Name', 'Called?');
                     al.order.forEach(function(o) {
                         push('  #' + o.position, o.name, o.called ? 'YES' : 'no');
@@ -5555,24 +5652,17 @@
                 });
             }
 
-            // --- Archived call lists ---
-            if (r.callOrderLists.archived.length > 0) {
-                section('Archived Call Order Lists');
-                r.callOrderLists.archived.forEach(function(al) {
-                    push(al.name + ' — Archived ' + formatDateFull(al.archivedAt) + ' — ' + al.calledCount + '/' + al.total + ' called (' + al.percentCalled + '%)');
-                    push('  Position', 'Name', 'Called?');
-                    al.order.forEach(function(o) {
-                        push('  #' + o.position, o.name, o.called ? 'YES' : 'no');
-                    });
-                    blank();
-                });
-            }
-
-            // --- To-do lists (active) ---
-            if (r.todoLists.active.length > 0) {
-                section('Active To-Do Lists');
-                r.todoLists.active.forEach(function(tl) {
-                    push(tl.name + ' — ' + tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+            // --- To-do lists worked on this lesson ---
+            if (r.todoLists.active.length > 0 || r.todoLists.archived.length > 0) {
+                section('To-Do Lists Worked On This Lesson');
+                var allTodo = r.todoLists.active.concat(r.todoLists.archived);
+                allTodo.forEach(function(tl) {
+                    var status = tl.isArchived ? ' (archived)' : ' (active)';
+                    push(tl.name + status + ' — ' + tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+                    if (tl.checkedThisLesson.length > 0) {
+                        push('  Items completed during this lesson', tl.checkedThisLesson.length);
+                        tl.checkedThisLesson.forEach(function(item) { push('    ' + item); });
+                    }
                     push('  Status', 'Item');
                     tl.items.forEach(function(it) {
                         push('  ' + (it.done ? 'DONE' : 'pending'), it.text);
@@ -5581,22 +5671,9 @@
                 });
             }
 
-            // --- To-do lists (archived) ---
-            if (r.todoLists.archived.length > 0) {
-                section('Archived To-Do Lists');
-                r.todoLists.archived.forEach(function(tl) {
-                    push(tl.name + ' — Archived ' + formatDateFull(tl.archivedAt) + ' — ' + tl.completedItems + '/' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
-                    push('  Status', 'Item');
-                    tl.items.forEach(function(it) {
-                        push('  ' + (it.done ? 'DONE' : 'pending'), it.text);
-                    });
-                    blank();
-                });
-            }
-
-            // --- Notes ---
+            // --- Notes (only those from this lesson) ---
             if (r.notes.length > 0) {
-                section('Student Notes');
+                section('Student Notes — This Lesson');
                 r.notes.forEach(function(n) {
                     push(n.studentName + ' (' + n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's') + ')');
                     push('  When', 'Note');
@@ -5607,21 +5684,20 @@
                 });
             }
 
-            // --- Timeline ---
+            // --- Timeline (this lesson only) ---
             if (r.timeline.length > 0) {
-                section('Session Timeline (What Happened)');
+                section('Lesson Timeline (What Happened)');
                 push('Time', 'Event');
                 r.timeline.forEach(function(t) {
                     push(formatDateFull(t.at), t.description);
                 });
             }
 
-            // Prefix BOM so Excel opens UTF-8 with accented characters correctly.
             var csv = '\uFEFF' + rows.map(function(row) {
                 return row.map(csvEscape).join(',');
             }).join('\r\n');
-            downloadBlob(csv, sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.csv', 'text/csv;charset=utf-8;');
-            logEvent('export_csv', {});
+            downloadBlob(csv, sanitizeFile(r.className) + '_' + sanitizeFile(r.lesson.name) + '_' + fileTimestamp() + '.csv', 'text/csv;charset=utf-8;');
+            logEvent('export_csv', { lesson: r.lesson.name });
             saveLiveState();
         }
 
@@ -5630,6 +5706,7 @@
         // ============================================================
         function exportJSON() {
             var r = buildSessionReport();
+            if (!r) { alertNoLesson(); return; }
             // Convert timestamps to ISO for interoperability
             var isoify = function(obj) {
                 if (obj && typeof obj === 'object') {
@@ -5637,7 +5714,7 @@
                     var out = {};
                     Object.keys(obj).forEach(function(k) {
                         var v = obj[k];
-                        if ((k === 'at' || k === 'ts' || k === 'sessionStart' || k === 'exportedAt' || k === 'createdAt' || k === 'archivedAt') && typeof v === 'number') {
+                        if ((k === 'at' || k === 'ts' || k === 'startedAt' || k === 'endedAt' || k === 'exportedAt' || k === 'createdAt' || k === 'archivedAt' || k === 'attendanceTakenAt') && typeof v === 'number') {
                             out[k] = new Date(v).toISOString();
                         } else {
                             out[k] = isoify(v);
@@ -5649,8 +5726,8 @@
             };
             var payload = isoify(r);
             var text = JSON.stringify(payload, null, 2);
-            downloadBlob(text, sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.json', 'application/json;charset=utf-8;');
-            logEvent('export_json', {});
+            downloadBlob(text, sanitizeFile(r.className) + '_' + sanitizeFile(r.lesson.name) + '_' + fileTimestamp() + '.json', 'application/json;charset=utf-8;');
+            logEvent('export_json', { lesson: r.lesson.name });
             saveLiveState();
         }
 
@@ -5661,6 +5738,7 @@
         // ============================================================
         function exportPDF() {
             var r = buildSessionReport();
+            if (!r) { alertNoLesson(); return; }
             var jspdf = window.jspdf;
             if (!jspdf || !jspdf.jsPDF) {
                 exportPDFViaPrint(r);
@@ -5688,7 +5766,7 @@
                 doc.setFontSize(8);
                 doc.setTextColor(160, 160, 160);
                 doc.setFont('helvetica', 'normal');
-                doc.text(r.className + ' — page ' + pageNum, margin, pageH - 20);
+                doc.text(r.className + ' — ' + r.lesson.name + ' — page ' + pageNum, margin, pageH - 20);
                 doc.text('Exported ' + formatDateFull(r.exportedAt), pageW - margin, pageH - 20, { align: 'right' });
                 doc.setTextColor(0, 0, 0);
             }
@@ -5794,41 +5872,49 @@
 
             // ============ Cover ============
             doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
+            doc.text('LESSON REPORT', margin, y + 12);
+            y += 20;
             doc.setFontSize(22);
             doc.setTextColor(C_HEADER[0], C_HEADER[1], C_HEADER[2]);
-            doc.text('Classroom Session Report', margin, y + 18);
-            y += 26;
-            doc.setFontSize(16);
+            // Wrap lesson name if long
+            var titleLines = doc.splitTextToSize(r.lesson.name, contentW);
+            titleLines.forEach(function(line) {
+                doc.text(line, margin, y + 20);
+                y += 26;
+            });
+            y += 2;
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'normal');
             doc.setTextColor(0, 0, 0);
-            doc.text(r.className, margin, y + 18);
-            y += 32;
+            doc.text(r.className, margin, y + 14);
+            y += 24;
             doc.setDrawColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
             doc.setLineWidth(2);
             doc.line(margin, y, margin + contentW, y);
             doc.setLineWidth(1);
             y += 14;
-            keyValueRow('Session Start', formatDateFull(r.sessionStart));
+            keyValueRow('Started', formatDateFull(r.lesson.startedAt));
+            keyValueRow('Ended', r.lesson.isActive ? '(in progress at export time)' : formatDateFull(r.lesson.endedAt));
+            keyValueRow('Duration', formatLessonDuration(r.lesson.durationMs));
+            if (r.lesson.attendanceTakenAt) keyValueRow('Attendance recorded at', formatDateFull(r.lesson.attendanceTakenAt));
             keyValueRow('Exported', formatDateFull(r.exportedAt));
-            keyValueRow('Duration', formatDurationHuman(r.durationMs));
-            spacer(6);
+            spacer(8);
 
-            // ============ Summary ============
-            sectionHeader('Summary');
+            // ============ Summary — this lesson only ============
+            sectionHeader('Lesson Summary');
             var summaryLeft = [
                 ['Total Students', r.stats.totalStudents],
-                ['Groups Formed', r.stats.totalGroups],
-                ['Random Picks Made', r.stats.randomPicksMade],
-                ['Timers Used', r.stats.timersStarted],
-                ['Lessons Completed', r.stats.lessonsCompleted + (r.stats.lessonActive ? ' (+1 active)' : '')]
+                ['Groups (current)', r.stats.totalGroups],
+                ['Random Picks Made', r.stats.randomPicksThisLesson],
+                ['Timers Used', r.stats.timersUsedThisLesson]
             ];
             var summaryRight = [
-                ['Net Points Awarded', r.stats.pointsNet],
-                ['  Added / Removed', r.stats.pointsAdded + ' / ' + r.stats.pointsRemoved],
-                ['Notes Recorded', r.stats.notesRecorded],
-                ['Total Lesson Time', formatDurationHuman(r.stats.totalLessonTimeMs)],
-                ['Lists (Active/Archived)',
-                    'Call ' + r.stats.activeCallLists + '/' + r.stats.archivedCallLists +
-                    ' · To-Do ' + r.stats.activeTodoLists + '/' + r.stats.archivedTodoLists]
+                ['Net Points This Lesson', r.stats.netPointsThisLesson],
+                ['  Added / Removed', r.stats.pointsAddedThisLesson + ' / ' + r.stats.pointsRemovedThisLesson],
+                ['Notes This Lesson', r.stats.notesThisLesson],
+                ['Lists Used', 'Call ' + r.stats.callListsUsed + ' · To-Do ' + r.stats.todoListsWorkedOn]
             ];
             var startY = y;
             doc.setFont('helvetica', 'bold');
@@ -5837,7 +5923,7 @@
                 doc.setFont('helvetica', 'bold');
                 doc.text(row[0] + ':', margin, y);
                 doc.setFont('helvetica', 'normal');
-                doc.text(String(row[1]), margin + 130, y);
+                doc.text(String(row[1]), margin + 150, y);
                 y += 15;
             });
             var summaryEndY = y;
@@ -5846,177 +5932,141 @@
                 doc.setFont('helvetica', 'bold');
                 doc.text(row[0] + ':', margin + contentW / 2, y);
                 doc.setFont('helvetica', 'normal');
-                doc.text(String(row[1]), margin + contentW / 2 + 140, y);
+                doc.text(String(row[1]), margin + contentW / 2 + 150, y);
                 y += 15;
             });
             y = Math.max(y, summaryEndY);
+            spacer(6);
+
+            // ============ Attendance ============
+            sectionHeader('Attendance');
+            // Three colored pills
+            checkPage(32);
+            var pillY = y;
+            var pillH = 22;
+            var pillGap = 8;
+            var pillWidth = (contentW - pillGap * 2) / 3;
+            [
+                { label: 'Present', count: r.stats.attendancePresent, color: C_GREEN },
+                { label: 'Late',    count: r.stats.attendanceLate,    color: [217, 119, 6] },
+                { label: 'Absent',  count: r.stats.attendanceAbsent,  color: C_RED }
+            ].forEach(function(p, i) {
+                var px = margin + i * (pillWidth + pillGap);
+                doc.setFillColor(p.color[0], p.color[1], p.color[2]);
+                doc.roundedRect(px, pillY, pillWidth, pillH, 4, 4, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.text(p.label + ':', px + 12, pillY + 15);
+                doc.setFontSize(12);
+                doc.text(String(p.count), px + pillWidth - 14, pillY + 15, { align: 'right' });
+            });
+            doc.setTextColor(0, 0, 0);
+            y += pillH + 12;
+
+            // Grouped by status — Absent first (what matters most), then Late, then Present
+            var statusBlocks = [
+                { key: 'absent',  label: 'Absent',  color: C_RED },
+                { key: 'late',    label: 'Late',    color: [217, 119, 6] },
+                { key: 'present', label: 'Present', color: C_GREEN }
+            ];
+            statusBlocks.forEach(function(sb) {
+                var list = (r.attendance[sb.key] || []).slice().sort();
+                if (list.length === 0) return;
+                checkPage(28);
+                doc.setFillColor(sb.color[0], sb.color[1], sb.color[2]);
+                doc.rect(margin, y, contentW, 15, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.text(sb.label.toUpperCase() + '  (' + list.length + ')', margin + 8, y + 10);
+                doc.setTextColor(0, 0, 0);
+                y += 15 + 4;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9.5);
+                var cols = list.length > 6 ? 2 : 1;
+                var rowsN = Math.ceil(list.length / cols);
+                var colW = contentW / cols;
+                for (var i = 0; i < rowsN; i++) {
+                    checkPage(13);
+                    for (var c = 0; c < cols; c++) {
+                        var name = list[i + c * rowsN];
+                        if (!name) continue;
+                        doc.text('- ' + name, margin + 10 + c * colW, y + 9);
+                    }
+                    y += 13;
+                }
+                spacer(4);
+            });
             spacer(4);
 
-            // ============ Students ============
+            // ============ Students (lesson-scoped) ============
             if (r.students.length > 0) {
-                sectionHeader('Students — Points & Participation');
-                var stuCols = ['Name', 'Group', 'Points', 'Notes', 'Times Called'];
-                var stuWidths = [contentW * 0.28, contentW * 0.30, contentW * 0.10, contentW * 0.10, contentW * 0.22];
+                sectionHeader('Students — This Lesson');
+                var stuCols = ['Name', 'Attendance', 'Group', 'Points', 'Notes', 'Called'];
+                var stuWidths = [contentW * 0.22, contentW * 0.14, contentW * 0.24, contentW * 0.12, contentW * 0.12, contentW * 0.16];
                 tableHeader(stuCols, stuWidths);
                 r.students.forEach(function(s, i) {
+                    var att = s.attendance ? (s.attendance.charAt(0).toUpperCase() + s.attendance.slice(1)) : 'Present';
+                    var attColor = s.attendance === 'absent' ? C_RED : (s.attendance === 'late' ? [217, 119, 6] : C_GREEN);
                     tableRow([
                         s.name,
+                        att,
                         s.group || 'unassigned',
-                        String(s.points),
+                        (s.pointsThisLesson > 0 ? '+' : '') + s.pointsThisLesson,
                         String(s.noteCount),
                         String(s.timesCalled)
                     ], stuWidths, { zebra: i % 2 === 1 });
                 });
                 spacer(6);
+                // Column-key footnote so teachers know these are lesson-scoped
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(8);
+                doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
+                doc.text('Points, Notes, and Called counts are for THIS LESSON only.', margin, y);
+                doc.setTextColor(0, 0, 0);
+                doc.setFont('helvetica', 'normal');
+                y += 12;
+                spacer(4);
             }
 
-            // ============ Lessons & Attendance ============
-            if (r.lessons.length > 0) {
-                sectionHeader('Lessons & Attendance');
-                r.lessons.forEach(function(l, idx) {
-                    // Header: just "Lesson N" — details go in a key-value block below
-                    var head = 'Lesson ' + (idx + 1) + (l.isActive ? ' (in progress)' : '');
-                    subHeader(head, formatDateFull(l.startedAt));
-
-                    // Details in a keyed layout — clear, scannable
-                    checkPage(60);
-                    doc.setFont('helvetica', 'normal');
-                    doc.setFontSize(9);
-                    var labelX = margin + 8;
-                    var valueX = margin + 120;
-                    var lineH = 13;
-
-                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
-                    doc.text('Started', labelX, y + 9);
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(formatDateFull(l.startedAt), valueX, y + 9);
-                    y += lineH;
-
-                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
-                    doc.text('Ended', labelX, y + 9);
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(l.isActive ? '(in progress)' : formatDateFull(l.endedAt), valueX, y + 9);
-                    y += lineH;
-
-                    doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
-                    doc.text('Duration', labelX, y + 9);
-                    doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(0, 0, 0);
-                    doc.text(formatLessonDuration(l.durationMs), valueX, y + 9);
-                    doc.setFont('helvetica', 'normal');
-                    y += lineH;
-
-                    if (l.attendanceTakenAt) {
-                        doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
-                        doc.text('Attendance recorded', labelX, y + 9);
-                        doc.setTextColor(0, 0, 0);
-                        doc.text(formatDateFull(l.attendanceTakenAt), valueX, y + 9);
-                        y += lineH;
-                    }
-                    spacer(6);
-
-                    // Attendance summary bar — small colored pills
-                    if (l.attendance.length > 0) {
-                        checkPage(30);
-                        var pillY = y;
-                        var pillH = 20;
-                        var pillGap = 8;
-                        var pillWidth = (contentW - pillGap * 2) / 3;
-                        [
-                            { label: 'Present', count: l.counts.present, color: C_GREEN },
-                            { label: 'Late',    count: l.counts.late,    color: [217, 119, 6] },
-                            { label: 'Absent',  count: l.counts.absent,  color: C_RED }
-                        ].forEach(function(p, i) {
-                            var px = margin + i * (pillWidth + pillGap);
-                            doc.setFillColor(p.color[0], p.color[1], p.color[2]);
-                            doc.roundedRect(px, pillY, pillWidth, pillH, 4, 4, 'F');
-                            doc.setTextColor(255, 255, 255);
-                            doc.setFont('helvetica', 'bold');
-                            doc.setFontSize(10);
-                            doc.text(p.label + ':', px + 10, pillY + 14);
-                            doc.setFontSize(11);
-                            doc.text(String(p.count), px + pillWidth - 12, pillY + 14, { align: 'right' });
-                        });
-                        doc.setTextColor(0, 0, 0);
-                        y += pillH + 12;
-                    } else {
-                        paragraph('(no attendance recorded)', C_MUTED);
-                        spacer(6);
-                        return;
-                    }
-
-                    // Grouped by status — Absent first (what teachers care about most),
-                    // then Late, then Present. Names laid out in columns for compactness.
-                    var byStatus = { present: [], absent: [], late: [] };
-                    l.attendance.forEach(function(a) {
-                        (byStatus[a.status] || byStatus.present).push(a.name);
-                    });
-
-                    var statusBlocks = [
-                        { key: 'absent',  label: 'Absent',  color: C_RED },
-                        { key: 'late',    label: 'Late',    color: [217, 119, 6] },
-                        { key: 'present', label: 'Present', color: C_GREEN }
-                    ];
-                    statusBlocks.forEach(function(sb) {
-                        var list = byStatus[sb.key];
-                        if (list.length === 0) return;
-                        list = list.slice().sort();
-
-                        // Colored strip with label + count
-                        checkPage(28);
-                        doc.setFillColor(sb.color[0], sb.color[1], sb.color[2]);
-                        doc.rect(margin, y, contentW, 15, 'F');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFont('helvetica', 'bold');
-                        doc.setFontSize(9);
-                        doc.text(sb.label.toUpperCase() + '  (' + list.length + ')', margin + 8, y + 10);
-                        doc.setTextColor(0, 0, 0);
-                        y += 15 + 4;
-
-                        // Two-column name layout for compactness
-                        doc.setFont('helvetica', 'normal');
-                        doc.setFontSize(9.5);
-                        var cols = list.length > 6 ? 2 : 1;
-                        var rowsN = Math.ceil(list.length / cols);
-                        var colW = contentW / cols;
-                        for (var i = 0; i < rowsN; i++) {
-                            checkPage(13);
-                            for (var c = 0; c < cols; c++) {
-                                var name = list[i + c * rowsN];
-                                if (!name) continue;
-                                doc.text('- ' + name, margin + 10 + c * colW, y + 9);
-                            }
-                            y += 13;
-                        }
-                        spacer(4);
-                    });
-                    spacer(6);
-                });
-            }
-
-            // ============ Groups ============
+            // ============ Groups (points scoped to this lesson) ============
             if (r.groups.length > 0) {
-                sectionHeader('Groups');
+                sectionHeader('Groups — Points Earned This Lesson');
                 r.groups.forEach(function(g) {
-                    subHeader(g.name, g.memberCount + ' members · ' + g.totalPoints + ' total points');
+                    subHeader(g.name, g.memberCount + ' members — ' + (g.totalPoints > 0 ? '+' : '') + g.totalPoints + ' points this lesson');
                     var grpWidths = [contentW * 0.72, contentW * 0.28];
                     if (g.members.length === 0) {
                         paragraph('(empty group)', C_MUTED);
                     } else {
-                        tableHeader(['Name', 'Points'], grpWidths);
+                        tableHeader(['Name', 'Points This Lesson'], grpWidths);
                         g.members.forEach(function(m, i) {
-                            tableRow([m.name, String(m.points)], grpWidths, { zebra: i % 2 === 1 });
+                            tableRow([m.name, (m.pointsThisLesson > 0 ? '+' : '') + m.pointsThisLesson], grpWidths, { zebra: i % 2 === 1 });
                         });
                     }
                     spacer(6);
                 });
             }
 
-            // ============ Active call lists ============
-            if (r.callOrderLists.active.length > 0) {
-                sectionHeader('Active Call Order Lists');
-                r.callOrderLists.active.forEach(function(al) {
-                    subHeader(al.name, al.calledCount + ' of ' + al.total + ' called (' + al.percentCalled + '%)');
+            // ============ Call lists used this lesson ============
+            if (r.callOrderLists.active.length > 0 || r.callOrderLists.archived.length > 0) {
+                sectionHeader('Call Order Lists Used This Lesson');
+                var allCallLists = r.callOrderLists.active.concat(r.callOrderLists.archived);
+                allCallLists.forEach(function(al) {
+                    var right = al.isArchived
+                        ? al.calledCount + '/' + al.total + ' overall (' + al.percentCalled + '%) — archived list'
+                        : al.calledCount + ' of ' + al.total + ' called overall (' + al.percentCalled + '%)';
+                    subHeader(al.name, right);
+                    // If any students were called during THIS lesson, highlight them
+                    if (al.calledThisLesson.length > 0) {
+                        doc.setFont('helvetica', 'italic');
+                        doc.setFontSize(9);
+                        doc.setTextColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
+                        doc.text('Called during this lesson: ' + al.calledThisLesson.join(', '), margin, y);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        y += 14;
+                    }
                     var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
                     tableHeader(['#', 'Name', 'Status'], w);
                     al.order.forEach(function(o, i) {
@@ -6030,29 +6080,30 @@
                 });
             }
 
-            // ============ Archived call lists ============
-            if (r.callOrderLists.archived.length > 0) {
-                sectionHeader('Archived Call Order Lists');
-                r.callOrderLists.archived.forEach(function(al) {
-                    subHeader(al.name, al.calledCount + '/' + al.total + ' (' + al.percentCalled + '%) — Archived ' + formatDateFull(al.archivedAt));
-                    var w = [contentW * 0.10, contentW * 0.60, contentW * 0.30];
-                    tableHeader(['#', 'Name', 'Status'], w);
-                    al.order.forEach(function(o, i) {
-                        tableRow(
-                            [String(o.position), o.name, o.called ? 'Called' : 'Not called'],
-                            w,
-                            { zebra: i % 2 === 1, color: o.called ? C_GREEN : C_MUTED }
-                        );
-                    });
-                    spacer(6);
-                });
-            }
-
-            // ============ Active to-do lists ============
-            if (r.todoLists.active.length > 0) {
-                sectionHeader('Active To-Do Lists');
-                r.todoLists.active.forEach(function(tl) {
-                    subHeader(tl.name, tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)');
+            // ============ To-do lists worked on this lesson ============
+            if (r.todoLists.active.length > 0 || r.todoLists.archived.length > 0) {
+                sectionHeader('To-Do Lists Worked On This Lesson');
+                var allTodo = r.todoLists.active.concat(r.todoLists.archived);
+                allTodo.forEach(function(tl) {
+                    var right = tl.isArchived
+                        ? tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) — archived list'
+                        : tl.completedItems + ' of ' + tl.totalItems + ' done (' + tl.percentComplete + '%)';
+                    subHeader(tl.name, right);
+                    if (tl.checkedThisLesson.length > 0) {
+                        doc.setFont('helvetica', 'italic');
+                        doc.setFontSize(9);
+                        doc.setTextColor(C_ACCENT[0], C_ACCENT[1], C_ACCENT[2]);
+                        var completedText = 'Completed during this lesson: ' + tl.checkedThisLesson.join('; ');
+                        var wrapped = doc.splitTextToSize(completedText, contentW);
+                        wrapped.forEach(function(line) {
+                            checkPage(13);
+                            doc.text(line, margin, y);
+                            y += 12;
+                        });
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        y += 2;
+                    }
                     var w = [contentW * 0.15, contentW * 0.85];
                     tableHeader(['Status', 'Item'], w);
                     tl.items.forEach(function(it, i) {
@@ -6066,27 +6117,9 @@
                 });
             }
 
-            // ============ Archived to-do lists ============
-            if (r.todoLists.archived.length > 0) {
-                sectionHeader('Archived To-Do Lists');
-                r.todoLists.archived.forEach(function(tl) {
-                    subHeader(tl.name, tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) — Archived ' + formatDateFull(tl.archivedAt));
-                    var w = [contentW * 0.15, contentW * 0.85];
-                    tableHeader(['Status', 'Item'], w);
-                    tl.items.forEach(function(it, i) {
-                        tableRow(
-                            [it.done ? 'Done' : 'Pending', it.text],
-                            w,
-                            { zebra: i % 2 === 1, color: it.done ? C_GREEN : null }
-                        );
-                    });
-                    spacer(6);
-                });
-            }
-
-            // ============ Notes ============
+            // ============ Notes taken this lesson ============
             if (r.notes.length > 0) {
-                sectionHeader('Student Notes');
+                sectionHeader('Student Notes — This Lesson');
                 r.notes.forEach(function(n) {
                     subHeader(n.studentName, n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's'));
                     n.notes.forEach(function(nt) {
@@ -6094,7 +6127,7 @@
                         doc.setFont('helvetica', 'bold');
                         doc.setFontSize(9);
                         doc.setTextColor(C_MUTED[0], C_MUTED[1], C_MUTED[2]);
-                        doc.text(formatDateFull(nt.at), margin, y);
+                        doc.text(formatTimeShort(nt.at), margin, y);
                         y += 12;
                         doc.setTextColor(0, 0, 0);
                         paragraph(nt.text);
@@ -6103,18 +6136,18 @@
                 });
             }
 
-            // ============ Timeline ============
+            // ============ Timeline (this lesson) ============
             if (r.timeline.length > 0) {
-                sectionHeader('Session Timeline — What Happened');
-                var tW = [contentW * 0.22, contentW * 0.78];
+                sectionHeader('Lesson Timeline — What Happened');
+                var tW = [contentW * 0.18, contentW * 0.82];
                 tableHeader(['Time', 'Event'], tW);
                 r.timeline.forEach(function(t, i) {
-                    tableRow([formatDateFull(t.at), t.description], tW, { zebra: i % 2 === 1 });
+                    tableRow([formatTimeShort(t.at), t.description], tW, { zebra: i % 2 === 1 });
                 });
             }
 
-            doc.save(sanitizeFile(r.className) + '_session_' + fileTimestamp() + '.pdf');
-            logEvent('export_pdf', {});
+            doc.save(sanitizeFile(r.className) + '_' + sanitizeFile(r.lesson.name) + '_' + fileTimestamp() + '.pdf');
+            logEvent('export_pdf', { lesson: r.lesson.name });
             saveLiveState();
         }
 
@@ -6142,128 +6175,150 @@
                 '.note-ts{color:#64748b;font-size:0.75rem;margin-bottom:3px;}' +
                 '@media print{h2,h3{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
 
-            var html = '<html><head><title>' + escapeHtml(r.className) + ' — Session Report</title><style>' + css + '</style></head><body>';
-            html += '<h1>Classroom Session Report</h1><div class="subtitle">' + escapeHtml(r.className) + '</div>';
-            html += '<div class="meta"><strong>Session Start:</strong> ' + formatDateFull(r.sessionStart) +
+            var html = '<html><head><title>' + escapeHtml(r.className) + ' — ' + escapeHtml(r.lesson.name) + '</title><style>' + css + '</style></head><body>';
+            html += '<div style="font-size:0.8rem;font-weight:700;color:#4a6fa5;letter-spacing:1px;">LESSON REPORT</div>';
+            html += '<h1>' + escapeHtml(r.lesson.name) + '</h1><div class="subtitle">' + escapeHtml(r.className) + '</div>';
+            html += '<div class="meta">' +
+                '<strong>Started:</strong> ' + formatDateFull(r.lesson.startedAt) +
+                ' &nbsp;·&nbsp; <strong>Ended:</strong> ' + (r.lesson.isActive ? '(in progress)' : formatDateFull(r.lesson.endedAt)) +
+                ' &nbsp;·&nbsp; <strong>Duration:</strong> ' + formatLessonDuration(r.lesson.durationMs) +
                 ' &nbsp;·&nbsp; <strong>Exported:</strong> ' + formatDateFull(r.exportedAt) +
-                ' &nbsp;·&nbsp; <strong>Duration:</strong> ' + formatDurationHuman(r.durationMs) + '</div>';
+                '</div>';
 
-            html += '<h2>Summary</h2>';
+            html += '<h2>Lesson Summary</h2>';
             html += '<div class="summary">';
             html += '<div><strong>Total Students:</strong> ' + r.stats.totalStudents + '</div>';
-            html += '<div><strong>Net Points:</strong> ' + r.stats.pointsNet + ' (+' + r.stats.pointsAdded + ' / −' + r.stats.pointsRemoved + ')</div>';
-            html += '<div><strong>Groups Formed:</strong> ' + r.stats.totalGroups + '</div>';
-            html += '<div><strong>Notes Recorded:</strong> ' + r.stats.notesRecorded + '</div>';
-            html += '<div><strong>Random Picks:</strong> ' + r.stats.randomPicksMade + '</div>';
-            html += '<div><strong>Timers Used:</strong> ' + r.stats.timersStarted + '</div>';
-            html += '<div><strong>Call Order Lists:</strong> ' + r.stats.activeCallLists + ' active · ' + r.stats.archivedCallLists + ' archived</div>';
-            html += '<div><strong>To-Do Lists:</strong> ' + r.stats.activeTodoLists + ' active · ' + r.stats.archivedTodoLists + ' archived</div>';
-            html += '<div><strong>Lessons Completed:</strong> ' + r.stats.lessonsCompleted + (r.stats.lessonActive ? ' (+1 active)' : '') + '</div>';
-            html += '<div><strong>Total Lesson Time:</strong> ' + formatDurationHuman(r.stats.totalLessonTimeMs) + '</div>';
+            html += '<div><strong>Net Points This Lesson:</strong> ' + r.stats.netPointsThisLesson + ' (+' + r.stats.pointsAddedThisLesson + ' / −' + r.stats.pointsRemovedThisLesson + ')</div>';
+            html += '<div><strong>Groups (current):</strong> ' + r.stats.totalGroups + '</div>';
+            html += '<div><strong>Notes This Lesson:</strong> ' + r.stats.notesThisLesson + '</div>';
+            html += '<div><strong>Random Picks:</strong> ' + r.stats.randomPicksThisLesson + '</div>';
+            html += '<div><strong>Timers Used:</strong> ' + r.stats.timersUsedThisLesson + '</div>';
+            html += '<div><strong>Call Lists Used:</strong> ' + r.stats.callListsUsed + '</div>';
+            html += '<div><strong>To-Do Lists Worked On:</strong> ' + r.stats.todoListsWorkedOn + '</div>';
             html += '</div>';
 
+            // Attendance — grouped by status
+            html += '<h2>Attendance</h2>';
+            html += '<div style="display:flex;gap:10px;margin-bottom:14px;">';
+            [
+                { label: 'Present', count: r.stats.attendancePresent, bg: '#10b981' },
+                { label: 'Late',    count: r.stats.attendanceLate,    bg: '#d97706' },
+                { label: 'Absent',  count: r.stats.attendanceAbsent,  bg: '#dc2626' }
+            ].forEach(function(p) {
+                html += '<div style="flex:1;background:' + p.bg + ';color:white;padding:10px;border-radius:6px;text-align:center;">' +
+                    '<div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">' + p.label.toUpperCase() + '</div>' +
+                    '<div style="font-size:1.5rem;font-weight:800;">' + p.count + '</div>' +
+                    '</div>';
+            });
+            html += '</div>';
+            [
+                { key: 'absent',  label: 'Absent',  color: '#dc2626' },
+                { key: 'late',    label: 'Late',    color: '#d97706' },
+                { key: 'present', label: 'Present', color: '#10b981' }
+            ].forEach(function(sb) {
+                var list = (r.attendance[sb.key] || []).slice().sort();
+                if (list.length === 0) return;
+                html += '<div style="background:' + sb.color + ';color:white;padding:6px 10px;font-weight:700;font-size:0.85rem;letter-spacing:0.5px;">' + sb.label.toUpperCase() + ' (' + list.length + ')</div>';
+                html += '<div style="padding:8px 10px;background:#f8fafc;margin-bottom:10px;column-count:2;column-gap:20px;">';
+                list.forEach(function(n) {
+                    html += '<div style="padding:2px 0;">- ' + escapeHtml(n) + '</div>';
+                });
+                html += '</div>';
+            });
+
             if (r.students.length > 0) {
-                html += '<h2>Students — Points &amp; Participation</h2><table><tr><th>Name</th><th>Group</th><th>Points</th><th>Notes</th><th>Times Called</th></tr>';
+                html += '<h2>Students — This Lesson</h2><table><tr><th>Name</th><th>Attendance</th><th>Group</th><th>Points</th><th>Notes</th><th>Called</th></tr>';
                 r.students.forEach(function(s) {
-                    html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + (s.group ? escapeHtml(s.group) : '<em>unassigned</em>') + '</td><td>' + s.points + '</td><td>' + s.noteCount + '</td><td>' + s.timesCalled + '</td></tr>';
+                    var att = s.attendance ? (s.attendance.charAt(0).toUpperCase() + s.attendance.slice(1)) : 'Present';
+                    var attCls = s.attendance === 'absent' ? 'notcalled' : (s.attendance === 'late' ? 'pending' : 'done');
+                    var ptsStr = (s.pointsThisLesson > 0 ? '+' : '') + s.pointsThisLesson;
+                    html += '<tr><td>' + escapeHtml(s.name) + '</td><td class="' + attCls + '">' + att + '</td><td>' + (s.group ? escapeHtml(s.group) : '<em>unassigned</em>') + '</td><td>' + ptsStr + '</td><td>' + s.noteCount + '</td><td>' + s.timesCalled + '</td></tr>';
                 });
                 html += '</table>';
-            }
-
-            // Lessons & Attendance
-            if (r.lessons.length > 0) {
-                html += '<h2>Lessons &amp; Attendance</h2>';
-                r.lessons.forEach(function(l, idx) {
-                    var head = 'Lesson ' + (idx + 1) + ' — ' + formatDateFull(l.startedAt);
-                    if (l.isActive) head += ' → (in progress)';
-                    else if (l.endedAt) head += ' → ' + formatTimeShort(l.endedAt);
-                    var meta = 'Duration ' + formatLessonDuration(l.durationMs) +
-                        ' · Present ' + l.counts.present + ' · Absent ' + l.counts.absent + ' · Late ' + l.counts.late;
-                    html += '<h3><span>' + escapeHtml(head) + '</span><span>' + meta + '</span></h3>';
-                    if (l.attendance.length > 0) {
-                        html += '<table><tr><th>Name</th><th>Status</th></tr>';
-                        l.attendance.forEach(function(a) {
-                            var cls = a.status === 'present' ? 'done' : (a.status === 'absent' ? 'notcalled' : '');
-                            var label = { present: '✓ Present', absent: '✗ Absent', late: '⏰ Late' }[a.status] || a.status;
-                            html += '<tr><td>' + escapeHtml(a.name) + '</td><td class="' + cls + '">' + label + '</td></tr>';
-                        });
-                        html += '</table>';
-                    } else {
-                        html += '<div style="color:#94a3b8;font-style:italic;padding:6px 0;">(no attendance recorded)</div>';
-                    }
-                });
+                html += '<div style="font-size:0.75rem;color:#64748b;font-style:italic;margin-top:4px;">Points, Notes, and Called are for this lesson only.</div>';
             }
 
             if (r.groups.length > 0) {
-                html += '<h2>Groups</h2>';
+                html += '<h2>Groups — Points Earned This Lesson</h2>';
                 r.groups.forEach(function(g) {
-                    html += '<h3><span>' + escapeHtml(g.name) + '</span><span>' + g.memberCount + ' members · ' + g.totalPoints + ' total pts</span></h3>';
+                    var ptsStr = (g.totalPoints > 0 ? '+' : '') + g.totalPoints;
+                    html += '<h3><span>' + escapeHtml(g.name) + '</span><span>' + g.memberCount + ' members · ' + ptsStr + ' pts this lesson</span></h3>';
                     if (g.members.length === 0) {
                         html += '<div style="color:#94a3b8;font-style:italic;padding:6px 0;">(empty group)</div>';
                     } else {
-                        html += '<table><tr><th>Name</th><th>Points</th></tr>';
+                        html += '<table><tr><th>Name</th><th>Points This Lesson</th></tr>';
                         g.members.forEach(function(m) {
-                            html += '<tr><td>' + escapeHtml(m.name) + '</td><td>' + m.points + '</td></tr>';
+                            html += '<tr><td>' + escapeHtml(m.name) + '</td><td>' + ((m.pointsThisLesson > 0 ? '+' : '') + m.pointsThisLesson) + '</td></tr>';
                         });
                         html += '</table>';
                     }
                 });
             }
 
-            function callListSection(title, lists, includeArchivedInfo) {
+            function callListsSection(title, lists) {
                 if (lists.length === 0) return '';
                 var out = '<h2>' + title + '</h2>';
                 lists.forEach(function(al) {
-                    var meta = al.calledCount + '/' + al.total + ' called (' + al.percentCalled + '%)';
-                    if (includeArchivedInfo) meta += ' · Archived ' + formatDateFull(al.archivedAt);
-                    out += '<h3><span>📋 ' + escapeHtml(al.name) + '</span><span>' + meta + '</span></h3>';
+                    var right = al.isArchived
+                        ? al.calledCount + '/' + al.total + ' overall (' + al.percentCalled + '%) — archived'
+                        : al.calledCount + '/' + al.total + ' overall (' + al.percentCalled + '%)';
+                    out += '<h3><span>' + escapeHtml(al.name) + '</span><span>' + right + '</span></h3>';
+                    if (al.calledThisLesson.length > 0) {
+                        out += '<div style="background:#eef4ff;border-left:3px solid #4a6fa5;padding:6px 10px;margin:4px 0 8px;font-size:0.85rem;"><strong>Called during this lesson:</strong> ' + escapeHtml(al.calledThisLesson.join(', ')) + '</div>';
+                    }
                     out += '<table><tr><th>#</th><th>Name</th><th>Status</th></tr>';
                     al.order.forEach(function(o) {
                         var cls = o.called ? 'called' : 'notcalled';
-                        var label = o.called ? '✓ Called' : '— Not called';
+                        var label = o.called ? 'Called' : 'Not called';
                         out += '<tr><td>' + o.position + '</td><td>' + escapeHtml(o.name) + '</td><td class="' + cls + '">' + label + '</td></tr>';
                     });
                     out += '</table>';
                 });
                 return out;
             }
-            html += callListSection('Active Call Order Lists', r.callOrderLists.active, false);
-            html += callListSection('Archived Call Order Lists', r.callOrderLists.archived, true);
+            html += callListsSection('Call Order Lists Used This Lesson', r.callOrderLists.active.concat(r.callOrderLists.archived));
 
-            function todoSection(title, lists, includeArchivedInfo) {
+            function todoSection(title, lists) {
                 if (lists.length === 0) return '';
                 var out = '<h2>' + title + '</h2>';
                 lists.forEach(function(tl) {
-                    var meta = tl.completedItems + '/' + tl.totalItems + ' done (' + tl.percentComplete + '%)';
-                    if (includeArchivedInfo) meta += ' · Archived ' + formatDateFull(tl.archivedAt);
-                    out += '<h3><span>☑ ' + escapeHtml(tl.name) + '</span><span>' + meta + '</span></h3>';
+                    var right = tl.isArchived
+                        ? tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%) — archived'
+                        : tl.completedItems + '/' + tl.totalItems + ' (' + tl.percentComplete + '%)';
+                    out += '<h3><span>' + escapeHtml(tl.name) + '</span><span>' + right + '</span></h3>';
+                    if (tl.checkedThisLesson.length > 0) {
+                        out += '<div style="background:#eef4ff;border-left:3px solid #4a6fa5;padding:6px 10px;margin:4px 0 8px;font-size:0.85rem;"><strong>Completed during this lesson:</strong><ul style="margin:4px 0 0 20px;">';
+                        tl.checkedThisLesson.forEach(function(item) {
+                            out += '<li>' + escapeHtml(item) + '</li>';
+                        });
+                        out += '</ul></div>';
+                    }
                     out += '<table><tr><th>Status</th><th>Item</th></tr>';
                     tl.items.forEach(function(it) {
                         var cls = it.done ? 'done' : 'pending';
-                        var label = it.done ? '✓ Done' : '○ Pending';
+                        var label = it.done ? 'Done' : 'Pending';
                         out += '<tr><td class="' + cls + '">' + label + '</td><td>' + escapeHtml(it.text) + '</td></tr>';
                     });
                     out += '</table>';
                 });
                 return out;
             }
-            html += todoSection('Active To-Do Lists', r.todoLists.active, false);
-            html += todoSection('Archived To-Do Lists', r.todoLists.archived, true);
+            html += todoSection('To-Do Lists Worked On This Lesson', r.todoLists.active.concat(r.todoLists.archived));
 
             if (r.notes.length > 0) {
-                html += '<h2>Student Notes</h2>';
+                html += '<h2>Student Notes — This Lesson</h2>';
                 r.notes.forEach(function(n) {
                     html += '<h3><span>' + escapeHtml(n.studentName) + '</span><span>' + n.notes.length + ' note' + (n.notes.length === 1 ? '' : 's') + '</span></h3>';
                     n.notes.forEach(function(nt) {
-                        html += '<div class="note"><div class="note-ts">' + formatDateFull(nt.at) + '</div>' + escapeHtml(nt.text) + '</div>';
+                        html += '<div class="note"><div class="note-ts">' + formatTimeShort(nt.at) + '</div>' + escapeHtml(nt.text) + '</div>';
                     });
                 });
             }
 
             if (r.timeline.length > 0) {
-                html += '<h2>Session Timeline — What Happened</h2><table><tr><th style="width:180px;">Time</th><th>Event</th></tr>';
+                html += '<h2>Lesson Timeline — What Happened</h2><table><tr><th style="width:100px;">Time</th><th>Event</th></tr>';
                 r.timeline.forEach(function(t) {
-                    html += '<tr><td>' + formatDateFull(t.at) + '</td><td>' + escapeHtml(t.description) + '</td></tr>';
+                    html += '<tr><td>' + formatTimeShort(t.at) + '</td><td>' + escapeHtml(t.description) + '</td></tr>';
                 });
                 html += '</table>';
             }
@@ -6271,7 +6326,7 @@
             html += '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<' + '/script></body></html>';
             w.document.write(html);
             w.document.close();
-            logEvent('export_pdf_print', {});
+            logEvent('export_pdf_print', { lesson: r.lesson.name });
             saveLiveState();
         }
     </script>
