@@ -3069,7 +3069,7 @@
                     el.onclick = (function(n) {
                         return function() {
                             if (isInAttendanceMode()) cycleAttendance(n);
-                            else openStudentModal(n);
+                            else checkLessonWarning(function() { openStudentModal(n); });
                         };
                     })(name);
                 } else {
@@ -3356,8 +3356,8 @@
                         html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
                         html += '<span class="m-name">' + escapeHtml(m) + '</span>';
                         html += '<span class="m-pts">' + pts + '</span>';
-                        html += '<button class="m-pt-btn minus" onclick="addPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
-                        html += '<button class="m-pt-btn plus" onclick="addPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
+                        html += '<button class="m-pt-btn minus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
+                        html += '<button class="m-pt-btn plus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
                         html += '</div>';
                     });
                 }
@@ -3372,8 +3372,8 @@
                     html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
                     html += '<span class="m-name">' + escapeHtml(m) + '</span>';
                     html += '<span class="m-pts">' + pts + '</span>';
-                    html += '<button class="m-pt-btn minus" onclick="addPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
-                    html += '<button class="m-pt-btn plus" onclick="addPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
+                    html += '<button class="m-pt-btn minus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
+                    html += '<button class="m-pt-btn plus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
                     html += '</div>';
                 });
                 html += '</div>';
@@ -3530,6 +3530,54 @@
         //  LESSONS & ATTENDANCE
         // ============================================================
 
+        // Session-scoped flag — once the teacher has dismissed the "lesson not started"
+        // warning, we don't nag them again until a lesson starts or ends.
+        var warnedAboutNoLesson = false;
+        var _pendingWarnedAction = null;
+
+        function checkLessonWarning(cb) {
+            if (liveState.activeLesson) { cb(); return; }
+            if (warnedAboutNoLesson) { cb(); return; }
+            _pendingWarnedAction = cb;
+            openNoLessonWarningModal();
+        }
+
+        function openNoLessonWarningModal() {
+            var html =
+                '<div class="modal-title" style="color:#b45309;">⚠️ Lesson Not Started</div>' +
+                '<div style="line-height:1.55;color:#374151;margin-bottom:14px;font-size:0.92rem;">' +
+                    'You haven\'t started a lesson yet. Points, notes, and attendance changes made now will still save locally, but they <strong>won\'t appear in the PDF export</strong> — the report only includes data from a running lesson.' +
+                '</div>' +
+                '<div style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 12px;margin-bottom:16px;font-size:0.85rem;color:#78350f;line-height:1.5;">' +
+                    '<strong>Recommended:</strong> click <strong>Start Lesson</strong> first so this class period is properly recorded and exportable.' +
+                '</div>' +
+                '<div class="modal-actions" style="flex-wrap:wrap;">' +
+                    '<button class="export-btn" onclick="cancelWarnedAction()">Cancel</button>' +
+                    '<button class="warn" onclick="continueWithoutLesson()">Continue Anyway</button>' +
+                    '<button class="automation" onclick="startLessonFromWarning()">▶ Start Lesson</button>' +
+                '</div>';
+            openModal(html);
+        }
+
+        function cancelWarnedAction() {
+            _pendingWarnedAction = null;
+            closeModal();
+        }
+
+        function continueWithoutLesson() {
+            warnedAboutNoLesson = true;
+            var cb = _pendingWarnedAction;
+            _pendingWarnedAction = null;
+            closeModal();
+            if (cb) cb();
+        }
+
+        function startLessonFromWarning() {
+            _pendingWarnedAction = null;
+            closeModal();
+            openStartLessonModal();
+        }
+
         function toggleLesson() {
             if (liveState.activeLesson) openEndLessonModal();
             else openStartLessonModal();
@@ -3584,6 +3632,7 @@
                 attendance: attendance,
                 attendanceTakenAt: null
             };
+            warnedAboutNoLesson = false; // fresh start — reset for whenever this lesson eventually ends
             logEvent('lesson_started', { name: name, studentCount: students.length });
             saveLiveState();
             updateLessonButtonUI();
@@ -3645,6 +3694,7 @@
             liveState.completedLessons = liveState.completedLessons || [];
             liveState.completedLessons.push(completed);
             liveState.activeLesson = null;
+            warnedAboutNoLesson = false; // teacher just left lesson mode — remind them next time they do a student action
             logEvent('lesson_ended', {
                 name: al.name,
                 durationMs: durationMs,
@@ -3841,9 +3891,9 @@
                 '</div>' +
                 attHtml +
                 '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' +
-                    '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">+1 point</button>' +
-                    '<button class="automation" onclick="addPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">+2 points</button>' +
-                    '<button class="warn" onclick="addPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">−1 point</button>' +
+                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">+1 point</button>' +
+                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">+2 points</button>' +
+                    '<button class="warn" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">−1 point</button>' +
                     '<button class="danger" onclick="resetStudentPoints(\'' + escapeAttr(name) + '\');openStudentModal(\'' + escapeAttr(name) + '\')">Reset</button>' +
                 '</div>' +
                 '<label style="display:block;margin-bottom:4px;">Add a note</label>' +
@@ -4185,7 +4235,7 @@
             });
             // Profile shortcut for the single-winner case
             if (names.length === 1) {
-                html += '<button onclick="openStudentModal(\'' + escapeAttr(names[0]) + '\');hideWinnerBanner()">Open Profile</button>';
+                html += '<button onclick="openWinnerProfile(\'' + escapeAttr(names[0]) + '\')">Open Profile</button>';
             }
             html += '<button class="export-btn" onclick="hideWinnerBanner()">Dismiss</button>';
             html += '</div>';
@@ -4198,17 +4248,32 @@
             currentWinners = [];
         }
 
+        // Gated wrapper — used from onclick handlers in the group panel and profile modal.
+        // If no lesson is active, warn the teacher once; otherwise, run through.
+        function tryAddPoints(name, delta) {
+            checkLessonWarning(function() { addPoints(name, delta, true); });
+        }
+
+        function openWinnerProfile(name) {
+            checkLessonWarning(function() {
+                hideWinnerBanner();
+                openStudentModal(name);
+            });
+        }
+
         function addPointToWinner(idx) {
             var name = currentWinners[idx];
             if (!name) return;
-            addPoints(name, 1, true);
+            checkLessonWarning(function() { addPoints(name, 1, true); });
         }
 
         function addPointToAllWinners() {
             if (currentWinners.length === 0) return;
-            // Stagger by ~140ms per student so animations cascade rather than piling up
-            currentWinners.forEach(function(name, i) {
-                setTimeout(function() { addPoints(name, 1, true); }, i * 140);
+            checkLessonWarning(function() {
+                // Stagger by ~140ms per student so animations cascade rather than piling up
+                currentWinners.forEach(function(name, i) {
+                    setTimeout(function() { addPoints(name, 1, true); }, i * 140);
+                });
             });
         }
 
