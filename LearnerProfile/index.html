@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learner Profile System</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --paper: #F7F5F0;
@@ -683,6 +684,80 @@
     .record-card { flex-wrap: wrap; }
     .record-actions { width: 100%; justify-content: flex-end; }
   }
+
+  /* ── AI Export instruction modal ── */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(30, 42, 50, 0.5); z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal-box {
+    background: var(--paper-raised); border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 32px;
+  }
+  .modal-box h2 { font-family: Georgia, serif; font-size: 20px; margin: 0 0 6px; color: var(--ink); }
+  .modal-box .modal-sub { font-size: 13px; color: var(--ink-faint); margin: 0 0 24px; line-height: 1.5; }
+  .modal-step { display: flex; gap: 14px; margin-bottom: 20px; align-items: flex-start; }
+  .modal-step-num {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: #fff; background: var(--accent);
+    font-family: Georgia, serif;
+  }
+  .modal-step-body { flex: 1; padding-top: 4px; }
+  .modal-step-body strong { font-size: 14.5px; display: block; margin-bottom: 4px; color: var(--ink); }
+  .modal-step-body p { font-size: 13px; color: var(--ink-soft); margin: 0; line-height: 1.55; }
+  .modal-step-body .modal-links {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+  }
+  .modal-step-body .modal-links a {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 12.5px; font-weight: 600; color: var(--ink-soft);
+    text-decoration: none; cursor: pointer; background: var(--paper-raised);
+    transition: all 0.1s;
+  }
+  .modal-step-body .modal-links a:hover {
+    border-color: var(--accent); color: var(--accent); background: var(--accent-light);
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: space-between; margin-top: 28px; flex-wrap: wrap; align-items: center; }
+  .modal-tip {
+    background: var(--accent-light); border-radius: 8px; padding: 12px 16px;
+    font-size: 12.5px; color: var(--accent); line-height: 1.55; margin-top: 20px;
+  }
+  .copy-success {
+    display: inline-block; padding: 4px 12px; border-radius: 4px;
+    background: var(--green-bg); color: var(--green); font-size: 12px; font-weight: 600;
+    margin-left: 8px;
+  }
+
+  @media print { .modal-overlay { display: none !important; } }
+
+  /* ── Database connection status ── */
+  .db-banner {
+    padding: 8px 24px; font-size: 12px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+  }
+  .db-banner.connected { background: var(--green-bg); color: var(--green); }
+  .db-banner.disconnected { background: var(--yellow-bg); color: var(--yellow); }
+  .db-banner.error { background: var(--red-bg); color: var(--red); }
+  .db-banner .db-status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .db-banner .db-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .db-banner.connected .db-dot { background: var(--green); }
+  .db-banner.disconnected .db-dot { background: var(--yellow); }
+  .db-banner.error .db-dot { background: var(--red); }
+  .db-banner a { color: inherit; text-decoration: underline; cursor: pointer; font-weight: 500; }
+  .db-config-section { max-width: 640px; }
+  .db-config-section input[type=text], .db-config-section input[type=url] {
+    width: 100%; padding: 11px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 14px; font-family: ui-monospace, monospace; background: var(--paper-raised);
+    color: var(--ink); outline: none; box-sizing: border-box;
+  }
+  .db-config-section input:focus { border-color: var(--accent); }
+  .sync-log { font-size: 11px; color: var(--ink-faint); max-height: 120px; overflow-y: auto;
+    background: #FBFAF6; border-radius: 4px; padding: 8px 10px; margin-top: 10px;
+    font-family: ui-monospace, monospace; line-height: 1.8; }
 </style>
 </head>
 <body>
@@ -1087,13 +1162,14 @@ const EVIDENCE_ROWS = [
 ];
 
 /* ══════════════════════════════════════════════════════════════
-   STORAGE — uses localStorage in a normal browser, falls back to
-   an in-memory store if localStorage is unavailable (e.g. very
-   restricted sandboxes). Records survive page reloads and browser
-   restarts on the machine you saved them on.
+   STORAGE — Dual layer: Supabase (primary) + localStorage (cache/fallback)
+   When Supabase is connected, all reads/writes go to the cloud database
+   AND mirror to localStorage for offline access. When disconnected,
+   falls back to localStorage only.
    ══════════════════════════════════════════════════════════════ */
 
-const storage = (function(){
+// ── Local storage layer (always available) ──
+const local = (function(){
   let mem = {};
   let persistent = false;
   try{
@@ -1107,7 +1183,7 @@ const storage = (function(){
   if(persistent){
     return {
       persistent: true,
-      set(k,v){ localStorage.setItem(k,v); return v; },
+      set(k,v){ localStorage.setItem(k,v); },
       get(k){ return localStorage.getItem(k); },
       del(k){ localStorage.removeItem(k); },
       keys(prefix){
@@ -1122,12 +1198,291 @@ const storage = (function(){
   }
   return {
     persistent: false,
-    set(k,v){ mem[k]=v; return v; },
+    set(k,v){ mem[k]=v; },
     get(k){ return (k in mem) ? mem[k] : null; },
     del(k){ delete mem[k]; },
     keys(prefix){ return Object.keys(mem).filter(k=>!prefix||k.indexOf(prefix)===0); },
   };
 })();
+
+// Keep backward compat reference
+const storage = local;
+
+// ── Supabase layer ──
+const db = {
+  client: null,
+  status: 'disconnected', // 'disconnected' | 'connected' | 'error'
+  lastError: '',
+
+  getConfig(){
+    try{
+      const raw = local.get('__supabase_config__');
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    // Default config — pre-configured for this project
+    return {
+      url: 'https://gppetukrcdtmebqxpotj.supabase.co',
+      key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwcGV0dWtyY2R0bWVicXhwb3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjI5NzEsImV4cCI6MjA5OTk5ODk3MX0.3zAfQlL8mGd5MRRJL5Rb-uv8Qj0l-8i7Ec--Z3FL8tU'
+    };
+  },
+
+  saveConfig(url, key){
+    local.set('__supabase_config__', JSON.stringify({ url, key }));
+  },
+
+  clearConfig(){
+    local.del('__supabase_config__');
+    db.client = null;
+    db.status = 'disconnected';
+  },
+
+  async connect(url, key){
+    try{
+      if(!url || !key) throw new Error('URL and API key are required');
+      if(typeof supabase === 'undefined' || !supabase.createClient){
+        throw new Error('Supabase library not loaded. Check your internet connection and refresh.');
+      }
+      db.client = supabase.createClient(url, key);
+      // Test connection with a simple query
+      const { data, error } = await db.client.from('students').select('student_id').limit(1);
+      if(error) throw new Error(error.message);
+      db.status = 'connected';
+      db.lastError = '';
+      db.saveConfig(url, key);
+      return true;
+    }catch(e){
+      db.status = 'error';
+      db.lastError = e.message;
+      db.client = null;
+      return false;
+    }
+  },
+
+  async autoConnect(){
+    const cfg = db.getConfig();
+    if(!cfg) return false;
+    return db.connect(cfg.url, cfg.key);
+  },
+
+  isConnected(){ return db.status === 'connected' && db.client; },
+};
+
+// ── Field mapping: JS camelCase <-> SQL snake_case ──
+const FIELD_MAP = {
+  chineseName:'chinese_name', className:'class_name', subjectStrengths:'subject_strengths',
+  interestsChecked:'interests_checked', interestsFree:'interests_free',
+  teacherObs:'teacher_obs', accommodationNotes:'accommodation_notes',
+  attendancePattern:'attendance_pattern', attendanceNote:'attendance_note',
+  firstLanguage:'first_language', otherLanguages:'other_languages',
+  englishProficiency:'english_proficiency', chineseProficiency:'chinese_proficiency',
+  cefrLevel:'cefr_level', cambridgeExams:'cambridge_exams',
+  otherEnglishTests:'other_english_tests', familyContext:'family_context',
+  physicalMedicalNotes:'physical_medical_notes', supportNetwork:'support_network',
+  bestTimeOfDay:'best_time_of_day', communicationPreferences:'communication_preferences',
+  groupRoleTendency:'group_role_tendency', userId:'user_id',
+  createdAt:'created_at', updatedAt:'updated_at',
+};
+const FIELD_MAP_REV = {};
+Object.entries(FIELD_MAP).forEach(([js,sql])=>{ FIELD_MAP_REV[sql]=js; });
+
+function recToRow(rec){
+  const row = {};
+  Object.entries(rec).forEach(([k,v])=>{
+    const sqlKey = FIELD_MAP[k] || k;
+    // student internal id maps to student_id column
+    if(k === 'id'){ row.student_id = v; return; }
+    // Skip transient fields
+    if(k.startsWith('_')) return;
+    row[sqlKey] = v;
+  });
+  return row;
+}
+
+function rowToRec(row){
+  const rec = {};
+  Object.entries(row).forEach(([k,v])=>{
+    if(k === 'id') return; // UUID primary key, not needed in app
+    if(k === 'student_id'){ rec.id = v; return; }
+    const jsKey = FIELD_MAP_REV[k] || k;
+    rec[jsKey] = v;
+  });
+  return rec;
+}
+
+// ── Core data functions (Supabase + localStorage) ──
+
+async function loadAllStudentsAsync(){
+  if(db.isConnected()){
+    try{
+      const { data, error } = await db.client.from('students').select('*').order('updated_at', { ascending: false });
+      if(error) throw error;
+      const students = data.map(row => migrateStudent(rowToRec(row)));
+      // Mirror to localStorage cache
+      students.forEach(rec => local.set('student:'+rec.id, JSON.stringify(rec)));
+      return students;
+    }catch(e){
+      console.error('DB load failed, falling back to local:', e);
+    }
+  }
+  // Fallback to localStorage
+  return loadAllStudentsLocal();
+}
+
+function loadAllStudentsLocal(){
+  const out = [];
+  const keys = local.keys('student:');
+  for(const k of keys){
+    try{
+      const raw = local.get(k);
+      if(raw) out.push(migrateStudent(JSON.parse(raw)));
+    }catch(e){}
+  }
+  out.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  return out;
+}
+
+// Synchronous version for backward compatibility (uses cached local data)
+function loadAllStudents(){
+  return loadAllStudentsLocal();
+}
+
+async function saveStudentAsync(rec){
+  rec.updatedAt = Date.now();
+  // Always save to localStorage
+  try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){}
+
+  if(db.isConnected()){
+    try{
+      const row = recToRow(rec);
+      const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+      if(error) throw error;
+      return true;
+    }catch(e){
+      console.error('DB save failed (local saved):', e);
+      return true; // still saved locally
+    }
+  }
+  return true;
+}
+
+function saveStudent(rec){
+  rec.updatedAt = Date.now();
+  try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){ return false; }
+  // Fire-and-forget async DB save
+  if(db.isConnected()){
+    const row = recToRow(rec);
+    db.client.from('students').upsert(row, { onConflict: 'student_id' }).then(({error})=>{
+      if(error) console.error('DB sync error:', error.message);
+    });
+  }
+  return true;
+}
+
+async function deleteStudentAsync(id){
+  try{ local.del('student:'+id); }catch(e){}
+  if(db.isConnected()){
+    try{
+      await db.client.from('students').delete().eq('student_id', id);
+    }catch(e){ console.error('DB delete failed:', e); }
+  }
+}
+
+function deleteStudentRecord(id){
+  try{ local.del('student:'+id); }catch(e){}
+  if(db.isConnected()){
+    db.client.from('students').delete().eq('student_id', id).then(({error})=>{
+      if(error) console.error('DB delete sync error:', error.message);
+    });
+  }
+}
+
+// ── Class registry (Supabase + localStorage) ──
+
+async function saveClassEntryAsync(entry){
+  local.set('classreg:'+entry.classId, JSON.stringify(entry));
+  if(db.isConnected()){
+    try{
+      await db.client.from('classes').upsert({
+        class_id: entry.classId,
+        name: entry.name,
+        created_at: new Date(entry.createdAt || Date.now()).toISOString(),
+      }, { onConflict: 'class_id' });
+    }catch(e){ console.error('DB class save failed:', e); }
+  }
+}
+
+async function loadClassRegistryAsync(){
+  if(db.isConnected()){
+    try{
+      const { data, error } = await db.client.from('classes').select('*');
+      if(!error && data){
+        const out = {};
+        data.forEach(row => {
+          const entry = { classId: row.class_id, name: row.name, createdAt: new Date(row.created_at).getTime() };
+          out[entry.name] = entry;
+          local.set('classreg:'+entry.classId, JSON.stringify(entry));
+        });
+        return out;
+      }
+    }catch(e){ console.error('DB class load failed:', e); }
+  }
+  return loadClassRegistry();
+}
+
+// Sync all localStorage data up to Supabase
+async function syncLocalToDb(){
+  if(!db.isConnected()) return { synced: 0, errors: 0 };
+  let synced = 0, errors = 0;
+
+  // Sync students
+  const students = loadAllStudentsLocal();
+  for(const rec of students){
+    try{
+      const row = recToRow(rec);
+      const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+      if(error) throw error;
+      synced++;
+    }catch(e){ errors++; console.error('Sync error for', rec.name, e); }
+  }
+
+  // Sync classes
+  const classes = loadClassRegistry();
+  for(const entry of Object.values(classes)){
+    try{
+      await db.client.from('classes').upsert({
+        class_id: entry.classId, name: entry.name,
+        created_at: new Date(entry.createdAt || Date.now()).toISOString(),
+      }, { onConflict: 'class_id' });
+    }catch(e){ errors++; }
+  }
+
+  return { synced, errors };
+}
+
+// Pull all data from Supabase into localStorage
+async function syncDbToLocal(){
+  if(!db.isConnected()) return { pulled: 0, errors: 0 };
+  let pulled = 0, errors = 0;
+  try{
+    const { data, error } = await db.client.from('students').select('*');
+    if(error) throw error;
+    data.forEach(row => {
+      const rec = migrateStudent(rowToRec(row));
+      local.set('student:'+rec.id, JSON.stringify(rec));
+      pulled++;
+    });
+  }catch(e){ errors++; }
+  try{
+    const { data, error } = await db.client.from('classes').select('*');
+    if(!error && data){
+      data.forEach(row => {
+        const entry = { classId: row.class_id, name: row.name, createdAt: new Date(row.created_at).getTime() };
+        local.set('classreg:'+entry.classId, JSON.stringify(entry));
+      });
+    }
+  }catch(e){ errors++; }
+  return { pulled, errors };
+}
 
 function loadAllStudents(){
   const out = [];
@@ -1155,7 +1510,6 @@ function migrateStudent(rec){
   if(rec.likes === undefined) rec.likes = '';
   if(rec.dislikes === undefined) rec.dislikes = '';
   if(!rec.posts) rec.posts = [];
-  // Tier 1: Learning Access
   if(!rec.accommodations) rec.accommodations = [];
   if(rec.accommodationNotes === undefined) rec.accommodationNotes = '';
   if(rec.attendancePattern === undefined) rec.attendancePattern = '';
@@ -1169,13 +1523,72 @@ function migrateStudent(rec){
   if(!rec.otherEnglishTests) rec.otherEnglishTests = [];
   if(rec.familyContext === undefined) rec.familyContext = '';
   if(rec.physicalMedicalNotes === undefined) rec.physicalMedicalNotes = '';
-  // Tier 2: Communication & Context
   if(rec.supportNetwork === undefined) rec.supportNetwork = '';
   if(rec.bestTimeOfDay === undefined) rec.bestTimeOfDay = '';
   if(!rec.communicationPreferences) rec.communicationPreferences = [];
   if(rec.groupRoleTendency === undefined) rec.groupRoleTendency = '';
   if(rec.goal === undefined) rec.goal = '';
+  // Identity & credentials
+  if(rec.chineseName === undefined) rec.chineseName = '';
+  if(!rec.userId) rec.userId = generateUserId();
+  if(!rec.password) rec.password = generatePassword();
   return rec;
+}
+
+// ── ID & Password Generation ──
+
+function generateUserId(){
+  // Readable, no ambiguous chars (I/O/0/1)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = 'STU-';
+  for(let i=0;i<5;i++) id += chars[Math.floor(Math.random()*chars.length)];
+  return id;
+}
+
+function generatePassword(){
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let pw = '';
+  for(let i=0;i<8;i++) pw += chars[Math.floor(Math.random()*chars.length)];
+  return pw;
+}
+
+function generateClassId(className){
+  const slug = (className||'class').replace(/[^a-zA-Z0-9]/g,'').substring(0,8).toUpperCase();
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for(let i=0;i<4;i++) suffix += chars[Math.floor(Math.random()*chars.length)];
+  return 'CLS-' + slug + '-' + suffix;
+}
+
+// ── Class Registry ──
+// Classes are first-class entities with unique IDs, stored as classreg:<classId>
+
+function loadClassRegistry(){
+  const out = {};
+  const keys = storage.keys('classreg:');
+  for(const k of keys){
+    try{
+      const raw = storage.get(k);
+      if(raw){ const cls = JSON.parse(raw); out[cls.name] = cls; }
+    }catch(e){}
+  }
+  return out;
+}
+
+function getOrCreateClassEntry(className){
+  if(!className || !className.trim()) return null;
+  className = className.trim();
+  const registry = loadClassRegistry();
+  if(registry[className]) return registry[className];
+  const entry = { classId: generateClassId(className), name: className, createdAt: Date.now() };
+  storage.set('classreg:' + entry.classId, JSON.stringify(entry));
+  return entry;
+}
+
+function getClassEntry(className){
+  if(!className || !className.trim()) return null;
+  const registry = loadClassRegistry();
+  return registry[className.trim()] || null;
 }
 
 function saveStudent(rec){
@@ -1260,7 +1673,8 @@ function suggestLevel(age){
 }
 
 function newDraft(){
-  return { id:uid(), name:'', age:'', birthdate:'', level:null, className:'', notes:'',
+  return { id:uid(), name:'', chineseName:'', age:'', birthdate:'', level:null, className:'', notes:'',
+    userId: generateUserId(), password: generatePassword(),
     subjectStrengths:[], likes:'', dislikes:'', posts:[],
     accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
     firstLanguage:'', otherLanguages:'', englishProficiency:'', chineseProficiency:'',
@@ -1278,16 +1692,23 @@ function getAllClassNames(){
   return Array.from(set).sort((a,b) => a.localeCompare(b));
 }
 
-function init(){
-  state.students = loadAllStudents();
+async function init(){
+  // Try to auto-connect to Supabase if previously configured
+  await db.autoConnect();
+
+  // Load students (from DB if connected, localStorage otherwise)
+  if(db.isConnected()){
+    state.students = await loadAllStudentsAsync();
+  } else {
+    state.students = loadAllStudentsLocal();
+  }
   state.view = 'dashboard';
   render();
 
-  // Event delegation: clicking a .sb-head toggles its parent .section-block between collapsed/expanded
+  // Event delegation for collapsible sections
   document.getElementById('app').addEventListener('click', function(e){
     const head = e.target.closest('.section-block > .sb-head');
     if(!head) return;
-    // Don't toggle if the click was on an interactive element inside the header (e.g. a zone-pill link)
     if(e.target.closest('a, button, select, input, textarea')) return;
     const block = head.parentElement;
     if(block && block.classList.contains('section-block')){
@@ -1314,6 +1735,9 @@ function render(opts){
   else if(state.view === 'compare') body = renderCompare();
   else if(state.view === 'grouping') body = renderGrouping();
   else if(state.view === 'data') body = renderData();
+  else if(state.view === 'bulkImport') body = renderBulkImport();
+  else if(state.view === 'classCredentials') body = renderClassCredentials();
+  else if(state.view === 'dbSettings') body = renderDbSettings();
 
   app.innerHTML = `
     ${state.view !== 'loading' ? renderTopbar() : ''}
@@ -1323,7 +1747,13 @@ function render(opts){
 }
 
 function renderTopbar(){
+  const dbClass = db.isConnected() ? 'connected' : db.status === 'error' ? 'error' : 'disconnected';
+  const dbLabel = db.isConnected() ? 'Database connected' : db.status === 'error' ? 'Connection error' : 'Local only';
   return `
+  <div class="db-banner ${dbClass} no-print">
+    <div class="db-status"><span class="db-dot"></span>${dbLabel}</div>
+    <a onclick="App.goDbSettings()">${db.isConnected() ? 'Settings' : 'Connect database'}</a>
+  </div>
   <div class="topbar">
     <div class="wrap topbar-inner">
       <div class="brand" onclick="App.goDashboard()">
@@ -1366,7 +1796,10 @@ function renderDashboard(){
         <h1 style="font-size:24px;">Student Records</h1>
         <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} record${students.length===1?'':'s'} across ${classNames.length} class${classNames.length===1?'':'es'}${groups.__unassigned__ ? ' + unassigned' : ''}</p>
       </div>
-      <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
+        <button class="btn btn-ghost" onclick="App.openBulkImport()">📋 Bulk Import Class</button>
+      </div>
     </div>
     ${students.length === 0 ? `
       <div class="empty-state card">
@@ -1412,7 +1845,7 @@ function renderRecordCard(rec){
   <div class="record-card" style="border-left-color:${lvl.color};">
     <div class="record-tab" style="background:${lvl.light};color:${lvl.color};">${initials}</div>
     <div class="record-info" onclick="App.openReport('${rec.id}')">
-      <div class="record-name">${escapeHtml(rec.name)}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
+      <div class="record-name">${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="color:var(--ink-faint);font-weight:400;">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
       <div class="record-meta">${lvl.label} · Age ${escapeHtml(String(rec.age||'?'))} · Updated ${date}</div>
     </div>
     <div class="record-zones" onclick="App.openReport('${rec.id}')" title="Section zones">
@@ -1468,9 +1901,16 @@ function renderNewInfo(){
     ${storageWarn}
 
     <div class="field-group">
-      <label class="field-label" for="f-name">Student name</label>
-      <input type="text" id="f-name" value="${escapeHtml(d.name)}" placeholder="Enter full name"
+      <label class="field-label" for="f-name">English name</label>
+      <input type="text" id="f-name" value="${escapeHtml(d.name)}" placeholder="Enter full English name"
         oninput="App.updateDraftName(this.value)"
+        autocomplete="off">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="f-cname">Chinese name <span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(optional)</span></label>
+      <input type="text" id="f-cname" value="${escapeHtml(d.chineseName||'')}" placeholder="中文名"
+        oninput="App.updateDraftChineseName(this.value)"
         autocomplete="off">
     </div>
 
@@ -1687,7 +2127,7 @@ function renderReport(){
 
     <div class="report-header">
       <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}</div>
-      <h1 class="report-title">Learner Profile — ${escapeHtml(rec.name)}</h1>
+      <h1 class="report-title">Learner Profile — ${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="font-weight:400;color:var(--ink-soft);">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}</h1>
       <div class="report-meta">${(function(){
         const parts = [];
         const ageFromBirth = computeAge(rec.birthdate);
@@ -1695,6 +2135,7 @@ function renderReport(){
         else if(rec.age) parts.push('Age ' + escapeHtml(String(rec.age)));
         parts.push('Assessed ' + date);
         if(rec.className) parts.push('Class: ' + escapeHtml(rec.className));
+        parts.push('<span class="mono" style="color:var(--accent);">ID: ' + escapeHtml(rec.userId) + '</span>');
         return parts.join(' · ');
       })()}</div>
     </div>
@@ -1714,6 +2155,19 @@ function renderReport(){
         <label for="rp-birthdate">Birthdate ${rec.birthdate && computeAge(rec.birthdate)!==null ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(age ' + computeAge(rec.birthdate) + ')</span>' : ''}</label>
         <input type="date" id="rp-birthdate" value="${escapeHtml(rec.birthdate||'')}"
           oninput="App.updateStudentBirthdate(this.value)">
+      </div>
+      <div class="student-meta-field">
+        <label for="rp-cname">Chinese name</label>
+        <input type="text" id="rp-cname" value="${escapeHtml(rec.chineseName||'')}" placeholder="中文名"
+          oninput="App.updateStudentChineseName(this.value)">
+      </div>
+      <div class="student-meta-field">
+        <label>User ID &amp; Password</label>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" value="${escapeHtml(rec.userId||'')}" style="flex:1;font-family:ui-monospace,monospace;font-size:13px;letter-spacing:0.5px;" oninput="App.updateStudentUserId(this.value)">
+          <input type="text" value="${escapeHtml(rec.password||'')}" style="flex:1;font-family:ui-monospace,monospace;font-size:13px;" oninput="App.updateStudentPassword(this.value)">
+          <button class="btn btn-ghost btn-sm" onclick="App.regenerateCredentials('${rec.id}')" title="Generate new random credentials" style="white-space:nowrap;padding:6px 8px;">🔄</button>
+        </div>
       </div>
     </div>
 
@@ -2531,12 +2985,13 @@ function renderClassOverview(){
     <div style="margin-bottom:20px;">
       <div class="report-eyebrow">Class Overview</div>
       <h1 style="font-size:26px;font-family:Georgia,serif;">${escapeHtml(className)}</h1>
-      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} student${students.length===1?'':'s'}</div>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} student${students.length===1?'':'s'}${(function(){ const ce = getOrCreateClassEntry(className); return ce ? ' · Class ID: <span class="mono" style="color:var(--accent);font-weight:600;">' + escapeHtml(ce.classId) + '</span>' : ''; })()}</div>
     </div>
 
     <div class="class-actions-bar no-print">
       <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
+      <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>
       <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
@@ -3091,6 +3546,209 @@ function renderData(){
    RESEARCH & METHODOLOGY PAGE
    ══════════════════════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════════════════════
+   BULK IMPORT
+   ══════════════════════════════════════════════════════════════ */
+
+function renderBulkImport(){
+  const preview = state.bulkPreview;
+  const allClasses = getAllClassNames();
+  return `
+  <div class="wrap-narrow">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <h1 style="font-size:22px;margin-bottom:6px;">Bulk Import Students</h1>
+    <p style="color:var(--ink-faint);font-size:13px;margin-bottom:24px;line-height:1.6;">Add a whole class at once. Each student will get an auto-generated User ID and password. You can adjust them individually later.</p>
+
+    <div class="field-group">
+      <label class="field-label">Class name</label>
+      <input type="text" list="bulk-class-suggestions" value="${escapeHtml(state.bulkClassName||'')}" placeholder="e.g. Class 8B"
+        oninput="App.updateBulkClassName(this.value)" autocomplete="off">
+      <datalist id="bulk-class-suggestions">
+        ${allClasses.map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}
+      </datalist>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Assessment level</label>
+      <div class="level-options">
+        ${Object.values(LEVEL_META).map(lvl => `
+          <div class="level-opt ${state.bulkLevel===lvl.key?'selected':''}"
+               style="${state.bulkLevel===lvl.key ? `border-color:${lvl.color};background:${lvl.light};` : ''}"
+               onclick="App.updateBulkLevel('${lvl.key}')">
+            <div class="lo-label" style="color:${state.bulkLevel===lvl.key?lvl.color:'var(--ink)'};">${lvl.label}</div>
+            <div class="lo-grades">${lvl.grades}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Student names <span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(one per line)</span></label>
+      <p style="font-size:12px;color:var(--ink-faint);margin:0 0 8px;line-height:1.5;">Paste names from a spreadsheet or type them. Formats accepted:<br>
+        <strong>English Name</strong> (one column)<br>
+        <strong>English Name, Chinese Name</strong> (comma or tab separated)</p>
+      <textarea style="min-height:200px;font-size:14px;line-height:1.8;" placeholder="e.g.
+Amy Zhang, 张小明
+Ben Li, 李明
+Cara Wang
+Dan Chen, 陈大伟"
+        oninput="App.updateBulkText(this.value)">${escapeHtml(state.bulkText||'')}</textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="App.previewBulkImport()">Preview import</button>
+      <div class="file-input-wrap" style="padding:10px;margin:0;flex:1;min-width:200px;">
+        <input type="file" accept=".csv,.tsv,.txt" onchange="App.handleBulkFile(this)" style="font-size:12px;">
+      </div>
+    </div>
+
+    ${preview ? `
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="font-size:15px;margin-bottom:12px;">Preview: ${preview.length} student${preview.length===1?'':'s'} to add</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">#</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">English Name</th>
+            <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">Chinese Name</th>
+          </tr></thead>
+          <tbody>
+            ${preview.map((p,i) => `<tr><td style="padding:5px 8px;border-bottom:1px solid var(--rule-soft);color:var(--ink-faint);">${i+1}</td><td style="padding:5px 8px;border-bottom:1px solid var(--rule-soft);font-weight:500;">${escapeHtml(p.name)}</td><td style="padding:5px 8px;border-bottom:1px solid var(--rule-soft);">${escapeHtml(p.chineseName||'—')}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:16px;display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="App.confirmBulkImport()">Import ${preview.length} student${preview.length===1?'':'s'}</button>
+          <button class="btn btn-ghost" onclick="App.goDashboard()">Cancel</button>
+        </div>
+      </div>
+    ` : ''}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CLASS CREDENTIALS VIEW (printable)
+   ══════════════════════════════════════════════════════════════ */
+
+function renderClassCredentials(){
+  const className = state.activeClassName;
+  const students = studentsInClass(className).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const classEntry = getOrCreateClassEntry(className);
+
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.openClassOverview('${escapeAttr(className)}')" style="margin-bottom:18px;">← Back to ${escapeHtml(className)}</button>
+
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Student Credentials</div>
+      <h1 style="font-size:24px;font-family:Georgia,serif;">${escapeHtml(className)}</h1>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">
+        ${students.length} student${students.length===1?'':'s'}
+        ${classEntry ? ' · Class ID: <span class="mono" style="color:var(--accent);font-weight:700;">' + escapeHtml(classEntry.classId) + '</span>' : ''}
+      </div>
+    </div>
+
+    <div class="info-callout no-print" style="background:var(--yellow-bg);border-color:var(--yellow-border);color:var(--ink);margin-bottom:20px;">
+      <strong style="color:var(--yellow);">Privacy notice</strong>
+      This page contains student credentials. Print or export it only for distribution to students. Store printed copies securely and do not leave them visible.
+    </div>
+
+    <div class="card" style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">#</th>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">English Name</th>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">Chinese Name</th>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">User ID</th>
+            <th style="text-align:left;padding:8px 10px;border-bottom:2px solid var(--rule);font-size:11px;text-transform:uppercase;color:var(--ink-faint);">Password</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${students.map((s,i) => `
+            <tr>
+              <td style="padding:8px 10px;border-bottom:1px solid var(--rule-soft);color:var(--ink-faint);">${i+1}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid var(--rule-soft);font-weight:500;">${escapeHtml(s.name||'—')}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid var(--rule-soft);">${escapeHtml(s.chineseName||'—')}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid var(--rule-soft);font-family:ui-monospace,monospace;font-weight:600;color:var(--accent);letter-spacing:0.5px;">${escapeHtml(s.userId||'—')}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid var(--rule-soft);font-family:ui-monospace,monospace;">${escapeHtml(s.password||'—')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;font-size:12px;color:var(--ink-faint);">
+      ${classEntry ? '<strong>Class ID:</strong> <span class="mono">' + escapeHtml(classEntry.classId) + '</span> — use this ID to reference this class from other apps in your network.' : ''}
+    </div>
+
+    <div class="action-row no-print">
+      <button class="btn btn-primary" onclick="window.print()">Print Credentials</button>
+      <button class="btn btn-ghost" onclick="App.exportClassCredentialsCSV('${escapeAttr(className)}')">📊 Download as CSV</button>
+    </div>
+  </div>`;
+}
+
+function renderDbSettings(){
+  const cfg = db.getConfig();
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <div style="margin-bottom:20px;">
+      <div class="report-eyebrow">Settings</div>
+      <h1 style="font-size:24px;font-family:Georgia,serif;">Database Connection</h1>
+      <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;max-width:640px;line-height:1.6;">Connect to a Supabase database so your records are stored in the cloud, accessible from any device, and available to other apps in your network via the Class ID and Student User ID.</p>
+    </div>
+
+    <div class="data-section db-config-section">
+      <h2>Connection status: <span style="color:${db.isConnected()?'var(--green)':db.status==='error'?'var(--red)':'var(--yellow)'};">${db.isConnected()?'✓ Connected':db.status==='error'?'✗ Error':'○ Not connected'}</span></h2>
+      ${db.lastError ? `<p style="color:var(--red);font-size:13px;">Error: ${escapeHtml(db.lastError)}</p>` : ''}
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">Enter your Supabase project URL and anon (public) API key. You can find these in your Supabase dashboard under Settings → API.</p>
+
+      <div class="field-group">
+        <label class="field-label">Supabase Project URL</label>
+        <input type="url" id="db-url" value="${escapeHtml(cfg ? cfg.url : '')}" placeholder="https://your-project.supabase.co">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Anon / Public API Key</label>
+        <input type="text" id="db-key" value="${escapeHtml(cfg ? cfg.key : '')}" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="App.connectDb()">Connect</button>
+        ${db.isConnected() ? `<button class="btn btn-ghost" onclick="App.disconnectDb()">Disconnect</button>` : ''}
+      </div>
+    </div>
+
+    ${db.isConnected() ? `
+      <div class="data-section db-config-section">
+        <h2>Sync data</h2>
+        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">Push all your local records to the database, or pull the latest from the database to this device.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="App.syncPush()">⬆ Push local → database</button>
+          <button class="btn btn-ghost" onclick="App.syncPull()">⬇ Pull database → local</button>
+        </div>
+        <div id="sync-log" class="sync-log" style="display:none;"></div>
+      </div>
+    ` : ''}
+
+    <div class="data-section db-config-section" style="margin-top:20px;">
+      <h2>Setup instructions</h2>
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">If you don't have a Supabase project yet:</p>
+      <ol style="font-size:13px;color:var(--ink-soft);line-height:2;">
+        <li>Go to <a href="https://supabase.com" target="_blank" style="color:var(--accent);">supabase.com</a> and create a free account</li>
+        <li>Create a new project (any name, pick a strong database password, choose a region near you)</li>
+        <li>Wait ~2 minutes for the project to set up</li>
+        <li>Go to <strong>SQL Editor</strong> in the left sidebar</li>
+        <li>Paste the database schema (download below) and click <strong>Run</strong></li>
+        <li>Go to <strong>Settings → API</strong> and copy your <strong>Project URL</strong> and <strong>anon public</strong> key</li>
+        <li>Paste them into the fields above and click <strong>Connect</strong></li>
+      </ol>
+      <button class="btn btn-ghost" onclick="App.downloadSchema()">💾 Download database schema (SQL)</button>
+    </div>
+  </div>`;
+}
+
+// Restore renderResearch properly
 function renderResearch(){
   return `
   <div class="wrap">
@@ -3140,6 +3798,61 @@ const App = {
   goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null; render(); },
   goResearch(){ state.view='research'; render(); },
 
+  goDbSettings(){ state.view='dbSettings'; render(); },
+
+  async connectDb(){
+    const urlEl = document.getElementById('db-url');
+    const keyEl = document.getElementById('db-key');
+    if(!urlEl || !keyEl) return;
+    const url = urlEl.value.trim();
+    const key = keyEl.value.trim();
+    if(!url || !key){ alert('Please enter both the Supabase URL and API key.'); return; }
+    const ok = await db.connect(url, key);
+    if(ok){
+      alert('Connected successfully! Your data will now sync to the database.');
+      // Auto-push local data to DB on first connect
+      await syncLocalToDb();
+      state.students = await loadAllStudentsAsync();
+    } else {
+      alert('Connection failed: ' + db.lastError);
+    }
+    render();
+  },
+
+  disconnectDb(){
+    if(!confirm('Disconnect from the database? Your local data will be kept, but changes won\'t sync until you reconnect.')) return;
+    db.clearConfig();
+    render();
+  },
+
+  async syncPush(){
+    const log = document.getElementById('sync-log');
+    if(log){ log.style.display='block'; log.textContent='Pushing local data to database...\n'; }
+    const result = await syncLocalToDb();
+    if(log) log.textContent += `Done. Synced ${result.synced} records, ${result.errors} errors.\n`;
+    alert(`Push complete: ${result.synced} records synced${result.errors ? ', ' + result.errors + ' errors' : ''}.`);
+  },
+
+  async syncPull(){
+    const log = document.getElementById('sync-log');
+    if(log){ log.style.display='block'; log.textContent='Pulling data from database...\n'; }
+    const result = await syncDbToLocal();
+    state.students = loadAllStudentsLocal();
+    if(log) log.textContent += `Done. Pulled ${result.pulled} records, ${result.errors} errors.\n`;
+    alert(`Pull complete: ${result.pulled} records downloaded${result.errors ? ', ' + result.errors + ' errors' : ''}.`);
+    render();
+  },
+
+  downloadSchema(){
+    const schema = `-- Learner Profile System Database Schema\n-- Run this in Supabase SQL Editor\n\nCREATE TABLE IF NOT EXISTS classes (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  class_id TEXT UNIQUE NOT NULL,\n  name TEXT NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE TABLE IF NOT EXISTS students (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  student_id TEXT UNIQUE NOT NULL,\n  user_id TEXT UNIQUE NOT NULL,\n  password TEXT NOT NULL DEFAULT '',\n  name TEXT NOT NULL DEFAULT '',\n  chinese_name TEXT DEFAULT '',\n  age TEXT DEFAULT '',\n  birthdate TEXT DEFAULT '',\n  class_name TEXT DEFAULT '',\n  level TEXT NOT NULL DEFAULT 'junior',\n  goal TEXT DEFAULT '',\n  notes TEXT DEFAULT '',\n  likes TEXT DEFAULT '',\n  dislikes TEXT DEFAULT '',\n  subject_strengths JSONB DEFAULT '[]'::jsonb,\n  posts JSONB DEFAULT '[]'::jsonb,\n  answers JSONB DEFAULT '{}'::jsonb,\n  interests_checked JSONB DEFAULT '[]'::jsonb,\n  interests_free TEXT DEFAULT '',\n  teacher_obs JSONB DEFAULT '{}',\n  history JSONB DEFAULT '[]'::jsonb,\n  accommodations JSONB DEFAULT '[]'::jsonb,\n  accommodation_notes TEXT DEFAULT '',\n  attendance_pattern TEXT DEFAULT '',\n  attendance_note TEXT DEFAULT '',\n  first_language TEXT DEFAULT '',\n  other_languages TEXT DEFAULT '',\n  english_proficiency TEXT DEFAULT '',\n  chinese_proficiency TEXT DEFAULT '',\n  cefr_level TEXT DEFAULT '',\n  cambridge_exams JSONB DEFAULT '[]'::jsonb,\n  other_english_tests JSONB DEFAULT '[]'::jsonb,\n  family_context TEXT DEFAULT '',\n  physical_medical_notes TEXT DEFAULT '',\n  support_network TEXT DEFAULT '',\n  best_time_of_day TEXT DEFAULT '',\n  communication_preferences JSONB DEFAULT '[]'::jsonb,\n  group_role_tendency TEXT DEFAULT '',\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE INDEX IF NOT EXISTS idx_students_class ON students (class_name);\nCREATE INDEX IF NOT EXISTS idx_students_user_id ON students (user_id);\n\nCREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN NEW.updated_at = NOW(); RETURN NEW; END;\n$$ LANGUAGE plpgsql;\n\nDROP TRIGGER IF EXISTS students_updated_at ON students;\nCREATE TRIGGER students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\nALTER TABLE students ENABLE ROW LEVEL SECURITY;\nALTER TABLE classes ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow all" ON students FOR ALL USING (true) WITH CHECK (true);\nCREATE POLICY "Allow all" ON classes FOR ALL USING (true) WITH CHECK (true);\n`;
+    const blob = new Blob([schema], { type: 'text/sql;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'learner-profile-schema.sql';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
   collapseAllSections(){
     document.querySelectorAll('.section-block').forEach(el => el.classList.add('collapsed'));
   },
@@ -3157,6 +3870,9 @@ const App = {
   updateDraftName(val){
     state.draft.name = val;
     App._syncBeginButton();
+  },
+  updateDraftChineseName(val){
+    state.draft.chineseName = val;
   },
   updateDraftAge(val){
     state.draft.age = val;
@@ -3300,6 +4016,9 @@ const App = {
       if(existingIdx>=0) state.students[existingIdx]=rec; else state.students.unshift(rec);
       state.activeId = rec.id;
     }
+    // Ensure class registry entry exists
+    const finalRec = state.students.find(s=>s.id===state.activeId);
+    if(finalRec && finalRec.className) getOrCreateClassEntry(finalRec.className);
     state.view='report'; state.draft=null;
     render();
   },
@@ -3335,6 +4054,116 @@ const App = {
       metaEl.setAttribute('data-base', base);
       metaEl.innerText = base + (trimmed ? ' · Class: ' + trimmed : '');
     }
+  },
+
+  updateStudentChineseName(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.chineseName = val;
+    saveStudent(rec);
+  },
+
+  updateStudentUserId(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.userId = val;
+    saveStudent(rec);
+  },
+
+  updateStudentPassword(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.password = val;
+    saveStudent(rec);
+  },
+
+  regenerateCredentials(id){
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    rec.userId = generateUserId();
+    rec.password = generatePassword();
+    saveStudent(rec);
+    render({preserveScroll:true});
+  },
+
+  openBulkImport(){
+    state.bulkClassName = '';
+    state.bulkLevel = 'junior';
+    state.bulkText = '';
+    state.bulkPreview = null;
+    state.view = 'bulkImport';
+    render();
+  },
+
+  updateBulkClassName(val){ state.bulkClassName = val; },
+  updateBulkLevel(val){ state.bulkLevel = val; },
+  updateBulkText(val){ state.bulkText = val; },
+
+  previewBulkImport(){
+    const text = state.bulkText || '';
+    const lines = text.split('\n').map(l=>l.trim()).filter(l=>l);
+    const parsed = lines.map(line => {
+      // Support: "English Name\tChinese Name" or "English Name, Chinese Name" or just "English Name"
+      let parts;
+      if(line.indexOf('\t') >= 0) parts = line.split('\t');
+      else if(line.indexOf(',') >= 0) parts = line.split(',');
+      else parts = [line];
+      return { name: (parts[0]||'').trim(), chineseName: (parts[1]||'').trim() };
+    }).filter(p => p.name);
+    state.bulkPreview = parsed;
+    render();
+  },
+
+  confirmBulkImport(){
+    const preview = state.bulkPreview;
+    if(!preview || !preview.length) return;
+    const className = (state.bulkClassName||'').trim();
+    const level = state.bulkLevel || 'junior';
+    // Ensure class entry exists
+    if(className) getOrCreateClassEntry(className);
+    let added = 0;
+    preview.forEach(p => {
+      const rec = {
+        id: uid(),
+        name: p.name,
+        chineseName: p.chineseName || '',
+        age: '', birthdate: '', level: level,
+        className: className, notes: '', goal: '',
+        userId: generateUserId(), password: generatePassword(),
+        subjectStrengths:[], likes:'', dislikes:'', posts:[],
+        accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
+        firstLanguage:'', otherLanguages:'', englishProficiency:'', chineseProficiency:'',
+        cefrLevel:'', cambridgeExams:[], otherEnglishTests:[],
+        familyContext:'', physicalMedicalNotes:'',
+        supportNetwork:'', bestTimeOfDay:'', communicationPreferences:[], groupRoleTendency:'',
+        answers:{}, interestsChecked:[], interestsFree:'',
+        teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' },
+        history:[], createdAt: Date.now(), updatedAt: Date.now(),
+      };
+      if(saveStudent(rec)){
+        state.students.unshift(rec);
+        added++;
+      }
+    });
+    alert(`Added ${added} student${added===1?'':'s'} to ${className || 'Unassigned'}.`);
+    App.goDashboard();
+  },
+
+  handleBulkFile(input){
+    const file = input.files && input.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      state.bulkText = e.target.result;
+      App.previewBulkImport();
+    };
+    reader.readAsText(file);
+  },
+
+  openClassCredentials(className){
+    state.activeClassName = className;
+    state.view = 'classCredentials';
+    render();
   },
 
   updateStudentNotes(val){
@@ -3742,14 +4571,43 @@ const App = {
   exportAIAnalysis(id){
     const rec = state.students.find(s=>s.id===id);
     if(!rec) return;
-    const md = buildAIAnalysisDoc(rec);
-    const blob = new Blob([md], { type:'text/markdown;charset=utf-8;' });
+    // Store the generated doc for download/copy
+    state._aiExportDoc = buildAIAnalysisDoc(rec);
+    state._aiExportName = (rec.name||'student').replace(/[^a-zA-Z0-9]/g,'-');
+    // Show the instruction modal
+    showAIExportModal();
+  },
+
+  doAIExportDownload(){
+    if(!state._aiExportDoc) return;
+    const blob = new Blob([state._aiExportDoc], { type:'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `AI-Analysis-${(rec.name||'student').replace(/[^a-zA-Z0-9]/g,'-')}.md`;
+    a.download = `AI-Analysis-${state._aiExportName}.md`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  },
+
+  doAIExportCopy(){
+    if(!state._aiExportDoc) return;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(state._aiExportDoc).then(()=>{
+        const badge = document.getElementById('copy-badge');
+        if(badge) badge.innerHTML = '<span class="copy-success">✓ Copied!</span>';
+        setTimeout(()=>{ if(badge) badge.innerHTML = ''; }, 3000);
+      }).catch(()=>{
+        // Fallback
+        fallbackCopy(state._aiExportDoc);
+      });
+    } else {
+      fallbackCopy(state._aiExportDoc);
+    }
+  },
+
+  closeAIExportModal(){
+    const overlay = document.getElementById('ai-export-modal');
+    if(overlay) overlay.remove();
   },
 
   /* ── CSV Export ── */
@@ -3771,6 +4629,19 @@ const App = {
     if(!state.students.length){ alert('No student records to export.'); return; }
     const csv = buildStudentCSV(state.students);
     downloadCSV(csv, `all-learner-profiles-${new Date().toISOString().slice(0,10)}.csv`);
+  },
+
+  exportClassCredentialsCSV(className){
+    const students = studentsInClass(className).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    if(!students.length) return;
+    const classEntry = getClassEntry(className);
+    const headers = ['#','English Name','Chinese Name','User ID','Password','Class','Class ID'];
+    const rows = students.map((s,i) => [
+      i+1, s.name||'', s.chineseName||'', s.userId||'', s.password||'',
+      className, classEntry ? classEntry.classId : ''
+    ].map(csvEscape).join(','));
+    const csv = headers.map(csvEscape).join(',') + '\n' + rows.join('\n');
+    downloadCSV(csv, `credentials-${(className||'class').replace(/[^a-zA-Z0-9]/g,'-')}.csv`);
   },
 
   /* ── Export / Import ── */
@@ -4395,6 +5266,90 @@ function escapeHtml(str){
   return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function escapeAttr(str){ return String(str||'').replace(/'/g, "\\'"); }
+
+function showAIExportModal(){
+  // Remove any existing modal
+  const existing = document.getElementById('ai-export-modal');
+  if(existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ai-export-modal';
+  overlay.className = 'modal-overlay';
+  overlay.onclick = function(e){ if(e.target === overlay) App.closeAIExportModal(); };
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <h2>🤖 AI Analysis Export</h2>
+      <p class="modal-sub">Get personalised teaching advice for this student from any AI assistant. Follow these simple steps:</p>
+
+      <div class="modal-step">
+        <div class="modal-step-num">1</div>
+        <div class="modal-step-body">
+          <strong>Get the student's profile</strong>
+          <p>Choose one of these options — both give the AI the same information:</p>
+          <div class="modal-links">
+            <a onclick="App.doAIExportCopy()">📋 Copy to clipboard</a>
+            <a onclick="App.doAIExportDownload()">💾 Download as file</a>
+            <span id="copy-badge"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="modal-step-num">2</div>
+        <div class="modal-step-body">
+          <strong>Open any AI assistant</strong>
+          <p>Open a new chat in whichever AI you prefer:</p>
+          <div class="modal-links">
+            <a href="https://chat.openai.com" target="_blank">ChatGPT ↗</a>
+            <a href="https://claude.ai" target="_blank">Claude ↗</a>
+            <a href="https://gemini.google.com" target="_blank">Gemini ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="modal-step-num">3</div>
+        <div class="modal-step-body">
+          <strong>Paste and send</strong>
+          <p>If you copied to clipboard: press <strong>Ctrl+V</strong> (or <strong>Cmd+V</strong> on Mac) into the chat box, then press Enter.</p>
+          <p style="margin-top:6px;">If you downloaded the file: drag the <strong>.md file</strong> into the chat window, or use the attachment/upload button.</p>
+        </div>
+      </div>
+
+      <div class="modal-step">
+        <div class="modal-step-num">4</div>
+        <div class="modal-step-body">
+          <strong>That's it — the AI will guide you from here</strong>
+          <p>It will ask you to confirm a disclaimer, then ask what subject and topic you're teaching, and then ask how it can help. Just answer naturally.</p>
+        </div>
+      </div>
+
+      <div class="modal-tip">
+        💡 <strong>Tip:</strong> You don't need to type any special prompt or instructions — everything the AI needs is already included in the file. Just paste and send.
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="App.closeAIExportModal()">Close</button>
+        <button class="btn btn-primary" onclick="App.doAIExportCopy(); App.closeAIExportModal();" style="background:#1a7f64;">📋 Copy &amp; Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e){}
+  document.body.removeChild(ta);
+  const badge = document.getElementById('copy-badge');
+  if(badge) badge.innerHTML = '<span class="copy-success">✓ Copied!</span>';
+  setTimeout(()=>{ if(badge) badge.innerHTML = ''; }, 3000);
+}
 
 init();
 })();
