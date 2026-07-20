@@ -748,6 +748,39 @@
   .db-banner.disconnected .db-dot { background: var(--yellow); }
   .db-banner.error .db-dot { background: var(--red); }
   .db-banner a { color: inherit; text-decoration: underline; cursor: pointer; font-weight: 500; }
+
+  /* ── Auth screens ── */
+  .auth-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px; background: var(--paper);
+  }
+  .auth-card {
+    background: var(--paper-raised); border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    padding: 40px 36px; width: 100%; max-width: 400px;
+  }
+  .auth-card h1 { font-family: Georgia, serif; font-size: 22px; margin: 0 0 4px; text-align: center; }
+  .auth-card .auth-sub { font-size: 13px; color: var(--ink-faint); text-align: center; margin-bottom: 28px; }
+  .auth-card .field-group { margin-bottom: 16px; }
+  .auth-card input[type=email], .auth-card input[type=password], .auth-card input[type=text] {
+    width: 100%; padding: 12px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
+    font-size: 15px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; box-sizing: border-box;
+  }
+  .auth-card input:focus { border-color: var(--accent); }
+  .auth-card .btn-block { width: 100%; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: var(--ink-faint); }
+  .auth-toggle a { color: var(--accent); cursor: pointer; font-weight: 600; text-decoration: none; }
+  .auth-error { background: var(--red-bg); color: var(--red); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .auth-brand { text-align: center; margin-bottom: 24px; }
+  .auth-brand .brand-mark { font-family: Georgia, serif; font-weight: 700; font-size: 24px; color: var(--accent); }
+  .auth-brand .brand-sub { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--ink-faint); display: block; margin-top: 2px; }
+  .user-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 14px; background: var(--accent-light);
+    font-size: 11.5px; color: var(--accent); font-weight: 600;
+  }
+  .user-pill a { color: var(--ink-faint); cursor: pointer; text-decoration: none; font-weight: 400; margin-left: 4px; }
+  .user-pill a:hover { color: var(--red); }
   .db-config-section { max-width: 640px; }
   .db-config-section input[type=text], .db-config-section input[type=url] {
     width: 100%; padding: 11px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
@@ -1289,12 +1322,12 @@ function recToRow(rec){
   const row = {};
   Object.entries(rec).forEach(([k,v])=>{
     const sqlKey = FIELD_MAP[k] || k;
-    // student internal id maps to student_id column
     if(k === 'id'){ row.student_id = v; return; }
-    // Skip transient fields
     if(k.startsWith('_')) return;
     row[sqlKey] = v;
   });
+  // Always tag with current user's ID for RLS
+  if(state.userId) row.owner_id = state.userId;
   return row;
 }
 
@@ -1402,11 +1435,13 @@ async function saveClassEntryAsync(entry){
   local.set('classreg:'+entry.classId, JSON.stringify(entry));
   if(db.isConnected()){
     try{
-      await db.client.from('classes').upsert({
+      const row = {
         class_id: entry.classId,
         name: entry.name,
         created_at: new Date(entry.createdAt || Date.now()).toISOString(),
-      }, { onConflict: 'class_id' });
+      };
+      if(state.userId) row.owner_id = state.userId;
+      await db.client.from('classes').upsert(row, { onConflict: 'class_id' });
     }catch(e){ console.error('DB class save failed:', e); }
   }
 }
@@ -1449,10 +1484,12 @@ async function syncLocalToDb(){
   const classes = loadClassRegistry();
   for(const entry of Object.values(classes)){
     try{
-      await db.client.from('classes').upsert({
+      const row = {
         class_id: entry.classId, name: entry.name,
         created_at: new Date(entry.createdAt || Date.now()).toISOString(),
-      }, { onConflict: 'class_id' });
+      };
+      if(state.userId) row.owner_id = state.userId;
+      await db.client.from('classes').upsert(row, { onConflict: 'class_id' });
     }catch(e){ errors++; }
   }
 
@@ -1693,16 +1730,31 @@ function getAllClassNames(){
 }
 
 async function init(){
-  // Try to auto-connect to Supabase if previously configured
+  // Try to auto-connect to Supabase
   await db.autoConnect();
 
-  // Load students (from DB if connected, localStorage otherwise)
   if(db.isConnected()){
-    state.students = await loadAllStudentsAsync();
+    // Check for existing auth session
+    try{
+      const { data: { session } } = await db.client.auth.getSession();
+      if(session && session.user){
+        state.userId = session.user.id;
+        state.userEmail = session.user.email;
+        state.students = await loadAllStudentsAsync();
+        state.view = 'dashboard';
+      } else {
+        state.view = 'login';
+      }
+    }catch(e){
+      console.error('Session check failed:', e);
+      state.view = 'login';
+    }
   } else {
+    // No database — fall back to local-only mode (no login required)
     state.students = loadAllStudentsLocal();
+    state.view = 'dashboard';
   }
-  state.view = 'dashboard';
+
   render();
 
   // Event delegation for collapsible sections
@@ -1726,6 +1778,8 @@ function render(opts){
   const app = document.getElementById('app');
   let body = '';
   if(state.view === 'loading') body = renderLoading();
+  else if(state.view === 'login') body = renderAuth('login');
+  else if(state.view === 'signup') body = renderAuth('signup');
   else if(state.view === 'dashboard') body = renderDashboard();
   else if(state.view === 'newInfo') body = renderNewInfo();
   else if(state.view === 'assess') body = renderAssess();
@@ -1740,7 +1794,7 @@ function render(opts){
   else if(state.view === 'dbSettings') body = renderDbSettings();
 
   app.innerHTML = `
-    ${state.view !== 'loading' ? renderTopbar() : ''}
+    ${(state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup') ? renderTopbar() : ''}
     ${body}
   `;
   if(!opts.preserveScroll) window.scrollTo(0,0);
@@ -1749,10 +1803,14 @@ function render(opts){
 function renderTopbar(){
   const dbClass = db.isConnected() ? 'connected' : db.status === 'error' ? 'error' : 'disconnected';
   const dbLabel = db.isConnected() ? 'Database connected' : db.status === 'error' ? 'Connection error' : 'Local only';
+  const userEmail = state.userEmail || '';
   return `
   <div class="db-banner ${dbClass} no-print">
     <div class="db-status"><span class="db-dot"></span>${dbLabel}</div>
-    <a onclick="App.goDbSettings()">${db.isConnected() ? 'Settings' : 'Connect database'}</a>
+    <div style="display:flex;align-items:center;gap:12px;">
+      ${userEmail ? `<span class="user-pill">${escapeHtml(userEmail)} <a onclick="App.logout()" title="Log out">✕</a></span>` : ''}
+      <a onclick="App.goDbSettings()">${db.isConnected() ? 'Settings' : 'Connect database'}</a>
+    </div>
   </div>
   <div class="topbar">
     <div class="wrap topbar-inner">
@@ -1770,7 +1828,52 @@ function renderTopbar(){
 }
 
 function renderLoading(){
-  return `<div class="wrap" style="padding-top:120px;text-align:center;color:var(--ink-faint);">Loading records…</div>`;
+  return `<div class="wrap" style="padding-top:120px;text-align:center;color:var(--ink-faint);">Loading…</div>`;
+}
+
+function renderAuth(mode){
+  const isLogin = mode === 'login';
+  return `
+  <div class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="brand-mark">Learner Profile</span>
+        <span class="brand-sub">Record System</span>
+      </div>
+      <h1>${isLogin ? 'Welcome back' : 'Create your account'}</h1>
+      <p class="auth-sub">${isLogin ? 'Log in to access your student records.' : 'Sign up to start building learner profiles.'}</p>
+
+      <div id="auth-error" class="auth-error"></div>
+
+      ${!isLogin ? `
+        <div class="field-group">
+          <label class="field-label" for="auth-name">Your name</label>
+          <input type="text" id="auth-name" placeholder="e.g. Ms. Zhang">
+        </div>
+      ` : ''}
+
+      <div class="field-group">
+        <label class="field-label" for="auth-email">Email</label>
+        <input type="email" id="auth-email" placeholder="your.email@school.edu">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="auth-password">Password ${!isLogin ? '<span style="font-weight:400;color:var(--ink-faint);text-transform:none;">(minimum 6 characters)</span>' : ''}</label>
+        <input type="password" id="auth-password" placeholder="${isLogin ? 'Enter password' : 'Choose a password'}"
+          onkeydown="if(event.key==='Enter') App.${isLogin ? 'submitLogin' : 'submitSignup'}()">
+      </div>
+
+      <button class="btn btn-primary btn-block" onclick="App.${isLogin ? 'submitLogin' : 'submitSignup'}()" style="margin-top:8px;">
+        ${isLogin ? 'Log in' : 'Create account'}
+      </button>
+
+      <div class="auth-toggle">
+        ${isLogin
+          ? 'Don\'t have an account? <a onclick="App.goSignup()">Sign up</a>'
+          : 'Already have an account? <a onclick="App.goLogin()">Log in</a>'}
+      </div>
+    </div>
+  </div>`;
 }
 
 /* ── Dashboard ── */
@@ -3797,6 +3900,90 @@ function renderResearch(){
 const App = {
   goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null; render(); },
   goResearch(){ state.view='research'; render(); },
+
+  goLogin(){ state.view='login'; render(); },
+  goSignup(){ state.view='signup'; render(); },
+
+  async submitLogin(){
+    const email = document.getElementById('auth-email')?.value?.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const errorEl = document.getElementById('auth-error');
+    if(!email || !password){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent='Please enter both email and password.'; }
+      return;
+    }
+    if(!db.isConnected()){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent='Database not connected. Check your internet connection and refresh.'; }
+      return;
+    }
+    try{
+      const { data, error } = await db.client.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+      state.userId = data.user.id;
+      state.userEmail = data.user.email;
+      state.students = await loadAllStudentsAsync();
+      state.view = 'dashboard';
+      render();
+    }catch(e){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent = e.message || 'Login failed.'; }
+    }
+  },
+
+  async submitSignup(){
+    const name = document.getElementById('auth-name')?.value?.trim();
+    const email = document.getElementById('auth-email')?.value?.trim();
+    const password = document.getElementById('auth-password')?.value;
+    const errorEl = document.getElementById('auth-error');
+    if(!email || !password){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent='Please fill in all fields.'; }
+      return;
+    }
+    if(password.length < 6){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent='Password must be at least 6 characters.'; }
+      return;
+    }
+    if(!db.isConnected()){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent='Database not connected. Check your internet connection and refresh.'; }
+      return;
+    }
+    try{
+      const { data, error } = await db.client.auth.signUp({
+        email, password,
+        options: { data: { display_name: name || email.split('@')[0] } }
+      });
+      if(error) throw error;
+      if(data.user && !data.user.confirmed_at && !data.session){
+        // Email confirmation required
+        if(errorEl){
+          errorEl.style.display='block';
+          errorEl.style.background='var(--green-bg)';
+          errorEl.style.color='var(--green)';
+          errorEl.textContent='Account created! Check your email to confirm, then log in.';
+        }
+        return;
+      }
+      // Auto-login after signup (if email confirmation not required)
+      state.userId = data.user.id;
+      state.userEmail = data.user.email;
+      state.students = [];
+      state.view = 'dashboard';
+      render();
+    }catch(e){
+      if(errorEl){ errorEl.style.display='block'; errorEl.textContent = e.message || 'Signup failed.'; }
+    }
+  },
+
+  async logout(){
+    if(!confirm('Log out? Your data is saved in the database.')) return;
+    if(db.isConnected()){
+      try{ await db.client.auth.signOut(); }catch(e){}
+    }
+    state.userId = null;
+    state.userEmail = null;
+    state.students = [];
+    state.view = 'login';
+    render();
+  },
 
   goDbSettings(){ state.view='dbSettings'; render(); },
 
