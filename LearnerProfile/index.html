@@ -781,6 +781,49 @@
   }
   .user-pill a { color: var(--ink-faint); cursor: pointer; text-decoration: none; font-weight: 400; margin-left: 4px; }
   .user-pill a:hover { color: var(--red); }
+
+  /* ── Multi-select mode ── */
+  .select-checkbox {
+    width: 20px; height: 20px; border-radius: 4px;
+    border: 2px solid var(--rule); background: var(--paper-raised);
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-right: 12px; cursor: pointer;
+    font-weight: 700; font-size: 13px; color: transparent;
+    transition: all 0.1s;
+  }
+  .select-checkbox:hover { border-color: var(--accent); }
+  .select-checkbox.checked {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  .selection-toolbar {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--paper-raised);
+    border-radius: 10px; padding: 14px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    display: flex; align-items: center; gap: 14px; z-index: 500;
+    font-size: 13.5px;
+    flex-wrap: wrap; max-width: 90vw;
+  }
+  .selection-toolbar strong { color: #fff; }
+  .selection-toolbar select {
+    padding: 8px 12px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1); color: #fff; font-size: 13px;
+    font-family: inherit; outline: none; min-width: 180px;
+  }
+  .selection-toolbar select option { color: var(--ink); background: var(--paper-raised); }
+  .selection-toolbar button {
+    padding: 8px 14px; border-radius: 6px; border: none;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .selection-toolbar .btn-clear {
+    background: transparent; color: rgba(255,255,255,0.7); border: 1.5px solid rgba(255,255,255,0.2);
+  }
+  .selection-toolbar .btn-clear:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+  .select-all-link {
+    font-size: 11.5px; color: var(--accent); cursor: pointer; margin-left: 12px;
+    font-weight: 600; text-decoration: underline;
+  }
+  .select-all-link:hover { color: var(--ink); }
+  @media print { .selection-toolbar, .select-checkbox { display: none !important; } }
   .db-config-section { max-width: 640px; }
   .db-config-section input[type=text], .db-config-section input[type=url] {
     width: 100%; padding: 11px 14px; border-radius: 6px; border: 1.5px solid var(--rule);
@@ -1401,14 +1444,39 @@ async function saveStudentAsync(rec){
 function saveStudent(rec){
   rec.updatedAt = Date.now();
   try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){ return false; }
-  // Fire-and-forget async DB save
+  // Fire-and-forget async DB save, but track errors visibly
   if(db.isConnected()){
+    state.dbSyncPending = (state.dbSyncPending||0) + 1;
     const row = recToRow(rec);
     db.client.from('students').upsert(row, { onConflict: 'student_id' }).then(({error})=>{
-      if(error) console.error('DB sync error:', error.message);
+      state.dbSyncPending = Math.max(0, (state.dbSyncPending||1) - 1);
+      if(error){
+        state.dbSyncErrors = state.dbSyncErrors || [];
+        state.dbSyncErrors.push({ name: rec.name || rec.id, error: error.message, time: Date.now() });
+        // Only keep last 20 errors
+        if(state.dbSyncErrors.length > 20) state.dbSyncErrors.shift();
+        console.error('DB sync error for', rec.name, ':', error.message);
+        // Update banner to show error state
+        if(typeof updateDbBanner === 'function') updateDbBanner();
+      }
     });
   }
   return true;
+}
+
+// Update just the db-banner in place without full re-render (avoid focus loss)
+function updateDbBanner(){
+  const banner = document.querySelector('.db-banner');
+  if(!banner) return;
+  const errCount = (state.dbSyncErrors||[]).length;
+  const pending = state.dbSyncPending || 0;
+  if(errCount > 0){
+    banner.className = 'db-banner error no-print';
+    const statusEl = banner.querySelector('.db-status');
+    if(statusEl) statusEl.innerHTML = `<span class="db-dot"></span>⚠ ${errCount} sync error${errCount===1?'':'s'} — click for details`;
+    statusEl.style.cursor = 'pointer';
+    statusEl.onclick = () => App.showSyncErrors();
+  }
 }
 
 async function deleteStudentAsync(id){
@@ -1730,17 +1798,42 @@ function getAllClassNames(){
 }
 
 async function init(){
-  // Try to auto-connect to Supabase
   await db.autoConnect();
 
   if(db.isConnected()){
-    // Check for existing auth session
     try{
       const { data: { session } } = await db.client.auth.getSession();
       if(session && session.user){
         state.userId = session.user.id;
         state.userEmail = session.user.email;
         state.students = await loadAllStudentsAsync();
+
+        // RECOVERY: if DB returned empty but localStorage has records for this session,
+        // it means previous saves failed. Offer to push them.
+        if(state.students.length === 0){
+          const localStudents = loadAllStudentsLocal();
+          if(localStudents.length > 0){
+            // Delay slightly so the page renders first
+            setTimeout(async () => {
+              const shouldPush = confirm(
+                `⚠ Data recovery needed\n\n` +
+                `The database has 0 records for your account, but this browser has ${localStudents.length} student${localStudents.length===1?'':'s'} saved locally.\n\n` +
+                `This usually means previous database saves failed (often because auth-migration.sql wasn't run).\n\n` +
+                `Would you like to push your local data to the database now?`
+              );
+              if(shouldPush){
+                const result = await syncLocalToDb();
+                if(result.errors > 0){
+                  alert(`Pushed ${result.synced} records, but ${result.errors} failed.\n\nCheck the database schema — you may need to run auth-migration.sql in your Supabase SQL Editor.\n\nClick "Settings" for details.`);
+                } else {
+                  alert(`Successfully pushed ${result.synced} records to the database.`);
+                }
+                state.students = await loadAllStudentsAsync();
+                render();
+              }
+            }, 500);
+          }
+        }
         state.view = 'dashboard';
       } else {
         state.view = 'login';
@@ -1750,14 +1843,12 @@ async function init(){
       state.view = 'login';
     }
   } else {
-    // No database — fall back to local-only mode (no login required)
     state.students = loadAllStudentsLocal();
     state.view = 'dashboard';
   }
 
   render();
 
-  // Event delegation for collapsible sections
   document.getElementById('app').addEventListener('click', function(e){
     const head = e.target.closest('.section-block > .sb-head');
     if(!head) return;
@@ -1880,8 +1971,8 @@ function renderAuth(mode){
 
 function renderDashboard(){
   const students = state.students;
+  if(!state.selectedIds) state.selectedIds = new Set();
 
-  // Group by class
   const groups = {};
   students.forEach(s => {
     const key = (s.className && s.className.trim()) ? s.className.trim() : '__unassigned__';
@@ -1892,14 +1983,19 @@ function renderDashboard(){
   const orderedGroups = classNames.map(c => ({ name: c, students: groups[c], isUnassigned: false }));
   if(groups.__unassigned__) orderedGroups.push({ name: 'Unassigned', students: groups.__unassigned__, isUnassigned: true });
 
+  const selectMode = !!state.selectMode;
+  const selectedCount = state.selectedIds.size;
+  const allClassNames = getAllClassNames();
+
   return `
-  <div class="wrap">
+  <div class="wrap" style="${selectMode && selectedCount > 0 ? 'padding-bottom:100px;' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:16px;flex-wrap:wrap;">
       <div>
         <h1 style="font-size:24px;">Student Records</h1>
         <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} record${students.length===1?'':'s'} across ${classNames.length} class${classNames.length===1?'':'es'}${groups.__unassigned__ ? ' + unassigned' : ''}</p>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        ${students.length > 0 ? `<button class="btn btn-ghost" onclick="App.toggleSelectMode()">${selectMode ? '✕ Exit select' : '☐ Select students'}</button>` : ''}
         <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
         <button class="btn btn-ghost" onclick="App.openBulkImport()">📋 Bulk Import Class</button>
       </div>
@@ -1910,26 +2006,40 @@ function renderDashboard(){
         <p>Start a new assessment to build a student's first learner profile.</p>
         <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
       </div>
-    ` : orderedGroups.map(renderClassGroup).join('')}
-  </div>`;
+    ` : orderedGroups.map(g => renderClassGroup(g, selectMode)).join('')}
+  </div>
+
+  ${selectMode && selectedCount > 0 ? `
+    <div class="selection-toolbar">
+      <strong>${selectedCount} selected</strong>
+      <select id="bulk-move-target" onchange="App.bulkMoveSelected(this.value); this.value='';">
+        <option value="" disabled selected>Move to class…</option>
+        ${allClassNames.map(c => `<option value="__cls__${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+        <option value="__unassign__">Unassigned</option>
+        <option value="__new__">+ New class…</option>
+      </select>
+      <button class="btn-clear" onclick="App.clearSelection()">Deselect all</button>
+    </div>
+  ` : ''}`;
 }
 
-function renderClassGroup(g){
-  const clickable = !g.isUnassigned;
+function renderClassGroup(g, selectMode){
+  const clickable = !g.isUnassigned && !selectMode;
+  const allInGroup = g.students.every(s => state.selectedIds && state.selectedIds.has(s.id));
   return `
   <div class="class-group">
     <div class="class-group-header ${clickable?'clickable':''}" ${clickable?`onclick="App.openClassOverview('${escapeAttr(g.name)}')"`:''}>
       <div>
-        <div class="class-group-name" style="${g.isUnassigned ? 'color:var(--ink-faint);font-style:italic;' : ''}">${escapeHtml(g.name)}</div>
+        <div class="class-group-name" style="${g.isUnassigned ? 'color:var(--ink-faint);font-style:italic;' : ''}">${escapeHtml(g.name)}${selectMode ? `<span class="select-all-link" onclick="event.stopPropagation();App.toggleSelectGroup('${escapeAttr(g.name)}', ${g.isUnassigned})">${allInGroup ? 'Deselect all' : 'Select all'}</span>` : ''}</div>
         ${clickable ? '<div class="class-group-hint">View class overview →</div>' : ''}
       </div>
       <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
     </div>
-    ${g.students.map(renderRecordCard).join('')}
+    ${g.students.map(rec => renderRecordCard(rec, selectMode)).join('')}
   </div>`;
 }
 
-function renderRecordCard(rec){
+function renderRecordCard(rec, selectMode){
   const lvl = LEVEL_META[rec.level] || LEVEL_META.primary;
   const zones = computeAllZones(rec);
   const date = new Date(rec.updatedAt || rec.createdAt).toLocaleDateString(undefined,{ day:'numeric', month:'short', year:'numeric' });
@@ -1937,29 +2047,35 @@ function renderRecordCard(rec){
   const allClasses = getAllClassNames();
   const currentClass = (rec.className||'').trim();
   const hasAccommodations = (rec.accommodations && rec.accommodations.length) || (rec.accommodationNotes && rec.accommodationNotes.trim());
-  // Build the "move" select options: existing classes + Unassigned + option to prompt for new
+  const isSelected = state.selectedIds && state.selectedIds.has(rec.id);
   const moveOptions = [
     `<option value="" disabled selected>Move to…</option>`,
     ...allClasses.filter(c => c !== currentClass).map(c => `<option value="__cls__${escapeHtml(c)}">${escapeHtml(c)}</option>`),
     currentClass ? `<option value="__unassign__">Unassigned</option>` : '',
     `<option value="__new__">+ New class…</option>`,
   ].join('');
+
+  const clickAction = selectMode
+    ? `App.toggleSelectStudent('${rec.id}')`
+    : `App.openReport('${rec.id}')`;
+
   return `
-  <div class="record-card" style="border-left-color:${lvl.color};">
+  <div class="record-card" style="border-left-color:${lvl.color};${isSelected ? 'background:var(--accent-light);' : ''}">
+    ${selectMode ? `<div class="select-checkbox ${isSelected?'checked':''}" onclick="App.toggleSelectStudent('${rec.id}')">${isSelected?'✓':''}</div>` : ''}
     <div class="record-tab" style="background:${lvl.light};color:${lvl.color};">${initials}</div>
-    <div class="record-info" onclick="App.openReport('${rec.id}')">
+    <div class="record-info" onclick="${clickAction}">
       <div class="record-name">${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="color:var(--ink-faint);font-weight:400;">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
       <div class="record-meta">${lvl.label} · Age ${escapeHtml(String(rec.age||'?'))} · Updated ${date}</div>
     </div>
-    <div class="record-zones" onclick="App.openReport('${rec.id}')" title="Section zones">
+    <div class="record-zones" onclick="${clickAction}" title="Section zones">
       ${zones.map(z=>`<div class="zone-dot" style="background:${ZONE_META[z].text};" title="${ZONE_META[z].label}"></div>`).join('')}
     </div>
-    <div class="record-actions">
+    ${selectMode ? '' : `<div class="record-actions">
       <select class="record-move" onchange="App.quickMove('${rec.id}', this.value); this.value='';" onclick="event.stopPropagation()" title="Move to a different class">
         ${moveOptions}
       </select>
       <button class="record-delete" onclick="event.stopPropagation(); App.confirmDelete('${rec.id}')" title="Delete record">×</button>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -3924,6 +4040,30 @@ const App = {
       state.students = await loadAllStudentsAsync();
       state.view = 'dashboard';
       render();
+
+      // Recovery: if DB is empty but local has data, offer to push
+      if(state.students.length === 0){
+        const localStudents = loadAllStudentsLocal();
+        if(localStudents.length > 0){
+          setTimeout(async () => {
+            const shouldPush = confirm(
+              `⚠ You have ${localStudents.length} student${localStudents.length===1?'':'s'} saved on this device that aren't in the database.\n\n` +
+              `Push them to the database now? (Recommended)`
+            );
+            if(shouldPush){
+              const result = await syncLocalToDb();
+              if(result.errors > 0){
+                alert(`Pushed ${result.synced} records, but ${result.errors} failed.\n\nYou may need to run auth-migration.sql in Supabase.`);
+              } else {
+                alert(`Pushed ${result.synced} records to the database.`);
+              }
+              state.students = await loadAllStudentsAsync();
+              render();
+            }
+          }, 300);
+        }
+      }
+      return;
     }catch(e){
       if(errorEl){ errorEl.style.display='block'; errorEl.textContent = e.message || 'Login failed.'; }
     }
@@ -3973,6 +4113,22 @@ const App = {
     }
   },
 
+  showSyncErrors(){
+    const errs = state.dbSyncErrors || [];
+    if(!errs.length){ alert('No sync errors.'); return; }
+    const msg = `Database sync errors (${errs.length}):\n\n` +
+      errs.slice(-10).map(e => `• ${e.name}: ${e.error}`).join('\n') +
+      `\n\nMost common cause: the auth-migration.sql file wasn't run in your Supabase SQL Editor. This adds the owner_id column that all writes require.\n\n` +
+      `Click OK to clear these errors and retry syncing.`;
+    if(confirm(msg)){
+      state.dbSyncErrors = [];
+      syncLocalToDb().then(result => {
+        alert(`Retry complete: ${result.synced} synced, ${result.errors} still failing.`);
+        render();
+      });
+    }
+  },
+
   async logout(){
     if(!confirm('Log out? Your data is saved in the database.')) return;
     if(db.isConnected()){
@@ -3986,6 +4142,89 @@ const App = {
   },
 
   goDbSettings(){ state.view='dbSettings'; render(); },
+
+  /* ── Multi-select ── */
+  toggleSelectMode(){
+    state.selectMode = !state.selectMode;
+    if(!state.selectMode) state.selectedIds = new Set();
+    render();
+  },
+
+  toggleSelectStudent(id){
+    if(!state.selectedIds) state.selectedIds = new Set();
+    if(state.selectedIds.has(id)) state.selectedIds.delete(id);
+    else state.selectedIds.add(id);
+    render({preserveScroll:true});
+  },
+
+  toggleSelectGroup(groupName, isUnassigned){
+    if(!state.selectedIds) state.selectedIds = new Set();
+    const key = isUnassigned ? '' : groupName;
+    const inGroup = state.students.filter(s => {
+      const cls = (s.className||'').trim();
+      return isUnassigned ? !cls : cls === key;
+    });
+    const allSelected = inGroup.every(s => state.selectedIds.has(s.id));
+    if(allSelected){
+      inGroup.forEach(s => state.selectedIds.delete(s.id));
+    } else {
+      inGroup.forEach(s => state.selectedIds.add(s.id));
+    }
+    render({preserveScroll:true});
+  },
+
+  clearSelection(){
+    state.selectedIds = new Set();
+    render({preserveScroll:true});
+  },
+
+  async bulkMoveSelected(action){
+    if(!action || !state.selectedIds || !state.selectedIds.size) return;
+    let target = '';
+    if(action === '__unassign__') target = '';
+    else if(action === '__new__'){
+      const newClass = prompt('Enter the new class name:');
+      if(!newClass || !newClass.trim()) return;
+      target = newClass.trim();
+      getOrCreateClassEntry(target);
+    } else if(action.startsWith('__cls__')){
+      target = action.substring(7);
+    } else {
+      return;
+    }
+
+    const selectedIds = Array.from(state.selectedIds);
+    let moved = 0, errors = 0;
+    for(const id of selectedIds){
+      const rec = state.students.find(s => s.id === id);
+      if(!rec) continue;
+      rec.className = target;
+      rec.updatedAt = Date.now();
+      // Save locally
+      try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){}
+      // Save to DB with error surfacing
+      if(db.isConnected()){
+        try{
+          const row = recToRow(rec);
+          const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+          if(error){ errors++; state.dbSyncErrors=state.dbSyncErrors||[]; state.dbSyncErrors.push({name:rec.name, error:error.message, time:Date.now()}); }
+          else moved++;
+        }catch(e){ errors++; }
+      } else {
+        moved++;
+      }
+    }
+
+    state.selectedIds = new Set();
+    state.selectMode = false;
+    render();
+
+    if(errors > 0){
+      alert(`Moved ${moved} students${target ? ' to ' + target : ' to Unassigned'}.\n\n⚠ ${errors} failed to save to database. Click the sync error banner for details.`);
+    } else {
+      alert(`Moved ${moved} student${moved===1?'':'s'}${target ? ' to ' + target : ' to Unassigned'}.`);
+    }
+  },
 
   async connectDb(){
     const urlEl = document.getElementById('db-url');
@@ -4301,19 +4540,19 @@ const App = {
     render();
   },
 
-  confirmBulkImport(){
+  async confirmBulkImport(){
     const preview = state.bulkPreview;
     if(!preview || !preview.length) return;
     const className = (state.bulkClassName||'').trim();
     const level = state.bulkLevel || 'junior';
-    // Ensure class entry exists
     if(className) getOrCreateClassEntry(className);
-    let added = 0;
-    preview.forEach(p => {
+
+    let added = 0, dbErrors = 0;
+    const errorSamples = [];
+
+    for(const p of preview){
       const rec = {
-        id: uid(),
-        name: p.name,
-        chineseName: p.chineseName || '',
+        id: uid(), name: p.name, chineseName: p.chineseName || '',
         age: '', birthdate: '', level: level,
         className: className, notes: '', goal: '',
         userId: generateUserId(), password: generatePassword(),
@@ -4327,12 +4566,43 @@ const App = {
         teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' },
         history:[], createdAt: Date.now(), updatedAt: Date.now(),
       };
-      if(saveStudent(rec)){
-        state.students.unshift(rec);
+      // Save to localStorage
+      try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){}
+      // Save to DB with awaited error handling
+      if(db.isConnected()){
+        try{
+          const row = recToRow(rec);
+          const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+          if(error){
+            dbErrors++;
+            if(errorSamples.length < 3) errorSamples.push(rec.name + ': ' + error.message);
+            state.dbSyncErrors = state.dbSyncErrors || [];
+            state.dbSyncErrors.push({ name: rec.name, error: error.message, time: Date.now() });
+          } else {
+            added++;
+          }
+        }catch(e){
+          dbErrors++;
+          if(errorSamples.length < 3) errorSamples.push(rec.name + ': ' + e.message);
+        }
+      } else {
         added++;
       }
-    });
-    alert(`Added ${added} student${added===1?'':'s'} to ${className || 'Unassigned'}.`);
+      state.students.unshift(rec);
+    }
+
+    if(dbErrors > 0){
+      alert(
+        `⚠ Bulk import had errors\n\n` +
+        `Added: ${added} students (all saved locally)\n` +
+        `Database errors: ${dbErrors}\n\n` +
+        `Sample errors:\n` + errorSamples.join('\n') + `\n\n` +
+        `MOST LIKELY CAUSE: You need to run auth-migration.sql in your Supabase SQL Editor. This adds the owner_id column that all writes require.\n\n` +
+        `Your students are saved locally on this device. Once you fix the database, click the sync error banner to push them.`
+      );
+    } else {
+      alert(`Added ${added} student${added===1?'':'s'} to ${className || 'Unassigned'}.`);
+    }
     App.goDashboard();
   },
 
