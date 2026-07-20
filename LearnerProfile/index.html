@@ -1807,33 +1807,6 @@ async function init(){
         state.userId = session.user.id;
         state.userEmail = session.user.email;
         state.students = await loadAllStudentsAsync();
-
-        // RECOVERY: if DB returned empty but localStorage has records for this session,
-        // it means previous saves failed. Offer to push them.
-        if(state.students.length === 0){
-          const localStudents = loadAllStudentsLocal();
-          if(localStudents.length > 0){
-            // Delay slightly so the page renders first
-            setTimeout(async () => {
-              const shouldPush = confirm(
-                `⚠ Data recovery needed\n\n` +
-                `The database has 0 records for your account, but this browser has ${localStudents.length} student${localStudents.length===1?'':'s'} saved locally.\n\n` +
-                `This usually means previous database saves failed (often because auth-migration.sql wasn't run).\n\n` +
-                `Would you like to push your local data to the database now?`
-              );
-              if(shouldPush){
-                const result = await syncLocalToDb();
-                if(result.errors > 0){
-                  alert(`Pushed ${result.synced} records, but ${result.errors} failed.\n\nCheck the database schema — you may need to run auth-migration.sql in your Supabase SQL Editor.\n\nClick "Settings" for details.`);
-                } else {
-                  alert(`Successfully pushed ${result.synced} records to the database.`);
-                }
-                state.students = await loadAllStudentsAsync();
-                render();
-              }
-            }, 500);
-          }
-        }
         state.view = 'dashboard';
       } else {
         state.view = 'login';
@@ -3940,11 +3913,40 @@ function renderDbSettings(){
 
     ${db.isConnected() ? `
       <div class="data-section db-config-section">
-        <h2>Sync data</h2>
-        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">Push all your local records to the database, or pull the latest from the database to this device.</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="App.syncPush()">⬆ Push local → database</button>
-          <button class="btn btn-ghost" onclick="App.syncPull()">⬇ Pull database → local</button>
+        <h2>🔍 Sync Diagnostics</h2>
+        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">See exactly what's in each storage location. Use this to understand mismatches before syncing.</p>
+        <div id="diag-area" style="background:#FBFAF6;border-radius:6px;padding:16px;margin-top:12px;font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.7;">
+          <em style="color:var(--ink-faint);font-family:inherit;">Click "Run Diagnostics" to inspect current state.</em>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+          <button class="btn btn-primary" onclick="App.runDiagnostics()">🔍 Run Diagnostics</button>
+        </div>
+      </div>
+
+      <div class="data-section db-config-section">
+        <h2>🔄 Sync Actions</h2>
+        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;">Run diagnostics first. Then choose the action that matches your situation.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+          <div style="border:1px solid var(--rule);border-radius:6px;padding:14px;background:var(--paper);">
+            <strong style="font-size:13px;">⬆ Push local → database</strong>
+            <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">Upload every record from this browser to the database. Uses upsert — existing records with matching IDs will be updated, not duplicated. Use this if local has records that database doesn't.</p>
+            <button class="btn btn-ghost btn-sm" onclick="App.syncPush()">Push local → DB</button>
+          </div>
+          <div style="border:1px solid var(--rule);border-radius:6px;padding:14px;background:var(--paper);">
+            <strong style="font-size:13px;">⬇ Pull database → local</strong>
+            <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">Download every record from the database to this browser. Use this on a new device or after fixing database issues.</p>
+            <button class="btn btn-ghost btn-sm" onclick="App.syncPull()">Pull DB → local</button>
+          </div>
+          <div style="border:1px solid var(--red-border);border-radius:6px;padding:14px;background:var(--red-bg);">
+            <strong style="font-size:13px;color:var(--red);">🗑 Delete all my records from database</strong>
+            <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">Removes every student and class you own from the database. Local browser data is untouched — you can push again after. Use this if the database has duplicates or corrupted data.</p>
+            <button class="btn btn-danger-ghost" onclick="App.wipeDbForUser()">Wipe my database records</button>
+          </div>
+          <div style="border:1px solid var(--red-border);border-radius:6px;padding:14px;background:var(--red-bg);">
+            <strong style="font-size:13px;color:var(--red);">🗑 Clear this browser's local data</strong>
+            <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">Removes all student and class records from this browser only. Database is untouched. Use this if local has stale data — pull from DB afterwards to get a clean copy.</p>
+            <button class="btn btn-danger-ghost" onclick="App.wipeLocal()">Clear browser data</button>
+          </div>
         </div>
         <div id="sync-log" class="sync-log" style="display:none;"></div>
       </div>
@@ -4041,25 +4043,17 @@ const App = {
       state.view = 'dashboard';
       render();
 
-      // Recovery: if DB is empty but local has data, offer to push
+      // If DB is empty but local has data, direct them to diagnostics (don't auto-push)
       if(state.students.length === 0){
-        const localStudents = loadAllStudentsLocal();
-        if(localStudents.length > 0){
-          setTimeout(async () => {
-            const shouldPush = confirm(
-              `⚠ You have ${localStudents.length} student${localStudents.length===1?'':'s'} saved on this device that aren't in the database.\n\n` +
-              `Push them to the database now? (Recommended)`
+        const localCount = loadAllStudentsLocal().length;
+        if(localCount > 0){
+          setTimeout(() => {
+            alert(
+              `⚠ Sync mismatch detected\n\n` +
+              `Database: 0 students\n` +
+              `This browser: ${localCount} students\n\n` +
+              `Go to Settings → Sync Diagnostics to review and decide how to resolve this. Do NOT push blindly — check the diagnostic panel first to avoid creating duplicates.`
             );
-            if(shouldPush){
-              const result = await syncLocalToDb();
-              if(result.errors > 0){
-                alert(`Pushed ${result.synced} records, but ${result.errors} failed.\n\nYou may need to run auth-migration.sql in Supabase.`);
-              } else {
-                alert(`Pushed ${result.synced} records to the database.`);
-              }
-              state.students = await loadAllStudentsAsync();
-              render();
-            }
           }, 300);
         }
       }
@@ -4252,20 +4246,133 @@ const App = {
   },
 
   async syncPush(){
+    if(!confirm('Push all local records to the database?\n\nThis uses upsert — existing records with matching IDs will be updated, not duplicated.')) return;
     const log = document.getElementById('sync-log');
     if(log){ log.style.display='block'; log.textContent='Pushing local data to database...\n'; }
     const result = await syncLocalToDb();
     if(log) log.textContent += `Done. Synced ${result.synced} records, ${result.errors} errors.\n`;
     alert(`Push complete: ${result.synced} records synced${result.errors ? ', ' + result.errors + ' errors' : ''}.`);
+    state.students = await loadAllStudentsAsync();
+    render();
   },
 
   async syncPull(){
+    if(!confirm('Pull all records from the database?\n\nThis will overwrite local data with what\'s in the database.')) return;
     const log = document.getElementById('sync-log');
     if(log){ log.style.display='block'; log.textContent='Pulling data from database...\n'; }
     const result = await syncDbToLocal();
     state.students = loadAllStudentsLocal();
     if(log) log.textContent += `Done. Pulled ${result.pulled} records, ${result.errors} errors.\n`;
     alert(`Pull complete: ${result.pulled} records downloaded${result.errors ? ', ' + result.errors + ' errors' : ''}.`);
+    render();
+  },
+
+  async runDiagnostics(){
+    const area = document.getElementById('diag-area');
+    if(!area) return;
+    area.innerHTML = '<em style="font-family:inherit;color:var(--ink-faint);">Running…</em>';
+
+    // Local counts
+    const localStudents = loadAllStudentsLocal();
+    const localClasses = loadClassRegistry();
+
+    // DB counts (visible to this user via RLS)
+    let dbStudents = [], dbClasses = [], dbError = null;
+    try{
+      const { data: sData, error: sErr } = await db.client.from('students').select('student_id, name, user_id, class_name, owner_id, updated_at');
+      if(sErr) throw sErr;
+      dbStudents = sData || [];
+      const { data: cData, error: cErr } = await db.client.from('classes').select('class_id, name, owner_id');
+      if(cErr) throw cErr;
+      dbClasses = cData || [];
+    }catch(e){ dbError = e.message; }
+
+    // Compute diffs
+    const localIds = new Set(localStudents.map(s=>s.id));
+    const dbIds = new Set(dbStudents.map(s=>s.student_id));
+    const onlyLocal = localStudents.filter(s => !dbIds.has(s.id));
+    const onlyDb = dbStudents.filter(s => !localIds.has(s.student_id));
+    const inBoth = localStudents.filter(s => dbIds.has(s.id));
+
+    // Check for orphaned records (owner_id doesn't match current user — shouldn't happen with RLS but let's be safe)
+    const orphaned = dbStudents.filter(s => s.owner_id !== state.userId);
+
+    let html = `<div style="font-family:inherit;">`;
+    html += `<div style="margin-bottom:10px;"><strong>Current user:</strong> ${escapeHtml(state.userEmail||'—')} <span style="color:var(--ink-faint);">(${state.userId||'no id'})</span></div>`;
+
+    if(dbError){
+      html += `<div style="color:var(--red);padding:10px;background:var(--red-bg);border-radius:4px;margin-bottom:10px;"><strong>Database error:</strong> ${escapeHtml(dbError)}</div>`;
+    }
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div style="padding:12px;background:var(--paper);border-radius:6px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-faint);margin-bottom:4px;">This browser (localStorage)</div>
+        <div style="font-size:24px;font-weight:700;color:var(--accent);">${localStudents.length}</div>
+        <div style="font-size:11px;color:var(--ink-faint);">students · ${Object.keys(localClasses).length} classes</div>
+      </div>
+      <div style="padding:12px;background:var(--paper);border-radius:6px;">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-faint);margin-bottom:4px;">Database (visible to you)</div>
+        <div style="font-size:24px;font-weight:700;color:var(--accent);">${dbStudents.length}</div>
+        <div style="font-size:11px;color:var(--ink-faint);">students · ${dbClasses.length} classes</div>
+      </div>
+    </div>`;
+
+    if(inBoth.length > 0){
+      html += `<div style="color:var(--green);margin-bottom:8px;">✓ ${inBoth.length} student${inBoth.length===1?'':'s'} present in BOTH stores (in sync)</div>`;
+    }
+    if(onlyLocal.length > 0){
+      html += `<div style="color:var(--yellow);margin-bottom:8px;">⚠ ${onlyLocal.length} student${onlyLocal.length===1?'':'s'} ONLY in local (not in DB): ${onlyLocal.slice(0,5).map(s=>escapeHtml(s.name)).join(', ')}${onlyLocal.length>5?'…':''}</div>`;
+    }
+    if(onlyDb.length > 0){
+      html += `<div style="color:var(--yellow);margin-bottom:8px;">⚠ ${onlyDb.length} student${onlyDb.length===1?'':'s'} ONLY in DB (not in local): ${onlyDb.slice(0,5).map(s=>escapeHtml(s.name||s.student_id)).join(', ')}${onlyDb.length>5?'…':''}</div>`;
+    }
+    if(orphaned.length > 0){
+      html += `<div style="color:var(--red);margin-bottom:8px;">⚠ ${orphaned.length} DB record${orphaned.length===1?'':'s'} have wrong owner_id (bug — please contact support)</div>`;
+    }
+    if(dbStudents.length === 0 && localStudents.length === 0){
+      html += `<div style="color:var(--ink-faint);">Both stores are empty. Ready to start fresh.</div>`;
+    } else if(inBoth.length === localStudents.length && inBoth.length === dbStudents.length){
+      html += `<div style="color:var(--green);font-weight:600;">✓ All records are in sync between browser and database.</div>`;
+    }
+
+    // Show sample of DB records for verification
+    if(dbStudents.length > 0){
+      html += `<div style="margin-top:16px;"><strong>Sample DB records (first 10):</strong><div style="max-height:200px;overflow-y:auto;margin-top:6px;font-size:11.5px;">`;
+      dbStudents.slice(0,10).forEach(s => {
+        html += `<div style="padding:4px 6px;border-bottom:1px solid var(--rule-soft);"><code>${escapeHtml(s.student_id)}</code> · ${escapeHtml(s.name||'(no name)')} · ${escapeHtml(s.user_id||'(no uid)')} · ${escapeHtml(s.class_name||'unassigned')}</div>`;
+      });
+      html += `</div></div>`;
+    }
+
+    html += `</div>`;
+    area.innerHTML = html;
+  },
+
+  async wipeDbForUser(){
+    if(!confirm('⚠ WIPE DATABASE\n\nThis will DELETE all your student and class records from the database.\n\nLocal browser data will be kept — you can push again after this.\n\nAre you sure?')) return;
+    if(!confirm('Really delete? Type-check: This is irreversible on the database side.\n\nClick OK to proceed.')) return;
+    let deleted = 0, errors = 0;
+    try{
+      const { data, error } = await db.client.from('students').delete().eq('owner_id', state.userId).select();
+      if(error) throw error;
+      deleted = data ? data.length : 0;
+    }catch(e){ errors++; alert('Student delete error: ' + e.message); }
+    try{
+      await db.client.from('classes').delete().eq('owner_id', state.userId);
+    }catch(e){ errors++; }
+    alert(`Wiped ${deleted} student records from database.${errors?' Some errors occurred.':''}\n\nYour local data is untouched. Run diagnostics to verify.`);
+    state.students = await loadAllStudentsAsync();
+    render();
+  },
+
+  wipeLocal(){
+    if(!confirm('⚠ CLEAR LOCAL DATA\n\nThis will remove all student and class records from THIS BROWSER only. The database is untouched.\n\nAfter this, you can pull from the database to get a clean copy. Continue?')) return;
+    const keys = local.keys('student:');
+    keys.forEach(k => local.del(k));
+    const classKeys = local.keys('classreg:');
+    classKeys.forEach(k => local.del(k));
+    alert(`Cleared ${keys.length} students and ${classKeys.length} classes from browser.`);
+    state.students = [];
     render();
   },
 
