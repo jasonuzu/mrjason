@@ -1367,6 +1367,14 @@ function recToRow(rec){
     const sqlKey = FIELD_MAP[k] || k;
     if(k === 'id'){ row.student_id = v; return; }
     if(k.startsWith('_')) return;
+    // Convert JS millisecond timestamps → Postgres ISO strings for TIMESTAMPTZ columns
+    if((k === 'createdAt' || k === 'updatedAt')){
+      if(typeof v === 'number'){ row[sqlKey] = new Date(v).toISOString(); return; }
+      if(typeof v === 'string' && /^\d+$/.test(v)){ row[sqlKey] = new Date(Number(v)).toISOString(); return; }
+      // already a date string or empty — pass through if valid, else skip
+      if(v){ row[sqlKey] = v; }
+      return;
+    }
     row[sqlKey] = v;
   });
   // Always tag with current user's ID for RLS
@@ -1379,7 +1387,14 @@ function rowToRec(row){
   Object.entries(row).forEach(([k,v])=>{
     if(k === 'id') return; // UUID primary key, not needed in app
     if(k === 'student_id'){ rec.id = v; return; }
+    if(k === 'owner_id') return; // internal, not needed in app model
     const jsKey = FIELD_MAP_REV[k] || k;
+    // Convert Postgres ISO date strings → JS millisecond timestamps
+    if((jsKey === 'createdAt' || jsKey === 'updatedAt') && v){
+      const ms = new Date(v).getTime();
+      rec[jsKey] = isNaN(ms) ? Date.now() : ms;
+      return;
+    }
     rec[jsKey] = v;
   });
   return rec;
@@ -5902,6 +5917,9 @@ function escapeAttr(str){ return String(str||'').replace(/'/g, "\\'"); }
 function diagnoseErrorMessage(err){
   if(!err) return '';
   const e = err.toLowerCase();
+  if(e.includes('date/time field value out of range') || e.includes('22008')){
+    return '➜ A timestamp was sent as a raw number instead of a date. This is now fixed in the app — refresh the page to load the fix, then try again.';
+  }
   if(e.includes('owner_id') && (e.includes('does not exist') || e.includes('column'))){
     return '➜ The owner_id column is missing from your students table. Run COMPLETE-SETUP.sql in your Supabase SQL Editor to fix this.';
   }
