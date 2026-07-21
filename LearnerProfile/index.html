@@ -1534,18 +1534,27 @@ async function loadClassRegistryAsync(){
 
 // Sync all localStorage data up to Supabase
 async function syncLocalToDb(){
-  if(!db.isConnected()) return { synced: 0, errors: 0 };
-  let synced = 0, errors = 0;
+  if(!db.isConnected()) return { synced: 0, errors: 0, firstError: null };
+  let synced = 0, errors = 0, firstError = null;
+
+  if(!state.userId){
+    return { synced: 0, errors: 1, firstError: 'Not logged in — cannot set owner_id. Please log in first.' };
+  }
 
   // Sync students
   const students = loadAllStudentsLocal();
   for(const rec of students){
     try{
       const row = recToRow(rec);
+      row.owner_id = state.userId; // guarantee ownership tag
       const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
       if(error) throw error;
       synced++;
-    }catch(e){ errors++; console.error('Sync error for', rec.name, e); }
+    }catch(e){
+      errors++;
+      if(!firstError) firstError = e.message;
+      console.error('Sync error for', rec.name, e);
+    }
   }
 
   // Sync classes
@@ -1554,14 +1563,15 @@ async function syncLocalToDb(){
     try{
       const row = {
         class_id: entry.classId, name: entry.name,
+        owner_id: state.userId,
         created_at: new Date(entry.createdAt || Date.now()).toISOString(),
       };
-      if(state.userId) row.owner_id = state.userId;
-      await db.client.from('classes').upsert(row, { onConflict: 'class_id' });
-    }catch(e){ errors++; }
+      const { error } = await db.client.from('classes').upsert(row, { onConflict: 'class_id' });
+      if(error) throw error;
+    }catch(e){ errors++; if(!firstError) firstError = e.message; }
   }
 
-  return { synced, errors };
+  return { synced, errors, firstError };
 }
 
 // Pull all data from Supabase into localStorage
@@ -4251,7 +4261,17 @@ const App = {
     if(log){ log.style.display='block'; log.textContent='Pushing local data to database...\n'; }
     const result = await syncLocalToDb();
     if(log) log.textContent += `Done. Synced ${result.synced} records, ${result.errors} errors.\n`;
-    alert(`Push complete: ${result.synced} records synced${result.errors ? ', ' + result.errors + ' errors' : ''}.`);
+    if(result.errors > 0 && result.firstError){
+      alert(
+        `Push finished with errors.\n\n` +
+        `Synced: ${result.synced}\n` +
+        `Failed: ${result.errors}\n\n` +
+        `First error:\n${result.firstError}\n\n` +
+        diagnoseErrorMessage(result.firstError)
+      );
+    } else {
+      alert(`Push complete: ${result.synced} records synced successfully.`);
+    }
     state.students = await loadAllStudentsAsync();
     render();
   },
@@ -4272,12 +4292,20 @@ const App = {
     if(!area) return;
     area.innerHTML = '<em style="font-family:inherit;color:var(--ink-faint);">Running…</em>';
 
-    // Local counts
     const localStudents = loadAllStudentsLocal();
     const localClasses = loadClassRegistry();
 
-    // DB counts (visible to this user via RLS)
     let dbStudents = [], dbClasses = [], dbError = null;
+    let schemaErrors = [];
+    let testInsertResult = null;
+
+    // Check schema: try to select owner_id specifically
+    try{
+      const { data, error } = await db.client.from('students').select('owner_id').limit(1);
+      if(error) schemaErrors.push({ table: 'students', column: 'owner_id', error: error.message });
+    }catch(e){ schemaErrors.push({ table: 'students', column: 'owner_id', error: e.message }); }
+
+    // Fetch counts
     try{
       const { data: sData, error: sErr } = await db.client.from('students').select('student_id, name, user_id, class_name, owner_id, updated_at');
       if(sErr) throw sErr;
@@ -4287,21 +4315,48 @@ const App = {
       dbClasses = cData || [];
     }catch(e){ dbError = e.message; }
 
-    // Compute diffs
+    // TEST INSERT: try inserting one representative student and capture the EXACT error
+    if(localStudents.length > 0){
+      const sample = localStudents[0];
+      const testRow = recToRow({
+        ...sample,
+        id: 'diag_test_' + Date.now(),  // unique id so we don't conflict
+        userId: 'DIAG-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+      });
+      try{
+        const { data, error } = await db.client.from('students').insert(testRow).select();
+        if(error){
+          testInsertResult = { success: false, error: error.message, code: error.code, hint: error.hint, details: error.details };
+        } else {
+          testInsertResult = { success: true, inserted: data };
+          // Clean up the test record
+          await db.client.from('students').delete().eq('student_id', testRow.student_id);
+        }
+      }catch(e){
+        testInsertResult = { success: false, error: e.message };
+      }
+    }
+
     const localIds = new Set(localStudents.map(s=>s.id));
     const dbIds = new Set(dbStudents.map(s=>s.student_id));
     const onlyLocal = localStudents.filter(s => !dbIds.has(s.id));
     const onlyDb = dbStudents.filter(s => !localIds.has(s.student_id));
     const inBoth = localStudents.filter(s => dbIds.has(s.id));
 
-    // Check for orphaned records (owner_id doesn't match current user — shouldn't happen with RLS but let's be safe)
-    const orphaned = dbStudents.filter(s => s.owner_id !== state.userId);
-
     let html = `<div style="font-family:inherit;">`;
     html += `<div style="margin-bottom:10px;"><strong>Current user:</strong> ${escapeHtml(state.userEmail||'—')} <span style="color:var(--ink-faint);">(${state.userId||'no id'})</span></div>`;
 
     if(dbError){
       html += `<div style="color:var(--red);padding:10px;background:var(--red-bg);border-radius:4px;margin-bottom:10px;"><strong>Database error:</strong> ${escapeHtml(dbError)}</div>`;
+    }
+
+    // Schema issues front and center
+    if(schemaErrors.length > 0){
+      html += `<div style="padding:12px;background:var(--red-bg);border-radius:6px;margin-bottom:12px;border-left:4px solid var(--red);">
+        <strong style="color:var(--red);font-family:inherit;">⚠ Schema issue detected</strong>
+        <div style="font-size:12px;margin-top:6px;">${schemaErrors.map(e => `Table <code>${e.table}</code>, column <code>${e.column}</code>: ${escapeHtml(e.error)}`).join('<br>')}</div>
+        <div style="font-size:12px;margin-top:8px;color:var(--ink-soft);font-family:inherit;">You need to run <strong>auth-migration.sql</strong> in your Supabase SQL Editor to fix this.</div>
+      </div>`;
     }
 
     html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
@@ -4317,31 +4372,43 @@ const App = {
       </div>
     </div>`;
 
+    // TEST INSERT result — this is the money shot for diagnosing
+    if(testInsertResult){
+      if(testInsertResult.success){
+        html += `<div style="padding:12px;background:var(--green-bg);border-radius:6px;margin-bottom:12px;border-left:4px solid var(--green);">
+          <strong style="color:var(--green);font-family:inherit;">✓ Test insert succeeded</strong>
+          <div style="font-size:12px;margin-top:4px;color:var(--ink-soft);font-family:inherit;">The database CAN accept student writes. If your existing local records aren't syncing, use "Push local → DB" now to sync them.</div>
+        </div>`;
+      } else {
+        html += `<div style="padding:12px;background:var(--red-bg);border-radius:6px;margin-bottom:12px;border-left:4px solid var(--red);">
+          <strong style="color:var(--red);font-family:inherit;">✗ Test insert FAILED — this is why students aren't saving</strong>
+          <div style="font-size:12.5px;margin-top:6px;padding:8px;background:var(--paper);border-radius:4px;"><strong>Error:</strong> ${escapeHtml(testInsertResult.error)}</div>
+          ${testInsertResult.code ? `<div style="font-size:11.5px;margin-top:4px;"><strong>Code:</strong> <code>${escapeHtml(testInsertResult.code)}</code></div>` : ''}
+          ${testInsertResult.details ? `<div style="font-size:11.5px;margin-top:4px;"><strong>Details:</strong> ${escapeHtml(testInsertResult.details)}</div>` : ''}
+          ${testInsertResult.hint ? `<div style="font-size:11.5px;margin-top:4px;"><strong>Hint:</strong> ${escapeHtml(testInsertResult.hint)}</div>` : ''}
+          <div style="font-size:12px;margin-top:10px;color:var(--ink-soft);font-family:inherit;line-height:1.5;">${diagnoseErrorMessage(testInsertResult.error)}</div>
+        </div>`;
+      }
+    }
+
     if(inBoth.length > 0){
-      html += `<div style="color:var(--green);margin-bottom:8px;">✓ ${inBoth.length} student${inBoth.length===1?'':'s'} present in BOTH stores (in sync)</div>`;
+      html += `<div style="color:var(--green);margin-bottom:8px;">✓ ${inBoth.length} student${inBoth.length===1?'':'s'} present in BOTH stores</div>`;
     }
     if(onlyLocal.length > 0){
       html += `<div style="color:var(--yellow);margin-bottom:8px;">⚠ ${onlyLocal.length} student${onlyLocal.length===1?'':'s'} ONLY in local (not in DB): ${onlyLocal.slice(0,5).map(s=>escapeHtml(s.name)).join(', ')}${onlyLocal.length>5?'…':''}</div>`;
     }
     if(onlyDb.length > 0){
-      html += `<div style="color:var(--yellow);margin-bottom:8px;">⚠ ${onlyDb.length} student${onlyDb.length===1?'':'s'} ONLY in DB (not in local): ${onlyDb.slice(0,5).map(s=>escapeHtml(s.name||s.student_id)).join(', ')}${onlyDb.length>5?'…':''}</div>`;
-    }
-    if(orphaned.length > 0){
-      html += `<div style="color:var(--red);margin-bottom:8px;">⚠ ${orphaned.length} DB record${orphaned.length===1?'':'s'} have wrong owner_id (bug — please contact support)</div>`;
-    }
-    if(dbStudents.length === 0 && localStudents.length === 0){
-      html += `<div style="color:var(--ink-faint);">Both stores are empty. Ready to start fresh.</div>`;
-    } else if(inBoth.length === localStudents.length && inBoth.length === dbStudents.length){
-      html += `<div style="color:var(--green);font-weight:600;">✓ All records are in sync between browser and database.</div>`;
+      html += `<div style="color:var(--yellow);margin-bottom:8px;">⚠ ${onlyDb.length} student${onlyDb.length===1?'':'s'} ONLY in DB: ${onlyDb.slice(0,5).map(s=>escapeHtml(s.name||s.student_id)).join(', ')}${onlyDb.length>5?'…':''}</div>`;
     }
 
-    // Show sample of DB records for verification
-    if(dbStudents.length > 0){
-      html += `<div style="margin-top:16px;"><strong>Sample DB records (first 10):</strong><div style="max-height:200px;overflow-y:auto;margin-top:6px;font-size:11.5px;">`;
-      dbStudents.slice(0,10).forEach(s => {
-        html += `<div style="padding:4px 6px;border-bottom:1px solid var(--rule-soft);"><code>${escapeHtml(s.student_id)}</code> · ${escapeHtml(s.name||'(no name)')} · ${escapeHtml(s.user_id||'(no uid)')} · ${escapeHtml(s.class_name||'unassigned')}</div>`;
-      });
-      html += `</div></div>`;
+    // Show any accumulated sync errors
+    if((state.dbSyncErrors||[]).length > 0){
+      html += `<div style="margin-top:16px;padding:10px;background:var(--yellow-bg);border-radius:6px;">
+        <strong style="font-family:inherit;font-size:12px;color:var(--yellow);">Recent sync errors (${state.dbSyncErrors.length}):</strong>
+        <div style="max-height:150px;overflow-y:auto;margin-top:6px;font-size:11px;">
+          ${state.dbSyncErrors.slice(-10).map(e => `<div style="padding:3px 0;border-bottom:1px solid var(--rule-soft);"><strong>${escapeHtml(e.name)}:</strong> ${escapeHtml(e.error)}</div>`).join('')}
+        </div>
+      </div>`;
     }
 
     html += `</div>`;
@@ -5830,6 +5897,31 @@ function escapeHtml(str){
   return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function escapeAttr(str){ return String(str||'').replace(/'/g, "\\'"); }
+
+// Human-friendly interpretation of common Postgres/Supabase errors
+function diagnoseErrorMessage(err){
+  if(!err) return '';
+  const e = err.toLowerCase();
+  if(e.includes('owner_id') && (e.includes('does not exist') || e.includes('column'))){
+    return '➜ The owner_id column is missing from your students table. Run COMPLETE-SETUP.sql in your Supabase SQL Editor to fix this.';
+  }
+  if(e.includes('row-level security') || e.includes('rls') || e.includes('policy')){
+    return '➜ Row Level Security is blocking the write. This usually means owner_id isn\'t being set correctly, or the RLS policies weren\'t created. Run COMPLETE-SETUP.sql.';
+  }
+  if(e.includes('violates') && e.includes('null')){
+    return '➜ A required field is missing. This is likely a schema mismatch — run COMPLETE-SETUP.sql for the correct table structure.';
+  }
+  if(e.includes('duplicate') || e.includes('unique')){
+    return '➜ A record with this ID already exists. This is usually harmless (upsert handles it), but if you see many of these, you may have duplicate data.';
+  }
+  if(e.includes('relation') && e.includes('does not exist')){
+    return '➜ The table doesn\'t exist. Run COMPLETE-SETUP.sql to create the students and classes tables.';
+  }
+  if(e.includes('jwt') || e.includes('auth') || e.includes('token')){
+    return '➜ Authentication issue. Try logging out and back in.';
+  }
+  return '➜ Run COMPLETE-SETUP.sql in your Supabase SQL Editor to ensure the schema is correct. If the problem persists, note this exact error message.';
+}
 
 function showAIExportModal(){
   // Remove any existing modal
