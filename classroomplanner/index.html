@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Classroom Layout & Live Classroom</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
         :root {
             --primary: #4a6fa5;
@@ -59,7 +60,6 @@
             color: #2c3e50;
         }
         #tab-brand {
-            margin-left: auto;
             padding: 0 20px;
             display: flex;
             align-items: center;
@@ -67,6 +67,119 @@
             font-size: 0.75rem;
             letter-spacing: 1px;
         }
+        /* Auth widget (right side of tab bar) */
+        .auth-widget {
+            margin-left: auto;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+        }
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.08);
+            color: #cbd5e0;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .auth-status:hover { background: rgba(255,255,255,0.16); color: #fff; }
+        .auth-status.signed-in {
+            background: rgba(16, 185, 129, 0.2);
+            color: #a7f3d0;
+        }
+        .auth-status.signed-in:hover { background: rgba(16, 185, 129, 0.32); }
+        .auth-status .cloud-icon { font-size: 0.95rem; }
+        .auth-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 12px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+            padding: 6px;
+            min-width: 220px;
+            z-index: 100;
+            margin-top: 4px;
+        }
+        .auth-menu.show { display: block; }
+        .auth-menu .auth-menu-info {
+            padding: 8px 10px;
+            font-size: 0.78rem;
+            color: #64748b;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .auth-menu .auth-menu-info strong { color: #2c3e50; display: block; word-break: break-all; }
+        .auth-menu button {
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+        .auth-menu button:hover { background: #f1f5f9; }
+        .auth-menu button.danger-item { color: #dc2626; }
+        .cloud-sync-chip {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #e0f2fe;
+            color: #0369a1;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+        .cloud-sync-chip.local-only {
+            background: #f1f5f9;
+            color: #64748b;
+        }
+        /* Import from Learner Profile picker */
+        .lp-class-list {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        .lp-class-row {
+            padding: 10px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .lp-class-row:last-child { border-bottom: none; }
+        .lp-class-row:hover { background: #eef4ff; }
+        .lp-class-row.selected {
+            background: #4a6fa5;
+            color: white;
+        }
+        .lp-class-name { font-weight: 700; }
+        .lp-class-meta { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+        .lp-preview-list {
+            max-height: 180px;
+            overflow-y: auto;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            border: 1px solid #e2e8f0;
+        }
+        .lp-preview-list div {
+            padding: 2px 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .lp-preview-list div:last-child { border: none; }
 
         /* --- VIEWS --- */
         .view {
@@ -1757,6 +1870,13 @@
     <div id="tab-bar">
         <button class="tab-btn active" id="tab-designer" onclick="switchView('designer')">DESIGNER</button>
         <button class="tab-btn" id="tab-live" onclick="switchView('live')">LIVE CLASSROOM</button>
+        <div class="auth-widget" id="auth-widget">
+            <div class="auth-status" id="auth-status" onclick="openAuthMenu(event)">
+                <span class="cloud-icon">☁</span>
+                <span id="auth-status-text">Sign in to sync</span>
+            </div>
+            <div class="auth-menu" id="auth-menu"></div>
+        </div>
         <div id="tab-brand">CLASSROOM TOOLKIT</div>
     </div>
 
@@ -1983,7 +2103,312 @@
             hydrateLayouts();
             loadCanvasStateFromBrowser();
             loadLiveState();
+            initSupabase();
         });
+
+        // ============================================================
+        //  SUPABASE AUTH + CLOUD SYNC
+        //  Same login as the Learner Profile System (Diagnostic tool).
+        //  When signed in: layouts + live sessions sync to the cloud.
+        //  When signed out: everything is localStorage-only (unchanged).
+        // ============================================================
+        var SB_URL = 'https://gppetukrcdtmebqxpotj.supabase.co';
+        var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwcGV0dWtyY2R0bWVicXhwb3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjI5NzEsImV4cCI6MjA5OTk5ODk3MX0.3zAfQlL8mGd5MRRJL5Rb-uv8Qj0l-8i7Ec--Z3FL8tU';
+        var sbClient = null;
+        var currentUser = null;
+        var cloudSyncTimer = null;
+        var isCloudPulling = false; // suppress push during pull merge
+
+        function initSupabase() {
+            if (!window.supabase || !window.supabase.createClient) {
+                console.warn('Supabase SDK not loaded — cloud sync disabled');
+                return;
+            }
+            try {
+                sbClient = window.supabase.createClient(SB_URL, SB_ANON, {
+                    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'classroom_designer_auth' }
+                });
+            } catch (e) {
+                console.error('Supabase init failed:', e);
+                return;
+            }
+            // Restore session on load
+            sbClient.auth.getSession().then(function(res) {
+                var session = res && res.data ? res.data.session : null;
+                currentUser = session ? session.user : null;
+                updateAuthUI();
+                if (currentUser) onSignedIn();
+            });
+            // React to future auth changes
+            sbClient.auth.onAuthStateChange(function(event, session) {
+                currentUser = session ? session.user : null;
+                updateAuthUI();
+                if (event === 'SIGNED_IN') onSignedIn();
+                if (event === 'SIGNED_OUT') onSignedOut();
+            });
+        }
+
+        function isSignedIn() { return !!currentUser; }
+
+        function updateAuthUI() {
+            var status = document.getElementById('auth-status');
+            var statusText = document.getElementById('auth-status-text');
+            if (!status || !statusText) return;
+            if (currentUser) {
+                status.classList.add('signed-in');
+                var name = currentUser.email || 'Signed in';
+                statusText.textContent = '☁ ' + (name.length > 24 ? name.slice(0, 22) + '…' : name);
+                status.querySelector('.cloud-icon').textContent = '';
+            } else {
+                status.classList.remove('signed-in');
+                statusText.textContent = 'Sign in to sync';
+                status.querySelector('.cloud-icon').textContent = '☁';
+            }
+        }
+
+        function openAuthMenu(e) {
+            if (e) e.stopPropagation();
+            var menu = document.getElementById('auth-menu');
+            var html = '';
+            if (currentUser) {
+                html += '<div class="auth-menu-info">Signed in as<strong>' + escapeHtml(currentUser.email || '') + '</strong></div>';
+                html += '<button onclick="pullLayoutsFromCloud();closeAuthMenu();">🔄 Refresh from cloud</button>';
+                html += '<button onclick="pushAllLayoutsToCloud();closeAuthMenu();">☁ Push all to cloud</button>';
+                html += '<button class="danger-item" onclick="doSignOut();closeAuthMenu();">Sign out</button>';
+            } else {
+                html += '<div class="auth-menu-info" style="border:none;">Use the same login as your<strong>Learner Profile / Diagnostic tool</strong></div>';
+                html += '<button onclick="openLoginModal();closeAuthMenu();">🔑 Sign in / Sign up</button>';
+            }
+            menu.innerHTML = html;
+            menu.classList.add('show');
+        }
+        function closeAuthMenu() {
+            var m = document.getElementById('auth-menu');
+            if (m) m.classList.remove('show');
+        }
+        document.addEventListener('click', function(e) {
+            var widget = document.getElementById('auth-widget');
+            if (widget && !widget.contains(e.target)) closeAuthMenu();
+        });
+
+        function openLoginModal(errMsg) {
+            var html =
+                '<div class="modal-title">☁ Sign in to sync your layouts</div>' +
+                '<div style="font-size:0.85rem;color:#64748b;margin-bottom:14px;line-height:1.5;">' +
+                    'Use the same email + password as your <strong>Learner Profile / Diagnostic Assessment</strong> tool. Once signed in, your layouts save to the cloud and you can import class rosters from your learner profile.' +
+                '</div>' +
+                (errMsg ? '<div style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;padding:8px 10px;border-radius:5px;margin-bottom:10px;font-size:0.85rem;">' + escapeHtml(errMsg) + '</div>' : '') +
+                '<label>Email</label>' +
+                '<input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">' +
+                '<label style="margin-top:6px;">Password</label>' +
+                '<input type="password" id="login-password" placeholder="Password" autocomplete="current-password">' +
+                '<div class="modal-actions" style="flex-wrap:wrap;">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                    '<button onclick="doSignUp()">Sign up (new)</button>' +
+                    '<button class="automation" onclick="doSignIn()">Sign in</button>' +
+                '</div>';
+            openModal(html);
+            setTimeout(function() {
+                var e = document.getElementById('login-email');
+                if (e) {
+                    e.focus();
+                    var p = document.getElementById('login-password');
+                    var enterHandler = function(evt) { if (evt.key === 'Enter') doSignIn(); };
+                    e.onkeydown = enterHandler;
+                    if (p) p.onkeydown = enterHandler;
+                }
+            }, 50);
+        }
+
+        function readLoginInputs() {
+            var email = (document.getElementById('login-email').value || '').trim();
+            var password = document.getElementById('login-password').value || '';
+            if (!email || !password) { alert('Enter both email and password.'); return null; }
+            return { email: email, password: password };
+        }
+
+        function doSignIn() {
+            if (!sbClient) { alert('Cloud sync unavailable — Supabase SDK failed to load. Check your internet connection.'); return; }
+            var inp = readLoginInputs();
+            if (!inp) return;
+            sbClient.auth.signInWithPassword({ email: inp.email, password: inp.password }).then(function(res) {
+                if (res.error) {
+                    closeModal();
+                    openLoginModal(res.error.message || 'Sign in failed.');
+                    return;
+                }
+                closeModal();
+                // onAuthStateChange -> onSignedIn will fire
+            });
+        }
+
+        function doSignUp() {
+            if (!sbClient) { alert('Cloud sync unavailable — Supabase SDK failed to load.'); return; }
+            var inp = readLoginInputs();
+            if (!inp) return;
+            sbClient.auth.signUp({ email: inp.email, password: inp.password }).then(function(res) {
+                if (res.error) {
+                    closeModal();
+                    openLoginModal(res.error.message || 'Sign up failed.');
+                    return;
+                }
+                closeModal();
+                alert('Signed up! Check your email for a confirmation link (if email confirmation is enabled). If not, you should be signed in already.');
+            });
+        }
+
+        function doSignOut() {
+            if (!sbClient) return;
+            sbClient.auth.signOut().then(function() {
+                // onAuthStateChange -> onSignedOut fires
+            });
+        }
+
+        function onSignedIn() {
+            updateAuthUI();
+            // Pull cloud layouts and merge with local
+            pullLayoutsFromCloud();
+        }
+        function onSignedOut() {
+            updateAuthUI();
+            // Stay on the local layouts — user can still work, just no cloud sync
+        }
+
+        // ---------- Cloud sync layer ----------
+
+        // Convert an in-memory layout to a row for the classroom_layouts table
+        function layoutToRow(l) {
+            var wrap = readSessionsWrapper();
+            var session = wrap.sessions[l.id] || null;
+            return {
+                layout_id: l.id,
+                owner_id: currentUser.id,
+                name: l.name,
+                items: l.items || [],
+                current_students: l.currentStudents || [],
+                last_layout_type: l.lastLayoutType || 'r5',
+                session_data: session || {},
+                learner_profile_class: l.learnerProfileClass || null,
+                created_at: new Date(l.createdAt || Date.now()).toISOString(),
+                updated_at: new Date(l.updatedAt || Date.now()).toISOString()
+            };
+        }
+
+        function rowToLayout(row) {
+            return {
+                id: row.layout_id,
+                name: row.name,
+                items: row.items || [],
+                currentStudents: row.current_students || [],
+                lastLayoutType: row.last_layout_type || 'r5',
+                learnerProfileClass: row.learner_profile_class || null,
+                createdAt: new Date(row.created_at).getTime(),
+                updatedAt: new Date(row.updated_at).getTime()
+            };
+        }
+
+        // Debounced push of the CURRENT layout (used from auto-save paths)
+        function queueCloudSync() {
+            if (!isSignedIn() || isCloudPulling) return;
+            if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+            cloudSyncTimer = setTimeout(function() {
+                cloudSyncTimer = null;
+                pushCurrentLayoutToCloud();
+            }, 800);
+        }
+
+        function pushCurrentLayoutToCloud() {
+            if (!isSignedIn() || !sbClient) return;
+            var layout = getCurrentLayout();
+            if (!layout) return;
+            sbClient.from('classroom_layouts')
+                .upsert(layoutToRow(layout), { onConflict: 'owner_id,layout_id' })
+                .then(function(res) {
+                    if (res.error) console.warn('Cloud push failed:', res.error.message);
+                });
+        }
+
+        function pushAllLayoutsToCloud() {
+            if (!isSignedIn() || !sbClient) { alert('Sign in first.'); return; }
+            var rows = layouts.map(layoutToRow);
+            if (rows.length === 0) { alert('Nothing to push.'); return; }
+            sbClient.from('classroom_layouts')
+                .upsert(rows, { onConflict: 'owner_id,layout_id' })
+                .then(function(res) {
+                    if (res.error) alert('Push failed: ' + res.error.message);
+                    else alert('Pushed ' + rows.length + ' layout(s) to the cloud.');
+                });
+        }
+
+        function pushLayoutDeletionToCloud(layoutId) {
+            if (!isSignedIn() || !sbClient) return;
+            sbClient.from('classroom_layouts').delete().eq('owner_id', currentUser.id).eq('layout_id', layoutId).then(function(res) {
+                if (res.error) console.warn('Cloud delete failed:', res.error.message);
+            });
+        }
+
+        // Pull all cloud layouts, merge with local (last-write-wins per layout id)
+        function pullLayoutsFromCloud() {
+            if (!isSignedIn() || !sbClient) return;
+            isCloudPulling = true;
+            sbClient.from('classroom_layouts').select('*').eq('owner_id', currentUser.id).then(function(res) {
+                if (res.error) {
+                    console.warn('Cloud pull failed:', res.error.message);
+                    if (res.error.message && res.error.message.indexOf('relation') !== -1) {
+                        alert('Cloud sync error: the "classroom_layouts" table doesn\'t exist yet. Run the SQL migration file in your Supabase SQL editor to enable cloud sync.');
+                    }
+                    isCloudPulling = false;
+                    return;
+                }
+                var cloudRows = res.data || [];
+                var localById = {};
+                layouts.forEach(function(l) { localById[l.id] = l; });
+                var toUpload = [];
+                cloudRows.forEach(function(row) {
+                    var cloud = rowToLayout(row);
+                    var local = localById[cloud.id];
+                    if (!local) {
+                        // Cloud-only → add locally
+                        layouts.push(cloud);
+                        // Also restore its session_data
+                        if (row.session_data && Object.keys(row.session_data).length > 0) {
+                            var wrap = readSessionsWrapper();
+                            wrap.sessions[cloud.id] = row.session_data;
+                            persistSessionsWrapper(wrap);
+                        }
+                    } else if ((local.updatedAt || 0) > (cloud.updatedAt || 0)) {
+                        // Local is newer → queue upload
+                        toUpload.push(local);
+                    } else {
+                        // Cloud is newer or equal → overwrite local
+                        Object.assign(local, cloud);
+                        if (row.session_data && Object.keys(row.session_data).length > 0) {
+                            var wrap = readSessionsWrapper();
+                            wrap.sessions[cloud.id] = row.session_data;
+                            persistSessionsWrapper(wrap);
+                        }
+                    }
+                    delete localById[cloud.id];
+                });
+                // Any local layouts not in cloud → upload them
+                Object.keys(localById).forEach(function(k) { toUpload.push(localById[k]); });
+                persistLayouts();
+
+                if (toUpload.length > 0) {
+                    var rows = toUpload.map(layoutToRow);
+                    sbClient.from('classroom_layouts')
+                        .upsert(rows, { onConflict: 'owner_id,layout_id' })
+                        .then(function() { isCloudPulling = false; });
+                } else {
+                    isCloudPulling = false;
+                }
+
+                // Reload current layout in the UI (in case it was overwritten)
+                if (getCurrentLayout()) loadCanvasStateFromBrowser();
+                loadLiveState();
+                if (document.getElementById('live-view').classList.contains('active')) renderLiveView();
+            });
+        }
 
         // ============================================================
         //  MULTI-LAYOUT STORAGE
@@ -2087,6 +2512,7 @@
         function persistLayouts() {
             var payload = { version: 1, currentLayoutId: currentLayoutId, layouts: layouts };
             localStorage.setItem(STORAGE_DESIGNER_KEY, JSON.stringify(payload));
+            queueCloudSync();
         }
 
         function readSessionsWrapper() {
@@ -2103,6 +2529,7 @@
 
         function persistSessionsWrapper(wrap) {
             localStorage.setItem(STORAGE_LIVE_KEY, JSON.stringify(wrap));
+            queueCloudSync();
         }
 
         // Auto-save the current canvas into the current layout's slot
@@ -2124,7 +2551,7 @@
                     var txtSpan = el.querySelector('.elem-txt');
                     text = txtSpan ? txtSpan.innerText : '';
                 }
-                items.push({
+                var itemObj = {
                     type: type,
                     left: el.style.left,
                     top: el.style.top,
@@ -2132,7 +2559,10 @@
                     height: el.style.height || el.offsetHeight + 'px',
                     text: text,
                     color: color
-                });
+                };
+                var lpId = el.getAttribute('data-lp-student-id');
+                if (lpId) itemObj.lp_student_id = lpId;
+                items.push(itemObj);
             });
             layout.items = items;
             layout.currentStudents = currentStudents.slice();
@@ -2158,6 +2588,7 @@
                 } else {
                     el.style.backgroundColor = item.color;
                 }
+                if (item.lp_student_id) el.setAttribute('data-lp-student-id', item.lp_student_id);
             });
             deselectAll();
             // Sync classroom name inputs to this layout's name
@@ -2275,6 +2706,7 @@
             var wrap = readSessionsWrapper();
             delete wrap.sessions[id];
             persistSessionsWrapper(wrap);
+            pushLayoutDeletionToCloud(id);
             if (layouts.length === 0) {
                 // Always keep at least one layout — create a fresh one
                 var starter = createLayout('Untitled Layout');
@@ -2364,6 +2796,14 @@
                     html += '<div class="layout-row-info">';
                     html += '<div class="layout-row-name">';
                     html += (isCurrent ? '<span class="layout-current-badge">CURRENT</span> ' : '') + escapeHtml(l.name || 'Untitled');
+                    if (l.learnerProfileClass) {
+                        html += ' <span class="cloud-sync-chip" title="Imported from Learner Profile: ' + escapeAttr(l.learnerProfileClass) + '">📥 LP</span>';
+                    }
+                    if (isSignedIn()) {
+                        html += ' <span class="cloud-sync-chip" title="Synced to cloud">☁ synced</span>';
+                    } else {
+                        html += ' <span class="cloud-sync-chip local-only" title="Stored in this browser only">📱 local</span>';
+                    }
                     html += '</div>';
                     html += '<div class="layout-row-meta">';
                     html += st.studentCount + ' student' + (st.studentCount === 1 ? '' : 's');
@@ -2683,6 +3123,41 @@
         }
 
         function generateRandomPlan() {
+            openNewPlanModal();
+        }
+
+        // Modal offering the roster source: paste text OR import from Learner Profile
+        function openNewPlanModal() {
+            var signedIn = isSignedIn();
+            var html =
+                '<div class="modal-title">🎲 New Plan From Roster</div>' +
+                '<div style="font-size:0.9rem;color:#64748b;margin-bottom:16px;line-height:1.5;">' +
+                    'Choose where the student names come from.' +
+                '</div>' +
+                // Option 1: Paste
+                '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px;margin-bottom:10px;cursor:pointer;" onclick="newPlanFromPaste()">' +
+                    '<div style="font-weight:700;color:#2c3e50;margin-bottom:2px;">📝 Paste student names</div>' +
+                    '<div style="font-size:0.82rem;color:#64748b;">Type or paste a list — comma, newline, or space-separated.</div>' +
+                '</div>' +
+                // Option 2: Learner Profile
+                (signedIn
+                    ? '<div style="background:#eef4ff;border:1px solid #4a6fa5;border-radius:6px;padding:12px;margin-bottom:10px;cursor:pointer;" onclick="newPlanFromLearnerProfile()">' +
+                        '<div style="font-weight:700;color:#2c3e50;margin-bottom:2px;">📥 Import from Learner Profile</div>' +
+                        '<div style="font-size:0.82rem;color:#4a6fa5;">Pick one of your classes — all students in it will be added and linked to their learner profiles.</div>' +
+                      '</div>'
+                    : '<div style="background:#f8fafc;border:1px dashed #cbd5e0;border-radius:6px;padding:12px;margin-bottom:10px;opacity:0.7;">' +
+                        '<div style="font-weight:700;color:#64748b;margin-bottom:2px;">☁ Import from Learner Profile</div>' +
+                        '<div style="font-size:0.82rem;color:#64748b;">Sign in with your Learner Profile / Diagnostic tool credentials to unlock this option.</div>' +
+                        '<button style="margin-top:8px;padding:5px 12px;font-size:0.8rem;" onclick="closeModal();openLoginModal();">Sign in</button>' +
+                      '</div>') +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                '</div>';
+            openModal(html);
+        }
+
+        function newPlanFromPaste() {
+            closeModal();
             var rosterInput = prompt(
                 "Paste student list here:\n\n" +
                 "• Surnames / Full names: Keep them together by separating each student with a comma or newline.\n" +
@@ -2700,6 +3175,145 @@
             lastLayoutType = layoutType ? layoutType.toLowerCase().trim() : "r5";
             currentStudents.sort(() => Math.random() - 0.5);
             buildLayoutPlacement(currentStudents, lastLayoutType);
+        }
+
+        // ---------- Import from Learner Profile ----------
+        var _lpFetchedStudents = null;
+        var _lpFetchedClassName = null;
+
+        function newPlanFromLearnerProfile() {
+            if (!isSignedIn() || !sbClient) { alert('Sign in first.'); return; }
+            closeModal();
+            openLPClassPickerModal();
+        }
+
+        function openLPClassPickerModal() {
+            var html =
+                '<div class="modal-title">📥 Import Class From Learner Profile</div>' +
+                '<div style="font-size:0.85rem;color:#64748b;margin-bottom:12px;">Loading your classes…</div>' +
+                '<div id="lp-picker-content"><em>Fetching from Supabase…</em></div>' +
+                '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="closeModal()">Cancel</button>' +
+                '</div>';
+            openModal(html);
+            fetchLPClasses();
+        }
+
+        function fetchLPClasses() {
+            sbClient.from('classes').select('id, class_id, name, created_at').eq('owner_id', currentUser.id).order('name').then(function(res) {
+                var container = document.getElementById('lp-picker-content');
+                if (!container) return;
+                if (res.error) {
+                    container.innerHTML = '<div style="color:#991b1b;background:#fee2e2;padding:10px;border-radius:5px;">Failed to load classes: ' + escapeHtml(res.error.message) + '</div>';
+                    return;
+                }
+                var classes = res.data || [];
+                if (classes.length === 0) {
+                    container.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">No classes found in your Learner Profile account. Add classes there first, then come back.</div>';
+                    return;
+                }
+                var html = '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Select a class:</div>';
+                html += '<div class="lp-class-list">';
+                classes.forEach(function(c) {
+                    html += '<div class="lp-class-row" onclick="selectLPClass(\'' + escapeAttr(c.name) + '\',\'' + escapeAttr(c.class_id || '') + '\')">' +
+                        '<div class="lp-class-name">' + escapeHtml(c.name) + '</div>' +
+                        '<div class="lp-class-meta">' + escapeHtml(c.class_id || '') + '</div>' +
+                        '</div>';
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            });
+        }
+
+        function selectLPClass(className, classId) {
+            var container = document.getElementById('lp-picker-content');
+            if (!container) return;
+            container.innerHTML = '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;"><strong>' + escapeHtml(className) + '</strong> — loading students…</div>';
+            sbClient.from('students')
+                .select('student_id, name, chinese_name')
+                .eq('owner_id', currentUser.id)
+                .eq('class_name', className)
+                .order('name')
+                .then(function(res) {
+                    if (res.error) {
+                        container.innerHTML = '<div style="color:#991b1b;background:#fee2e2;padding:10px;border-radius:5px;">Failed to load students: ' + escapeHtml(res.error.message) + '</div>';
+                        return;
+                    }
+                    var students = res.data || [];
+                    if (students.length === 0) {
+                        container.innerHTML =
+                            '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;"><strong>' + escapeHtml(className) + '</strong></div>' +
+                            '<div style="color:#94a3b8;font-style:italic;padding:10px;">This class has no students yet in your Learner Profile account.</div>';
+                        return;
+                    }
+                    _lpFetchedStudents = students;
+                    _lpFetchedClassName = className;
+                    var html =
+                        '<div style="font-size:0.85rem;color:#2c3e50;margin-bottom:6px;"><strong>' + escapeHtml(className) + '</strong> — ' + students.length + ' student' + (students.length === 1 ? '' : 's') + '</div>' +
+                        '<div class="lp-preview-list">';
+                    students.forEach(function(s) {
+                        var lbl = s.name || 'Unnamed';
+                        if (s.chinese_name) lbl += ' (' + s.chinese_name + ')';
+                        html += '<div>' + escapeHtml(lbl) + '</div>';
+                    });
+                    html += '</div>';
+                    html += '<div style="margin-top:10px;">' +
+                        '<label style="font-size:0.85rem;">Layout name</label>' +
+                        '<input type="text" id="lp-layout-name" value="' + escapeAttrHtml(className) + '">' +
+                        '<label style="font-size:0.85rem;margin-top:6px;">Seating arrangement</label>' +
+                        '<select id="lp-layout-type" style="width:100%;padding:6px;border:1px solid #cbd5e0;border-radius:4px;">' +
+                            '<option value="r5" selected>Rows of 5</option>' +
+                            '<option value="r4">Rows of 4</option>' +
+                            '<option value="r6">Rows of 6</option>' +
+                            '<option value="r7">Rows of 7</option>' +
+                            '<option value="t4">Tables of 4</option>' +
+                            '<option value="t5">Tables of 5</option>' +
+                            '<option value="t6">Tables of 6</option>' +
+                        '</select>' +
+                        '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+                            '<button class="export-btn" onclick="openLPClassPickerModal()">← Back to classes</button>' +
+                            '<button class="automation" onclick="createLayoutFromLPImport()">Create Layout</button>' +
+                        '</div>';
+                    container.innerHTML = html;
+                });
+        }
+
+        function createLayoutFromLPImport() {
+            if (!_lpFetchedStudents || _lpFetchedStudents.length === 0) return;
+            var nameInput = document.getElementById('lp-layout-name');
+            var typeInput = document.getElementById('lp-layout-type');
+            var layoutName = (nameInput && nameInput.value || _lpFetchedClassName || 'Imported Class').trim();
+            var layoutType = (typeInput && typeInput.value) || 'r5';
+            if (!layoutName) { alert('Please enter a layout name.'); return; }
+
+            // Save current work, create a new layout, switch to it
+            saveCanvasStateToBrowser();
+            saveCurrentSessionToCurrentLayout();
+            var l = createLayout(layoutName);
+            l.learnerProfileClass = _lpFetchedClassName;
+            switchToLayout(l.id);
+
+            // Build name list; store LP student IDs so items keep their link
+            var names = _lpFetchedStudents.map(function(s) { return s.name || 'Unnamed'; });
+            currentStudents = names.slice();
+            lastLayoutType = layoutType;
+            currentStudents.sort(function() { return Math.random() - 0.5; });
+            buildLayoutPlacement(currentStudents, lastLayoutType);
+
+            // Now tag each newly-created student desk with its LP student_id
+            var lpByName = {};
+            _lpFetchedStudents.forEach(function(s) { if (s.name) lpByName[s.name] = s.student_id; });
+            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
+                var span = el.querySelector('.elem-txt');
+                var nm = span ? span.innerText : '';
+                if (lpByName[nm]) el.setAttribute('data-lp-student-id', lpByName[nm]);
+            });
+            // Re-persist so the lp_student_id lives in items[]
+            saveCanvasStateToBrowser();
+
+            closeModal();
+            _lpFetchedStudents = null;
+            _lpFetchedClassName = null;
         }
 
         function automaticallyShuffleOrMix() {
@@ -3857,6 +4471,16 @@
             if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
             var d = liveState.studentData[name];
             var grp = findGroupForStudent(name);
+            // Is this student linked to their Learner Profile record?
+            var lpId = null;
+            var layout = getCurrentLayout();
+            if (layout && layout.items) {
+                var it = layout.items.find(function(i) { return i.type === 'student' && (i.text || '') === name; });
+                if (it && it.lp_student_id) lpId = it.lp_student_id;
+            }
+            var lpChip = lpId
+                ? '<span style="display:inline-block;background:#eef4ff;color:#4a6fa5;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;" title="Linked to Learner Profile ' + escapeAttr(lpId) + '">🔗 LP: ' + escapeHtml(lpId) + '</span>'
+                : '';
             var notesHtml = '';
             if (d.notes.length === 0) {
                 notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">No notes yet.</div>';
@@ -3884,7 +4508,7 @@
                     '</div>';
             }
             var html =
-                '<div class="modal-title">' + escapeHtml(name) + '</div>' +
+                '<div class="modal-title">' + escapeHtml(name) + lpChip + '</div>' +
                 '<div style="color:#64748b;font-size:0.85rem;margin-bottom:14px;">' +
                     'Points: <strong style="color:#2c3e50;font-size:1.1rem;">' + d.points + '</strong>' +
                     (grp ? ' &nbsp;·&nbsp; Group: <strong style="color:' + grp.color + ';">' + escapeHtml(grp.name) + '</strong>' : ' &nbsp;·&nbsp; Unassigned') +
