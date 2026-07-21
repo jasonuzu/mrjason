@@ -3200,7 +3200,10 @@
         }
 
         function fetchLPClasses() {
-            sbClient.from('classes').select('id, class_id, name, created_at').eq('owner_id', currentUser.id).order('name').then(function(res) {
+            // RLS already scopes to the current user via `auth.uid() = owner_id`.
+            // No client-side owner_id filter — that way, if the RLS query returns 0 rows we know
+            // it's actually an ownership problem (usually orphaned owner_id = NULL from legacy data).
+            sbClient.from('classes').select('id, class_id, name, created_at').order('name').then(function(res) {
                 var container = document.getElementById('lp-picker-content');
                 if (!container) return;
                 if (res.error) {
@@ -3209,7 +3212,7 @@
                 }
                 var classes = res.data || [];
                 if (classes.length === 0) {
-                    container.innerHTML = '<div style="color:#64748b;font-style:italic;padding:10px;">No classes found in your Learner Profile account. Add classes there first, then come back.</div>';
+                    renderLPEmptyDiagnostic(container);
                     return;
                 }
                 var html = '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Select a class:</div>';
@@ -3225,13 +3228,73 @@
             });
         }
 
+        function renderLPEmptyDiagnostic(container) {
+            var uid = currentUser.id;
+            var repairSQL =
+                '-- Run this ONCE in your Supabase SQL editor.\n' +
+                '-- It claims any classes and students that have owner_id = NULL\n' +
+                '-- (a leftover state from before multi-user auth was added)\n' +
+                '-- under YOUR account, so they become visible again.\n\n' +
+                "UPDATE classes  SET owner_id = '" + uid + "' WHERE owner_id IS NULL;\n" +
+                "UPDATE students SET owner_id = '" + uid + "' WHERE owner_id IS NULL;\n\n" +
+                '-- (Optional) See what got fixed:\n' +
+                "SELECT COUNT(*) AS classes_now_yours  FROM classes  WHERE owner_id = '" + uid + "';\n" +
+                "SELECT COUNT(*) AS students_now_yours FROM students WHERE owner_id = '" + uid + "';";
+            window._lpRepairSQL = repairSQL;
+
+            container.innerHTML =
+                '<div style="background:#fff7ed;border:1px solid #fdba74;padding:12px;border-radius:6px;margin-bottom:12px;">' +
+                    '<div style="font-weight:700;color:#9a3412;margin-bottom:6px;">🔍 No classes visible to your account</div>' +
+                    '<div style="font-size:0.85rem;color:#7c2d12;line-height:1.55;">' +
+                        'You\'re signed in as <code style="background:#fff;padding:1px 5px;border-radius:3px;font-size:0.78rem;">' + escapeHtml(currentUser.email || '') + '</code> — that half works.' +
+                        '<br><br><strong>Most likely cause:</strong> your classes and students in the Learner Profile database have <code>owner_id = NULL</code>. This is a legacy state from before multi-user auth was added. The database\'s Row Level Security hides <code>NULL</code>-owned rows from everyone (including their creator).' +
+                        '<br><br>This matches the issue you were debugging in the Learner Profile System previously.' +
+                    '</div>' +
+                '</div>' +
+                '<div style="font-weight:700;color:#2c3e50;margin-bottom:6px;">🔧 One-time fix</div>' +
+                '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;line-height:1.5;">Paste this into your Supabase SQL editor. It claims any orphaned records (classes AND students) under your account. Fully idempotent — safe to run twice.</div>' +
+                '<div style="background:#0f172a;color:#e2e8f0;padding:12px;border-radius:5px;font-family:\'SF Mono\',Menlo,monospace;font-size:0.75rem;white-space:pre;overflow-x:auto;max-height:220px;overflow-y:auto;">' +
+                    escapeHtml(repairSQL) +
+                '</div>' +
+                '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">' +
+                    '<button class="automation" onclick="copyLPRepairSQL()">📋 Copy SQL</button>' +
+                    '<a href="https://supabase.com/dashboard/project/gppetukrcdtmebqxpotj/sql/new" target="_blank" style="padding:8px 14px;background:#4a6fa5;color:white;border-radius:4px;text-decoration:none;font-size:0.85rem;font-weight:600;display:inline-block;">↗ Open SQL Editor</a>' +
+                    '<button class="export-btn" onclick="fetchLPClasses()">🔄 Try again</button>' +
+                '</div>' +
+                '<details style="margin-top:14px;font-size:0.8rem;color:#64748b;">' +
+                    '<summary style="cursor:pointer;">Why is this happening?</summary>' +
+                    '<div style="padding:8px 0;line-height:1.55;">' +
+                    'The Row Level Security policy on your <code>classes</code> table is <code>USING (auth.uid() = owner_id)</code>. When a row\'s <code>owner_id</code> is <code>NULL</code>, that comparison is neither true nor false — it\'s <code>NULL</code> — which the database treats as "not visible". So legacy rows created before you added auth stay invisible until they get an owner. The SQL above assigns them all to your account.' +
+                    '</div>' +
+                '</details>';
+        }
+
+        function copyLPRepairSQL() {
+            var sql = window._lpRepairSQL || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(sql).then(
+                    function() {
+                        var btns = document.querySelectorAll('button');
+                        btns.forEach(function(b) { if (b.textContent.indexOf('Copy SQL') !== -1) { b.textContent = '✓ Copied!'; setTimeout(function() { b.textContent = '📋 Copy SQL'; }, 2000); } });
+                    },
+                    function() { promptFallbackCopy(sql); }
+                );
+            } else {
+                promptFallbackCopy(sql);
+            }
+        }
+        function promptFallbackCopy(sql) {
+            // Old browsers — show it in a prompt() so the teacher can select-all-and-copy
+            prompt('Copy this SQL (press Ctrl/Cmd+C):', sql);
+        }
+
         function selectLPClass(className, classId) {
             var container = document.getElementById('lp-picker-content');
             if (!container) return;
             container.innerHTML = '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;"><strong>' + escapeHtml(className) + '</strong> — loading students…</div>';
+            // Same reasoning: no client-side owner_id filter; RLS handles it.
             sbClient.from('students')
                 .select('student_id, name, chinese_name')
-                .eq('owner_id', currentUser.id)
                 .eq('class_name', className)
                 .order('name')
                 .then(function(res) {
@@ -3243,7 +3306,8 @@
                     if (students.length === 0) {
                         container.innerHTML =
                             '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;"><strong>' + escapeHtml(className) + '</strong></div>' +
-                            '<div style="color:#94a3b8;font-style:italic;padding:10px;">This class has no students yet in your Learner Profile account.</div>';
+                            '<div style="background:#fff7ed;border:1px solid #fdba74;padding:10px;border-radius:5px;font-size:0.85rem;color:#7c2d12;">No students visible in this class. If you know students should be here, they may have <code>owner_id = NULL</code> — <button onclick="renderLPEmptyDiagnostic(document.getElementById(\'lp-picker-content\'))" style="padding:2px 8px;font-size:0.78rem;margin-left:4px;">Show the repair SQL</button></div>' +
+                            '<div style="margin-top:10px;"><button class="export-btn" onclick="openLPClassPickerModal()">← Back to classes</button></div>';
                         return;
                     }
                     _lpFetchedStudents = students;
