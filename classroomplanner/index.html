@@ -3200,27 +3200,68 @@
         }
 
         function fetchLPClasses() {
-            // RLS already scopes to the current user via `auth.uid() = owner_id`.
-            // No client-side owner_id filter — that way, if the RLS query returns 0 rows we know
-            // it's actually an ownership problem (usually orphaned owner_id = NULL from legacy data).
-            sbClient.from('classes').select('id, class_id, name, created_at').order('name').then(function(res) {
+            // Query both sources in parallel:
+            //  1. `classes` table (canonical)
+            //  2. distinct class_names from `students` (fallback + gives us live student counts)
+            // Merging them means we work even when one side is missing / mis-owned.
+            var classesQ = sbClient.from('classes').select('id, class_id, name, created_at');
+            var studentsQ = sbClient.from('students').select('class_name');
+            Promise.all([classesQ, studentsQ]).then(function(results) {
+                var classesRes = results[0];
+                var studentsRes = results[1];
                 var container = document.getElementById('lp-picker-content');
                 if (!container) return;
-                if (res.error) {
-                    container.innerHTML = '<div style="color:#991b1b;background:#fee2e2;padding:10px;border-radius:5px;">Failed to load classes: ' + escapeHtml(res.error.message) + '</div>';
+
+                if (classesRes.error && studentsRes.error) {
+                    container.innerHTML = '<div style="color:#991b1b;background:#fee2e2;padding:10px;border-radius:5px;">Failed to load: ' + escapeHtml(classesRes.error.message) + '</div>';
                     return;
                 }
-                var classes = res.data || [];
-                if (classes.length === 0) {
+
+                var classesData = classesRes.data || [];
+                var studentsData = studentsRes.data || [];
+
+                // Merge by class name
+                var byName = {};
+                classesData.forEach(function(c) {
+                    if (!c.name) return;
+                    byName[c.name] = { name: c.name, class_id: c.class_id || '', source: 'classes', studentCount: 0 };
+                });
+                studentsData.forEach(function(s) {
+                    var cn = s.class_name;
+                    if (!cn) return;
+                    if (byName[cn]) {
+                        byName[cn].studentCount += 1;
+                    } else {
+                        byName[cn] = { name: cn, class_id: '', source: 'students', studentCount: 1 };
+                    }
+                });
+
+                var allClasses = Object.keys(byName).map(function(k) { return byName[k]; })
+                    .sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+                if (allClasses.length === 0) {
                     renderLPEmptyDiagnostic(container);
                     return;
                 }
-                var html = '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Select a class:</div>';
+
+                // If some classes exist only in students, drop a small note so the teacher knows
+                var derivedCount = allClasses.filter(function(c) { return c.source === 'students'; }).length;
+
+                var html = '';
+                if (derivedCount > 0) {
+                    html += '<div style="background:#eef4ff;border:1px solid #4a6fa5;padding:8px 10px;border-radius:5px;margin-bottom:10px;font-size:0.78rem;color:#2c3e50;line-height:1.5;">' +
+                        '<strong>Note:</strong> ' + derivedCount + ' class name' + (derivedCount === 1 ? ' was' : 's were') + ' derived from your student records because the <code>classes</code> table doesn\'t have matching entries. This still works — students carry their <code>class_name</code> — but you can tidy this up later in your Learner Profile app.' +
+                        '</div>';
+                }
+                html += '<div style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Select a class:</div>';
                 html += '<div class="lp-class-list">';
-                classes.forEach(function(c) {
+                allClasses.forEach(function(c) {
+                    var meta = [];
+                    if (c.class_id) meta.push(c.class_id);
+                    meta.push(c.studentCount + ' student' + (c.studentCount === 1 ? '' : 's'));
                     html += '<div class="lp-class-row" onclick="selectLPClass(\'' + escapeAttr(c.name) + '\',\'' + escapeAttr(c.class_id || '') + '\')">' +
                         '<div class="lp-class-name">' + escapeHtml(c.name) + '</div>' +
-                        '<div class="lp-class-meta">' + escapeHtml(c.class_id || '') + '</div>' +
+                        '<div class="lp-class-meta">' + escapeHtml(meta.join(' · ')) + '</div>' +
                         '</div>';
                 });
                 html += '</div>';
