@@ -447,6 +447,15 @@
   .post-timestamp .edited-marker {
     text-transform: none; font-weight: 400; margin-left: 6px; font-size: 10.5px;
   }
+  .post-source-badge {
+    display: inline-block; margin-left: 8px; padding: 2px 8px;
+    border-radius: 10px; font-size: 10px; font-weight: 700;
+    text-transform: none; letter-spacing: 0.2px; vertical-align: middle;
+    background: #E8F0FE; color: #1a5fb4; border: 1px solid #c4d9f5;
+  }
+  .post-source-badge.live { background: #E7F6EC; color: #1a7f4b; border-color: #b8e6c9; }
+  .post-item.external { border-left-color: #1a5fb4; }
+  .post-item.external.live { border-left-color: #1a7f4b; }
   .post-content {
     font-size: 13.5px; line-height: 1.55; color: var(--ink);
     white-space: pre-wrap; word-wrap: break-word;
@@ -2721,13 +2730,15 @@ function renderContextSection(rec, lvl){
 
 function renderPostsSection(rec){
   const posts = rec.posts || [];
+  const liveCount = posts.filter(p => /live classroom/i.test(p.source || '')).length;
   return `
     <div class="section-block no-print-collapse">
       <div class="sb-head">
         <div>
           <div class="sb-title">Posts &amp; Updates</div>
-          <div class="sb-domain">Timestamped log — observations, incidents, meetings, plans, calls home</div>
+          <div class="sb-domain">Timestamped log — observations, incidents, meetings, plans, calls home${liveCount ? ' · ' + liveCount + ' from Live Classroom' : ''}</div>
         </div>
+        ${db.isConnected() ? `<button class="btn btn-ghost btn-sm no-print" onclick="event.stopPropagation();App.refreshActiveStudent();" title="Pull the latest posts, including any from the Live Classroom app">↻ Refresh</button>` : ''}
       </div>
 
       <div class="new-post-form no-print">
@@ -2754,10 +2765,15 @@ function renderPostsSection(rec){
 
 function renderPost(post){
   const isEditing = state.editingPostId === post.id;
+  // A post has a "source" when it came from another app (e.g. Live Classroom).
+  // Posts created in this app have no source (or source === 'Learner Profile').
+  const source = post.source && post.source !== 'Learner Profile' ? post.source : '';
+  const isExternal = !!source;
+  const isLive = /live classroom/i.test(source);
   return `
-    <div class="post-item">
+    <div class="post-item${isExternal ? ' external' : ''}${isLive ? ' live' : ''}">
       <div class="post-timestamp">
-        ${formatPostTimestamp(post.timestamp)}${post.editedAt ? '<span class="edited-marker">(edited ' + formatPostTimestamp(post.editedAt) + ')</span>' : ''}
+        ${formatPostTimestamp(post.timestamp)}${post.editedAt ? '<span class="edited-marker">(edited ' + formatPostTimestamp(post.editedAt) + ')</span>' : ''}${source ? `<span class="post-source-badge${isLive ? ' live' : ''}">${isLive ? '🔴 ' : '🔗 '}${escapeHtml(source)}</span>` : ''}
       </div>
       ${isEditing ? `
         <textarea id="edit-post-${post.id}" class="post-edit-textarea">${escapeHtml(post.content)}</textarea>
@@ -2768,7 +2784,7 @@ function renderPost(post){
       ` : `
         <div class="post-content">${escapeHtml(post.content)}</div>
         <div class="post-actions no-print">
-          <button class="post-action" onclick="App.startEditPost('${post.id}')">Edit</button>
+          ${isExternal ? '' : `<button class="post-action" onclick="App.startEditPost('${post.id}')">Edit</button>`}
           <button class="post-action danger" onclick="App.deleteStudentPost('${post.id}')">Delete</button>
         </div>
       `}
@@ -2938,7 +2954,7 @@ function renderPrintSummary(rec, lvl){
     <div class="ps-section">
       <div class="ps-section-title">Posts &amp; Updates (${posts.length})</div>
       <div class="ps-posts">
-        ${posts.map(p => `<div class="ps-post"><span class="ps-post-date">${formatPostTimestamp(p.timestamp)}${p.editedAt?' (edited)':''}</span><br>${escapeHtml(p.content)}</div>`).join('')}
+        ${posts.map(p => { const src = p.source && p.source !== 'Learner Profile' ? p.source : ''; return `<div class="ps-post"><span class="ps-post-date">${formatPostTimestamp(p.timestamp)}${p.editedAt?' (edited)':''}${src ? ' · ' + escapeHtml(src) : ''}</span><br>${escapeHtml(p.content)}</div>`; }).join('')}
       </div>
     </div>
     ` : ''}
@@ -4638,7 +4654,29 @@ const App = {
     render();
   },
 
-  openReport(id){ state.activeId=id; state.view='report'; render(); },
+  async openReport(id){
+    state.activeId = id;
+    state.view = 'report';
+    render();
+    // If connected, refresh this student from the DB so posts written by other
+    // apps (e.g. Live Classroom) show up immediately.
+    if(db.isConnected()){
+      try{
+        const { data, error } = await db.client.from('students').select('*').eq('student_id', id).single();
+        if(!error && data){
+          const fresh = migrateStudent(rowToRec(data));
+          const idx = state.students.findIndex(s => s.id === id);
+          if(idx >= 0) state.students[idx] = fresh;
+          local.set('student:'+fresh.id, JSON.stringify(fresh));
+          if(state.activeId === id && state.view === 'report') render({preserveScroll:true});
+        }
+      }catch(e){ /* silent — cached copy still shows */ }
+    }
+  },
+
+  refreshActiveStudent(){
+    if(state.activeId) App.openReport(state.activeId);
+  },
 
   editRecord(id){
     const rec = state.students.find(s=>s.id===id);
@@ -5605,7 +5643,8 @@ function buildAIAnalysisDoc(rec){
     lines.push('');
     posts.forEach(p => {
       const dateStr = formatPostTimestamp(p.timestamp);
-      lines.push(`**${dateStr}${p.editedAt ? ' (edited)' : ''}**`);
+      const src = p.source && p.source !== 'Learner Profile' ? ' — ' + p.source : '';
+      lines.push(`**${dateStr}${p.editedAt ? ' (edited)' : ''}${src}**`);
       lines.push(p.content);
       lines.push('');
     });
