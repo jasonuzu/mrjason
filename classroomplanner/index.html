@@ -4591,7 +4591,13 @@
                 notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">No notes yet.</div>';
             } else {
                 d.notes.slice().reverse().forEach(function(n) {
-                    notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + '</span>' + escapeHtml(n.text) + '</div>';
+                    var lpChip = '';
+                    if (n.lpPosted) {
+                        lpChip = ' <span style="background:#dcfce7;color:#065f46;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;" title="Auto-posted to Learner Profile System">✓ Posted to LP</span>';
+                    } else if (n.lpPostError) {
+                        lpChip = ' <span style="background:#fee2e2;color:#991b1b;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;" title="' + escapeAttr(n.lpPostError) + '">LP post failed</span>';
+                    }
+                    notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + lpChip + '</span>' + escapeHtml(n.text) + '</div>';
                 });
             }
             // Attendance section — only shown when a lesson is active
@@ -4645,11 +4651,101 @@
             var val = document.getElementById('stu-note-input').value.trim();
             if (!val) { closeModal(); return; }
             if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
-            liveState.studentData[name].notes.push({ text: val, ts: Date.now() });
+            var noteEntry = { text: val, ts: Date.now() };
+            liveState.studentData[name].notes.push(noteEntry);
             logEvent('note_added', { student: name, text: val });
             saveLiveState();
+            // Auto-post to the Learner Profile System if this student is linked
+            postNoteToLearnerProfile(name, noteEntry);
             renderLiveView();
             openStudentModal(name); // refresh
+        }
+
+        // Find the STU-XXXXX id for a student name in the current layout, if any
+        function getLPStudentIdForName(name) {
+            var layout = getCurrentLayout();
+            if (!layout || !layout.items) return null;
+            var it = layout.items.find(function(i) { return i.type === 'student' && (i.text || '') === name; });
+            return (it && it.lp_student_id) || null;
+        }
+
+        // Post a note to the Learner Profile System's students.posts JSONB array.
+        // Silently no-ops if signed out, student not linked, or the RPC/table isn't reachable.
+        function postNoteToLearnerProfile(name, noteEntry) {
+            if (!isSignedIn() || !sbClient) return;
+            var lpId = getLPStudentIdForName(name);
+            if (!lpId) return;
+
+            var lessonPart = (liveState.activeLesson && liveState.activeLesson.name)
+                ? ' (' + liveState.activeLesson.name + ')'
+                : '';
+            var content = 'Live Classroom Update' + lessonPart + '\n\n' + noteEntry.text;
+
+            // Try the atomic RPC first (from api-functions.sql in the LP System)
+            sbClient.rpc('add_student_post', {
+                p_student_id: lpId,
+                p_content: content,
+                p_source: 'classroom-live'
+            }).then(function(res) {
+                if (res.error) {
+                    var msg = (res.error.message || '').toLowerCase();
+                    var isMissingRpc = msg.indexOf('does not exist') !== -1 || msg.indexOf('not found') !== -1 || msg.indexOf('function') !== -1;
+                    if (isMissingRpc) {
+                        // Fall back to a manual read-modify-write on students.posts
+                        postNoteToLPManualFallback(lpId, content, noteEntry, name);
+                    } else {
+                        noteEntry.lpPostError = res.error.message;
+                        saveLiveState();
+                        refreshProfileModalIfOpen(name);
+                    }
+                } else {
+                    noteEntry.lpPosted = true;
+                    noteEntry.lpPostAt = Date.now();
+                    saveLiveState();
+                    refreshProfileModalIfOpen(name);
+                }
+            });
+        }
+
+        function postNoteToLPManualFallback(lpId, content, noteEntry, name) {
+            sbClient.from('students').select('posts').eq('student_id', lpId).single().then(function(res) {
+                if (res.error) {
+                    noteEntry.lpPostError = res.error.message;
+                    saveLiveState();
+                    refreshProfileModalIfOpen(name);
+                    return;
+                }
+                var posts = res.data.posts || [];
+                posts.push({
+                    id: 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+                    timestamp: Date.now(),
+                    content: content,
+                    source: 'classroom-live'
+                });
+                sbClient.from('students').update({ posts: posts }).eq('student_id', lpId).then(function(r2) {
+                    if (r2.error) {
+                        noteEntry.lpPostError = r2.error.message;
+                    } else {
+                        noteEntry.lpPosted = true;
+                        noteEntry.lpPostAt = Date.now();
+                    }
+                    saveLiveState();
+                    refreshProfileModalIfOpen(name);
+                });
+            });
+        }
+
+        // Re-render the currently-open profile modal for this student so the LP chip updates
+        function refreshProfileModalIfOpen(name) {
+            var backdrop = document.getElementById('modal-backdrop');
+            if (!backdrop || backdrop.style.display === 'none') return;
+            var box = document.getElementById('modal-box');
+            if (!box) return;
+            var title = box.querySelector('.modal-title');
+            if (!title) return;
+            var t = title.textContent || '';
+            // Match by prefix so the LP chip suffix on the name doesn't throw us off
+            if (t.indexOf(name) === 0) openStudentModal(name);
         }
         function resetStudentPoints(name) {
             if (!confirm("Reset points to 0 for " + name + "?")) return;
