@@ -2730,7 +2730,7 @@ function renderContextSection(rec, lvl){
 
 function renderPostsSection(rec){
   const posts = rec.posts || [];
-  const liveCount = posts.filter(p => /live classroom/i.test(p.source || '')).length;
+  const liveCount = posts.filter(p => /live.?classroom|classroom.?live/i.test(p.source || '') || /live classroom/i.test(p.content || '')).length;
   return `
     <div class="section-block no-print-collapse">
       <div class="sb-head">
@@ -2738,7 +2738,10 @@ function renderPostsSection(rec){
           <div class="sb-title">Posts &amp; Updates</div>
           <div class="sb-domain">Timestamped log — observations, incidents, meetings, plans, calls home${liveCount ? ' · ' + liveCount + ' from Live Classroom' : ''}</div>
         </div>
-        ${db.isConnected() ? `<button class="btn btn-ghost btn-sm no-print" onclick="event.stopPropagation();App.refreshActiveStudent();" title="Pull the latest posts, including any from the Live Classroom app">↻ Refresh</button>` : ''}
+        ${db.isConnected() ? `<div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm no-print" onclick="event.stopPropagation();App.refreshActiveStudent();" title="Pull the latest posts, including any from the Live Classroom app">↻ Refresh</button>
+          <button class="btn btn-ghost btn-sm no-print" onclick="event.stopPropagation();App.diagnosePosts();" title="Trace where Live Classroom posts are going">🔍 Diagnose</button>
+        </div>` : ''}
       </div>
 
       <div class="new-post-form no-print">
@@ -2767,9 +2770,11 @@ function renderPost(post){
   const isEditing = state.editingPostId === post.id;
   // A post has a "source" when it came from another app (e.g. Live Classroom).
   // Posts created in this app have no source (or source === 'Learner Profile').
-  const source = post.source && post.source !== 'Learner Profile' ? post.source : '';
-  const isExternal = !!source;
-  const isLive = /live classroom/i.test(source);
+  const rawSource = post.source && post.source !== 'Learner Profile' ? post.source : '';
+  const isLive = /live.?classroom|classroom.?live/i.test(rawSource) || /live classroom/i.test(post.content || '');
+  // Show a friendly label for the classroom-live source
+  const source = rawSource ? (isLive ? 'Live Classroom' : rawSource) : '';
+  const isExternal = !!rawSource;
   return `
     <div class="post-item${isExternal ? ' external' : ''}${isLive ? ' live' : ''}">
       <div class="post-timestamp">
@@ -4676,6 +4681,97 @@ const App = {
 
   refreshActiveStudent(){
     if(state.activeId) App.openReport(state.activeId);
+  },
+
+  // Traces the Live Classroom → database → profile chain for the active student
+  async diagnosePosts(){
+    const id = state.activeId;
+    if(!id) return;
+    const rec = state.students.find(s => s.id === id);
+    const lines = [];
+    lines.push('POSTS DIAGNOSTIC');
+    lines.push('');
+    lines.push('Student in this app:');
+    lines.push('  name        : ' + (rec ? rec.name : '(not loaded)'));
+    lines.push('  student_id  : ' + id);
+    lines.push('  user_id     : ' + (rec && rec.userId ? rec.userId : '(none)'));
+    lines.push('  posts shown : ' + ((rec && rec.posts) ? rec.posts.length : 0));
+    lines.push('');
+
+    if(!db.isConnected()){
+      lines.push('Database: NOT CONNECTED — cannot check further.');
+      alert(lines.join('\n'));
+      return;
+    }
+    lines.push('Logged in as: ' + (state.userEmail || '(none)'));
+    lines.push('Your user id: ' + (state.userId || '(none)'));
+    lines.push('');
+
+    // 1. Raw row for this student
+    let row = null;
+    try{
+      const { data, error } = await db.client
+        .from('students')
+        .select('student_id, name, user_id, owner_id, posts')
+        .eq('student_id', id)
+        .single();
+      if(error) throw error;
+      row = data;
+      const dbPosts = Array.isArray(row.posts) ? row.posts : [];
+      lines.push('1. Row in database: FOUND');
+      lines.push('   owner_id matches you: ' + (row.owner_id === state.userId ? 'YES' : 'NO  ← problem'));
+      lines.push('   posts in database   : ' + dbPosts.length);
+      if(dbPosts.length){
+        lines.push('   most recent sources : ' + dbPosts.slice(-3).map(p => p.source || '(none)').join(', '));
+      }
+    }catch(e){
+      lines.push('1. Row in database: NOT FOUND');
+      lines.push('   error: ' + e.message);
+      lines.push('   ← The Live Classroom app is writing to a different student_id.');
+    }
+    lines.push('');
+
+    // 2. Does the add_student_post RPC exist and work?
+    try{
+      const { error } = await db.client.rpc('add_student_post', {
+        p_student_id: '__diagnostic_no_such_student__',
+        p_content: 'diagnostic',
+        p_source: 'diagnostic'
+      });
+      if(!error){
+        lines.push('2. add_student_post RPC: EXISTS (unexpected success on fake id)');
+      } else if(/not found|access denied/i.test(error.message)){
+        lines.push('2. add_student_post RPC: EXISTS and working');
+        lines.push('   (rejected the fake student id, which is correct)');
+      } else if(/could not find|does not exist|schema cache/i.test(error.message)){
+        lines.push('2. add_student_post RPC: MISSING  ← problem');
+        lines.push('   Run COMPLETE-SETUP.sql to create it.');
+      } else {
+        lines.push('2. add_student_post RPC: error — ' + error.message);
+      }
+    }catch(e){
+      lines.push('2. add_student_post RPC: error — ' + e.message);
+    }
+    lines.push('');
+
+    // 3. Any posts anywhere in your data, in case they landed on another student
+    try{
+      const { data, error } = await db.client.from('students').select('student_id, name, posts');
+      if(error) throw error;
+      let total = 0; const holders = [];
+      (data || []).forEach(r => {
+        const ps = Array.isArray(r.posts) ? r.posts : [];
+        const live = ps.filter(p => /live.?classroom|classroom.?live/i.test(p.source || ''));
+        if(live.length){ total += live.length; holders.push(r.name + ' (' + r.student_id + '): ' + live.length); }
+      });
+      lines.push('3. Live Classroom posts across all your students: ' + total);
+      if(holders.length) lines.push('   ' + holders.slice(0, 8).join('\n   '));
+      else lines.push('   ← None anywhere. The classroom app never wrote to the database.');
+    }catch(e){
+      lines.push('3. Scan failed: ' + e.message);
+    }
+
+    alert(lines.join('\n'));
   },
 
   editRecord(id){
