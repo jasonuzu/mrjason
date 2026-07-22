@@ -456,6 +456,50 @@
   .post-source-badge.live { background: #E7F6EC; color: #1a7f4b; border-color: #b8e6c9; }
   .post-item.external { border-left-color: #1a5fb4; }
   .post-item.external.live { border-left-color: #1a7f4b; }
+
+  /* ── Lesson history ── */
+  .lesson-card {
+    border: 1px solid var(--rule); border-radius: 8px; margin-bottom: 12px;
+    background: var(--paper-raised); overflow: hidden;
+  }
+  .lesson-head {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    cursor: pointer; background: var(--paper);
+  }
+  .lesson-head:hover { background: var(--accent-light); }
+  .lesson-title { font-weight: 700; font-size: 14.5px; flex: 1; }
+  .lesson-date { font-size: 11.5px; color: var(--ink-faint); }
+  .lesson-chev { color: var(--ink-faint); font-size: 12px; transition: transform 0.15s; }
+  .lesson-card.open .lesson-chev { transform: rotate(90deg); }
+  .lesson-body { display: none; padding: 14px 16px; border-top: 1px solid var(--rule); }
+  .lesson-card.open .lesson-body { display: block; }
+  .att-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .att-pill {
+    padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  }
+  .att-pill.present { background: var(--green-bg); color: var(--green); }
+  .att-pill.late { background: var(--yellow-bg); color: var(--yellow); }
+  .att-pill.absent { background: var(--red-bg); color: var(--red); }
+  .lesson-notes-box {
+    background: #FBFAF6; border-left: 3px solid var(--accent);
+    padding: 10px 12px; border-radius: 0 5px 5px 0; margin: 10px 0;
+    font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+  }
+  .lesson-sub {
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--ink-faint); font-weight: 700; margin: 12px 0 5px;
+  }
+  .lesson-student-row {
+    display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
+    border-bottom: 1px solid var(--rule-soft); font-size: 12.5px;
+  }
+  .lesson-student-row:last-child { border-bottom: none; }
+  .lesson-pts {
+    background: var(--accent-light); color: var(--accent);
+    padding: 1px 7px; border-radius: 9px; font-size: 10.5px; font-weight: 700;
+  }
+  .lesson-names { font-size: 12px; color: var(--ink-soft); line-height: 1.7; }
+  @media print { .lesson-body { display: block !important; } }
   .post-content {
     font-size: 13.5px; line-height: 1.55; color: var(--ink);
     white-space: pre-wrap; word-wrap: break-word;
@@ -3151,6 +3195,106 @@ function studentsInClass(className){
   return state.students.filter(s => (s.className||'').trim() === (className||'').trim());
 }
 
+function formatLessonDuration(ms){
+  const mins = Math.round((ms||0)/60000);
+  if(mins < 60) return mins + ' min';
+  const h = Math.floor(mins/60), m = mins%60;
+  return h + 'h' + (m ? ' ' + m + 'm' : '');
+}
+
+function renderLessonHistory(className){
+  const lessons = state.lessonsByClass && state.lessonsByClass[className];
+  if(lessons === undefined){
+    return `<h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Lesson History</h2>
+      <p style="color:var(--ink-faint);font-size:13px;">Loading lessons…</p>`;
+  }
+  if(!lessons.length){
+    return `<h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Lesson History</h2>
+      <div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;line-height:1.6;">
+        No lessons recorded yet. When you end a lesson in the Live Classroom app, it will appear here with attendance, notes, and student activity.
+      </div>`;
+  }
+
+  return `
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">
+      Lesson History <span style="font-weight:400;color:var(--ink-faint);font-size:13px;">(${lessons.length})</span>
+      <button class="btn btn-ghost btn-sm no-print" style="margin-left:10px;" onclick="App.reloadLessons('${escapeAttr(className)}')">↻ Refresh</button>
+    </h2>
+    ${lessons.map(l => renderLessonCard(l)).join('')}
+  `;
+}
+
+function renderLessonCard(l){
+  const started = l.started_at ? new Date(l.started_at) : null;
+  const dateStr = started
+    ? started.toLocaleDateString(undefined,{ weekday:'short', day:'numeric', month:'short', year:'numeric' }) +
+      ' · ' + started.toLocaleTimeString(undefined,{ hour:'numeric', minute:'2-digit' })
+    : '—';
+  const att = l.attendance || {};
+  const byStatus = { present:[], late:[], absent:[] };
+  Object.keys(att).forEach(n => { if(byStatus[att[n]]) byStatus[att[n]].push(n); });
+  const sd = l.student_data || {};
+  const activeNames = Object.keys(sd).sort((a,b) => (sd[b].points||0) - (sd[a].points||0));
+  const isOpen = state.openLessonIds && state.openLessonIds.has(l.lesson_id);
+
+  return `
+  <div class="lesson-card${isOpen ? ' open' : ''}">
+    <div class="lesson-head" onclick="App.toggleLesson('${escapeAttr(l.lesson_id)}')">
+      <span class="lesson-chev">▶</span>
+      <div style="flex:1;">
+        <div class="lesson-title">${escapeHtml(l.name || 'Untitled Lesson')}</div>
+        <div class="lesson-date">${dateStr} · ${formatLessonDuration(l.duration_ms)}</div>
+      </div>
+      <div class="att-pills">
+        <span class="att-pill present">${l.present_count||0} present</span>
+        ${l.late_count ? `<span class="att-pill late">${l.late_count} late</span>` : ''}
+        ${l.absent_count ? `<span class="att-pill absent">${l.absent_count} absent</span>` : ''}
+      </div>
+    </div>
+    <div class="lesson-body">
+      ${l.notes ? `
+        <div class="lesson-sub">Lesson notes</div>
+        <div class="lesson-notes-box">${escapeHtml(l.notes)}</div>
+      ` : `<div style="font-size:12.5px;color:var(--ink-faint);font-style:italic;">No lesson notes were written.</div>`}
+
+      ${byStatus.absent.length || byStatus.late.length ? `
+        <div class="lesson-sub">Attendance detail</div>
+        <div class="lesson-names">
+          ${byStatus.absent.length ? `<div><strong style="color:var(--red);">Absent:</strong> ${byStatus.absent.map(escapeHtml).join(', ')}</div>` : ''}
+          ${byStatus.late.length ? `<div><strong style="color:var(--yellow);">Late:</strong> ${byStatus.late.map(escapeHtml).join(', ')}</div>` : ''}
+        </div>
+      ` : ''}
+
+      ${activeNames.length ? `
+        <div class="lesson-sub">Student activity during this lesson</div>
+        <div>
+          ${activeNames.map(n => {
+            const d = sd[n] || {};
+            const notes = d.notes || [];
+            return `
+            <div class="lesson-student-row">
+              <strong style="min-width:110px;">${escapeHtml(n)}</strong>
+              ${d.points ? `<span class="lesson-pts">${d.points} pt${d.points===1?'':'s'}</span>` : ''}
+              <span style="color:var(--ink-soft);flex:1;">${notes.length ? notes.map(x => escapeHtml(x.text)).join(' · ') : ''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      ${(l.groups && l.groups.length) ? `
+        <div class="lesson-sub">Groups</div>
+        <div class="lesson-names">
+          ${l.groups.map(g => `<div><strong>${escapeHtml(g.name||'Group')}:</strong> ${(g.members||[]).map(escapeHtml).join(', ')}</div>`).join('')}
+        </div>
+      ` : ''}
+
+      <div style="margin-top:14px;display:flex;gap:8px;" class="no-print">
+        <button class="btn btn-ghost btn-sm" onclick="App.deleteLesson('${escapeAttr(l.lesson_id)}','${escapeAttr(l.class_name||'')}')" style="color:var(--red);">🗑 Delete this lesson</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderClassOverview(){
   const className = state.activeClassName;
   const students = studentsInClass(className);
@@ -3229,10 +3373,11 @@ function renderClassOverview(){
     <div class="class-actions-bar no-print">
       <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
-      <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>
-      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
+      <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
+
+    <div id="lesson-history-section">${renderLessonHistory(className)}</div>
 
     <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Distribution across domains</h2>
     <div class="stat-grid">
@@ -5312,7 +5457,77 @@ const App = {
   openClassOverview(className){
     state.activeClassName = className;
     state.view = 'classOverview';
+    if(!state.lessonsByClass) state.lessonsByClass = {};
+    // Clear so the section shows "Loading…" then fills in
+    delete state.lessonsByClass[className];
     render();
+    App.loadLessonsForClass(className);
+  },
+
+  async loadLessonsForClass(className){
+    if(!state.lessonsByClass) state.lessonsByClass = {};
+    if(!db.isConnected()){
+      state.lessonsByClass[className] = [];
+      App.repaintLessons(className);
+      return;
+    }
+    try{
+      // Match on the class code when we have one, otherwise on the name.
+      const entry = getOrCreateClassEntry(className);
+      let q = db.client.from('lessons').select('*').order('started_at', { ascending: false });
+      q = (entry && entry.classId)
+        ? q.or('class_id.eq.' + entry.classId + ',class_name.eq.' + className)
+        : q.eq('class_name', className);
+      const { data, error } = await q;
+      if(error) throw error;
+      state.lessonsByClass[className] = data || [];
+    }catch(e){
+      console.error('Lesson load failed:', e);
+      state.lessonsByClass[className] = [];
+      if(/does not exist/i.test(e.message || '')){
+        state.lessonsTableMissing = true;
+      }
+    }
+    App.repaintLessons(className);
+  },
+
+  // Repaint just the lesson section so the rest of the page doesn't flicker
+  repaintLessons(className){
+    if(state.view !== 'classOverview' || state.activeClassName !== className) return;
+    const el = document.getElementById('lesson-history-section');
+    if(el) el.innerHTML = renderLessonHistory(className);
+    else render({preserveScroll:true});
+  },
+
+  reloadLessons(className){
+    if(!state.lessonsByClass) state.lessonsByClass = {};
+    delete state.lessonsByClass[className];
+    App.repaintLessons(className);
+    App.loadLessonsForClass(className);
+  },
+
+  toggleLesson(lessonId){
+    if(!state.openLessonIds) state.openLessonIds = new Set();
+    if(state.openLessonIds.has(lessonId)) state.openLessonIds.delete(lessonId);
+    else state.openLessonIds.add(lessonId);
+    App.repaintLessons(state.activeClassName);
+  },
+
+  async deleteLesson(lessonId, className){
+    if(!confirm('Delete this lesson from the record?\n\nThis removes it permanently from the database. Student profiles and posts are not affected.')) return;
+    if(db.isConnected()){
+      try{
+        const { error } = await db.client.from('lessons').delete().eq('lesson_id', lessonId);
+        if(error) throw error;
+      }catch(e){
+        alert('Could not delete: ' + e.message);
+        return;
+      }
+    }
+    const target = className || state.activeClassName;
+    const list = (state.lessonsByClass && state.lessonsByClass[target]) || [];
+    state.lessonsByClass[target] = list.filter(l => l.lesson_id !== lessonId);
+    App.repaintLessons(target);
   },
 
   openCompare(className){
