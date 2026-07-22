@@ -1904,6 +1904,7 @@
             <button onclick="addRow()">↓ Add Empty Vertical Row</button>
             <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
             <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
+            <button class="export-btn" onclick="repairLPLinks()" title="Re-link every desk to its Learner Profile record by matching names">🔗 Repair LP links</button>
 
             <div class="section-title">File Operations</div>
             <div class="btn-grid">
@@ -3405,16 +3406,19 @@
             currentStudents.sort(function() { return Math.random() - 0.5; });
             buildLayoutPlacement(currentStudents, lastLayoutType);
 
-            // Now tag each newly-created student desk with its LP student_id
+            // Store the name -> LP student_id map ON THE LAYOUT. This is the durable
+            // record: desks get rebuilt by shuffle/mix, but this map survives.
             var lpByName = {};
-            _lpFetchedStudents.forEach(function(s) { if (s.name) lpByName[s.name] = s.student_id; });
-            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
-                var span = el.querySelector('.elem-txt');
-                var nm = span ? span.innerText : '';
-                if (lpByName[nm]) el.setAttribute('data-lp-student-id', lpByName[nm]);
+            _lpFetchedStudents.forEach(function(s) {
+                if (s.name) lpByName[String(s.name).trim()] = s.student_id;
             });
+            l.lpStudentIds = lpByName;
+
+            // Tag the desks that exist right now
+            applyLPLinksToCanvas();
             // Re-persist so the lp_student_id lives in items[]
             saveCanvasStateToBrowser();
+            persistLayouts();
 
             closeModal();
             _lpFetchedStudents = null;
@@ -3448,7 +3452,39 @@
             buildLayoutPlacement(currentStudents, lastLayoutType);
         }
 
+        // Write the current layout's name -> LP student_id map onto the desks on canvas.
+        // Safe to call any time; desks with no known link are left alone.
+        function applyLPLinksToCanvas() {
+            var layout = getCurrentLayout();
+            var map = (layout && layout.lpStudentIds) || {};
+            var tagged = 0;
+            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
+                var span = el.querySelector('.elem-txt');
+                var nm = (span ? (span.innerText || span.textContent || '') : '').trim();
+                var id = map[nm];
+                if (id) { el.setAttribute('data-lp-student-id', id); tagged++; }
+            });
+            return tagged;
+        }
+
+        // Harvest any links currently on the canvas into the layout's map, so links
+        // created before this map existed are not lost.
+        function harvestLPLinksFromCanvas() {
+            var layout = getCurrentLayout();
+            if (!layout) return;
+            if (!layout.lpStudentIds) layout.lpStudentIds = {};
+            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
+                var id = el.getAttribute('data-lp-student-id');
+                if (!id) return;
+                var span = el.querySelector('.elem-txt');
+                var nm = (span ? (span.innerText || span.textContent || '') : '').trim();
+                if (nm) layout.lpStudentIds[nm] = id;
+            });
+        }
+
         function buildLayoutPlacement(students, layoutType) {
+            // Keep the LP links before we destroy the desks that carry them
+            harvestLPLinksFromCanvas();
             var oldDesks = canvas.querySelectorAll('.elem-student');
             oldDesks.forEach(el => {
                 selectedEls = selectedEls.filter(item => item !== el);
@@ -3507,7 +3543,10 @@
                 }
                 spawnItem('student', posX, posY, student);
             });
+            // Re-attach the LP links to the freshly created desks
+            applyLPLinksToCanvas();
             saveCanvasStateToBrowser();
+            persistLayouts();
         }
 
         function exportLayoutAsImage() {
@@ -4661,20 +4700,90 @@
             openStudentModal(name); // refresh
         }
 
+        // Rebuild this layout's LP links by matching desk names against the database.
+        // Repairs layouts whose links were lost, without needing a re-import.
+        function repairLPLinks() {
+            if (!isSignedIn() || !sbClient) {
+                alert('Sign in to the Learner Profile database first.');
+                return;
+            }
+            var layout = getCurrentLayout();
+            if (!layout) { alert('No layout is open.'); return; }
+
+            harvestLPLinksFromCanvas();
+
+            var deskNames = [];
+            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
+                var span = el.querySelector('.elem-txt');
+                var nm = (span ? (span.innerText || span.textContent || '') : '').trim();
+                if (nm) deskNames.push(nm);
+            });
+            if (deskNames.length === 0) { alert('No student desks on this layout.'); return; }
+
+            sbClient.from('students').select('student_id, name').then(function(res) {
+                if (res.error) { alert('Could not read students: ' + res.error.message); return; }
+                var byName = {};
+                (res.data || []).forEach(function(s) {
+                    if (s.name) byName[String(s.name).trim()] = s.student_id;
+                });
+
+                if (!layout.lpStudentIds) layout.lpStudentIds = {};
+                var matched = [], unmatched = [];
+                deskNames.forEach(function(nm) {
+                    if (byName[nm]) { layout.lpStudentIds[nm] = byName[nm]; matched.push(nm); }
+                    else { unmatched.push(nm); }
+                });
+
+                applyLPLinksToCanvas();
+                saveCanvasStateToBrowser();
+                persistLayouts();
+
+                var msg = 'LP LINK REPAIR\n\n' +
+                          'Linked: ' + matched.length + ' of ' + deskNames.length + ' desks\n';
+                if (unmatched.length) {
+                    msg += '\nNo matching profile for:\n  ' + unmatched.join('\n  ') +
+                           '\n\nThese names differ from the Learner Profile System. ' +
+                           'Rename the desk to match the profile exactly, then repair again.';
+                } else {
+                    msg += '\nEvery desk is linked. Notes will now post to the Learner Profile System.';
+                }
+                alert(msg);
+            });
+        }
+
         // Find the STU-XXXXX id for a student name in the current layout, if any
         function getLPStudentIdForName(name) {
             var layout = getCurrentLayout();
-            if (!layout || !layout.items) return null;
-            var it = layout.items.find(function(i) { return i.type === 'student' && (i.text || '') === name; });
-            return (it && it.lp_student_id) || null;
+            if (!layout) return null;
+            var key = String(name || '').trim();
+            // 1. The item itself
+            if (layout.items) {
+                var it = layout.items.find(function(i) {
+                    return i.type === 'student' && String(i.text || '').trim() === key;
+                });
+                if (it && it.lp_student_id) return it.lp_student_id;
+            }
+            // 2. The layout's durable link map (survives shuffles and rebuilds)
+            if (layout.lpStudentIds && layout.lpStudentIds[key]) return layout.lpStudentIds[key];
+            return null;
         }
 
         // Post a note to the Learner Profile System's students.posts JSONB array.
         // Silently no-ops if signed out, student not linked, or the RPC/table isn't reachable.
         function postNoteToLearnerProfile(name, noteEntry) {
-            if (!isSignedIn() || !sbClient) return;
+            if (!isSignedIn() || !sbClient) {
+                noteEntry.lpPostError = 'Not signed in — note saved locally only.';
+                saveLiveState();
+                refreshProfileModalIfOpen(name);
+                return;
+            }
             var lpId = getLPStudentIdForName(name);
-            if (!lpId) return;
+            if (!lpId) {
+                noteEntry.lpPostError = 'Not linked to a Learner Profile. Use "Repair LP links" in the Designer toolbar.';
+                saveLiveState();
+                refreshProfileModalIfOpen(name);
+                return;
+            }
 
             var lessonPart = (liveState.activeLesson && liveState.activeLesson.name)
                 ? ' (' + liveState.activeLesson.name + ')'
@@ -4689,8 +4798,19 @@
             }).then(function(res) {
                 if (res.error) {
                     var msg = (res.error.message || '').toLowerCase();
-                    var isMissingRpc = msg.indexOf('does not exist') !== -1 || msg.indexOf('not found') !== -1 || msg.indexOf('function') !== -1;
-                    if (isMissingRpc) {
+                    // "Student not found or access denied" is the RPC's OWN rejection —
+                    // it means the id is wrong, NOT that the function is missing.
+                    var isBadStudentId = msg.indexOf('student not found') !== -1 || msg.indexOf('access denied') !== -1;
+                    var isMissingRpc = !isBadStudentId && (
+                        msg.indexOf('could not find') !== -1 ||
+                        msg.indexOf('schema cache') !== -1 ||
+                        msg.indexOf('does not exist') !== -1
+                    );
+                    if (isBadStudentId) {
+                        noteEntry.lpPostError = 'Wrong student id (' + lpId + '). Use "Repair LP links".';
+                        saveLiveState();
+                        refreshProfileModalIfOpen(name);
+                    } else if (isMissingRpc) {
                         // Fall back to a manual read-modify-write on students.posts
                         postNoteToLPManualFallback(lpId, content, noteEntry, name);
                     } else {
