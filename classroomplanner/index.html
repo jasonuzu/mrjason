@@ -3181,6 +3181,7 @@
         // ---------- Import from Learner Profile ----------
         var _lpFetchedStudents = null;
         var _lpFetchedClassName = null;
+        var _lpFetchedClassId = null;
 
         function newPlanFromLearnerProfile() {
             if (!isSignedIn() || !sbClient) { alert('Sign in first.'); return; }
@@ -3354,6 +3355,7 @@
                     }
                     _lpFetchedStudents = students;
                     _lpFetchedClassName = className;
+                    _lpFetchedClassId = classId || '';
                     var html =
                         '<div style="font-size:0.85rem;color:#2c3e50;margin-bottom:6px;"><strong>' + escapeHtml(className) + '</strong> — ' + students.length + ' student' + (students.length === 1 ? '' : 's') + '</div>' +
                         '<div class="lp-preview-list">';
@@ -3397,6 +3399,7 @@
             saveCurrentSessionToCurrentLayout();
             var l = createLayout(layoutName);
             l.learnerProfileClass = _lpFetchedClassName;
+            l.learnerProfileClassId = _lpFetchedClassId || '';
             switchToLayout(l.id);
 
             // Build name list; store LP student IDs so items keep their link
@@ -3423,6 +3426,7 @@
             closeModal();
             _lpFetchedStudents = null;
             _lpFetchedClassName = null;
+            _lpFetchedClassId = null;
         }
 
         function automaticallyShuffleOrMix() {
@@ -4414,6 +4418,12 @@
                     '<div style="flex:1;background:#d97706;color:white;padding:10px;border-radius:6px;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">LATE</div><div style="font-size:1.4rem;font-weight:800;">' + l + '</div></div>' +
                     '<div style="flex:1;background:#dc2626;color:white;padding:10px;border-radius:6px;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:0.5px;opacity:0.9;">ABSENT</div><div style="font-size:1.4rem;font-weight:800;">' + a + '</div></div>' +
                 '</div>' +
+                '<div style="margin-bottom:12px;">' +
+                    '<label style="display:block;font-weight:700;color:#2c3e50;font-size:0.85rem;margin-bottom:4px;">📝 Lesson notes <span style="font-weight:400;color:#64748b;">(optional)</span></label>' +
+                    '<div style="font-size:0.78rem;color:#64748b;margin-bottom:5px;">How did the lesson go? What worked, what to follow up on next time?</div>' +
+                    '<textarea id="end-lesson-notes" rows="4" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:5px;font-family:inherit;font-size:0.88rem;resize:vertical;box-sizing:border-box;" placeholder="e.g. Speaking task ran long — only 4 pairs presented. Group 3 needs the vocab sheet re-explained. Follow up with Eelin about the missed homework."></textarea>' +
+                    '<div id="end-lesson-lp-status" style="font-size:0.78rem;color:#64748b;margin-top:5px;"></div>' +
+                '</div>' +
                 '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:12px;margin-bottom:8px;">' +
                     '<div style="font-weight:700;color:#92400e;margin-bottom:4px;font-size:0.9rem;">⚠️ Export your PDF now</div>' +
                     '<div style="font-size:0.82rem;color:#78350f;line-height:1.4;">The next lesson will replace this one in your exports. Save a PDF (or CSV / JSON) before moving on so you have a permanent record.</div>' +
@@ -4428,15 +4438,18 @@
 
         function confirmEndLesson(exportFirst) {
             if (!liveState.activeLesson) { closeModal(); return; }
+            // Grab the teacher's lesson notes before the modal closes
+            var notesEl = document.getElementById('end-lesson-notes');
+            var lessonNotes = notesEl ? (notesEl.value || '').trim() : '';
             if (exportFirst) {
                 // Export FIRST (while lesson is still active — report uses the active lesson)
                 exportPDF();
             }
             closeModal();
-            endLesson();
+            endLesson(lessonNotes);
         }
 
-        function endLesson() {
+        function endLesson(lessonNotes) {
             if (!liveState.activeLesson) return;
             var al = liveState.activeLesson;
             var durationMs = Date.now() - al.startedAt;
@@ -4446,6 +4459,7 @@
                 startedAt: al.startedAt,
                 endedAt: Date.now(),
                 durationMs: durationMs,
+                notes: lessonNotes || '',
                 attendance: JSON.parse(JSON.stringify(al.attendance || {})),
                 attendanceTakenAt: al.attendanceTakenAt
             };
@@ -4464,6 +4478,81 @@
             updateLessonButtonUI();
             updateAttendanceBannerUI();
             renderLiveView();
+            // Push the whole lesson record to the Learner Profile System
+            postLessonToLearnerProfile(completed);
+        }
+
+        // ---------- Post a completed lesson to the LP System, linked to the class ----------
+
+        // Resolve this layout's class_id (CLS-807-MH87). Uses the stored id when the
+        // layout came from an LP import; otherwise looks it up by class name.
+        function resolveLPClassId(cb) {
+            var layout = getCurrentLayout();
+            var stored = layout && layout.learnerProfileClassId;
+            var className = (layout && layout.learnerProfileClass) || (layout && layout.name) || '';
+            if (stored) { cb(stored, className); return; }
+            if (!sbClient || !className) { cb('', className); return; }
+            sbClient.from('classes').select('class_id, name').eq('name', className).then(function(res) {
+                var found = (!res.error && res.data && res.data[0]) ? res.data[0].class_id : '';
+                if (found && layout) { layout.learnerProfileClassId = found; persistLayouts(); }
+                cb(found || '', className);
+            });
+        }
+
+        function postLessonToLearnerProfile(completed) {
+            if (!isSignedIn() || !sbClient) {
+                completed.lpPostError = 'Not signed in — lesson saved locally only.';
+                saveLiveState();
+                return;
+            }
+            resolveLPClassId(function(classId, className) {
+                // Snapshot each student's points and notes from this session
+                var sd = {};
+                Object.keys(liveState.studentData || {}).forEach(function(nm) {
+                    var d = liveState.studentData[nm] || {};
+                    var pts = d.points || 0;
+                    var ns = (d.notes || []).filter(function(n) {
+                        return n.ts >= completed.startedAt && n.ts <= completed.endedAt;
+                    });
+                    if (pts || ns.length) {
+                        sd[nm] = { points: pts, notes: ns.map(function(n) { return { text: n.text, ts: n.ts }; }) };
+                    }
+                });
+
+                var row = {
+                    lesson_id: completed.id,
+                    owner_id: currentUser ? currentUser.id : null,
+                    class_id: classId || '',
+                    class_name: className || '',
+                    name: completed.name || 'Untitled Lesson',
+                    notes: completed.notes || '',
+                    started_at: new Date(completed.startedAt).toISOString(),
+                    ended_at: new Date(completed.endedAt).toISOString(),
+                    duration_ms: completed.durationMs || 0,
+                    attendance: completed.attendance || {},
+                    present_count: countAttendance(completed.attendance, 'present'),
+                    absent_count: countAttendance(completed.attendance, 'absent'),
+                    late_count: countAttendance(completed.attendance, 'late'),
+                    student_data: sd,
+                    groups: liveState.groups || []
+                };
+
+                sbClient.from('lessons').upsert(row, { onConflict: 'lesson_id' }).then(function(res) {
+                    if (res.error) {
+                        completed.lpPostError = res.error.message;
+                        var m = (res.error.message || '').toLowerCase();
+                        if (m.indexOf('lessons') !== -1 && m.indexOf('does not exist') !== -1) {
+                            completed.lpPostError = 'The lessons table is missing — run LESSONS-SETUP.sql in Supabase.';
+                        }
+                        alert('Lesson saved locally, but could not be sent to the Learner Profile System:\n\n' + completed.lpPostError);
+                    } else {
+                        completed.lpPosted = true;
+                        completed.lpPostAt = Date.now();
+                    }
+                    saveLiveState();
+                    renderLiveView();
+                });
+            });
         }
 
         function countAttendance(att, status) {
