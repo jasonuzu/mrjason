@@ -2375,7 +2375,15 @@
 
         // Roles held by a layout item, resolved through its LP link
         function rolesForItem(item) {
-            var sid = item && item.lp_student_id;
+            if (!item) return [];
+            var sid = item.lp_student_id;
+            if (!sid) {
+                // The item may have lost its link (e.g. overwritten by a cloud pull).
+                // The layout's durable name -> id map is the backstop.
+                var layout = getCurrentLayout();
+                var map = (layout && layout.lpStudentIds) || {};
+                sid = map[String(item.text || '').trim()];
+            }
             var ids = (sid && lpStudentRoles[sid]) || [];
             return ids.map(function(id) { return lpRoles[id]; }).filter(Boolean);
         }
@@ -2492,6 +2500,7 @@
 
         // Convert an in-memory layout to a row for the classroom_layouts table
         function layoutToRow(l) {
+            stampLinksOntoItems(l);   // never upload items that have lost their links
             var wrap = readSessionsWrapper();
             var session = wrap.sessions[l.id] || null;
             return {
@@ -2583,6 +2592,7 @@
                     var local = localById[cloud.id];
                     if (!local) {
                         // Cloud-only → add locally
+                        rebuildLinkMapFromItems(cloud);   // recover links on a new device
                         layouts.push(cloud);
                         // Also restore its session_data
                         if (row.session_data && Object.keys(row.session_data).length > 0) {
@@ -2594,8 +2604,17 @@
                         // Local is newer → queue upload
                         toUpload.push(local);
                     } else {
-                        // Cloud is newer or equal → overwrite local
+                        // Cloud is newer or equal → overwrite local.
+                        // The link map is local-only, so keep it and re-apply it to
+                        // the incoming items; otherwise every desk loses its profile
+                        // link (and therefore its roles) on each refresh.
+                        var keptLinks = local.lpStudentIds || {};
+                        var keptClassId = local.learnerProfileClassId || '';
                         Object.assign(local, cloud);
+                        local.lpStudentIds = keptLinks;
+                        if (keptClassId && !local.learnerProfileClassId) local.learnerProfileClassId = keptClassId;
+                        rebuildLinkMapFromItems(local);   // pick up links the cloud did carry
+                        stampLinksOntoItems(local);       // and push the map back onto the items
                         if (row.session_data && Object.keys(row.session_data).length > 0) {
                             var wrap = readSessionsWrapper();
                             wrap.sessions[cloud.id] = row.session_data;
@@ -3684,6 +3703,30 @@
                 if (id) { el.setAttribute('data-lp-student-id', id); tagged++; }
             });
             return tagged;
+        }
+
+        // Write the durable name -> id map onto the layout's items. Items are what
+        // travel to the cloud and what Live view reads, so they must carry the link.
+        function stampLinksOntoItems(layout) {
+            if (!layout || !layout.items) return;
+            var map = layout.lpStudentIds || {};
+            layout.items.forEach(function(it) {
+                if (it.type !== 'student') return;
+                var id = map[String(it.text || '').trim()];
+                if (id) it.lp_student_id = id;
+            });
+        }
+
+        // Rebuild the map from whatever links the items carry. Needed after a cloud
+        // pull, and on a second device that has never seen this layout before.
+        function rebuildLinkMapFromItems(layout) {
+            if (!layout || !layout.items) return;
+            if (!layout.lpStudentIds) layout.lpStudentIds = {};
+            layout.items.forEach(function(it) {
+                if (it.type !== 'student' || !it.lp_student_id) return;
+                var nm = String(it.text || '').trim();
+                if (nm) layout.lpStudentIds[nm] = it.lp_student_id;
+            });
         }
 
         // Harvest any links currently on the canvas into the layout's map, so links
