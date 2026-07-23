@@ -1509,26 +1509,64 @@ async function saveStudentAsync(rec){
   return true;
 }
 
+/* Debounced, strictly-ordered database writes.
+   Text inputs call saveStudent on every keystroke. Firing an upsert per keystroke
+   raced: requests completed out of order, so an older partial value could land
+   last. This coalesces rapid edits and chains them per student so writes for one
+   record can never overtake each other. */
+const dbWrites = {
+  timers: {},   // id -> debounce timeout
+  chains: {},   // id -> promise chain (guarantees ordering)
+  dirty: {},    // id -> most recent record awaiting write
+
+  schedule(rec, delay){
+    if(!db.isConnected()) return;
+    const id = rec.id;
+    this.dirty[id] = rec;
+    if(this.timers[id]) clearTimeout(this.timers[id]);
+    this.timers[id] = setTimeout(() => this._send(id), delay === undefined ? 600 : delay);
+  },
+
+  _send(id){
+    if(this.timers[id]){ clearTimeout(this.timers[id]); delete this.timers[id]; }
+    const rec = this.dirty[id];
+    if(!rec || !db.isConnected()) return this.chains[id] || Promise.resolve();
+    delete this.dirty[id];
+    const row = recToRow(rec);
+    const prev = this.chains[id] || Promise.resolve();
+    this.chains[id] = prev
+      .then(() => db.client.from('students').upsert(row, { onConflict: 'student_id' }))
+      .then(res => {
+        if(res && res.error){
+          state.dbSyncErrors = state.dbSyncErrors || [];
+          state.dbSyncErrors.push({ name: rec.name || rec.id, error: res.error.message, time: Date.now() });
+          if(state.dbSyncErrors.length > 20) state.dbSyncErrors.shift();
+          console.error('DB sync error for', rec.name, ':', res.error.message);
+          if(typeof updateDbBanner === 'function') updateDbBanner();
+        }
+      })
+      .catch(e => console.error('DB write failed:', e));
+    return this.chains[id];
+  },
+
+  hasPending(id){ return !!(this.timers[id] || this.dirty[id]); },
+
+  // Resolve only once every queued write for this student has completed
+  async flush(id){
+    this._send(id);
+    if(this.chains[id]){ try{ await this.chains[id]; }catch(e){} }
+  },
+
+  async flushAll(){
+    const ids = new Set(Object.keys(this.timers).concat(Object.keys(this.dirty), Object.keys(this.chains)));
+    for(const id of ids){ await this.flush(id); }
+  },
+};
+
 function saveStudent(rec){
   rec.updatedAt = Date.now();
   try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){ return false; }
-  // Fire-and-forget async DB save, but track errors visibly
-  if(db.isConnected()){
-    state.dbSyncPending = (state.dbSyncPending||0) + 1;
-    const row = recToRow(rec);
-    db.client.from('students').upsert(row, { onConflict: 'student_id' }).then(({error})=>{
-      state.dbSyncPending = Math.max(0, (state.dbSyncPending||1) - 1);
-      if(error){
-        state.dbSyncErrors = state.dbSyncErrors || [];
-        state.dbSyncErrors.push({ name: rec.name || rec.id, error: error.message, time: Date.now() });
-        // Only keep last 20 errors
-        if(state.dbSyncErrors.length > 20) state.dbSyncErrors.shift();
-        console.error('DB sync error for', rec.name, ':', error.message);
-        // Update banner to show error state
-        if(typeof updateDbBanner === 'function') updateDbBanner();
-      }
-    });
-  }
+  dbWrites.schedule(rec);
   return true;
 }
 
@@ -1603,6 +1641,7 @@ async function loadClassRegistryAsync(){
 // Sync all localStorage data up to Supabase
 async function syncLocalToDb(){
   if(!db.isConnected()) return { synced: 0, errors: 0, firstError: null };
+  await dbWrites.flushAll();
   let synced = 0, errors = 0, firstError = null;
 
   if(!state.userId){
@@ -1667,18 +1706,6 @@ async function syncDbToLocal(){
   return { pulled, errors };
 }
 
-function loadAllStudents(){
-  const out = [];
-  const keys = storage.keys('student:');
-  for(const k of keys){
-    try{
-      const raw = storage.get(k);
-      if(raw) out.push(migrateStudent(JSON.parse(raw)));
-    }catch(e){ /* skip unreadable record */ }
-  }
-  out.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-  return out;
-}
 
 // Migrate records from earlier versions of this tool so they work with new features
 function migrateStudent(rec){
@@ -1748,10 +1775,10 @@ function generateClassId(className){
 
 function loadClassRegistry(){
   const out = {};
-  const keys = storage.keys('classreg:');
+  const keys = local.keys('classreg:');
   for(const k of keys){
     try{
-      const raw = storage.get(k);
+      const raw = local.get(k);
       if(raw){ const cls = JSON.parse(raw); out[cls.name] = cls; }
     }catch(e){}
   }
@@ -1764,7 +1791,18 @@ function getOrCreateClassEntry(className){
   const registry = loadClassRegistry();
   if(registry[className]) return registry[className];
   const entry = { classId: generateClassId(className), name: className, createdAt: Date.now() };
-  storage.set('classreg:' + entry.classId, JSON.stringify(entry));
+  local.set('classreg:' + entry.classId, JSON.stringify(entry));
+  // Persist to the database too, so other apps can resolve the class code
+  if(db.isConnected() && state.userId){
+    db.client.from('classes').upsert({
+      class_id: entry.classId,
+      name: entry.name,
+      owner_id: state.userId,
+      created_at: new Date(entry.createdAt).toISOString(),
+    }, { onConflict: 'class_id' }).then(({error}) => {
+      if(error) console.error('Class DB save failed:', error.message);
+    });
+  }
   return entry;
 }
 
@@ -1774,17 +1812,7 @@ function getClassEntry(className){
   return registry[className.trim()] || null;
 }
 
-function saveStudent(rec){
-  rec.updatedAt = Date.now();
-  try{
-    storage.set('student:'+rec.id, JSON.stringify(rec));
-    return true;
-  }catch(e){ console.error('Save failed:', e); return false; }
-}
 
-function deleteStudentRecord(id){
-  try{ storage.del('student:'+id); }catch(e){}
-}
 
 /* ══════════════════════════════════════════════════════════════
    SCORING
@@ -1899,6 +1927,15 @@ async function init(){
   }
 
   render();
+
+  // A debounced edit must not be lost if the tab closes or is hidden
+  const commitPending = function(){
+    Object.keys(dbWrites.dirty).forEach(function(id){ dbWrites._send(id); });
+  };
+  window.addEventListener('beforeunload', commitPending);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden') commitPending();
+  });
 
   document.getElementById('app').addEventListener('click', function(e){
     const head = e.target.closest('.section-block > .sb-head');
@@ -4213,7 +4250,12 @@ function renderResearch(){
    ══════════════════════════════════════════════════════════════ */
 
 const App = {
-  goDashboard(){ state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null; render(); },
+  goDashboard(){
+    const leaving = state.activeId;
+    state.view='dashboard'; state.draft=null; state.activeId=null; state.editingPostId=null;
+    if(leaving) dbWrites._send(leaving);   // commit any debounced edit now
+    render();
+  },
   goResearch(){ state.view='research'; render(); },
 
   goLogin(){ state.view='login'; render(); },
@@ -4322,6 +4364,7 @@ const App = {
 
   async logout(){
     if(!confirm('Log out? Your data is saved in the database.')) return;
+    await dbWrites.flushAll();
     if(db.isConnected()){
       try{ await db.client.auth.signOut(); }catch(e){}
     }
@@ -4465,6 +4508,7 @@ const App = {
 
   async syncPull(){
     if(!confirm('Pull all records from the database?\n\nThis will overwrite local data with what\'s in the database.')) return;
+    await dbWrites.flushAll();
     const log = document.getElementById('sync-log');
     if(log){ log.style.display='block'; log.textContent='Pulling data from database...\n'; }
     const result = await syncDbToLocal();
@@ -4478,6 +4522,7 @@ const App = {
     const area = document.getElementById('diag-area');
     if(!area) return;
     area.innerHTML = '<em style="font-family:inherit;color:var(--ink-faint);">Running…</em>';
+    await dbWrites.flushAll();
 
     const localStudents = loadAllStudentsLocal();
     const localClasses = loadClassRegistry();
@@ -4816,24 +4861,34 @@ const App = {
     const opening = state.students.find(s => s.id === id);
     state.nameAtOpen = opening ? (opening.name || '') : '';
     render();
-    // If connected, refresh this student from the DB so posts written by other
-    // apps (e.g. Live Classroom) show up immediately.
-    if(db.isConnected()){
-      try{
-        const { data, error } = await db.client.from('students').select('*').eq('student_id', id).single();
-        if(!error && data){
-          const fresh = migrateStudent(rowToRec(data));
-          const idx = state.students.findIndex(s => s.id === id);
-          if(idx >= 0) state.students[idx] = fresh;
-          local.set('student:'+fresh.id, JSON.stringify(fresh));
-          if(state.activeId === id && state.view === 'report') render({preserveScroll:true});
+    if(!db.isConnected()) return;
+    // Make sure any edits still queued for this student have reached the database
+    // BEFORE we read it back — otherwise the read returns a stale row and
+    // overwrites the edit that hasn't landed yet.
+    await dbWrites.flush(id);
+    try{
+      const { data, error } = await db.client.from('students').select('*').eq('student_id', id).single();
+      if(error || !data) return;
+      // If the teacher started typing again while the fetch was in flight, the
+      // local copy is newer. Take only the posts (what this refresh is for) and
+      // leave every other field alone.
+      const idx = state.students.findIndex(s => s.id === id);
+      const fresh = migrateStudent(rowToRec(data));
+      if(dbWrites.hasPending(id)){
+        if(idx >= 0){
+          state.students[idx].posts = fresh.posts || [];
+          local.set('student:'+id, JSON.stringify(state.students[idx]));
         }
-      }catch(e){ /* silent — cached copy still shows */ }
-    }
+      } else {
+        if(idx >= 0) state.students[idx] = fresh;
+        local.set('student:'+fresh.id, JSON.stringify(fresh));
+      }
+      if(state.activeId === id && state.view === 'report') render({preserveScroll:true});
+    }catch(e){ /* silent — cached copy still shows */ }
   },
 
-  refreshActiveStudent(){
-    if(state.activeId) App.openReport(state.activeId);
+  async refreshActiveStudent(){
+    if(state.activeId) await App.openReport(state.activeId);
   },
 
   // Traces the Live Classroom → database → profile chain for the active student
