@@ -277,6 +277,21 @@
         }
         .movable-element.selected { outline: 3px solid #007bff; outline-offset: 2px; z-index: 5; }
 
+        .role-stripe {
+            position: absolute; top: 0; left: 0; right: 0; height: 6px;
+            display: flex; pointer-events: none; z-index: 2;
+        }
+        .role-stripe span { flex: 1 1 0; }
+        .movable-element.has-roles .elem-txt { padding-top: 8px; }
+        .role-legend-item {
+            display: flex; align-items: flex-start; gap: 10px;
+            padding: 9px 0; border-bottom: 1px solid #e2e8f0;
+        }
+        .role-legend-item:last-child { border-bottom: none; }
+        .role-legend-swatch {
+            width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; margin-top: 2px;
+        }
+
         .elem-txt {
             pointer-events: none;
             word-wrap: break-word;
@@ -1905,6 +1920,7 @@
             <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
             <button class="shuffle-btn" onclick="automaticallyShuffleOrMix()">🔄 Automatically Change Seating Plan</button>
             <button class="export-btn" onclick="repairLPLinks()" title="Re-link every desk to its Learner Profile record by matching names">🔗 Repair LP links</button>
+            <button class="export-btn" onclick="openRoleLegend()" title="Roles defined in the Learner Profile System">🎭 Roles</button>
 
             <div class="section-title">File Operations</div>
             <div class="btn-grid">
@@ -2269,6 +2285,100 @@
             updateAuthUI();
             // Pull cloud layouts and merge with local
             pullLayoutsFromCloud();
+            fetchLPRoles();
+        }
+
+        // ---------- Roles from the Learner Profile System ----------
+        var lpRoles = {};          // role_id -> { name, color, description }
+        var lpStudentRoles = {};   // student_id -> [role_id]
+
+        function fetchLPRoles(cb) {
+            if (!isSignedIn() || !sbClient) { if (cb) cb(); return; }
+            sbClient.from('roles').select('role_id, name, color, description, sort_order').then(function(res) {
+                if (!res.error && res.data) {
+                    lpRoles = {};
+                    res.data.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); })
+                        .forEach(function(r) {
+                            lpRoles[r.role_id] = {
+                                name: r.name || 'Untitled role',
+                                color: r.color || '#3B6E71',
+                                description: r.description || ''
+                            };
+                        });
+                }
+                return sbClient.from('students').select('student_id, roles');
+            }).then(function(res) {
+                if (res && !res.error && res.data) {
+                    lpStudentRoles = {};
+                    res.data.forEach(function(s) {
+                        if (Array.isArray(s.roles) && s.roles.length) lpStudentRoles[s.student_id] = s.roles;
+                    });
+                }
+                applyRolesToCanvas();
+                if (cb) cb();
+            }).catch(function() { if (cb) cb(); });
+        }
+
+        // Colour each desk's name and add a stripe for the roles that student holds
+        function applyRolesToCanvas() {
+            canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
+                var old = el.querySelector('.role-stripe');
+                if (old) old.remove();
+                el.classList.remove('has-roles');
+                var span = el.querySelector('.elem-txt');
+                if (span) span.style.color = '';
+
+                var sid = el.getAttribute('data-lp-student-id');
+                var ids = (sid && lpStudentRoles[sid]) || [];
+                var roles = ids.map(function(id) { return lpRoles[id]; }).filter(Boolean);
+                if (!roles.length) return;
+
+                if (span) span.style.color = roles[0].color;
+                var stripe = document.createElement('div');
+                stripe.className = 'role-stripe';
+                roles.forEach(function(r) {
+                    var seg = document.createElement('span');
+                    seg.style.backgroundColor = r.color;
+                    stripe.appendChild(seg);
+                });
+                el.appendChild(stripe);
+                el.classList.add('has-roles');
+                el.title = roles.map(function(r) {
+                    return r.name + (r.description ? ' — ' + r.description : '');
+                }).join('\n');
+            });
+        }
+
+        function openRoleLegend() {
+            var ids = Object.keys(lpRoles);
+            var html = '<div class="modal-title">Roles</div>';
+            if (!ids.length) {
+                html += '<div style="font-size:0.88rem;color:#64748b;line-height:1.5;">' +
+                        'No roles defined yet. Create them in the Learner Profile System — open any student, ' +
+                        'find the <strong>Roles</strong> section, and click <strong>Manage roles</strong>.</div>';
+            } else {
+                var counts = {};
+                Object.keys(lpStudentRoles).forEach(function(sid) {
+                    lpStudentRoles[sid].forEach(function(rid) { counts[rid] = (counts[rid] || 0) + 1; });
+                });
+                html += '<div style="font-size:0.82rem;color:#64748b;margin-bottom:8px;">' +
+                        'Defined in the Learner Profile System. Desk names and stripes use these colours.</div>';
+                ids.forEach(function(id) {
+                    var r = lpRoles[id];
+                    html += '<div class="role-legend-item">' +
+                        '<div class="role-legend-swatch" style="background:' + escapeHtml(r.color) + ';"></div>' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-weight:700;color:#2c3e50;font-size:0.9rem;">' + escapeHtml(r.name) +
+                                '<span style="font-weight:400;color:#94a3b8;font-size:0.78rem;margin-left:6px;">' +
+                                (counts[id] || 0) + ' student' + ((counts[id] || 0) === 1 ? '' : 's') + '</span></div>' +
+                            (r.description ? '<div style="font-size:0.8rem;color:#64748b;margin-top:2px;line-height:1.4;">' + escapeHtml(r.description) + '</div>' : '') +
+                        '</div></div>';
+                });
+            }
+            html += '<div class="modal-actions">' +
+                    '<button class="export-btn" onclick="fetchLPRoles(function(){ closeModal(); openRoleLegend(); })">\u21bb Refresh</button>' +
+                    '<button class="automation" onclick="closeModal()">Close</button></div>';
+            openModal(html);
         }
         function onSignedOut() {
             updateAuthUI();
@@ -2592,6 +2702,7 @@
                 if (item.lp_student_id) el.setAttribute('data-lp-student-id', item.lp_student_id);
             });
             deselectAll();
+            applyRolesToCanvas();
             // Sync classroom name inputs to this layout's name
             var d = document.getElementById('designer-class-name');
             if (d) d.value = layout.name || '';
@@ -3419,6 +3530,7 @@
 
             // Tag the desks that exist right now
             applyLPLinksToCanvas();
+            fetchLPRoles();
             // Re-persist so the lp_student_id lives in items[]
             saveCanvasStateToBrowser();
             persistLayouts();
@@ -3549,6 +3661,7 @@
             });
             // Re-attach the LP links to the freshly created desks
             applyLPLinksToCanvas();
+            applyRolesToCanvas();
             saveCanvasStateToBrowser();
             persistLayouts();
         }
@@ -4892,6 +5005,7 @@
                 applyLPLinksToCanvas();
                 saveCanvasStateToBrowser();
                 persistLayouts();
+                fetchLPRoles();
                 if (applyRenames) renderLiveView();
             });
         }
