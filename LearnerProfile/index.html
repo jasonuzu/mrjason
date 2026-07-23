@@ -500,6 +500,57 @@
   }
   .lesson-names { font-size: 12px; color: var(--ink-soft); line-height: 1.7; }
   @media print { .lesson-body { display: block !important; } }
+
+  /* ── Roles ── */
+  .role-chip-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .role-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px 7px 10px; border-radius: 16px;
+    border: 1.5px solid var(--rule); background: var(--paper-raised);
+    font-size: 13px; font-weight: 600; cursor: pointer; user-select: none;
+    transition: border-color .12s, background .12s;
+  }
+  .role-chip:hover { border-color: var(--ink-faint); }
+  .role-chip .box {
+    width: 15px; height: 15px; border-radius: 3px; flex-shrink: 0;
+    border: 1.5px solid var(--rule); background: var(--paper-raised);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; color: transparent; font-weight: 800;
+  }
+  .role-chip.checked .box { color: #fff; }
+  .role-chip .role-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .role-manager { margin-top: 14px; border-top: 1px solid var(--rule); padding-top: 12px; }
+  .role-row {
+    display: flex; align-items: center; gap: 8px; padding: 7px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .role-row:last-of-type { border-bottom: none; }
+  .role-row input[type=color] {
+    width: 34px; height: 30px; padding: 0; border: 1.5px solid var(--rule);
+    border-radius: 5px; background: none; cursor: pointer; flex-shrink: 0;
+  }
+  .role-row input[type=text] {
+    padding: 7px 10px; border: 1.5px solid var(--rule); border-radius: 5px;
+    font-size: 13px; font-family: inherit; background: var(--paper-raised);
+    color: var(--ink); outline: none; min-width: 0;
+  }
+  .role-row input[type=text]:focus { border-color: var(--accent); }
+  .role-row .role-name-input { flex: 0 0 150px; font-weight: 600; }
+  .role-row .role-desc-input { flex: 1; }
+  .role-row .role-del {
+    background: none; border: none; color: var(--ink-faint); cursor: pointer;
+    font-size: 16px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+  }
+  .role-row .role-del:hover { color: var(--red); background: var(--red-bg); }
+  .role-count { font-size: 11.5px; color: var(--ink-faint); }
+  .role-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 8px; border-radius: 9px; font-size: 10.5px;
+    font-weight: 700; margin-left: 6px; vertical-align: middle;
+  }
+  @media print { .role-manager { display: none !important; } }
   .post-content {
     font-size: 13.5px; line-height: 1.55; color: var(--ink);
     white-space: pre-wrap; word-wrap: break-word;
@@ -1394,6 +1445,22 @@ const db = {
   },
 
   isConnected(){ return db.status === 'connected' && db.client; },
+
+  // Which optional schema pieces exist. Probed once after connecting so a
+  // migration that hasn't been run can never break every student write.
+  caps: { studentRoles: null, rolesTable: null },
+
+  async probeCaps(){
+    if(!db.isConnected()) return;
+    try{
+      const { error } = await db.client.from('students').select('roles').limit(1);
+      db.caps.studentRoles = !error;
+    }catch(e){ db.caps.studentRoles = false; }
+    try{
+      const { error } = await db.client.from('roles').select('role_id').limit(1);
+      db.caps.rolesTable = !error;
+    }catch(e){ db.caps.rolesTable = false; }
+  },
 };
 
 // ── Field mapping: JS camelCase <-> SQL snake_case ──
@@ -1420,6 +1487,7 @@ function recToRow(rec){
     const sqlKey = FIELD_MAP[k] || k;
     if(k === 'id'){ row.student_id = v; return; }
     if(k.startsWith('_')) return;
+    if(k === 'roles' && db.caps.studentRoles === false) return;  // column not migrated yet
     // Convert JS millisecond timestamps → Postgres ISO strings for TIMESTAMPTZ columns
     if((k === 'createdAt' || k === 'updatedAt')){
       if(typeof v === 'number'){ row[sqlKey] = new Date(v).toISOString(); return; }
@@ -1570,6 +1638,71 @@ function saveStudent(rec){
   return true;
 }
 
+// ── Role library (max 10, shared across all of this teacher's students) ──
+
+const MAX_ROLES = 10;
+const ROLE_PALETTE = ['#3B6E71','#B35C00','#7C3AED','#1a7f4b','#B23A34',
+                      '#1a5fb4','#C2185B','#5D4037','#00796B','#F57F17'];
+
+function loadRolesLocal(){
+  try{
+    const raw = local.get('roles:library');
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+
+function saveRolesLocal(roles){
+  try{ local.set('roles:library', JSON.stringify(roles)); }catch(e){}
+}
+
+async function loadRolesAsync(){
+  if(db.isConnected() && db.caps.rolesTable !== false){
+    try{
+      const { data, error } = await db.client.from('roles').select('*').order('sort_order');
+      if(error) throw error;
+      const roles = (data||[]).map(r => ({
+        id: r.role_id, name: r.name || '', color: r.color || ROLE_PALETTE[0],
+        description: r.description || '', sortOrder: r.sort_order || 0,
+      }));
+      saveRolesLocal(roles);
+      return roles;
+    }catch(e){ console.error('Role load failed:', e); }
+  }
+  return loadRolesLocal();
+}
+
+function saveRole(role){
+  const roles = state.roles || [];
+  saveRolesLocal(roles);
+  if(db.isConnected() && db.caps.rolesTable !== false && state.userId){
+    db.client.from('roles').upsert({
+      role_id: role.id, owner_id: state.userId, name: role.name,
+      color: role.color, description: role.description,
+      sort_order: role.sortOrder || 0,
+    }, { onConflict: 'role_id' }).then(({error}) => {
+      if(error) console.error('Role save failed:', error.message);
+    });
+  }
+}
+
+function deleteRoleRecord(roleId){
+  saveRolesLocal(state.roles || []);
+  if(db.isConnected() && db.caps.rolesTable !== false){
+    db.client.from('roles').delete().eq('role_id', roleId).then(({error}) => {
+      if(error) console.error('Role delete failed:', error.message);
+    });
+  }
+}
+
+function getRole(roleId){
+  return (state.roles || []).find(r => r.id === roleId) || null;
+}
+
+function rolesForStudent(rec){
+  return (rec.roles || []).map(getRole).filter(Boolean);
+}
+
 // Update just the db-banner in place without full re-render (avoid focus loss)
 function updateDbBanner(){
   const banner = document.querySelector('.db-banner');
@@ -1709,6 +1842,7 @@ async function syncDbToLocal(){
 
 // Migrate records from earlier versions of this tool so they work with new features
 function migrateStudent(rec){
+  if(!rec.roles) rec.roles = [];
   if(!rec.history) rec.history = [];
   if(rec.notes === undefined) rec.notes = '';
   if(rec.className === undefined) rec.className = '';
@@ -1884,7 +2018,7 @@ function suggestLevel(age){
 }
 
 function newDraft(){
-  return { id:uid(), name:'', chineseName:'', age:'', birthdate:'', level:null, className:'', notes:'',
+  return { id:uid(), name:'', chineseName:'', age:'', birthdate:'', level:null, className:'', notes:'', roles:[],
     userId: generateUserId(), password: generatePassword(),
     subjectStrengths:[], likes:'', dislikes:'', posts:[],
     accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
@@ -1912,7 +2046,9 @@ async function init(){
       if(session && session.user){
         state.userId = session.user.id;
         state.userEmail = session.user.email;
+        await db.probeCaps();
         state.students = await loadAllStudentsAsync();
+        state.roles = await loadRolesAsync();
         state.view = 'dashboard';
       } else {
         state.view = 'login';
@@ -1923,6 +2059,7 @@ async function init(){
     }
   } else {
     state.students = loadAllStudentsLocal();
+    state.roles = loadRolesLocal();
     state.view = 'dashboard';
   }
 
@@ -2152,7 +2289,11 @@ function renderRecordCard(rec, selectMode){
     ${selectMode ? `<div class="select-checkbox ${isSelected?'checked':''}" onclick="App.toggleSelectStudent('${rec.id}')">${isSelected?'✓':''}</div>` : ''}
     <div class="record-tab" style="background:${lvl.light};color:${lvl.color};">${initials}</div>
     <div class="record-info" onclick="${clickAction}">
-      <div class="record-name">${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="color:var(--ink-faint);font-weight:400;">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
+      <div class="record-name">${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="color:var(--ink-faint);font-weight:400;">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}${(function(){
+        const rs = rolesForStudent(rec);
+        if(!rs.length) return '';
+        return ' ' + rs.map(r => `<span class="role-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${r.color};vertical-align:middle;margin-left:2px;" title="${escapeHtml(r.name)}"></span>`).join('');
+      })()}${hasAccommodations ? '<span class="acc-badge" title="Has accommodations on file">ACC</span>' : ''}</div>
       <div class="record-meta">${lvl.label} · Age ${escapeHtml(String(rec.age||'?'))} · Updated ${date}</div>
     </div>
     <div class="record-zones" onclick="${clickAction}" title="Section zones">
@@ -2491,6 +2632,8 @@ function renderReport(){
 
     <div class="screen-report-body">
 
+    <div id="roles-section-wrap">${renderRolesSection(rec)}</div>
+
     ${renderPostsSection(rec)}
 
     <div class="section-block no-print-collapse">
@@ -2812,6 +2955,74 @@ function renderContextSection(rec, lvl){
       <p class="subsection-hint">Others who work with this student — learning support teacher, counsellor, sports coach, form tutor, peer mentor.</p>
       <textarea class="context-textarea" placeholder="e.g. Ms. Chen (learning support, Tues+Thurs), Mr. Li (counselling, biweekly), swim coach…"
         oninput="App.updateSupportNetwork(this.value)">${escapeHtml(rec.supportNetwork||'')}</textarea>
+    </div>`;
+}
+
+function renderRolesSection(rec){
+  const roles = state.roles || [];
+  const assigned = rec.roles || [];
+  const managing = !!state.managingRoles;
+  const atLimit = roles.length >= MAX_ROLES;
+
+  return `
+    <div class="section-block no-print-collapse">
+      <div class="sb-head">
+        <div>
+          <div class="sb-title">Roles</div>
+          <div class="sb-domain">Classroom responsibilities — colours show on this student's desk in Classroom Live</div>
+        </div>
+        <button class="btn btn-ghost btn-sm no-print" onclick="event.stopPropagation();App.toggleRoleManager();">
+          ${managing ? '✕ Done' : '⚙ Manage roles'}
+        </button>
+      </div>
+
+      ${roles.length ? `
+        <div class="role-chip-grid">
+          ${roles.map(r => {
+            const on = assigned.includes(r.id);
+            return `<div class="role-chip ${on?'checked':''}"
+              style="${on ? `border-color:${r.color};background:${r.color}18;color:${r.color};` : ''}"
+              title="${escapeHtml(r.description || r.name)}"
+              onclick="App.toggleStudentRole('${escapeAttr(r.id)}')">
+              <span class="box" style="${on ? `background:${r.color};border-color:${r.color};` : ''}">${on?'✓':''}</span>
+              <span class="role-dot" style="background:${r.color};"></span>
+              <span id="role-label-${escapeAttr(r.id)}">${escapeHtml(r.name || 'Untitled role')}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : `
+        <div style="font-size:13px;color:var(--ink-faint);font-style:italic;">
+          No roles defined yet. Click <strong>Manage roles</strong> to create some — e.g. Group Leader, Timekeeper, Reader.
+        </div>
+      `}
+
+      ${managing ? `
+        <div class="role-manager no-print">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink-faint);font-weight:700;">Role library</div>
+            <div class="role-count">${roles.length} of ${MAX_ROLES} used</div>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:8px;line-height:1.5;">
+            These roles are shared across all your students. Editing one here changes it everywhere.
+          </div>
+          ${roles.map(r => `
+            <div class="role-row">
+              <input type="color" value="${escapeHtml(r.color)}"
+                onchange="App.updateRoleColor('${escapeAttr(r.id)}', this.value)" title="Role colour">
+              <input type="text" class="role-name-input" value="${escapeHtml(r.name)}" placeholder="Role name"
+                oninput="App.updateRoleName('${escapeAttr(r.id)}', this.value)">
+              <input type="text" class="role-desc-input" value="${escapeHtml(r.description||'')}" placeholder="Short description — what does this role do?"
+                oninput="App.updateRoleDescription('${escapeAttr(r.id)}', this.value)">
+              <button class="role-del" onclick="App.deleteRole('${escapeAttr(r.id)}')" title="Delete this role">×</button>
+            </div>
+          `).join('')}
+          <div style="margin-top:10px;">
+            <button class="btn btn-ghost btn-sm" onclick="App.addRole()" ${atLimit?'disabled':''}
+              title="${atLimit ? 'Maximum of ' + MAX_ROLES + ' roles reached' : 'Create a new role'}">+ Add role</button>
+            ${atLimit ? `<span class="role-count" style="margin-left:8px;">Maximum of ${MAX_ROLES} reached — delete one to add another.</span>` : ''}
+          </div>
+        </div>
+      ` : ''}
     </div>`;
 }
 
@@ -4278,7 +4489,9 @@ const App = {
       if(error) throw error;
       state.userId = data.user.id;
       state.userEmail = data.user.email;
+      await db.probeCaps();
       state.students = await loadAllStudentsAsync();
+      state.roles = await loadRolesAsync();
       state.view = 'dashboard';
       render();
 
@@ -4377,7 +4590,100 @@ const App = {
 
   goDbSettings(){ state.view='dbSettings'; render(); },
 
+  /* ── Roles ── */
+
+  repaintRoles(){
+    const rec = state.students.find(s => s.id === state.activeId);
+    const el = document.getElementById('roles-section-wrap');
+    if(rec && el) el.innerHTML = renderRolesSection(rec);
+  },
+
+  toggleRoleManager(){
+    state.managingRoles = !state.managingRoles;
+    App.repaintRoles();
+  },
+
+  toggleStudentRole(roleId){
+    const rec = state.students.find(s => s.id === state.activeId);
+    if(!rec) return;
+    rec.roles = rec.roles || [];
+    const i = rec.roles.indexOf(roleId);
+    if(i === -1) rec.roles.push(roleId); else rec.roles.splice(i, 1);
+    saveStudent(rec);
+    App.repaintRoles();
+  },
+
+  addRole(){
+    state.roles = state.roles || [];
+    if(state.roles.length >= MAX_ROLES){
+      alert('You already have ' + MAX_ROLES + ' roles. Delete one before adding another.');
+      return;
+    }
+    const role = {
+      id: 'role_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7),
+      name: '',
+      color: ROLE_PALETTE[state.roles.length % ROLE_PALETTE.length],
+      description: '',
+      sortOrder: state.roles.length,
+    };
+    state.roles.push(role);
+    saveRole(role);
+    App.repaintRoles();
+    // Put the cursor straight into the new role's name field
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('.role-name-input');
+      const last = inputs[inputs.length - 1];
+      if(last && last.focus) last.focus();
+    }, 0);
+  },
+
+  updateRoleName(roleId, val){
+    const r = getRole(roleId);
+    if(!r) return;
+    r.name = val;
+    saveRole(r);
+    // Update the chip label in place — re-rendering would steal focus
+    const label = document.getElementById('role-label-' + roleId);
+    if(label) label.innerText = val || 'Untitled role';
+  },
+
+  updateRoleDescription(roleId, val){
+    const r = getRole(roleId);
+    if(!r) return;
+    r.description = val;
+    saveRole(r);
+  },
+
+  updateRoleColor(roleId, val){
+    const r = getRole(roleId);
+    if(!r) return;
+    r.color = val;
+    saveRole(r);
+    App.repaintRoles();
+  },
+
+  deleteRole(roleId){
+    const r = getRole(roleId);
+    if(!r) return;
+    const label = r.name || 'this role';
+    const holders = state.students.filter(s => (s.roles||[]).includes(roleId));
+    const msg = holders.length
+      ? `Delete “${label}”?\n\nIt is currently assigned to ${holders.length} student${holders.length===1?'':'s'}. It will be removed from them too.`
+      : `Delete “${label}”?`;
+    if(!confirm(msg)) return;
+
+    state.roles = (state.roles || []).filter(x => x.id !== roleId);
+    deleteRoleRecord(roleId);
+    // Unassign from every student that had it
+    holders.forEach(s => {
+      s.roles = (s.roles || []).filter(x => x !== roleId);
+      saveStudent(s);
+    });
+    App.repaintRoles();
+  },
+
   /* ── Multi-select ── */
+
   toggleSelectMode(){
     state.selectMode = !state.selectMode;
     if(!state.selectMode) state.selectedIds = new Set();
