@@ -2397,7 +2397,7 @@ function renderReport(){
 
     <div class="report-header">
       <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}</div>
-      <h1 class="report-title">Learner Profile — ${escapeHtml(rec.name)}${rec.chineseName ? ' <span style="font-weight:400;color:var(--ink-soft);">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}</h1>
+      <h1 class="report-title">Learner Profile — <span id="rp-title-name">${escapeHtml(rec.name)}</span><span id="rp-title-cname">${rec.chineseName ? ' <span style="font-weight:400;color:var(--ink-soft);">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}</span></h1>
       <div class="report-meta">${(function(){
         const parts = [];
         const ageFromBirth = computeAge(rec.birthdate);
@@ -2411,6 +2411,12 @@ function renderReport(){
     </div>
 
     <div class="student-meta-card no-print">
+      <div class="student-meta-field">
+        <label for="rp-name">English name</label>
+        <input type="text" id="rp-name" value="${escapeHtml(rec.name||'')}" placeholder="Student's name"
+          oninput="App.updateStudentName(this.value)" onblur="App.confirmStudentName()">
+        <div id="rp-name-hint" style="font-size:11px;color:var(--ink-faint);margin-top:3px;line-height:1.45;"></div>
+      </div>
       <div class="student-meta-field">
         <label for="rp-class">Class</label>
         <input type="text" id="rp-class" list="class-suggestions-report" value="${escapeHtml(rec.className||'')}"
@@ -4807,6 +4813,8 @@ const App = {
   async openReport(id){
     state.activeId = id;
     state.view = 'report';
+    const opening = state.students.find(s => s.id === id);
+    state.nameAtOpen = opening ? (opening.name || '') : '';
     render();
     // If connected, refresh this student from the DB so posts written by other
     // apps (e.g. Live Classroom) show up immediately.
@@ -4950,11 +4958,53 @@ const App = {
     }
   },
 
+  updateStudentName(val){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    rec.name = val;
+    saveStudent(rec);
+    // Update the heading in place (no re-render — that would steal focus)
+    const titleEl = document.getElementById('rp-title-name');
+    if(titleEl) titleEl.innerText = val;
+    // If this is a rename, explain the knock-on effect for the classroom app
+    const hintEl = document.getElementById('rp-name-hint');
+    if(hintEl){
+      const before = (state.nameAtOpen || '').trim();
+      const now = (val || '').trim();
+      if(!now){
+        hintEl.innerHTML = '<span style="color:var(--red);">A name is required — this student will show as blank until you enter one.</span>';
+      } else if(before && now !== before){
+        hintEl.innerHTML = '<span style="color:var(--yellow);">Renamed from “' + escapeHtml(before) + '”. ' +
+          'Their Classroom Live desk still points to the right profile, but the desk will keep the old label until you click <strong>🔗 Repair LP links</strong> in the Classroom Designer.</span>';
+      } else {
+        hintEl.innerHTML = '';
+      }
+    }
+  },
+
+  // On blur, restore a name if the field was left empty
+  confirmStudentName(){
+    const rec = state.students.find(s=>s.id===state.activeId);
+    if(!rec) return;
+    if((rec.name || '').trim()) return;
+    const fallback = (state.nameAtOpen || '').trim() || 'Unnamed student';
+    rec.name = fallback;
+    saveStudent(rec);
+    const input = document.getElementById('rp-name');
+    if(input) input.value = fallback;
+    const titleEl = document.getElementById('rp-title-name');
+    if(titleEl) titleEl.innerText = fallback;
+    const hintEl = document.getElementById('rp-name-hint');
+    if(hintEl) hintEl.innerHTML = '<span style="color:var(--ink-faint);">A name is required, so the previous one was restored.</span>';
+  },
+
   updateStudentChineseName(val){
     const rec = state.students.find(s=>s.id===state.activeId);
     if(!rec) return;
     rec.chineseName = val;
     saveStudent(rec);
+    const el = document.getElementById('rp-title-cname');
+    if(el) el.innerHTML = val ? ' <span style="font-weight:400;color:var(--ink-soft);">(' + escapeHtml(val) + ')</span>' : '';
   },
 
   updateStudentUserId(val){
