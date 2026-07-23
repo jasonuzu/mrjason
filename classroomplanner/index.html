@@ -283,6 +283,17 @@
         }
         .role-stripe span { flex: 1 1 0; }
         .movable-element.has-roles .elem-txt { padding-top: 8px; }
+        .live-elem .role-stripe { border-radius: 6px 6px 0 0; }
+        .live-elem.has-roles { padding-top: 6px; }
+        .live-role-dots {
+            position: absolute; bottom: 3px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 3px; pointer-events: none;
+        }
+        .live-role-dots i {
+            width: 6px; height: 6px; border-radius: 50%; display: block;
+            box-shadow: 0 0 0 1px rgba(255,255,255,.75);
+        }
+
         .role-legend-item {
             display: flex; align-items: flex-start; gap: 10px;
             padding: 9px 0; border-bottom: 1px solid #e2e8f0;
@@ -2315,8 +2326,56 @@
                     });
                 }
                 applyRolesToCanvas();
+                // Live view builds its own elements, so it needs a re-render
+                var liveEl = document.getElementById('live-view');
+                if (liveEl && liveEl.classList.contains('active')) renderLiveView();
                 if (cb) cb();
             }).catch(function() { if (cb) cb(); });
+        }
+
+        // Roles held by a layout item, resolved through its LP link
+        function rolesForItem(item) {
+            var sid = item && item.lp_student_id;
+            var ids = (sid && lpStudentRoles[sid]) || [];
+            return ids.map(function(id) { return lpRoles[id]; }).filter(Boolean);
+        }
+
+        function roleStripeHtml(roles) {
+            if (!roles.length) return '';
+            return '<div class="role-stripe">' + roles.map(function(r) {
+                return '<span style="background:' + escapeHtml(r.color) + ';"></span>';
+            }).join('') + '</div>';
+        }
+
+        function roleDotsHtml(roles) {
+            if (roles.length < 2) return '';
+            return '<div class="live-role-dots">' + roles.map(function(r) {
+                return '<i style="background:' + escapeHtml(r.color) + ';"></i>';
+            }).join('') + '</div>';
+        }
+
+        // A tinted name must stay legible on any desk colour, so it gets a halo
+        // that contrasts with the role colour itself rather than the background.
+        function roleTextStyle(color) {
+            var halo = relLuminance(color) < 0.5 ? 'rgba(255,255,255,.9)' : 'rgba(0,0,0,.55)';
+            return 'color:' + color + ';text-shadow:0 0 2px ' + halo + ',0 0 2px ' + halo + ';';
+        }
+
+        // Relative luminance, used to pick that halo
+        function relLuminance(hex) {
+            hex = rgbToHex(hex).replace('#', '');
+            if (hex.length !== 6) return 0.5;
+            var v = [0, 2, 4].map(function(i) {
+                var c = parseInt(hex.substr(i, 2), 16) / 255;
+                return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            });
+            return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+        }
+
+        function contrastRatio(a, b) {
+            var la = relLuminance(a), lb = relLuminance(b);
+            var hi = Math.max(la, lb), lo = Math.min(la, lb);
+            return (hi + 0.05) / (lo + 0.05);
         }
 
         // Colour each desk's name and add a stripe for the roles that student holds
@@ -2326,14 +2385,18 @@
                 if (old) old.remove();
                 el.classList.remove('has-roles');
                 var span = el.querySelector('.elem-txt');
-                if (span) span.style.color = '';
+                if (span) { span.style.color = ''; span.style.textShadow = ''; }
 
                 var sid = el.getAttribute('data-lp-student-id');
                 var ids = (sid && lpStudentRoles[sid]) || [];
                 var roles = ids.map(function(id) { return lpRoles[id]; }).filter(Boolean);
                 if (!roles.length) return;
 
-                if (span) span.style.color = roles[0].color;
+                if (span) {
+                    span.style.color = roles[0].color;
+                    var halo = relLuminance(roles[0].color) < 0.5 ? 'rgba(255,255,255,.9)' : 'rgba(0,0,0,.55)';
+                    span.style.textShadow = '0 0 2px ' + halo + ',0 0 2px ' + halo;
+                }
                 var stripe = document.createElement('div');
                 stripe.className = 'role-stripe';
                 roles.forEach(function(r) {
@@ -3840,6 +3903,9 @@
             document.getElementById('tab-live').classList.toggle('active', name === 'live');
             if (name === 'live') {
                 renderLiveView();
+                // Roles may not have loaded yet (or may have changed in the
+                // Learner Profile System since we last looked)
+                if (isSignedIn() && !Object.keys(lpRoles).length) fetchLPRoles();
             }
         }
 
@@ -3936,10 +4002,24 @@
                     if (attStatus === 'absent') el.classList.add('att-absent');
                     else if (attStatus === 'late') el.classList.add('att-late');
                     var attBadgeHtml = getAttendanceBadge(attStatus, isInAttendanceMode());
+
+                    // Roles: stripe along the top, name tinted when it stays readable
+                    var itemRoles = rolesForItem(item);
+                    var nameStyle = '';
+                    if (itemRoles.length) {
+                        el.classList.add('has-roles');
+                        nameStyle = ' style="' + escapeHtml(roleTextStyle(itemRoles[0].color)) + '"';
+                        el.title = itemRoles.map(function(r) {
+                            return r.name + (r.description ? ' — ' + r.description : '');
+                        }).join('\n');
+                    }
+
                     el.innerHTML =
-                        '<span class="stu-name">' + escapeHtml(name) + '</span>' +
+                        roleStripeHtml(itemRoles) +
+                        '<span class="stu-name"' + nameStyle + '>' + escapeHtml(name) + '</span>' +
                         '<span class="stu-points">' + pts + '</span>' +
                         attBadgeHtml +
+                        roleDotsHtml(itemRoles) +
                         (noteCount > 0 ? '<span class="stu-note-badge">📝' + noteCount + '</span>' : '');
                     el.onclick = (function(n) {
                         return function() {
