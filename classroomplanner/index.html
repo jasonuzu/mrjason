@@ -4801,42 +4801,98 @@
 
             harvestLPLinksFromCanvas();
 
-            var deskNames = [];
+            // Collect desks with their current label AND any id already stored
+            var desks = [];
             canvas.querySelectorAll('.movable-element[data-type="student"]').forEach(function(el) {
                 var span = el.querySelector('.elem-txt');
                 var nm = (span ? (span.innerText || span.textContent || '') : '').trim();
-                if (nm) deskNames.push(nm);
+                if (!nm) return;
+                var existing = el.getAttribute('data-lp-student-id') ||
+                               (layout.lpStudentIds && layout.lpStudentIds[nm]) || '';
+                desks.push({ el: el, span: span, name: nm, id: existing });
             });
-            if (deskNames.length === 0) { alert('No student desks on this layout.'); return; }
+            if (desks.length === 0) { alert('No student desks on this layout.'); return; }
 
             sbClient.from('students').select('student_id, name').then(function(res) {
                 if (res.error) { alert('Could not read students: ' + res.error.message); return; }
-                var byName = {};
+                var byName = {}, byId = {};
                 (res.data || []).forEach(function(s) {
-                    if (s.name) byName[String(s.name).trim()] = s.student_id;
+                    var nm = String(s.name || '').trim();
+                    if (nm) byName[nm] = s.student_id;
+                    byId[s.student_id] = nm;
                 });
 
                 if (!layout.lpStudentIds) layout.lpStudentIds = {};
-                var matched = [], unmatched = [];
-                deskNames.forEach(function(nm) {
-                    if (byName[nm]) { layout.lpStudentIds[nm] = byName[nm]; matched.push(nm); }
-                    else { unmatched.push(nm); }
+                var ok = [], renamed = [], linked = [], unmatched = [];
+
+                desks.forEach(function(d) {
+                    // 1. ID FIRST — an existing valid link is authoritative. A student
+                    //    renamed in the Learner Profile System still resolves here.
+                    if (d.id && byId[d.id] !== undefined) {
+                        layout.lpStudentIds[d.name] = d.id;
+                        var profileName = byId[d.id];
+                        if (profileName && profileName !== d.name) {
+                            renamed.push({ desk: d, from: d.name, to: profileName });
+                        } else {
+                            ok.push(d.name);
+                        }
+                        return;
+                    }
+                    // 2. No usable id — fall back to matching on the name
+                    if (byName[d.name]) {
+                        layout.lpStudentIds[d.name] = byName[d.name];
+                        d.el.setAttribute('data-lp-student-id', byName[d.name]);
+                        linked.push(d.name);
+                        return;
+                    }
+                    unmatched.push(d.name);
                 });
+
+                var msg = 'LP LINK REPAIR\n\n' +
+                          'Already linked : ' + ok.length + '\n' +
+                          'Newly linked   : ' + linked.length + '\n' +
+                          'Renamed        : ' + renamed.length + '\n' +
+                          'No match       : ' + unmatched.length + '\n';
+
+                if (renamed.length) {
+                    msg += '\nThese students were renamed in the Learner Profile System:\n  ' +
+                           renamed.map(function(r) { return r.from + '  →  ' + r.to; }).join('\n  ') +
+                           '\n\nTheir links are intact and notes will post correctly either way.\n' +
+                           'Update the desk labels to the new names?';
+                }
+                if (unmatched.length) {
+                    msg += '\n\nNo profile found for:\n  ' + unmatched.join('\n  ') +
+                           '\nRename the desk to match the profile exactly, then repair again.';
+                }
+                if (!renamed.length && !unmatched.length) {
+                    msg += '\nEvery desk is linked. Notes will post to the Learner Profile System.';
+                }
+
+                var applyRenames = renamed.length ? confirm(msg) : (alert(msg), false);
+
+                if (applyRenames) {
+                    renamed.forEach(function(r) {
+                        if (r.desk.span) r.desk.span.innerText = r.to;
+                        r.desk.el.setAttribute('data-lp-student-id', r.desk.id);
+                        layout.lpStudentIds[r.to] = r.desk.id;
+                        delete layout.lpStudentIds[r.from];
+                    });
+                    // Keep the roster used by shuffle in step with the new labels
+                    if (Array.isArray(currentStudents)) {
+                        renamed.forEach(function(r) {
+                            var k = currentStudents.indexOf(r.from);
+                            if (k !== -1) currentStudents[k] = r.to;
+                        });
+                    }
+                } else {
+                    // Labels stay as they are, but keep the old label mapped to the id
+                    renamed.forEach(function(r) { layout.lpStudentIds[r.from] = r.desk.id; });
+                }
 
                 applyLPLinksToCanvas();
                 saveCanvasStateToBrowser();
                 persistLayouts();
-
-                var msg = 'LP LINK REPAIR\n\n' +
-                          'Linked: ' + matched.length + ' of ' + deskNames.length + ' desks\n';
-                if (unmatched.length) {
-                    msg += '\nNo matching profile for:\n  ' + unmatched.join('\n  ') +
-                           '\n\nThese names differ from the Learner Profile System. ' +
-                           'Rename the desk to match the profile exactly, then repair again.';
-                } else {
-                    msg += '\nEvery desk is linked. Notes will now post to the Learner Profile System.';
-                }
-                alert(msg);
+                if (applyRenames) renderLiveView();
             });
         }
 
