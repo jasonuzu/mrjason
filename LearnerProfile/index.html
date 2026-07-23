@@ -2491,6 +2491,8 @@ function renderReport(){
 
     <div class="screen-report-body">
 
+    ${renderPostsSection(rec)}
+
     <div class="section-block no-print-collapse">
       <div class="sb-head">
         <div>
@@ -2546,8 +2548,6 @@ function renderReport(){
         </div>
       </div>
     </div>
-
-    ${renderPostsSection(rec)}
 
     ${renderLearningAccessSection(rec, lvl)}
     ${renderContextSection(rec, lvl)}
