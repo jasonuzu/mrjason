@@ -2178,6 +2178,15 @@
 
         function isSignedIn() { return !!currentUser; }
 
+        // Returning to the tab re-checks roles, throttled so tab-flipping is cheap.
+        // Desks keep showing the cached roles throughout, so nothing ever goes bare.
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState !== 'visible') return;
+            if (!isSignedIn()) return;
+            if (Date.now() - lpRolesFetchedAt < 60000) return;
+            fetchLPRoles();
+        });
+
         function updateAuthUI() {
             var status = document.getElementById('auth-status');
             var statusText = document.getElementById('auth-status-text');
@@ -2300,8 +2309,34 @@
         }
 
         // ---------- Roles from the Learner Profile System ----------
+        // Cached in localStorage so every render has data immediately. Without this
+        // the desks paint bare for a second or two after a tab refocus or reload,
+        // because the network fetch is async but rendering is not.
+        var LP_ROLES_CACHE_KEY = 'classroom_lp_roles_cache';
         var lpRoles = {};          // role_id -> { name, color, description }
         var lpStudentRoles = {};   // student_id -> [role_id]
+        var lpRolesFetchedAt = 0;
+
+        function loadRolesCache() {
+            try {
+                var raw = localStorage.getItem(LP_ROLES_CACHE_KEY);
+                if (!raw) return;
+                var c = JSON.parse(raw);
+                if (c && c.roles) lpRoles = c.roles;
+                if (c && c.studentRoles) lpStudentRoles = c.studentRoles;
+            } catch (e) { /* corrupt cache — ignore, the fetch will rebuild it */ }
+        }
+
+        function saveRolesCache() {
+            try {
+                localStorage.setItem(LP_ROLES_CACHE_KEY, JSON.stringify({
+                    roles: lpRoles, studentRoles: lpStudentRoles, at: Date.now()
+                }));
+            } catch (e) { /* quota — not fatal */ }
+        }
+
+        // Load the cache immediately so the first paint already has roles
+        loadRolesCache();
 
         function fetchLPRoles(cb) {
             if (!isSignedIn() || !sbClient) { if (cb) cb(); return; }
@@ -2325,12 +2360,17 @@
                         if (Array.isArray(s.roles) && s.roles.length) lpStudentRoles[s.student_id] = s.roles;
                     });
                 }
+                lpRolesFetchedAt = Date.now();
+                saveRolesCache();
                 applyRolesToCanvas();
                 // Live view builds its own elements, so it needs a re-render
                 var liveEl = document.getElementById('live-view');
                 if (liveEl && liveEl.classList.contains('active')) renderLiveView();
                 if (cb) cb();
-            }).catch(function() { if (cb) cb(); });
+            }).catch(function() {
+                // Keep whatever the cache holds rather than clearing the desks
+                if (cb) cb();
+            });
         }
 
         // Roles held by a layout item, resolved through its LP link
@@ -3903,9 +3943,10 @@
             document.getElementById('tab-live').classList.toggle('active', name === 'live');
             if (name === 'live') {
                 renderLiveView();
-                // Roles may not have loaded yet (or may have changed in the
-                // Learner Profile System since we last looked)
-                if (isSignedIn() && !Object.keys(lpRoles).length) fetchLPRoles();
+                // Cached roles are already on screen; refresh if they're stale or absent
+                if (isSignedIn() && (!Object.keys(lpRoles).length || Date.now() - lpRolesFetchedAt > 60000)) {
+                    fetchLPRoles();
+                }
             }
         }
 
@@ -4593,6 +4634,9 @@
             updateLessonButtonUI();
             updateAttendanceBannerUI();
             renderLiveView();
+            // Start of a lesson is the moment roles matter most — pull the latest.
+            // The cached copy is already on screen, so this only corrects drift.
+            fetchLPRoles();
         }
 
         // Dialog before actually ending — reminds to export and offers Export + End as one action
