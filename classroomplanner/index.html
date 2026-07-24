@@ -294,6 +294,32 @@
             box-shadow: 0 0 0 1px rgba(255,255,255,.75);
         }
 
+        /* Quick feedback */
+        .qf-cats { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+        .qf-cat {
+            padding: 6px 11px; border-radius: 14px; border: 1.5px solid #cbd5e0;
+            background: #fff; color: #475569; font-size: 0.78rem; font-weight: 600;
+            font-family: inherit; cursor: pointer; white-space: nowrap;
+        }
+        .qf-cat:hover { border-color: #94a3b8; }
+        .qf-cat.active { background: #2c3e50; border-color: #2c3e50; color: #fff; }
+        .qf-items {
+            display: flex; flex-wrap: wrap; gap: 5px;
+            padding: 9px; background: #f8fafc; border-radius: 7px; margin-bottom: 4px;
+        }
+        .qf-item {
+            padding: 8px 11px; border-radius: 6px; border: 1.5px solid transparent;
+            font-size: 0.82rem; font-weight: 600; font-family: inherit;
+            cursor: pointer; text-align: left; line-height: 1.25;
+        }
+        .qf-item.pos { background: #e7f6ec; color: #1a7f4b; border-color: #b8e6c9; }
+        .qf-item.pos:hover { background: #d4efdd; }
+        .qf-item.neu { background: #eef2f6; color: #52616e; border-color: #d6dee6; }
+        .qf-item.neu:hover { background: #e2e9ef; }
+        .qf-item.sup { background: #fdeceb; color: #b23a34; border-color: #f5c9c6; }
+        .qf-item.sup:hover { background: #fadedc; }
+        .qf-item:active { transform: translateY(1px); }
+
         .role-legend-item {
             display: flex; align-items: flex-start; gap: 10px;
             padding: 9px 0; border-bottom: 1px solid #e2e8f0;
@@ -4980,6 +5006,110 @@
         }
 
         // --- Student modal (notes + points) ---
+
+        // ---------- Quick feedback ----------
+        // One tap logs an observation, so notes can be captured mid-lesson.
+        // tone: p = positive, n = neutral, s = support needed
+        var QUICK_FEEDBACK = [
+          { id:'eng', label:'Engagement', items:[
+            {t:'Participated voluntarily',tone:'p'},{t:'Asked a question',tone:'p'},{t:'Fully engaged',tone:'p'},
+            {t:'Responded when called on',tone:'n'},
+            {t:'Off task',tone:'s'},{t:'Needed redirection',tone:'s'},{t:'Withdrew from activity',tone:'s'} ]},
+          { id:'lrn', label:'Learning', items:[
+            {t:'Understood independently',tone:'p'},{t:'Applied strategy',tone:'p'},{t:'Improved after feedback',tone:'p'},
+            {t:'Needed one explanation',tone:'n'},
+            {t:'Needed repeated support',tone:'s'},{t:'Misunderstood key concept',tone:'s'},{t:'Gave up before solving',tone:'s'} ]},
+          { id:'col', label:'Collaboration', items:[
+            {t:'Helped others',tone:'p'},{t:'Encouraged teammates',tone:'p'},{t:'Excellent teamwork',tone:'p'},
+            {t:'Worked independently',tone:'n'},
+            {t:'Dominated discussion',tone:'s'},{t:'Conflict with peer',tone:'s'},{t:'Relied on others',tone:'s'} ]},
+          { id:'cnf', label:'Confidence', items:[
+            {t:'Volunteered',tone:'p'},{t:'Took academic risk',tone:'p'},{t:'Persisted',tone:'p'},
+            {t:'Needed encouragement',tone:'n'},
+            {t:'Avoided participation',tone:'s'},{t:'Gave up easily',tone:'s'},{t:'Hesitant',tone:'s'} ]},
+          { id:'beh', label:'Behaviour', items:[
+            {t:'Respectful',tone:'p'},{t:'Followed expectations',tone:'p'},
+            {t:'Needed reminder',tone:'n'},
+            {t:'Distracted others',tone:'s'},{t:'Easily distracted',tone:'s'},{t:'Disruptive',tone:'s'} ]},
+          { id:'exf', label:'Executive Function', items:[
+            {t:'Organized',tone:'p'},{t:'Managed time well',tone:'p'},{t:'Completed task',tone:'p'},
+            {t:'Needed reminder',tone:'n'},
+            {t:'Forgot materials',tone:'s'},{t:'Rushed work',tone:'s'},{t:'Incomplete task',tone:'s'} ]},
+          { id:'emo', label:'Emotional', items:[
+            {t:'Positive mood',tone:'p'},{t:'Calm',tone:'p'},
+            {t:'Quiet today',tone:'n'},
+            {t:'Appeared frustrated',tone:'s'},{t:'Appeared tired',tone:'s'},{t:'Easily discouraged',tone:'s'} ]},
+          { id:'spk', label:'Speaking', items:[
+            {t:'Used target language',tone:'p'},{t:'Initiated conversation',tone:'p'},{t:'Excellent fluency',tone:'p'},
+            {t:'Answered when prompted',tone:'n'},
+            {t:'Used L1 frequently',tone:'s'},{t:'Avoided speaking',tone:'s'},{t:'Needed language support',tone:'s'} ]},
+          { id:'rea', label:'Reading', items:[
+            {t:'Strong comprehension',tone:'p'},{t:'Used reading strategies',tone:'p'},
+            {t:'Read independently',tone:'n'},
+            {t:'Needed support',tone:'s'},{t:'Guessed instead of reading',tone:'s'},{t:'Struggled with text',tone:'s'} ]},
+          { id:'wri', label:'Writing', items:[
+            {t:'Strong ideas',tone:'p'},{t:'Organized writing',tone:'p'},{t:'Revised independently',tone:'p'},
+            {t:'Finished draft',tone:'n'},
+            {t:'Grammar difficulties',tone:'s'},{t:'Needed writing support',tone:'s'},{t:'Incomplete writing',tone:'s'} ]},
+          { id:'cre', label:'Creativity', items:[
+            {t:'Original idea',tone:'p'},{t:'Tried new approach',tone:'p'},{t:'Excellent problem solving',tone:'p'},
+            {t:'Followed model',tone:'n'},
+            {t:'Needed example',tone:'s'},{t:'Avoided challenge',tone:'s'} ]}
+        ];
+        var TONE_MARK = { p:'\u2705', n:'\u2796', s:'\u274C' };
+        var openFeedbackCat = null;   // which category is expanded in the modal
+
+        function findFeedbackCat(id) {
+            for (var i = 0; i < QUICK_FEEDBACK.length; i++) {
+                if (QUICK_FEEDBACK[i].id === id) return QUICK_FEEDBACK[i];
+            }
+            return null;
+        }
+
+        function toggleFeedbackCat(name, catId) {
+            openFeedbackCat = (openFeedbackCat === catId) ? null : catId;
+            openStudentModal(name);
+        }
+
+        // One tap = a logged, posted observation
+        function quickNote(name, catId, idx) {
+            var cat = findFeedbackCat(catId);
+            if (!cat || !cat.items[idx]) return;
+            var item = cat.items[idx];
+            var text = TONE_MARK[item.tone] + ' ' + cat.label + ': ' + item.t;
+            if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+            var noteEntry = { text: text, ts: Date.now(), tone: item.tone, category: cat.label, quick: true };
+            liveState.studentData[name].notes.push(noteEntry);
+            logEvent('note_added', { student: name, text: text, quick: true });
+            saveLiveState();
+            postNoteToLearnerProfile(name, noteEntry);
+            renderLiveView();
+            openStudentModal(name);
+        }
+
+        function quickFeedbackHtml(name) {
+            var cat = openFeedbackCat ? findFeedbackCat(openFeedbackCat) : null;
+            var html = '<div style="margin-bottom:6px;font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;">Quick feedback</div>' +
+                       '<div class="qf-cats">';
+            QUICK_FEEDBACK.forEach(function(c) {
+                var on = (openFeedbackCat === c.id);
+                html += '<button class="qf-cat' + (on ? ' active' : '') + '" onclick="toggleFeedbackCat(\'' +
+                        escapeAttr(name) + '\',\'' + c.id + '\')">' + escapeHtml(c.label) + '</button>';
+            });
+            html += '</div>';
+            if (cat) {
+                html += '<div class="qf-items">';
+                cat.items.forEach(function(it, i) {
+                    var cls = it.tone === 'p' ? 'pos' : (it.tone === 'n' ? 'neu' : 'sup');
+                    html += '<button class="qf-item ' + cls + '" onclick="quickNote(\'' + escapeAttr(name) +
+                            '\',\'' + cat.id + '\',' + i + ')">' + TONE_MARK[it.tone] + ' ' + escapeHtml(it.t) + '</button>';
+                });
+                html += '</div>';
+                html += '<div style="font-size:0.75rem;color:#94a3b8;margin:6px 0 12px;">Tapping one logs it straight away and posts it to the learner profile.</div>';
+            }
+            return html;
+        }
+
         function openStudentModal(name) {
             if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
             var d = liveState.studentData[name];
@@ -5039,6 +5169,7 @@
                     '<button class="warn" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">−1 point</button>' +
                     '<button class="danger" onclick="resetStudentPoints(\'' + escapeAttr(name) + '\');openStudentModal(\'' + escapeAttr(name) + '\')">Reset</button>' +
                 '</div>' +
+                quickFeedbackHtml(name) +
                 '<label style="display:block;margin-bottom:4px;">Add a note</label>' +
                 '<textarea class="modal-input" id="stu-note-input" placeholder="Observation, participation, behavior, etc."></textarea>' +
                 '<div class="modal-actions">' +
