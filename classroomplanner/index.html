@@ -427,6 +427,23 @@
         .elem-teacher { border-width: 3px; border-radius: 2px; }
         .elem-door { border-right: 6px double #333; background-color: #e0d0b0; }
         .elem-arrow { border: none !important; background: transparent !important; box-shadow: none !important; }
+        /* Free shapes and labels */
+        .elem-line { border: none !important; box-shadow: none !important; border-radius: 2px; }
+        .elem-circle { border-radius: 50%; }
+        .elem-square { border-radius: 4px; }
+        .elem-label {
+            background: transparent !important; border: 2px dashed transparent !important;
+            box-shadow: none !important; font-weight: 700; font-size: 1.05rem;
+        }
+        .elem-label:hover { border-color: #cbd5e0 !important; }
+        .elem-label.selected { border-color: #3b82f6 !important; }
+        .live-elem.live-line { border: none; box-shadow: none; border-radius: 2px; }
+        .live-elem.live-circle { border-radius: 50%; }
+        .live-elem.live-square { border-radius: 4px; }
+        .live-elem.live-label {
+            background: transparent !important; border: none; box-shadow: none;
+            font-weight: 700; font-size: 1.05rem;
+        }
         .arrow-svg { width: 100%; height: 100%; pointer-events: none; }
 
         .selection-box {
@@ -2046,6 +2063,14 @@
                 <button onclick="spawnItem('arrow')">Arrow</button>
             </div>
 
+            <div class="section-title">Shapes &amp; Labels</div>
+            <div class="btn-grid">
+                <button onclick="spawnItem('line')" title="A straight line — rotate it for diagonals">Line</button>
+                <button onclick="spawnItem('circle')" title="A circle or oval zone">Circle</button>
+                <button onclick="spawnItem('square')" title="A rectangle or square zone">Square</button>
+                <button onclick="spawnItem('label')" title="Free-floating text with no background">Text Label</button>
+            </div>
+
             <div class="section-title">Automated Tools</div>
             <button onclick="addRow()">↓ Add Empty Vertical Row</button>
             <button class="automation" onclick="generateRandomPlan()">🎲 New Plan From Roster</button>
@@ -2069,6 +2094,15 @@
 
                 <label>Fill/Object Color:</label>
                 <input type="color" id="prop-color" oninput="updateColor()">
+
+                <label style="margin-top:10px;">Rotation: <span id="prop-rotation-val">0°</span></label>
+                <input type="range" id="prop-rotation" min="0" max="360" step="1" value="0"
+                       oninput="updateRotation()" style="width:100%;">
+                <div class="btn-grid" style="margin-top:4px;">
+                    <button onclick="nudgeRotation(-45)">↺ 45°</button>
+                    <button onclick="nudgeRotation(45)">↻ 45°</button>
+                    <button onclick="setRotation(0)">Reset</button>
+                </div>
 
                 <button class="danger" style="width:100%; margin-top: 10px;" onclick="deleteSelectedItems()">Delete Selection (Del)</button>
             </div>
@@ -2929,6 +2963,7 @@
                     var txtSpan = el.querySelector('.elem-txt');
                     text = txtSpan ? txtSpan.innerText : '';
                 }
+                if (type === 'label') color = rgbToHex(el.style.color || '#1e293b');
                 var itemObj = {
                     type: type,
                     left: el.style.left,
@@ -2938,6 +2973,8 @@
                     text: text,
                     color: color
                 };
+                var rot = getElRotation(el);
+                if (rot) itemObj.rotation = rot;
                 var lpId = el.getAttribute('data-lp-student-id');
                 if (lpId) itemObj.lp_student_id = lpId;
                 items.push(itemObj);
@@ -2963,9 +3000,12 @@
                 el.style.height = item.height;
                 if (item.type === 'arrow') {
                     drawArrowSVG(el, item.color, item.text);
+                } else if (item.type === 'label') {
+                    el.style.color = item.color || '#1e293b';
                 } else {
                     el.style.backgroundColor = item.color;
                 }
+                if (item.rotation) setElRotation(el, item.rotation);
                 if (item.lp_student_id) el.setAttribute('data-lp-student-id', item.lp_student_id);
             });
             deselectAll();
@@ -3313,6 +3353,13 @@
                 return;
             }
             document.getElementById('inspector').style.display = 'block';
+            var rotSlider = document.getElementById('prop-rotation');
+            var rotOut = document.getElementById('prop-rotation-val');
+            if (rotSlider) {
+                var deg = getElRotation(selectedEls[0]);
+                rotSlider.value = deg;
+                if (rotOut) rotOut.textContent = deg + '\u00B0';
+            }
             if (selectedEls.length > 1) {
                 document.getElementById('inspector-title').innerText = "Properties (" + selectedEls.length + " Items)";
                 document.getElementById('label-field-container').style.display = 'none';
@@ -3330,8 +3377,13 @@
                 } else {
                     var txtSpan = el.querySelector('.elem-txt');
                     document.getElementById('prop-label').value = txtSpan ? txtSpan.innerText : '';
-                    document.getElementById('prop-color').value = rgbToHex(el.style.backgroundColor);
+                    document.getElementById('prop-color').value = (type === 'label')
+                        ? rgbToHex(el.style.color || '#1e293b')
+                        : rgbToHex(el.style.backgroundColor);
                 }
+                // A plain line carries no text
+                document.getElementById('label-field-container').style.display =
+                    (type === 'line') ? 'none' : 'block';
             }
         }
 
@@ -3414,6 +3466,39 @@
             saveCanvasStateToBrowser();
         }
 
+        // ---------- Rotation (any item, full 360°) ----------
+        function setElRotation(el, deg) {
+            deg = ((parseInt(deg, 10) || 0) % 360 + 360) % 360;
+            el.setAttribute('data-rotation', deg);
+            el.style.transform = deg ? 'rotate(' + deg + 'deg)' : '';
+            return deg;
+        }
+
+        function getElRotation(el) {
+            return parseInt(el.getAttribute('data-rotation'), 10) || 0;
+        }
+
+        function updateRotation() {
+            var slider = document.getElementById('prop-rotation');
+            if (!slider) return;
+            var deg = parseInt(slider.value, 10) || 0;
+            selectedEls.forEach(function(el) { setElRotation(el, deg); });
+            var out = document.getElementById('prop-rotation-val');
+            if (out) out.textContent = deg + '\u00B0';
+            saveCanvasStateToBrowser();
+        }
+
+        function setRotation(deg) {
+            var slider = document.getElementById('prop-rotation');
+            if (slider) slider.value = ((deg % 360) + 360) % 360;
+            updateRotation();
+        }
+
+        function nudgeRotation(delta) {
+            if (!selectedEls.length) return;
+            setRotation(getElRotation(selectedEls[0]) + delta);
+        }
+
         function updateColor() {
             var val = document.getElementById('prop-color').value;
             selectedEls.forEach(el => {
@@ -3423,6 +3508,8 @@
                     var poly = el.querySelector('polygon');
                     if (line) line.setAttribute('stroke', val);
                     if (poly) poly.setAttribute('fill', val);
+                } else if (type === 'label') {
+                    el.style.color = val;   // a label is text, not a filled box
                 } else {
                     el.style.backgroundColor = val;
                 }
@@ -3462,6 +3549,27 @@
                 el.style.height = '40px';
                 el.style.backgroundColor = 'transparent';
                 drawArrowSVG(el, '#333333', text || 'Direction');
+            } else if (type === 'line') {
+                el.style.width = '180px';
+                el.style.height = '6px';
+                el.style.backgroundColor = '#334155';
+            } else if (type === 'label') {
+                el.style.width = '150px';
+                el.style.height = '34px';
+                el.style.backgroundColor = 'transparent';
+                el.style.color = '#1e293b';
+                var lspan = document.createElement('span');
+                lspan.className = 'elem-txt';
+                lspan.innerText = text || 'Label';
+                el.appendChild(lspan);
+            } else if (type === 'circle' || type === 'square') {
+                el.style.width = (type === 'circle') ? '110px' : '130px';
+                el.style.height = (type === 'circle') ? '110px' : '90px';
+                el.style.backgroundColor = (type === 'circle') ? '#fde68a' : '#bfdbfe';
+                var sspan = document.createElement('span');
+                sspan.className = 'elem-txt';
+                sspan.innerText = text || '';
+                el.appendChild(sspan);
             } else {
                 el.style.width = (type === 'teacher') ? '130px' : ((type === 'door') ? '70px' : '85px');
                 el.style.height = (type === 'teacher') ? '65px' : ((type === 'door') ? '20px' : '50px');
@@ -4210,6 +4318,7 @@
                 el.style.top = item.top;
                 el.style.width = item.width;
                 el.style.height = item.height;
+                if (item.rotation) el.style.transform = 'rotate(' + item.rotation + 'deg)';
 
                 if (item.type === 'arrow') {
                     el.style.background = 'transparent';
@@ -4257,6 +4366,12 @@
                             else checkLessonWarning(function() { openStudentModal(n); });
                         };
                     })(name);
+                } else if (item.type === 'line') {
+                    el.style.backgroundColor = item.color || '#334155';
+                } else if (item.type === 'label') {
+                    el.style.background = 'transparent';
+                    el.style.color = item.color || '#1e293b';
+                    el.innerHTML = '<span class="stu-name">' + escapeHtml(item.text || '') + '</span>';
                 } else {
                     el.style.backgroundColor = item.color || '#e0d0b0';
                     el.style.color = pickTextColor(item.color || '#e0d0b0');
