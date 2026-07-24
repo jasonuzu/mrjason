@@ -5240,6 +5240,37 @@
 
         function gameEscHandler(e) { if (e.key === 'Escape') closeClassGame(); }
 
+        // Point Blast reports what it awarded; add it to each student's real total.
+        function applyPointBlastAwards(awarded) {
+            if (!awarded) return;
+            var known = {};
+            liveRosterNames().forEach(function(n) { known[n] = true; });
+            var applied = 0, total = 0;
+            Object.keys(awarded).forEach(function(name) {
+                var pts = parseInt(awarded[name], 10);
+                if (!known[name] || !isFinite(pts) || pts === 0) return;
+                if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
+                liveState.studentData[name].points += pts;
+                applied++; total += pts;
+            });
+            if (!applied) return;
+            logEvent('points_added', { source: 'Point Blast', students: applied, delta: total });
+            saveLiveState();
+            renderLiveView();
+            renderGroupsPanel();
+            var bar = document.getElementById('game-count');
+            if (bar) bar.textContent = applied + ' students · ' + total + ' points added to the class';
+        }
+
+        window.addEventListener('message', function(e) {
+            var d = e.data;
+            if (!d || d.source !== 'pointblast' || d.type !== 'awarded') return;
+            // Only trust messages from the game frame we opened
+            var frame = document.getElementById('game-frame');
+            if (!frame || e.source !== frame.contentWindow) return;
+            applyPointBlastAwards(d.awarded);
+        });
+
         function closeClassGame() {
             var o = document.getElementById('game-overlay');
             if (o) o.remove();
@@ -9122,7 +9153,13 @@
             // 4. Wait for all animations to finish
             await Promise.all(promises);
 
-            // 5. Update history and UI
+            // 5. Report the result to the classroom app, then update history and UI
+            try {
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ source: 'pointblast', type: 'awarded', awarded: awarded, ts: timestamp }, '*');
+                }
+            } catch (e) { /* standalone use — nothing to report to */ }
+
             names.forEach(name => {
                 history.push({ name, points: awarded[name], time: timestamp });
             });
