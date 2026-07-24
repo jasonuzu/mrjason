@@ -60,13 +60,36 @@
             color: #2c3e50;
         }
         #tab-brand {
-            padding: 0 20px;
+            padding: 0 16px;
             display: flex;
             align-items: center;
+            gap: 5px;
             color: #94a3b8;
             font-size: 0.75rem;
             letter-spacing: 1px;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
         }
+        #tab-brand:hover { color: #e2e8f0; }
+        #tab-brand-caret { font-size: 0.6rem; transition: transform 0.15s; }
+        #tab-brand.open #tab-brand-caret { transform: rotate(180deg); }
+        #brand-menu {
+            position: absolute; top: calc(100% + 4px); left: 10px;
+            background: #fff; border-radius: 8px; min-width: 250px; padding: 6px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+            display: none; z-index: 900; cursor: default;
+        }
+        #tab-brand.open #brand-menu { display: block; }
+        #brand-menu a {
+            display: flex; align-items: center; gap: 11px;
+            padding: 10px 12px; border-radius: 5px;
+            text-decoration: none; color: #2c3e50; letter-spacing: normal;
+        }
+        #brand-menu a:hover { background: #f1f5f9; }
+        #brand-menu .bm-icon { font-size: 1.25rem; flex-shrink: 0; }
+        #brand-menu .bm-title { display: block; font-weight: 700; font-size: 0.88rem; line-height: 1.2; }
+        #brand-menu .bm-sub { display: block; font-size: 0.75rem; color: #64748b; margin-top: 1px; }
         /* Auth widget (right side of tab bar) */
         .auth-widget {
             margin-left: auto;
@@ -1980,7 +2003,19 @@
             </div>
             <div class="auth-menu" id="auth-menu"></div>
         </div>
-        <div id="tab-brand">CLASSROOM TOOLKIT</div>
+        <div id="tab-brand" onclick="toggleBrandMenu(event)" title="Other apps in this suite">
+            <span>ATLAS ORION</span><span id="tab-brand-caret">▾</span>
+            <div id="brand-menu">
+                <a href="https://jasonuzu.github.io/mrjason/LearnerProfile/index.html" target="_blank" rel="noopener">
+                    <span class="bm-icon">📋</span>
+                    <span><span class="bm-title">Learner Profile</span><span class="bm-sub">Student records and assessments</span></span>
+                </a>
+                <a href="https://jasonuzu.github.io/mrjason/theteacherscanvas/" target="_blank" rel="noopener">
+                    <span class="bm-icon">🎨</span>
+                    <span><span class="bm-title">Teacher's Canvas</span><span class="bm-sub">Planning and creation space</span></span>
+                </a>
+            </div>
+        </div>
     </div>
 
     <!-- ================= DESIGNER VIEW ================= -->
@@ -5186,6 +5221,17 @@
             renderBanners();
             closeModal();
         }
+
+        // ---------- Suite menu on the brand ----------
+        function toggleBrandMenu(e) {
+            e.stopPropagation();
+            var el = document.getElementById('tab-brand');
+            if (el) el.classList.toggle('open');
+        }
+        document.addEventListener('click', function(e) {
+            var el = document.getElementById('tab-brand');
+            if (el && !el.contains(e.target)) el.classList.remove('open');
+        });
 
         // ---------- Class games ----------
         // Each game ships as inert text in this file. We inject the current live
