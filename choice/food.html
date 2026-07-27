@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍽️ Random Food Choice Machine</title>
+    <style>
+        :root {
+            --bg: #1a0a2e;
+            --face-skin: #ffc8a2;
+            --face-cheek: #ff9e9e;
+            --mouth-inside: #4a1c1c;
+            --card-bg: rgba(30, 15, 50, 0.85);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: radial-gradient(ellipse at center, #2d1b4e 0%, #0d0520 60%, #050210 100%);
+            font-family: 'Segoe UI', 'Poppins', system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            cursor: default;
+        }
+
+        /* ============ STARS / SPARKLES BACKGROUND ============ */
+        .stars-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle var(--dur) ease-in-out infinite;
+            animation-delay: var(--delay);
+            opacity: 0;
+        }
+        @keyframes twinkle {
+            0%,
+            100% {
+                opacity: 0.2;
+                transform: scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.6);
+            }
+        }
+
+        /* ============ GIANT FACE BEHIND APP ============ */
+        .face-wrapper {
+            position: fixed;
+            z-index: 1;
+            pointer-events: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(70vmin, 550px);
+            height: min(70vmin, 550px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .face {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, #ffe0cc 0%, #ffc8a2 40%, #f5b88a 70%, #e8a478 100%);
+            box-shadow:
+                0 0 80px rgba(255, 180, 130, 0.5),
+                0 0 200px rgba(255, 150, 100, 0.25),
+                inset 0 -20px 40px rgba(0, 0, 0, 0.08),
+                inset 0 10px 30px rgba(255, 255, 255, 0.3);
+        }
+        /* Eyes */
+        .eye {
+            position: absolute;
+            width: 22%;
+            height: 26%;
+            background: white;
+            border-radius: 50%;
+            top: 28%;
+            box-shadow:
+                inset 0 4px 8px rgba(0, 0, 0, 0.1),
+                0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        .eye.left {
+            left: 18%;
+        }
+        .eye.right {
+            right: 18%;
+        }
+        .pupil {
+            position: absolute;
+            width: 45%;
+            height: 50%;
+            background: radial-gradient(circle, #1a0a00 0%, #3d1c00 60%, #1a0a00 100%);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: transform 0.3s ease;
+        }
+        .pupil::after {
+            content: '';
+            position: absolute;
+            width: 25%;
+            height: 25%;
+            background: white;
+            border-radius: 50%;
+            top: 15%;
+            right: 18%;
+        }
+        /* Blinking */
+        .eyelid {
+            position: absolute;
+            width: 100%;
+            height: 0%;
+            background: #ffc8a2;
+            top: 0;
+            left: 0;
+            border-radius: 0 0 50% 50%;
+            animation: blink 4s ease-in-out infinite;
+            z-index: 2;
+        }
+        @keyframes blink {
+            0%,
+            45%,
+            55%,
+            100% {
+                height: 0%;
+            }
+            48%,
+            52% {
+                height: 55%;
+            }
+        }
+        /* Eyebrows */
+        .eyebrow {
+            position: absolute;
+            width: 28%;
+            height: 10%;
+            border-radius: 50%;
+            border-top: 6px solid #6b3a2a;
+            top: 22%;
+        }
+        .eyebrow.left {
+            left: 14%;
+            transform: rotate(-8deg);
+        }
+        .eyebrow.right {
+            right: 14%;
+            transform: rotate(8deg);
+        }
+        /* Cheeks */
+        .cheek {
+            position: absolute;
+            width: 18%;
+            height: 12%;
+            background: radial-gradient(circle, #ff9e9e 0%, transparent 70%);
+            border-radius: 50%;
+            top: 48%;
+            opacity: 0.7;
+        }
+        .cheek.left {
+            left: 10%;
+        }
+        .cheek.right {
+            right: 10%;
+        }
+        /* Mouth */
+        .mouth-area {
+            position: absolute;
+            bottom: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40%;
+            height: 18%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mouth {
+            width: 85%;
+            height: 100%;
+            background: #4a1c1c;
+            border-radius: 50%;
+            animation: munch 0.55s ease-in-out infinite;
+            box-shadow: inset 0 4px 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .mouth .tongue {
+            position: absolute;
+            bottom: -30%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 55%;
+            background: #e8576b;
+            border-radius: 50%;
+        }
+        @keyframes munch {
+            0%,
+            100% {
+                transform: scaleY(0.35);
+                border-radius: 50%;
+            }
+            40% {
+                transform: scaleY(1.0);
+                border-radius: 40%;
+            }
+            70% {
+                transform: scaleY(0.7);
+                border-radius: 45%;
+            }
+        }
+        .mouth.munch-fast {
+            animation: munchFast 0.2s ease-in-out infinite;
+        }
+        @keyframes munchFast {
+            0%,
+            100% {
+                transform: scaleY(0.3);
+                border-radius: 50%;
+            }
+            40% {
+                transform: scaleY(1.1);
+                border-radius: 38%;
+            }
+            70% {
+                transform: scaleY(0.65);
+                border-radius: 44%;
+            }
+        }
+        /* Food particles near mouth */
+        .food-particle {
+            position: fixed;
+            z-index: 2;
+            pointer-events: none;
+            font-size: 24px;
+            animation: particleEaten 0.9s ease-in forwards;
+        }
+        @keyframes particleEaten {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1) rotate(0deg);
+            }
+            70% {
+                opacity: 0.8;
+                transform: translate(var(--dx), var(--dy)) scale(0.5) rotate(180deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(var(--dx2), var(--dy2)) scale(0.1) rotate(360deg);
+            }
+        }
+
+        /* ============ FLOATING NAMES ============ */
+        .floating-name {
+            position: fixed;
+            z-index: 3;
+            pointer-events: none;
+            font-weight: 900;
+            font-size: clamp(20px, 3.5vw, 38px);
+            text-shadow:
+                0 0 15px currentColor,
+                0 0 35px currentColor,
+                0 0 60px rgba(255, 255, 255, 0.5);
+            letter-spacing: 2px;
+            animation: floatAround var(--travel-dur) ease-in-out infinite,
+                colorFlash 2.5s ease-in-out infinite;
+            animation-delay: var(--start-delay), 0s;
+            white-space: nowrap;
+        }
+        @keyframes floatAround {
+            0% {
+                transform: translate(var(--sx), var(--sy)) rotate(0deg);
+            }
+            15% {
+                transform: translate(var(--p1x), var(--p1y)) rotate(6deg);
+            }
+            30% {
+                transform: translate(var(--p2x), var(--p2y)) rotate(-4deg);
+            }
+            50% {
+                transform: translate(var(--p3x), var(--p3y)) rotate(8deg);
+            }
+            65% {
+                transform: translate(var(--p4x), var(--p4y)) rotate(-6deg);
+            }
+            80% {
+                transform: translate(var(--p5x), var(--p5y)) rotate(3deg);
+            }
+            100% {
+                transform: translate(var(--sx), var(--sy)) rotate(0deg);
+            }
+        }
+        @keyframes colorFlash {
+            0%,
+            100% {
+                color: #ff4444;
+            }
+            14% {
+                color: #ff8800;
+            }
+            28% {
+                color: #ffdd00;
+            }
+            42% {
+                color: #44ff44;
+            }
+            57% {
+                color: #44aaff;
+            }
+            71% {
+                color: #aa44ff;
+            }
+            85% {
+                color: #ff44aa;
+            }
+        }
+
+        /* ============ FLOATING FOOD EMOJIS ============ */
+        .floating-food {
+            position: fixed;
+            z-index: 3;
+            pointer-events: none;
+            font-size: clamp(22px, 4vw, 40px);
+            animation: foodBounce var(--bounce-dur) ease-in-out infinite;
+            animation-delay: var(--bounce-delay);
+            filter: drop-shadow(0 0 10px rgba(255, 200, 100, 0.6));
+        }
+        @keyframes foodBounce {
+            0%,
+            100% {
+                transform: translate(var(--bx), var(--by)) rotate(0deg) scale(1);
+            }
+            20% {
+                transform: translate(var(--bx2), var(--by2)) rotate(25deg) scale(1.2);
+            }
+            40% {
+                transform: translate(var(--bx3), var(--by3)) rotate(-15deg) scale(0.9);
+            }
+            60% {
+                transform: translate(var(--bx4), var(--by4)) rotate(30deg) scale(1.15);
+            }
+            80% {
+                transform: translate(var(--bx5), var(--by5)) rotate(-20deg) scale(0.95);
+            }
+        }
+
+        /* ============ MAIN APP CARD ============ */
+        .app-card {
+            position: relative;
+            z-index: 10;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 28px;
+            padding: 28px 30px 30px;
+            width: min(92vw, 460px);
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow:
+                0 20px 60px rgba(0, 0, 0, 0.5),
+                0 0 0 2px rgba(255, 255, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: center;
+            color: #f0e6ff;
+            transition: box-shadow 0.5s ease;
+        }
+        .app-card.spinning {
+            box-shadow:
+                0 20px 80px rgba(255, 150, 50, 0.6),
+                0 0 120px rgba(255, 120, 30, 0.4),
+                0 0 0 3px rgba(255, 200, 100, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .app-title {
+            font-size: clamp(24px, 5vw, 34px);
+            font-weight: 900;
+            margin-bottom: 6px;
+            background: linear-gradient(135deg, #ffda44, #ff6b6b, #ffda44);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 1px;
+            animation: titleShimmer 3s ease-in-out infinite;
+        }
+        @keyframes titleShimmer {
+            0%,
+            100% {
+                filter: brightness(1);
+            }
+            50% {
+                filter: brightness(1.4);
+            }
+        }
+        .app-subtitle {
+            font-size: 14px;
+            color: #c9b8e8;
+            margin-bottom: 18px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Meal type selector */
+        .meal-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .meal-tab {
+            flex: 1;
+            min-width: 90px;
+            padding: 10px 12px;
+            border-radius: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.06);
+            color: #d5c8f0;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        .meal-tab:hover {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        .meal-tab.active {
+            background: linear-gradient(135deg, #ff7b3d, #ff5e62);
+            border-color: #ffaa70;
+            color: #fff;
+            box-shadow: 0 6px 25px rgba(255, 100, 50, 0.5);
+            animation: pulseTab 2s ease-in-out infinite;
+        }
+        @keyframes pulseTab {
+            0%,
+            100% {
+                box-shadow: 0 6px 25px rgba(255, 100, 50, 0.5);
+            }
+            50% {
+                box-shadow: 0 6px 40px rgba(255, 140, 70, 0.8);
+            }
+        }
+
+        /* Food list */
+        .food-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+            min-height: 50px;
+            align-items: center;
+        }
+        .food-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 14px;
+            font-weight: 600;
+            color: #f0e6ff;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .food-tag .delete-food {
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            line-height: 1;
+            margin-left: 2px;
+        }
+        .food-tag .delete-food:hover {
+            opacity: 1;
+            color: #ff5e62;
+            transform: scale(1.3);
+        }
+        .food-tag.highlighted {
+            background: #ff7b3d !important;
+            border-color: #ffaa70 !important;
+            color: #fff !important;
+            transform: scale(1.12);
+            box-shadow: 0 0 30px rgba(255, 120, 40, 0.7);
+            z-index: 5;
+            animation: popTag 0.3s ease-out;
+        }
+        @keyframes popTag {
+            0% {
+                transform: scale(0.7);
+            }
+            60% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1.12);
+            }
+        }
+
+        /* Add food input */
+        .add-food-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+        .add-food-input {
+            flex: 1;
+            padding: 11px 16px;
+            border-radius: 50px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+            letter-spacing: 0.3px;
+        }
+        .add-food-input:focus {
+            border-color: #ffaa70;
+            background: rgba(255, 255, 255, 0.14);
+            box-shadow: 0 0 20px rgba(255, 140, 70, 0.3);
+        }
+        .add-food-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+        .btn-add {
+            padding: 11px 18px;
+            border-radius: 50px;
+            border: none;
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            color: #fff;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(108, 92, 231, 0.5);
+        }
+
+        /* Choose button */
+        .btn-choose {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border-radius: 50px;
+            border: none;
+            background: linear-gradient(135deg, #ff5e62, #ff7b3d);
+            color: #fff;
+            font-weight: 900;
+            font-size: 20px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            box-shadow: 0 10px 30px rgba(255, 90, 50, 0.45);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-choose:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 16px 40px rgba(255, 100, 50, 0.6);
+            letter-spacing: 3px;
+        }
+        .btn-choose:active {
+            transform: scale(0.95);
+            transition: transform 0.1s ease;
+        }
+        .btn-choose::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.2) 50%, transparent 60%);
+            animation: btnShine 2s ease-in-out infinite;
+        }
+        @keyframes btnShine {
+            0%,
+            100% {
+                transform: translateX(-100%);
+            }
+            50% {
+                transform: translateX(100%);
+            }
+        }
+        .btn-choose:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Result */
+        .result-area {
+            margin-top: 18px;
+            padding: 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.4s ease;
+        }
+        .result-area.has-result {
+            background: rgba(255, 130, 50, 0.2);
+            border-color: rgba(255, 160, 80, 0.6);
+            box-shadow: 0 0 40px rgba(255, 120, 40, 0.35);
+            animation: resultGlow 0.8s ease-out;
+        }
+        @keyframes resultGlow {
+            0% {
+                box-shadow: 0 0 0px rgba(255, 120, 40, 0);
+            }
+            50% {
+                box-shadow: 0 0 80px rgba(255, 150, 60, 0.7);
+            }
+            100% {
+                box-shadow: 0 0 40px rgba(255, 120, 40, 0.35);
+            }
+        }
+        .result-text {
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            animation: resultBounce 0.6s ease-out;
+        }
+        @keyframes resultBounce {
+            0% {
+                transform: scale(0.3);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.3);
+            }
+            70% {
+                transform: scale(0.9);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .result-emoji {
+            font-size: 40px;
+            animation: resultBounce 0.6s ease-out;
+        }
+
+        /* Save indicator */
+        .save-indicator {
+            font-size: 11px;
+            color: #8be0a0;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            letter-spacing: 0.5px;
+        }
+        .save-indicator.visible {
+            opacity: 0.9;
+        }
+
+        /* Music toggle */
+        .music-toggle {
+            position: fixed;
+            z-index: 20;
+            top: 16px;
+            right: 16px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .music-toggle:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(0, 0, 0, 0.6);
+            transform: scale(1.1);
+        }
+        .music-toggle.muted {
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 500px) {
+            .app-card {
+                padding: 18px 14px 20px;
+                border-radius: 20px;
+                width: 94vw;
+            }
+            .floating-name {
+                font-size: clamp(14px, 4vw, 22px);
+            }
+            .floating-food {
+                font-size: clamp(16px, 3.5vw, 28px);
+            }
+            .meal-tab {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            .btn-choose {
+                font-size: 17px;
+                padding: 13px;
+            }
+            .result-text {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Stars background -->
+    <div class="stars-container" id="starsContainer"></div>
+
+    <!-- ============ GIANT MUNCHING FACE ============ -->
+    <div class="face-wrapper" id="faceWrapper">
+        <div class="face">
+            <div class="eyebrow left"></div>
+            <div class="eyebrow right"></div>
+            <div class="eye left">
+                <div class="pupil" id="pupilLeft"></div>
+                <div class="eyelid"></div>
+            </div>
+            <div class="eye right">
+                <div class="pupil" id="pupilRight"></div>
+                <div class="eyelid"></div>
+            </div>
+            <div class="cheek left"></div>
+            <div class="cheek right"></div>
+            <div class="mouth-area">
+                <div class="mouth" id="theMouth">
+                    <div class="tongue"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ FLOATING NAMES ============ -->
+    <div class="floating-name" id="nameClaire"
+    style="--travel-dur:11s;--start-delay:0s;--sx:5vw;--sy:8vh;--p1x:75vw;--p1y:12vh;--p2x:88vw;--p2y:55vh;--p3x:70vw;--p3y:82vh;--p4x:15vw;--p4y:75vh;--p5x:3vw;--p5y:40vh;">Claire</div>
+    <div class="floating-name" id="nameDaddy"
+    style="--travel-dur:13s;--start-delay:-4s;--sx:80vw;--sy:75vh;--p1x:10vw;--p1y:70vh;--p2x:5vw;--p2y:20vh;--p3x:60vw;--p3y:8vh;--p4x:85vw;--p4y:30vh;--p5x:82vw;--p5y:70vh;">Daddy</div>
+    <div class="floating-name" id="nameMommy"
+    style="--travel-dur:14s;--start-delay:-7s;--sx:70vw;--sy:10vh;--p1x:8vw;--p1y:25vh;--p2x:15vw;--p2y:65vh;--p3x:78vw;--p3y:72vh;--p4x:88vw;--p4y:18vh;--p5x:55vw;--p5y:50vh;">Mommy</div>
+
+    <!-- ============ FLOATING FOOD EMOJIS ============ -->
+    <div id="floatingFoodsContainer"></div>
+
+    <!-- ============ MAIN APP CARD ============ -->
+    <div class="app-card" id="appCard">
+        <div class="app-title">🍽️ Food Choice Machine</div>
+        <div class="app-subtitle">Let the munching face decide!</div>
+
+        <!-- Meal type tabs -->
+        <div class="meal-tabs" id="mealTabs">
+            <button class="meal-tab active" data-meal="breakfast">🌅 Breakfast</button>
+            <button class="meal-tab" data-meal="lunch">☀️ Lunch</button>
+            <button class="meal-tab" data-meal="dinner">🌙 Dinner</button>
+        </div>
+
+        <!-- Food list -->
+        <div class="food-list" id="foodList"></div>
+
+        <!-- Add food -->
+        <div class="add-food-row">
+            <input type="text" class="add-food-input" id="addFoodInput" placeholder="Add a food item..." maxlength="40">
+            <button class="btn-add" id="btnAdd">+ Add</button>
+        </div>
+
+        <!-- Choose button -->
+        <button class="btn-choose" id="btnChoose">🎰 SPIN & CHOOSE! 🎰</button>
+
+        <!-- Result -->
+        <div class="result-area" id="resultArea">
+            <span style="opacity:0.6;">Click the button to choose!</span>
+        </div>
+
+        <!-- Save indicator -->
+        <div class="save-indicator" id="saveIndicator">💾 Saved to browser!</div>
+    </div>
+
+    <!-- Music toggle -->
+    <button class="music-toggle" id="musicToggle" title="Toggle Music">🎵</button>
+
+    <script>
+        (function() {
+            // ==================== DOM REFS ====================
+            const appCard = document.getElementById('appCard');
+            const foodListEl = document.getElementById('foodList');
+            const addFoodInput = document.getElementById('addFoodInput');
+            const btnAdd = document.getElementById('btnAdd');
+            const btnChoose = document.getElementById('btnChoose');
+            const resultArea = document.getElementById('resultArea');
+            const saveIndicator = document.getElementById('saveIndicator');
+            const mealTabs = document.getElementById('mealTabs');
+            const theMouth = document.getElementById('theMouth');
+            const musicToggle = document.getElementById('musicToggle');
+            const faceWrapper = document.getElementById('faceWrapper');
+            const pupilLeft = document.getElementById('pupilLeft');
+            const pupilRight = document.getElementById('pupilRight');
+            const floatingFoodsContainer = document.getElementById('floatingFoodsContainer');
+            const starsContainer = document.getElementById('starsContainer');
+
+            // ==================== STATE ====================
+            const STORAGE_KEY = 'foodChoiceMachine_data_v2';
+            let currentMeal = 'breakfast';
+            let isSpinning = false;
+            let musicPlaying = false;
+            let audioCtx = null;
+            let musicInterval = null;
+            let masterGain = null;
+
+            const defaultFoods = {
+                breakfast: ['🥞 Pancakes', '🍳 Eggs & Bacon', '🥣 Cereal', '🍞 Toast & Jam', '🥑 Avocado Toast',
+                    '🧇 Waffles', '🥤 Smoothie Bowl', '🍌 Banana Pancakes', '🥚 Omelette', '🍩 Donuts'
+                ],
+                lunch: ['🥪 Sandwich', '🥗 Caesar Salad', '🍜 Ramen', '🌯 Burrito', '🍔 Burger', '🍕 Pizza Slice',
+                    '🌮 Tacos', '🍣 Sushi Roll', '🥙 Gyro', '🧆 Falafel Wrap'
+                ],
+                dinner: ['🍝 Spaghetti', '🥩 Steak', '🍗 Roast Chicken', '🐟 Grilled Salmon', '🍛 Curry',
+                    '🥘 Paella', '🍲 Stew', '🧆 Meatballs', '🍤 Shrimp Scampi', '🥘 Stir Fry'
+                ],
+            };
+
+            let allFoods = JSON.parse(JSON.stringify(defaultFoods));
+
+            // Load from localStorage
+            function loadFromStorage() {
+                try {
+                    const stored = localStorage.getItem(STORAGE_KEY);
+                    if (stored) {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && typeof parsed === 'object') {
+                            for (const meal of ['breakfast', 'lunch', 'dinner']) {
+                                if (Array.isArray(parsed[meal]) && parsed[meal].length > 0) {
+                                    allFoods[meal] = parsed[meal];
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Could not load from localStorage:', e);
+                }
+            }
+
+            function saveToStorage() {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(allFoods));
+                    showSaveIndicator();
+                } catch (e) {
+                    console.warn('Could not save to localStorage:', e);
+                }
+            }
+
+            function showSaveIndicator() {
+                saveIndicator.classList.add('visible');
+                clearTimeout(saveIndicator._timeout);
+                saveIndicator._timeout = setTimeout(() => {
+                    saveIndicator.classList.remove('visible');
+                }, 1800);
+            }
+
+            // ==================== RENDER FOOD LIST ====================
+            function renderFoodList() {
+                const foods = allFoods[currentMeal];
+                foodListEl.innerHTML = '';
+                if (foods.length === 0) {
+                    foodListEl.innerHTML =
+                        '<span style="opacity:0.5;font-style:italic;">No foods yet — add some above!</span>';
+                    return;
+                }
+                foods.forEach((food, index) => {
+                    const tag = document.createElement('span');
+                    tag.className = 'food-tag';
+                    tag.innerHTML =
+                        `${food} <span class="delete-food" data-index="${index}" title="Remove">✕</span>`;
+                    foodListEl.appendChild(tag);
+                });
+
+                // Add delete handlers
+                foodListEl.querySelectorAll('.delete-food').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const idx = parseInt(btn.dataset.index);
+                        if (!isNaN(idx) && idx >= 0 && idx < allFoods[currentMeal].length) {
+                            allFoods[currentMeal].splice(idx, 1);
+                            renderFoodList();
+                            saveToStorage();
+                        }
+                    });
+                });
+            }
+
+            // ==================== MEAL TAB SWITCHING ====================
+            function setMealTab(meal) {
+                currentMeal = meal;
+                mealTabs.querySelectorAll('.meal-tab').forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.meal === meal);
+                });
+                renderFoodList();
+                resultArea.classList.remove('has-result');
+                resultArea.innerHTML = '<span style="opacity:0.6;">Click the button to choose!</span>';
+            }
+
+            mealTabs.addEventListener('click', (e) => {
+                const tab = e.target.closest('.meal-tab');
+                if (!tab || isSpinning) return;
+                setMealTab(tab.dataset.meal);
+            });
+
+            // ==================== ADD FOOD ====================
+            function addFood() {
+                const val = addFoodInput.value.trim();
+                if (!val) return;
+                if (val.length > 40) {
+                    alert('Food name too long! Keep it under 40 characters.');
+                    return;
+                }
+                // Check duplicate
+                if (allFoods[currentMeal].some(f => f.toLowerCase() === val.toLowerCase())) {
+                    // Still add but maybe with slight variation? Just add it.
+                }
+                allFoods[currentMeal].push(val);
+                addFoodInput.value = '';
+                renderFoodList();
+                saveToStorage();
+                addFoodInput.focus();
+            }
+
+            btnAdd.addEventListener('click', addFood);
+            addFoodInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') addFood();
+            });
+
+            // ==================== RANDOM CHOICE / SPIN ====================
+            function spinAndChoose() {
+                if (isSpinning) return;
+                const foods = allFoods[currentMeal];
+                if (foods.length === 0) {
+                    resultArea.classList.add('has-result');
+                    resultArea.innerHTML =
+                        '<span style="color:#ff8888;">Add some foods first! 🍽️</span>';
+                    return;
+                }
+                if (foods.length === 1) {
+                    resultArea.classList.add('has-result');
+                    resultArea.innerHTML =
+                        `<span class="result-text">${foods[0]}</span> <span class="result-emoji">😋</span>`;
+                    return;
+                }
+
+                isSpinning = true;
+                btnChoose.disabled = true;
+                appCard.classList.add('spinning');
+                theMouth.classList.add('munch-fast');
+                resultArea.classList.remove('has-result');
+                resultArea.innerHTML = '<span style="font-size:22px;">🌀 Choosing...</span>';
+
+                // Rapidly highlight tags
+                const tags = foodListEl.querySelectorAll('.food-tag');
+                let spinCycles = 0;
+                const maxCycles = 18 + Math.floor(Math.random() * 12); // 18-30 cycles
+                let cycleSpeed = 50; // ms per highlight change
+                let currentHighlight = -1;
+                let spinInterval;
+
+                function doSpinCycle() {
+                    // Remove previous highlight
+                    if (currentHighlight >= 0 && tags[currentHighlight]) {
+                        tags[currentHighlight].classList.remove('highlighted');
+                    }
+                    currentHighlight = Math.floor(Math.random() * tags.length);
+                    if (tags[currentHighlight]) {
+                        tags[currentHighlight].classList.add('highlighted');
+                    }
+                    spinCycles++;
+
+                    if (spinCycles >= maxCycles) {
+                        // Slow down
+                        clearInterval(spinInterval);
+                        const remainingCycles = 6 + Math.floor(Math.random() * 5);
+                        let slowCycles = 0;
+                        const slowInterval = setInterval(() => {
+                            if (currentHighlight >= 0 && tags[currentHighlight]) {
+                                tags[currentHighlight].classList.remove('highlighted');
+                            }
+                            currentHighlight = Math.floor(Math.random() * tags.length);
+                            if (tags[currentHighlight]) {
+                                tags[currentHighlight].classList.add('highlighted');
+                            }
+                            slowCycles++;
+                            if (slowCycles >= remainingCycles) {
+                                clearInterval(slowInterval);
+                                finishSpin(tags);
+                            }
+                        }, 150 + slowCycles * 60);
+                    }
+                }
+
+                spinInterval = setInterval(doSpinCycle, cycleSpeed);
+
+                // Spawn extra food particles during spin
+                const particleInterval = setInterval(() => {
+                    spawnFoodParticle();
+                }, 150);
+                spinInterval._particleInterval = particleInterval;
+
+                function finishSpin(tags) {
+                    clearInterval(spinInterval._particleInterval);
+                    // Pick final random choice
+                    const chosenIndex = Math.floor(Math.random() * foods.length);
+                    const chosenFood = foods[chosenIndex];
+
+                    // Clear all highlights
+                    tags.forEach(t => t.classList.remove('highlighted'));
+                    // Highlight the winner
+                    if (tags[chosenIndex]) {
+                        tags[chosenIndex].classList.add('highlighted');
+                        setTimeout(() => tags[chosenIndex].classList.remove('highlighted'), 2500);
+                    }
+
+                    // Show result
+                    resultArea.classList.add('has-result');
+                    resultArea.innerHTML =
+                        `<span class="result-text">${chosenFood}</span> <span class="result-emoji">😋</span>`;
+
+                    // Reset
+                    theMouth.classList.remove('munch-fast');
+                    appCard.classList.remove('spinning');
+                    btnChoose.disabled = false;
+                    isSpinning = false;
+
+                    // Big chomp - extra particles
+                    for (let i = 0; i < 6; i++) {
+                        setTimeout(() => spawnFoodParticle(), i * 80);
+                    }
+
+                    // Puppet eyes look at result
+                    const pupils = [pupilLeft, pupilRight];
+                    pupils.forEach(p => {
+                        p.style.transform = 'translate(-30%, -60%)';
+                        setTimeout(() => {
+                            p.style.transform = 'translate(-50%, -50%)';
+                        }, 600);
+                    });
+                }
+            }
+
+            btnChoose.addEventListener('click', spinAndChoose);
+
+            // ==================== FOOD PARTICLES (munched near mouth) ====================
+            const foodEmojis = ['🍕', '🍔', '🌮', '🍩', '🍪', '🍎', '🍌', '🍇', '🥞', '🧇', '🍳', '🥗', '🍜', '🍝', '🍣',
+                '🍤', '🧁', '🍰', '🍗', '🥩'
+            ];
+
+            function spawnFoodParticle() {
+                const faceRect = faceWrapper.getBoundingClientRect();
+                const mouthArea = theMouth.getBoundingClientRect();
+                const cx = mouthArea.left + mouthArea.width / 2;
+                const cy = mouthArea.top + mouthArea.height / 2;
+
+                const particle = document.createElement('span');
+                particle.className = 'food-particle';
+                particle.textContent = foodEmojis[Math.floor(Math.random() * foodEmojis.length)];
+                // Start near but outside the mouth
+                const startAngle = Math.random() * Math.PI * 2;
+                const startDist = 50 + Math.random() * 80;
+                const sx = cx + Math.cos(startAngle) * startDist;
+                const sy = cy + Math.sin(startAngle) * startDist;
+                particle.style.left = sx + 'px';
+                particle.style.top = sy + 'px';
+                // Target: into the mouth center
+                const dx = cx - sx;
+                const dy = cy - sy;
+                const dx2 = dx * 1.3;
+                const dy2 = dy * 1.3;
+                particle.style.setProperty('--dx', dx * 0.7 + 'px');
+                particle.style.setProperty('--dy', dy * 0.7 + 'px');
+                particle.style.setProperty('--dx2', dx2 + 'px');
+                particle.style.setProperty('--dy2', dy2 + 'px');
+                document.body.appendChild(particle);
+                // Remove after animation
+                setTimeout(() => {
+                    if (particle.parentNode) particle.parentNode.removeChild(particle);
+                }, 950);
+            }
+
+            // Spawn periodic food particles for the munching face
+            setInterval(() => {
+                if (!isSpinning && Math.random() < 0.5) {
+                    spawnFoodParticle();
+                }
+            }, 1400);
+
+            // ==================== STARS BACKGROUND ====================
+            function createStars() {
+                starsContainer.innerHTML = '';
+                const count = 80;
+                for (let i = 0; i < count; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'star';
+                    star.style.left = Math.random() * 100 + '%';
+                    star.style.top = Math.random() * 100 + '%';
+                    const size = 1 + Math.random() * 3;
+                    star.style.width = size + 'px';
+                    star.style.height = size + 'px';
+                    star.style.setProperty('--dur', (2 + Math.random() * 5) + 's');
+                    star.style.setProperty('--delay', Math.random() * 6 + 's');
+                    starsContainer.appendChild(star);
+                }
+            }
+            createStars();
+
+            // ==================== FLOATING FOOD EMOJIS ====================
+            function createFloatingFoods() {
+                floatingFoodsContainer.innerHTML = '';
+                const count = 14;
+                const emojis = ['🍕', '🍔', '🌮', '🍩', '🍪', '🍎', '🍌', '🍇', '🥞', '🧇', '🍳', '🥗', '🍜', '🍝', '🍣',
+                    '🍤', '🧁', '🍰', '🍗', '🥩', '🥑', '🍒', '🍓', '🥐'
+                ];
+                for (let i = 0; i < count; i++) {
+                    const el = document.createElement('span');
+                    el.className = 'floating-food';
+                    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                    // Random bounce path
+                    const bx = (Math.random() * 80) + 'vw';
+                    const by = (Math.random() * 80) + 'vh';
+                    const bx2 = (Math.random() * 70 + 5) + 'vw';
+                    const by2 = (Math.random() * 70 + 5) + 'vh';
+                    const bx3 = (Math.random() * 75 + 3) + 'vw';
+                    const by3 = (Math.random() * 75 + 3) + 'vh';
+                    const bx4 = (Math.random() * 80) + 'vw';
+                    const by4 = (Math.random() * 80) + 'vh';
+                    const bx5 = (Math.random() * 70 + 10) + 'vw';
+                    const by5 = (Math.random() * 70 + 10) + 'vh';
+                    el.style.setProperty('--bx', bx);
+                    el.style.setProperty('--by', by);
+                    el.style.setProperty('--bx2', bx2);
+                    el.style.setProperty('--by2', by2);
+                    el.style.setProperty('--bx3', bx3);
+                    el.style.setProperty('--by3', by3);
+                    el.style.setProperty('--bx4', bx4);
+                    el.style.setProperty('--by4', by4);
+                    el.style.setProperty('--bx5', bx5);
+                    el.style.setProperty('--by5', by5);
+                    el.style.setProperty('--bounce-dur', (8 + Math.random() * 14) + 's');
+                    el.style.setProperty('--bounce-delay', Math.random() * -15 + 's');
+                    el.style.left = bx;
+                    el.style.top = by;
+                    floatingFoodsContainer.appendChild(el);
+                }
+            }
+            createFloatingFoods();
+
+            // ==================== MUSIC SYSTEM ====================
+            function initAudio() {
+                if (audioCtx) return;
+                try {
+                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                    masterGain = audioCtx.createGain();
+                    masterGain.gain.value = 0.08;
+                    masterGain.connect(audioCtx.destination);
+                } catch (e) {
+                    console.warn('Web Audio API not supported:', e);
+                }
+            }
+
+            function playNote(freq, startTime, duration, gainVal = 0.06) {
+                if (!audioCtx || !masterGain) return;
+                const osc = audioCtx.createOscillator();
+                const noteGain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                noteGain.gain.setValueAtTime(gainVal, startTime);
+                noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                osc.connect(noteGain);
+                noteGain.connect(masterGain);
+                osc.start(startTime);
+                osc.stop(startTime + duration + 0.05);
+            }
+
+            // Happy melody in C major pentatonic
+            const melodyNotes = [
+                { freq: 523, dur: 0.25 }, // C5
+                { freq: 659, dur: 0.25 }, // E5
+                { freq: 784, dur: 0.3 }, // G5
+                { freq: 1047, dur: 0.35 }, // C6
+                { freq: 784, dur: 0.2 }, // G5
+                { freq: 659, dur: 0.2 }, // E5
+                { freq: 587, dur: 0.25 }, // D5
+                { freq: 659, dur: 0.3 }, // E5
+                { freq: 523, dur: 0.35 }, // C5
+                { freq: 440, dur: 0.2 }, // A4
+                { freq: 523, dur: 0.25 }, // C5
+                { freq: 659, dur: 0.3 }, // E5
+                { freq: 784, dur: 0.4 }, // G5
+                { freq: 659, dur: 0.2 }, // E5
+                { freq: 523, dur: 0.5 }, // C5
+            ];
+
+            function playMelody() {
+                if (!audioCtx || !masterGain || !musicPlaying) return;
+                const now = audioCtx.currentTime;
+                let timeOffset = 0;
+                melodyNotes.forEach(note => {
+                    playNote(note.freq, now + timeOffset, note.dur, 0.05);
+                    timeOffset += note.dur + 0.04;
+                });
+            }
+
+            function startMusic() {
+                initAudio();
+                if (!audioCtx) return;
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().then(() => {
+                        _actuallyStartMusic();
+                    });
+                } else {
+                    _actuallyStartMusic();
+                }
+            }
+
+            function _actuallyStartMusic() {
+                musicPlaying = true;
+                musicToggle.classList.remove('muted');
+                musicToggle.textContent = '🎵';
+                playMelody();
+                // Loop the melody
+                const loopDuration = melodyNotes.reduce((acc, n) => acc + n.dur + 0.04, 0) + 0.6;
+                if (musicInterval) clearInterval(musicInterval);
+                musicInterval = setInterval(() => {
+                    if (musicPlaying) playMelody();
+                }, loopDuration * 1000);
+            }
+
+            function stopMusic() {
+                musicPlaying = false;
+                musicToggle.classList.add('muted');
+                musicToggle.textContent = '🔇';
+                if (musicInterval) {
+                    clearInterval(musicInterval);
+                    musicInterval = null;
+                }
+            }
+
+            function toggleMusic() {
+                initAudio();
+                if (musicPlaying) {
+                    stopMusic();
+                } else {
+                    startMusic();
+                }
+            }
+
+            musicToggle.addEventListener('click', toggleMusic);
+
+            // Try to init audio on first user interaction
+            document.addEventListener('click', function initAudioOnInteraction() {
+                initAudio();
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }, { once: true });
+
+            // ==================== FACE EYES FOLLOW MOUSE ====================
+            document.addEventListener('mousemove', (e) => {
+                const faceRect = faceWrapper.getBoundingClientRect();
+                const faceCX = faceRect.left + faceRect.width / 2;
+                const faceCY = faceRect.top + faceRect.height / 2;
+                const maxOffset = 12; // px
+                const dx = e.clientX - faceCX;
+                const dy = e.clientY - faceCY;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                const clampedDist = Math.min(dist, 400);
+                const ratio = clampedDist / 400;
+                const offsetX = (dx / dist) * maxOffset * ratio;
+                const offsetY = (dy / dist) * maxOffset * ratio;
+                [pupilLeft, pupilRight].forEach(p => {
+                    p.style.transform = `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px))`;
+                });
+            });
+
+            // ==================== KEYBOARD SHORTCUT ====================
+            document.addEventListener('keydown', (e) => {
+                if (e.key === ' ' && !isSpinning && document.activeElement !== addFoodInput) {
+                    e.preventDefault();
+                    spinAndChoose();
+                }
+                if (e.key === 'm' && e.ctrlKey) {
+                    e.preventDefault();
+                    toggleMusic();
+                }
+            });
+
+            // ==================== INIT ====================
+            loadFromStorage();
+            renderFoodList();
+            setMealTab('breakfast');
+
+            // Auto-start music attempt (will likely be blocked, but we try on interaction)
+            setTimeout(() => {
+                initAudio();
+            }, 500);
+
+            console.log('🍽️ Food Choice Machine ready!');
+            console.log('  - Press SPACE to spin');
+            console.log('  - Click the 🎵 button for music');
+            console.log('  - Add your own foods & they save to browser storage');
+            console.log('  - The giant face is munching behind the app 👀');
+        })();
+    </script>
+</body>
+</html>
