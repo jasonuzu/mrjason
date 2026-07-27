@@ -551,6 +551,73 @@
     font-weight: 700; margin-left: 6px; vertical-align: middle;
   }
   @media print { .role-manager { display: none !important; } }
+
+  /* ── Gradebook ── */
+  .gb-week-card {
+    border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px;
+    margin-bottom: 12px; background: var(--paper-raised); cursor: pointer;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .gb-week-card:hover { border-color: var(--accent); background: var(--accent-light); }
+  .gb-week-title { font-weight: 700; font-size: 15px; flex: 1; }
+  .gb-week-meta { font-size: 12px; color: var(--ink-faint); }
+  .gb-live-dot {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px;
+    font-weight: 700; padding: 2px 9px; border-radius: 10px;
+  }
+  .gb-live-dot.live { background: var(--green-bg); color: var(--green); }
+  .gb-live-dot.draft { background: var(--yellow-bg); color: var(--yellow); }
+  .gb-grid-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; margin: 12px 0; }
+  table.gb-grid { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.gb-grid th, table.gb-grid td {
+    border: 1px solid var(--rule-soft); padding: 6px 9px; text-align: center; white-space: nowrap;
+  }
+  table.gb-grid thead th {
+    background: var(--paper); position: sticky; top: 0; font-size: 11.5px;
+    color: var(--ink-soft); font-weight: 700;
+  }
+  table.gb-grid .gb-name-col { text-align: left; position: sticky; left: 0; background: var(--paper-raised); font-weight: 600; min-width: 130px; }
+  table.gb-grid thead .gb-name-col { z-index: 2; }
+  table.gb-grid .gb-cn { color: var(--ink-faint); font-weight: 400; font-size: 11px; }
+  table.gb-grid input, table.gb-grid select {
+    width: 62px; border: 1px solid transparent; background: transparent;
+    font-family: inherit; font-size: 12.5px; text-align: center; padding: 3px; border-radius: 4px; color: var(--ink);
+  }
+  table.gb-grid input:hover, table.gb-grid select:hover { border-color: var(--rule); }
+  table.gb-grid input:focus, table.gb-grid select:focus { border-color: var(--accent); background: #fff; outline: none; }
+  table.gb-grid input.gb-fb { width: 150px; text-align: left; }
+  table.gb-grid .gb-avg-row td { background: var(--accent-light); font-weight: 700; color: var(--accent); }
+  table.gb-grid .gb-assess-head { background: #EEF4FB; }
+  table.gb-grid .gb-part-head { background: #FBF3E8; }
+  .gb-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .gb-att-cell { display: flex; gap: 2px; justify-content: center; }
+  .gb-att-btn {
+    width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--rule);
+    font-size: 10px; font-weight: 700; cursor: pointer; background: var(--paper); color: var(--ink-faint); padding: 0;
+  }
+  .gb-att-btn.on-present { background: var(--green); color: #fff; border-color: var(--green); }
+  .gb-att-btn.on-late { background: var(--yellow); color: #fff; border-color: var(--yellow); }
+  .gb-att-btn.on-absent { background: var(--red); color: #fff; border-color: var(--red); }
+  .gb-action-chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-start; }
+  .gb-action-chip {
+    font-size: 10.5px; padding: 2px 8px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink-soft); white-space: nowrap;
+  }
+  .gb-action-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .gb-import-menu { position: relative; display: inline-block; }
+  .gb-share-box {
+    background: var(--green-bg); border: 1px solid var(--green); border-radius: 8px;
+    padding: 12px 14px; margin: 12px 0; font-size: 13px;
+  }
+  .gb-share-box .gb-link {
+    font-family: var(--mono, monospace); font-size: 12px; background: #fff;
+    border: 1px solid var(--rule); border-radius: 5px; padding: 7px 9px; margin: 6px 0;
+    word-break: break-all; color: var(--accent);
+  }
+  @media (max-width: 640px) {
+    table.gb-grid input { width: 48px; }
+    table.gb-grid input.gb-fb { width: 110px; }
+  }
   .post-content {
     font-size: 13.5px; line-height: 1.55; color: var(--ink);
     white-space: pre-wrap; word-wrap: break-word;
@@ -1703,6 +1770,152 @@ function rolesForStudent(rec){
   return (rec.roles || []).map(getRole).filter(Boolean);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   GRADEBOOK — weekly, one row per week per class, saved to the DB
+   ══════════════════════════════════════════════════════════════ */
+
+const DEFAULT_PART_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+function gbNewWeekId(){
+  return 'gwk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+}
+function gbToken(){
+  // reasonably unguessable share token
+  return (Date.now().toString(36) + Math.random().toString(36).slice(2,10) +
+          Math.random().toString(36).slice(2,10)).replace(/[^a-z0-9]/g,'');
+}
+
+// Build a fresh week for a class, seeding the roster from that class's students
+function gbCreateWeek(className){
+  const entry = getOrCreateClassEntry(className);
+  const students = state.students
+    .filter(s => (s.className||'') === className)
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''))
+    .map(s => ({
+      student_id: s.id,
+      name: s.name || '',
+      chinese_name: s.chineseName || '',
+      scores: {}, participation: {}, attendance: {},
+      points_total: '', week_feedback: '',
+      assignment_feedback: {}, actions: [],
+    }));
+  const today = new Date();
+  const title = 'Week of ' + today.toLocaleDateString(undefined, { day:'numeric', month:'short' });
+  return {
+    week_id: gbNewWeekId(),
+    class_id: entry ? entry.classId : '',
+    class_name: className,
+    title: title,
+    week_start: '',
+    is_published: false,
+    share_token: '',
+    published_at: null,
+    data: {
+      assessments: [],
+      participation: { columns: DEFAULT_PART_DAYS.slice() },
+      students: students,
+      share: { showAverages: true, showAttendance: true, showParticipation: true },
+    },
+    updatedAt: Date.now(),
+  };
+}
+
+function gbRowToWeek(row){
+  const d = row.data || {};
+  return {
+    week_id: row.week_id,
+    class_id: row.class_id || '',
+    class_name: row.class_name || '',
+    title: row.title || '',
+    week_start: row.week_start || '',
+    is_published: !!row.is_published,
+    share_token: row.share_token || '',
+    published_at: row.published_at || null,
+    data: {
+      assessments: d.assessments || [],
+      participation: d.participation || { columns: DEFAULT_PART_DAYS.slice() },
+      students: d.students || [],
+      share: d.share || { showAverages:true, showAttendance:true, showParticipation:true },
+    },
+    updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+  };
+}
+
+function gbWeekToRow(wk){
+  return {
+    week_id: wk.week_id,
+    owner_id: state.userId || null,
+    class_id: wk.class_id || '',
+    class_name: wk.class_name || '',
+    title: wk.title || '',
+    week_start: wk.week_start || null,
+    is_published: !!wk.is_published,
+    share_token: wk.share_token || null,
+    published_at: wk.published_at || null,
+    data: wk.data || {},
+  };
+}
+
+function gbSaveLocal(wk){
+  try{ local.set('gbweek:'+wk.week_id, JSON.stringify(wk)); }catch(e){}
+}
+
+function gbLoadLocalList(){
+  const out = [];
+  local.keys('gbweek:').forEach(k => {
+    try{ const w = JSON.parse(local.get(k)); if(w) out.push(w); }catch(e){}
+  });
+  return out;
+}
+
+// Debounced save of the active week (edits happen cell by cell)
+const gbSaver = {
+  timer: null,
+  schedule(){
+    if(this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 700);
+  },
+  async flush(){
+    if(this.timer){ clearTimeout(this.timer); this.timer = null; }
+    const wk = state.gbWeek;
+    if(!wk) return;
+    wk.updatedAt = Date.now();
+    gbSaveLocal(wk);
+    if(db.isConnected() && state.userId){
+      try{
+        const { error } = await db.client.from('gradebook_weeks')
+          .upsert(gbWeekToRow(wk), { onConflict: 'week_id' });
+        if(error) console.error('Gradebook save failed:', error.message);
+      }catch(e){ console.error('Gradebook save error:', e); }
+    }
+  },
+};
+
+async function gbLoadWeeksForClass(className){
+  if(db.isConnected() && state.userId){
+    try{
+      const { data, error } = await db.client.from('gradebook_weeks')
+        .select('*').eq('class_name', className).order('created_at', { ascending:false });
+      if(error) throw error;
+      return (data || []).map(gbRowToWeek);
+    }catch(e){
+      console.error('Gradebook load failed:', e);
+      if(/does not exist/i.test(e.message||'')) state.gbTableMissing = true;
+    }
+  }
+  return gbLoadLocalList().filter(w => w.class_name === className)
+    .sort((a,b) => (b.updatedAt||0) - (a.updatedAt||0));
+}
+
+// Compute a class average for an assessment column (numeric scores only)
+function gbAssessAverage(wk, assessId){
+  const vals = wk.data.students
+    .map(s => parseFloat(s.scores[assessId]))
+    .filter(v => isFinite(v));
+  if(!vals.length) return '';
+  return (vals.reduce((a,b)=>a+b,0) / vals.length).toFixed(1);
+}
+
 // Update just the db-banner in place without full re-render (avoid focus loss)
 function updateDbBanner(){
   const banner = document.querySelector('.db-banner');
@@ -2040,6 +2253,18 @@ function getAllClassNames(){
 async function init(){
   await db.autoConnect();
 
+  // Parent report mode — reached via a shared ?report=TOKEN link. No login.
+  const params = new URLSearchParams(location.search);
+  const reportToken = params.get('report');
+  if(reportToken){
+    state.parentMode = true;
+    state.parentToken = reportToken;
+    state.view = 'parentRoster';
+    await App.parentLoadRoster(reportToken);
+    render();
+    return;
+  }
+
   if(db.isConnected()){
     try{
       const { data: { session } } = await db.client.auth.getSession();
@@ -2108,9 +2333,13 @@ function render(opts){
   else if(state.view === 'bulkImport') body = renderBulkImport();
   else if(state.view === 'classCredentials') body = renderClassCredentials();
   else if(state.view === 'dbSettings') body = renderDbSettings();
+  else if(state.view === 'gradebook') body = renderGradebook();
+  else if(state.view === 'gradebookWeek') body = renderGradebookWeek();
+  else if(state.view === 'parentRoster') body = renderParentRoster();
+  else if(state.view === 'parentReport') body = renderParentReport();
 
   app.innerHTML = `
-    ${(state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup') ? renderTopbar() : ''}
+    ${(state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup' && !state.parentMode) ? renderTopbar() : ''}
     ${body}
   `;
   if(!opts.preserveScroll) window.scrollTo(0,0);
@@ -3549,6 +3778,288 @@ function renderLessonCard(l){
   </div>`;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   PARENT REPORT (no login; reached via ?report=TOKEN share link)
+   ══════════════════════════════════════════════════════════════ */
+
+function renderParentShell(inner){
+  return `
+    <div style="max-width:680px;margin:0 auto;padding:20px 16px;">
+      <div style="text-align:center;margin-bottom:8px;">
+        <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:Georgia,serif;">Weekly Report</div>
+        <div style="font-size:13px;color:var(--ink-faint);">家长周报</div>
+      </div>
+      ${inner}
+      <div style="text-align:center;margin-top:26px;font-size:11px;color:var(--ink-faint);">Learner Profile System</div>
+    </div>`;
+}
+
+function renderParentRoster(){
+  const r = state.parentRoster;
+  let inner;
+  if(r === undefined){
+    inner = `<p style="text-align:center;color:var(--ink-faint);">Loading…</p>`;
+  } else if(r === null){
+    inner = `<div class="card" style="padding:18px;text-align:center;color:var(--red);">
+      This report link is not available. It may have been taken offline by the teacher.<br>
+      <span style="font-size:12px;color:var(--ink-faint);">此链接暂不可用。</span></div>`;
+  } else if(!r.length){
+    inner = `<div class="card" style="padding:18px;text-align:center;color:var(--ink-faint);">No students in this report.</div>`;
+  } else {
+    inner = `
+      <div style="text-align:center;font-size:14px;color:var(--ink-soft);margin-bottom:16px;">
+        Find your child, then enter their password.<br>
+        <span style="font-size:12px;color:var(--ink-faint);">找到您的孩子，然后输入密码。</span>
+      </div>
+      ${r.map(s => `
+        <div class="card" style="padding:0;margin-bottom:10px;overflow:hidden;">
+          <div onclick="App.parentPick('${escapeAttr(s.student_id)}')" style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:15px;">${escapeHtml(s.name||'')}</div>
+              ${s.chinese_name?`<div style="font-size:13px;color:var(--ink-faint);">${escapeHtml(s.chinese_name)}</div>`:''}
+            </div>
+            <div style="color:var(--ink-faint);font-size:20px;">›</div>
+          </div>
+          ${state.parentPicked === s.student_id ? `
+            <div style="padding:0 16px 14px;border-top:1px solid var(--rule-soft);">
+              <div style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px;">Enter ${escapeHtml(s.name)}\u2019s password  <span style="color:var(--ink-faint);">输入密码</span></div>
+              <div style="display:flex;gap:8px;">
+                <input type="password" id="parent-pw" class="input" style="flex:1;" placeholder="Password / 密码"
+                  onkeydown="if(event.key==='Enter')App.parentUnlock('${escapeAttr(s.student_id)}')">
+                <button class="btn btn-primary" onclick="App.parentUnlock('${escapeAttr(s.student_id)}')">View</button>
+              </div>
+              ${state.parentError ? `<div style="color:var(--red);font-size:12.5px;margin-top:6px;">${escapeHtml(state.parentError)}</div>` : ''}
+            </div>` : ''}
+        </div>`).join('')}
+    `;
+  }
+  return renderParentShell(inner);
+}
+
+function renderParentReport(){
+  const rep = state.parentReport;
+  if(!rep) return renderParentShell(`<p style="text-align:center;color:var(--ink-faint);">Loading…</p>`);
+  const st = rep.student || {};
+  const assess = rep.assessments || [];
+  const part = (rep.participation && rep.participation.columns) || [];
+  const share = rep.share || {};
+  const ACTION_LABELS = {
+    conference:'A student–teacher conference is suggested', praise:'Praised for a great week',
+    improving:'Showing noticeable improvement', concern:'An area of concern to discuss',
+    homework:'Missing or incomplete homework', support:'Would benefit from extra support',
+  };
+
+  // scores
+  let scoreCards = '';
+  if(assess.length){
+    scoreCards = `<div style="margin-bottom:18px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Assessments  <span style="color:var(--ink-faint);font-weight:400;">作业与评估</span></div>
+      ${assess.map(a => {
+        const val = (st.scores||{})[a.id];
+        const fb = (st.assignment_feedback||{})[a.id];
+        const avg = share.showAverages !== false ? ((st._averages||{})[a.id]) : null;
+        return `<div class="card" style="padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <div style="font-weight:700;flex:1;">${escapeHtml(a.name||'')}</div>
+            <div style="font-size:18px;font-weight:800;color:var(--accent);">${val!==undefined&&val!==''?escapeHtml(String(val)):'–'}${a.total?`<span style="font-size:12px;color:var(--ink-faint);font-weight:400;"> / ${escapeHtml(String(a.total))}</span>`:''}</div>
+          </div>
+          ${a.description?`<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">${escapeHtml(a.description)}</div>`:''}
+          ${avg!==null&&avg!==undefined&&avg!==''?`<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Class average 班级平均: <strong>${escapeHtml(String(avg))}</strong></div>`:''}
+          ${fb?`<div style="font-size:13px;margin-top:6px;padding:8px 10px;background:var(--accent-light);border-radius:6px;color:var(--ink);">${escapeHtml(fb)}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // participation & attendance
+  let partBlock = '';
+  if(share.showParticipation !== false && part.length){
+    partBlock = `<div style="margin-bottom:18px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;">This week  <span style="color:var(--ink-faint);font-weight:400;">本周表现</span></div>
+      <div class="card" style="padding:12px 14px;">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          <tr style="color:var(--ink-faint);font-size:11px;text-transform:uppercase;">
+            <th style="text-align:left;padding:3px;">Day 日</th>
+            <th style="text-align:center;padding:3px;">Participation 参与</th>
+            ${share.showAttendance!==false?`<th style="text-align:center;padding:3px;">Attendance 出勤</th>`:''}
+          </tr>
+          ${part.map(c => {
+            const pts = (st.participation||{})[c] || '';
+            const att = (st.attendance||{})[c] || '';
+            const attLabel = att==='present'?'<span style="color:var(--green);">Present 到</span>'
+              : att==='late'?'<span style="color:var(--yellow);">Late 迟到</span>'
+              : att==='absent'?'<span style="color:var(--red);">Absent 缺席</span>' : '<span style="color:var(--ink-faint);">–</span>';
+            return `<tr style="border-top:1px solid var(--rule-soft);">
+              <td style="padding:5px 3px;">${escapeHtml(c)}</td>
+              <td style="text-align:center;padding:5px 3px;">${pts!==''?escapeHtml(String(pts)):'–'}</td>
+              ${share.showAttendance!==false?`<td style="text-align:center;padding:5px 3px;">${attLabel}</td>`:''}
+            </tr>`;
+          }).join('')}
+        </table>
+        ${st.points_total?`<div style="margin-top:10px;font-size:14px;">Total points 总积分: <strong style="color:var(--accent);">${escapeHtml(String(st.points_total))}</strong></div>`:''}
+      </div>
+    </div>`;
+  }
+
+  // feedback + actions
+  let feedbackBlock = '';
+  if(st.week_feedback || (st.actions&&st.actions.length)){
+    feedbackBlock = `<div style="margin-bottom:18px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Teacher feedback  <span style="color:var(--ink-faint);font-weight:400;">老师反馈</span></div>
+      ${st.week_feedback?`<div class="card" style="padding:12px 14px;margin-bottom:8px;font-size:14px;line-height:1.55;">${escapeHtml(st.week_feedback)}</div>`:''}
+      ${(st.actions&&st.actions.length)?`<div class="card" style="padding:12px 14px;">
+        ${st.actions.map(a => `<div style="font-size:13.5px;padding:4px 0;display:flex;gap:8px;"><span style="color:var(--accent);">•</span>${escapeHtml(ACTION_LABELS[a]||a)}</div>`).join('')}
+      </div>`:''}
+    </div>`;
+  }
+
+  return renderParentShell(`
+    <div style="text-align:center;margin-bottom:6px;">
+      <div style="font-size:19px;font-weight:800;">${escapeHtml(st.name||'')}${st.chinese_name?` <span style="color:var(--ink-faint);font-weight:400;">${escapeHtml(st.chinese_name)}</span>`:''}</div>
+      <div style="font-size:13px;color:var(--ink-faint);">${escapeHtml(rep.title||'')}${rep.class_name?` · ${escapeHtml(rep.class_name)}`:''}</div>
+    </div>
+    <div style="text-align:center;margin-bottom:18px;">
+      <button class="btn btn-ghost btn-sm" onclick="App.parentBack()">← Choose a different student</button>
+    </div>
+    ${scoreCards}
+    ${partBlock}
+    ${feedbackBlock}
+    ${(!assess.length && !partBlock && !feedbackBlock) ? `<div class="card" style="padding:18px;text-align:center;color:var(--ink-faint);">No details recorded for this week yet.</div>` : ''}
+  `);
+}
+
+/* ── Gradebook: list of weeks for a class ── */
+function renderGradebook(){
+  const className = state.gbClassName || '';
+  const weeks = state.gbWeeks;
+  return `
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.openClassOverview('${escapeAttr(className)}')" style="margin-bottom:18px;">← Back to ${escapeHtml(className)}</button>
+    <div class="report-header">
+      <h1 class="report-title">Gradebook — ${escapeHtml(className)}</h1>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">Weekly records. Each week is saved on its own and can be shared with parents when you\u2019re ready.</div>
+    </div>
+    ${state.gbTableMissing ? `<div class="card" style="padding:14px;border-color:var(--red);color:var(--red);font-size:13px;">The gradebook table is missing. Run <strong>GRADEBOOK-SETUP.sql</strong> in Supabase, then reload.</div>` : ''}
+    <div style="margin:16px 0;">
+      <button class="btn btn-primary" onclick="App.gbNewWeek()">+ New Week</button>
+    </div>
+    ${weeks === undefined ? `<p style="color:var(--ink-faint);font-size:13px;">Loading weeks…</p>`
+      : !weeks.length ? `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">No weeks yet. Click <strong>New Week</strong> to start — your students in ${escapeHtml(className)} will be added automatically.</div>`
+      : weeks.map(wk => `
+        <div class="gb-week-card" onclick="App.gbOpenWeek('${escapeAttr(wk.week_id)}')">
+          <div style="flex:1;">
+            <div class="gb-week-title">${escapeHtml(wk.title || 'Untitled week')}</div>
+            <div class="gb-week-meta">${(wk.data.students||[]).length} students · ${(wk.data.assessments||[]).length} assessment${(wk.data.assessments||[]).length===1?'':'s'}</div>
+          </div>
+          <span class="gb-live-dot ${wk.is_published?'live':'draft'}">${wk.is_published?'● Live':'Draft'}</span>
+        </div>`).join('')}
+  `;
+}
+
+/* ── Gradebook: the editable week grid ── */
+function renderGradebookWeek(){
+  const wk = state.gbWeek;
+  if(!wk) return `<p>No week open.</p>`;
+  const assess = wk.data.assessments || [];
+  const partCols = (wk.data.participation && wk.data.participation.columns) || [];
+  const students = wk.data.students || [];
+  const share = wk.data.share || {};
+
+  // header row 1: group labels
+  let head = `<tr>
+    <th class="gb-name-col" rowspan="2">Student</th>`;
+  assess.forEach(a => {
+    head += `<th class="gb-assess-head" title="${escapeAttr(a.description||'')}">${escapeHtml(a.name||'Assessment')}<div style="font-weight:400;color:var(--ink-faint);font-size:10px;">/ ${escapeHtml(String(a.total||''))}</div>
+      <button class="btn btn-ghost" style="font-size:10px;padding:1px 5px;margin-top:2px;" onclick="App.gbEditAssessment('${escapeAttr(a.id)}')">edit</button></th>`;
+  });
+  head += `<th class="gb-assess-head" rowspan="2"><button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button></th>`;
+  if(share.showParticipation !== false){
+    partCols.forEach(c => { head += `<th class="gb-part-head">${escapeHtml(c)}</th>`; });
+  }
+  head += `<th rowspan="2">Points<br>total</th><th rowspan="2">Weekly<br>feedback</th><th rowspan="2">Actions</th></tr>`;
+  // header row 2: sub labels
+  head += `<tr>`;
+  assess.forEach(() => { head += `<th class="gb-assess-head" style="font-weight:400;color:var(--ink-faint);">score</th>`; });
+  if(share.showParticipation !== false){
+    partCols.forEach(() => { head += `<th class="gb-part-head" style="font-weight:400;color:var(--ink-faint);font-size:10px;">pts / att</th>`; });
+  }
+  head += `</tr>`;
+
+  // body
+  let bodyRows = students.map((st, si) => {
+    let row = `<tr>
+      <td class="gb-name-col">${escapeHtml(st.name||'')}${st.chinese_name?`<div class="gb-cn">${escapeHtml(st.chinese_name)}</div>`:''}</td>`;
+    assess.forEach(a => {
+      row += `<td><input type="text" inputmode="decimal" value="${escapeAttr(st.scores[a.id]||'')}"
+        oninput="App.gbSetScore(${si},'${escapeAttr(a.id)}',this.value)" placeholder="–"></td>`;
+    });
+    row += `<td></td>`; // under the +Assessment column
+    if(share.showParticipation !== false){
+      partCols.forEach(c => {
+        const att = st.attendance[c] || '';
+        row += `<td>
+          <input type="text" inputmode="numeric" value="${escapeAttr(st.participation[c]||'')}" placeholder="–"
+            oninput="App.gbSetParticipation(${si},'${escapeAttr(c)}',this.value)" style="width:42px;">
+          <div class="gb-att-cell">
+            <button class="gb-att-btn ${att==='present'?'on-present':''}" title="Present" onclick="App.gbSetAttendance(${si},'${escapeAttr(c)}','present')">P</button>
+            <button class="gb-att-btn ${att==='late'?'on-late':''}" title="Late" onclick="App.gbSetAttendance(${si},'${escapeAttr(c)}','late')">L</button>
+            <button class="gb-att-btn ${att==='absent'?'on-absent':''}" title="Absent" onclick="App.gbSetAttendance(${si},'${escapeAttr(c)}','absent')">A</button>
+          </div>
+        </td>`;
+      });
+    }
+    row += `<td><input type="text" inputmode="numeric" value="${escapeAttr(st.points_total||'')}" placeholder="–" oninput="App.gbSetPointsTotal(${si},this.value)" style="width:52px;"></td>`;
+    row += `<td><input type="text" class="gb-fb" value="${escapeAttr(st.week_feedback||'')}" placeholder="Add feedback…" oninput="App.gbSetWeekFeedback(${si},this.value)"></td>`;
+    row += `<td><button class="btn btn-ghost btn-sm" onclick="App.gbOpenActions(${si})">Options</button></td>`;
+    row += `</tr>`;
+    return row;
+  }).join('');
+
+  // class average row
+  if(share.showAverages !== false && assess.length){
+    let avg = `<tr class="gb-avg-row"><td class="gb-name-col">Class average</td>`;
+    assess.forEach(a => { avg += `<td>${escapeHtml(gbAssessAverage(wk, a.id))}</td>`; });
+    avg += `<td></td>`;
+    if(share.showParticipation !== false){ partCols.forEach(() => avg += `<td></td>`); }
+    avg += `<td></td><td></td><td></td></tr>`;
+    bodyRows += avg;
+  }
+
+  return `
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.gbBackToList()" style="margin-bottom:14px;">← All weeks</button>
+    <div class="report-header">
+      <h1 class="report-title" style="display:flex;align-items:center;gap:10px;">
+        <input type="text" value="${escapeAttr(wk.title||'')}" onchange="App.gbSetTitle(this.value)"
+          style="font:inherit;border:1px solid transparent;border-radius:5px;padding:2px 6px;color:var(--ink);"
+          onmouseover="this.style.borderColor='var(--rule)'" onmouseout="this.style.borderColor='transparent'">
+        <span class="gb-live-dot ${wk.is_published?'live':'draft'}">${wk.is_published?'● Live':'Draft'}</span>
+      </h1>
+      <div style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${escapeHtml(wk.class_name)} · ${(students.length)} students</div>
+    </div>
+
+    <div class="gb-toolbar no-print">
+      <button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button>
+      <button class="btn btn-ghost btn-sm" onclick="App.gbImportFromClassroom()">↓ Import from Live Classroom</button>
+      <button class="btn btn-ghost btn-sm" onclick="App.gbEditColumns()">Participation days…</button>
+      <button class="btn btn-ghost btn-sm" onclick="App.gbShareSettings()">What parents see…</button>
+      <div style="flex:1;"></div>
+      ${wk.is_published
+        ? `<button class="btn btn-ghost btn-sm" onclick="App.gbRepublish()">↻ Update live report</button>
+           <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="App.gbUnpublish()">Take offline</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="App.gbGoLive()">● Go Live</button>`}
+    </div>
+
+    ${wk.is_published ? App.gbShareBoxHtml(wk) : ''}
+
+    <div class="gb-grid-wrap">
+      <table class="gb-grid">
+        <thead>${head}</thead>
+        <tbody>${bodyRows || `<tr><td colspan="99" style="padding:16px;color:var(--ink-faint);">No students in this class yet.</td></tr>`}</tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Tip: scroll the grid sideways to see every column. Everything you type saves automatically. Use <strong>Options</strong> on a student for conferences and other notes to post to their profile.</div>
+  `;
+}
+
 function renderClassOverview(){
   const className = state.activeClassName;
   const students = studentsInClass(className);
@@ -3627,6 +4138,7 @@ function renderClassOverview(){
     <div class="class-actions-bar no-print">
       <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
+      <button class="btn btn-primary" onclick="App.openGradebook('${escapeAttr(className)}')">📖 Gradebook</button>
       <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
@@ -5915,6 +6427,390 @@ const App = {
     delete state.lessonsByClass[className];
     App.repaintLessons(className);
     App.loadLessonsForClass(className);
+  },
+
+  /* ── Gradebook ── */
+
+  async openGradebook(className){
+    state.gbClassName = className;
+    state.gbWeek = null;
+    state.gbWeeks = undefined;
+    state.view = 'gradebook';
+    render();
+    state.gbWeeks = await gbLoadWeeksForClass(className);
+    if(state.view === 'gradebook') render({preserveScroll:true});
+  },
+
+  gbBackToList(){
+    gbSaver.flush();
+    App.openGradebook(state.gbClassName);
+  },
+
+  async gbNewWeek(){
+    const wk = gbCreateWeek(state.gbClassName);
+    state.gbWeek = wk;
+    state.view = 'gradebookWeek';
+    gbSaveLocal(wk);
+    gbSaver.schedule();
+    render();
+    if(!(state.gbWeeks)) state.gbWeeks = [];
+  },
+
+  gbOpenWeek(weekId){
+    const wk = (state.gbWeeks||[]).find(w => w.week_id === weekId);
+    if(!wk) return;
+    // deep clone so edits are isolated until saved
+    state.gbWeek = JSON.parse(JSON.stringify(wk));
+    state.view = 'gradebookWeek';
+    render();
+  },
+
+  gbSetTitle(v){ if(state.gbWeek){ state.gbWeek.title = v; gbSaver.schedule(); } },
+
+  gbSetScore(si, aid, v){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.scores[aid] = v; gbSaver.schedule();
+    App.gbRepaintAveragesSoon();
+  },
+  gbSetParticipation(si, col, v){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.participation[col] = v; gbSaver.schedule();
+  },
+  gbSetAttendance(si, col, status){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.attendance[col] = (st.attendance[col] === status) ? '' : status;
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+  gbSetPointsTotal(si, v){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.points_total = v; gbSaver.schedule();
+  },
+  gbSetWeekFeedback(si, v){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.week_feedback = v; gbSaver.schedule();
+  },
+
+  // repaint the average row without stealing focus from a live input
+  gbRepaintAveragesSoon(){
+    if(state._gbAvgTimer) clearTimeout(state._gbAvgTimer);
+    state._gbAvgTimer = setTimeout(() => {
+      if(state.view === 'gradebookWeek') render({preserveScroll:true});
+    }, 900);
+  },
+
+  gbAddAssessment(){
+    const name = prompt('Assessment name (e.g. Task 1, Weekend Homework):');
+    if(name === null) return;
+    const desc = prompt('Short description (optional):') || '';
+    const total = prompt('Total possible score (e.g. 10, 100):') || '';
+    state.gbWeek.data.assessments.push({
+      id: 'as_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      name: name.trim() || 'Assessment', description: desc.trim(), total: total.trim(),
+    });
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+
+  gbEditAssessment(aid){
+    const a = state.gbWeek.data.assessments.find(x => x.id === aid);
+    if(!a) return;
+    const choice = prompt('Edit assessment — type:\n  1 to rename\n  2 to change description\n  3 to change total\n  4 to delete\n\nEnter 1-4:', '1');
+    if(choice === null) return;
+    if(choice === '4'){
+      if(confirm(`Delete "${a.name}"? Scores in this column will be removed.`)){
+        state.gbWeek.data.assessments = state.gbWeek.data.assessments.filter(x => x.id !== aid);
+        state.gbWeek.data.students.forEach(s => { delete s.scores[aid]; delete s.assignment_feedback[aid]; });
+      }
+    } else if(choice === '1'){
+      const v = prompt('New name:', a.name); if(v !== null) a.name = v.trim() || a.name;
+    } else if(choice === '2'){
+      const v = prompt('New description:', a.description||''); if(v !== null) a.description = v.trim();
+    } else if(choice === '3'){
+      const v = prompt('New total:', a.total||''); if(v !== null) a.total = v.trim();
+    }
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+
+  gbEditColumns(){
+    const cols = (state.gbWeek.data.participation.columns || []).join(', ');
+    const v = prompt('Participation columns (comma separated).\nThese are usually the school days, but you can use anything:', cols);
+    if(v === null) return;
+    state.gbWeek.data.participation.columns = v.split(',').map(x => x.trim()).filter(Boolean);
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+
+  gbShareSettings(){
+    const sh = state.gbWeek.data.share;
+    const msg = 'What parents see when this week is live.\n\n' +
+      'Type a line for each to toggle, then OK:\n' +
+      `  Averages:      ${sh.showAverages!==false?'ON':'off'}\n` +
+      `  Attendance:    ${sh.showAttendance!==false?'ON':'off'}\n` +
+      `  Participation: ${sh.showParticipation!==false?'ON':'off'}\n\n` +
+      'Enter A, T, or P (any combination) to flip those, or leave blank to keep:';
+    const v = (prompt(msg, '') || '').toLowerCase();
+    if(v.includes('a')) sh.showAverages = !(sh.showAverages !== false);
+    if(v.includes('t')) sh.showAttendance = !(sh.showAttendance !== false);
+    if(v.includes('p')) sh.showParticipation = !(sh.showParticipation !== false);
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+
+  gbOpenActions(si){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    const ACTIONS = [
+      { id:'conference', label:'Suggest a student–teacher conference' },
+      { id:'praise', label:'Praise — great week' },
+      { id:'improving', label:'Noticeable improvement' },
+      { id:'concern', label:'Area of concern to discuss' },
+      { id:'homework', label:'Missing / incomplete homework' },
+      { id:'support', label:'Would benefit from extra support' },
+    ];
+    const current = st.actions || [];
+    const menu = ACTIONS.map((a,i) => `${i+1}. [${current.includes(a.id)?'x':' '}] ${a.label}`).join('\n');
+    const pick = prompt(`Options for ${st.name} — these appear on the weekly report and can post to the profile.\n\n${menu}\n\nEnter numbers to toggle (e.g. 1,3), or:\n  F = write assignment feedback\n  0 = clear all`, '');
+    if(pick === null) return;
+    if(pick.toLowerCase().includes('f')){
+      App.gbAssignmentFeedback(si);
+      return;
+    }
+    if(pick.trim() === '0'){ st.actions = []; }
+    else {
+      pick.split(',').forEach(tok => {
+        const n = parseInt(tok.trim(),10);
+        if(n>=1 && n<=ACTIONS.length){
+          const id = ACTIONS[n-1].id;
+          const idx = current.indexOf(id);
+          if(idx===-1) current.push(id); else current.splice(idx,1);
+        }
+      });
+      st.actions = current;
+    }
+    gbSaver.schedule();
+    // Offer to post the actions to the student's profile timeline
+    if(st.actions.length && confirm(`Post these notes to ${st.name}'s profile as an update?`)){
+      const labels = st.actions.map(id => (ACTIONS.find(a=>a.id===id)||{}).label).filter(Boolean);
+      App.gbPostToProfile(st, 'Weekly report — ' + state.gbWeek.title + '\n' + labels.map(l=>'• '+l).join('\n'));
+    }
+    render({preserveScroll:true});
+  },
+
+  gbAssignmentFeedback(si){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    const assess = state.gbWeek.data.assessments;
+    if(!assess.length){ alert('Add an assessment first.'); return; }
+    const list = assess.map((a,i) => `${i+1}. ${a.name}`).join('\n');
+    const which = prompt(`Feedback for ${st.name} on which assessment?\n\n${list}\n\nEnter a number:`, '1');
+    if(which === null) return;
+    const idx = parseInt(which,10) - 1;
+    if(idx < 0 || idx >= assess.length) return;
+    const a = assess[idx];
+    const existing = st.assignment_feedback[a.id] || '';
+    const fb = prompt(`Feedback on "${a.name}" for ${st.name}:`, existing);
+    if(fb === null) return;
+    st.assignment_feedback[a.id] = fb.trim();
+    gbSaver.schedule();
+  },
+
+  async gbPostToProfile(st, content){
+    const rec = state.students.find(s => s.id === st.student_id);
+    if(!rec){ return; }
+    rec.posts = rec.posts || [];
+    rec.posts.unshift({ id:'p_'+Date.now().toString(36), timestamp:Date.now(), content, source:'gradebook' });
+    saveStudent(rec);
+    if(db.isConnected()){
+      try{ await db.client.rpc('add_student_post', { p_student_id: st.student_id, p_content: content, p_source: 'gradebook' }); }catch(e){}
+    }
+  },
+
+  async gbImportFromClassroom(){
+    const wk = state.gbWeek;
+    if(!db.isConnected()){ alert('Connect to the database to import Live Classroom data.'); return; }
+    if(!confirm('Import points and attendance from Live Classroom lessons this week?\n\nThis fills the points total and daily attendance from lessons recorded for this class. It won\u2019t overwrite anything you\u2019ve typed by hand where a lesson has no data.')) return;
+    try{
+      const entry = getOrCreateClassEntry(wk.class_name);
+      let q = db.client.from('lessons').select('*').order('started_at', { ascending:true });
+      q = (entry && entry.classId)
+        ? q.or('class_id.eq.'+entry.classId+',class_name.eq.'+wk.class_name)
+        : q.eq('class_name', wk.class_name);
+      const { data, error } = await q;
+      if(error) throw error;
+      const lessons = data || [];
+      if(!lessons.length){ alert('No lessons found for this class yet.'); return; }
+      // Aggregate points and attendance by student name
+      const byName = {};
+      lessons.forEach(les => {
+        const sd = les.student_data || {};
+        Object.keys(sd).forEach(nm => {
+          byName[nm] = byName[nm] || { points:0, att:{} };
+          byName[nm].points += (sd[nm].points || 0);
+        });
+        const att = les.attendance || {};
+        const day = les.started_at ? new Date(les.started_at).toLocaleDateString(undefined,{weekday:'long'}) : null;
+        if(day){
+          Object.keys(att).forEach(nm => {
+            byName[nm] = byName[nm] || { points:0, att:{} };
+            byName[nm].att[day] = att[nm];
+          });
+        }
+      });
+      let filled = 0;
+      wk.data.students.forEach(st => {
+        const agg = byName[st.name];
+        if(!agg) return;
+        if(agg.points && !st.points_total){ st.points_total = String(agg.points); filled++; }
+        Object.keys(agg.att).forEach(day => {
+          if((wk.data.participation.columns||[]).includes(day) && !st.attendance[day]){
+            st.attendance[day] = agg.att[day]; filled++;
+          }
+        });
+      });
+      gbSaver.schedule();
+      render({preserveScroll:true});
+      alert(filled ? `Imported ${filled} value${filled===1?'':'s'} from Live Classroom.` : 'Nothing new to import — values already filled or no matching students.');
+    }catch(e){
+      alert('Import failed: ' + e.message);
+    }
+  },
+
+  gbShareBoxHtml(wk){
+    const base = location.origin + location.pathname;
+    const link = base + '?report=' + encodeURIComponent(wk.share_token);
+    return `
+      <div class="gb-share-box no-print">
+        <strong>● This week is live.</strong> Share this link with parents. They pick their child and enter that student\u2019s password to see only their own child\u2019s report.
+        <div class="gb-link">${escapeHtml(link)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="App.gbCopyLink('${escapeAttr(link)}')">Copy link</button>
+        <span style="font-size:12px;color:var(--ink-faint);margin-left:8px;">Published ${wk.published_at ? new Date(wk.published_at).toLocaleString() : ''}</span>
+      </div>`;
+  },
+
+  gbCopyLink(link){
+    if(navigator.clipboard){ navigator.clipboard.writeText(link).then(()=>{}, ()=>{}); }
+    alert('Link copied:\n\n' + link);
+  },
+
+  // Freeze a snapshot and publish
+  async gbGoLive(){
+    const wk = state.gbWeek;
+    if(!wk.data.students.length){ alert('No students to publish.'); return; }
+    if(!confirm('Go live with this week?\n\nParents will be able to open a link, choose their child, enter that student\u2019s password, and see their child\u2019s report for this week. You can update or take it offline anytime.')) return;
+    await gbSaver.flush();
+    if(!wk.share_token) wk.share_token = gbToken();
+    wk.is_published = true;
+    wk.published_at = new Date().toISOString();
+    await App.gbWritePublished(wk);
+    render({preserveScroll:true});
+  },
+
+  async gbRepublish(){
+    const wk = state.gbWeek;
+    await gbSaver.flush();
+    wk.published_at = new Date().toISOString();
+    await App.gbWritePublished(wk);
+    alert('The live report now shows your latest changes.');
+    render({preserveScroll:true});
+  },
+
+  // Write the frozen snapshot into the row (parents read the snapshot, not live edits)
+  async gbWritePublished(wk){
+    const snapshot = JSON.parse(JSON.stringify(wk.data));
+    // Precompute class averages here so parents can see them without us ever
+    // sending other students' individual scores to the parent RPC.
+    const averages = {};
+    (snapshot.assessments || []).forEach(a => {
+      const vals = (snapshot.students || [])
+        .map(s => parseFloat((s.scores||{})[a.id]))
+        .filter(v => isFinite(v));
+      averages[a.id] = vals.length ? (vals.reduce((x,y)=>x+y,0)/vals.length).toFixed(1) : '';
+    });
+    // stamp each student's row with the shared averages (small, non-sensitive)
+    (snapshot.students || []).forEach(s => { s._averages = averages; });
+    const row = gbWeekToRow(wk);
+    row.published_snapshot = snapshot;
+    gbSaveLocal(wk);
+    if(db.isConnected() && state.userId){
+      try{
+        const { error } = await db.client.from('gradebook_weeks').upsert(row, { onConflict:'week_id' });
+        if(error) throw error;
+      }catch(e){ alert('Publish failed: ' + e.message); }
+    } else {
+      alert('Connect to the database to publish a shareable report.');
+    }
+  },
+
+  async gbUnpublish(){
+    const wk = state.gbWeek;
+    if(!confirm('Take this week offline? The parent link will stop working until you go live again.')) return;
+    wk.is_published = false;
+    await gbSaver.flush();
+    if(db.isConnected() && state.userId){
+      try{ await db.client.from('gradebook_weeks').update({ is_published:false }).eq('week_id', wk.week_id); }catch(e){}
+    }
+    render({preserveScroll:true});
+  },
+
+  /* ── Parent report (no login) ── */
+
+  async parentLoadRoster(token){
+    state.parentRoster = undefined;
+    if(!db.isConnected()){
+      try{ await db.autoConnect(); }catch(e){}
+    }
+    if(!db.isConnected()){ state.parentRoster = null; return; }
+    try{
+      const { data, error } = await db.client.rpc('get_published_roster', { p_token: token });
+      if(error) throw error;
+      state.parentRoster = data || [];
+    }catch(e){
+      console.error('Roster load failed:', e);
+      state.parentRoster = null;
+    }
+  },
+
+  parentPick(studentId){
+    state.parentPicked = (state.parentPicked === studentId) ? null : studentId;
+    state.parentError = '';
+    render();
+    setTimeout(() => { const el = document.getElementById('parent-pw'); if(el) el.focus(); }, 30);
+  },
+
+  async parentUnlock(studentId){
+    const el = document.getElementById('parent-pw');
+    const pw = el ? el.value : '';
+    if(!pw){ state.parentError = 'Please enter the password.'; render(); return; }
+    state.parentError = '';
+    try{
+      const { data, error } = await db.client.rpc('get_student_report', {
+        p_token: state.parentToken, p_student_id: studentId, p_password: pw,
+      });
+      if(error) throw error;
+      if(!data || data.error){
+        state.parentError = (data && data.error === 'bad_password')
+          ? 'That password did not match. Please check and try again. 密码不正确。'
+          : 'This report is not available.';
+        render();
+        return;
+      }
+      // class averages were baked onto the student row at publish time
+      data._averages = (data.student && data.student._averages) || {};
+      state.parentReport = data;
+      state.view = 'parentReport';
+      render();
+    }catch(e){
+      state.parentError = 'Something went wrong. Please try again.';
+      render();
+    }
+  },
+
+  parentBack(){
+    state.parentReport = null;
+    state.parentPicked = null;
+    state.parentError = '';
+    state.view = 'parentRoster';
+    render();
   },
 
   toggleLesson(lessonId){
