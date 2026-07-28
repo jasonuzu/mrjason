@@ -1975,19 +1975,42 @@ function gbRatingForCell(st, col){
            overridden: false, hasPoints: live.has, points: live.points };
 }
 
+// Fetch every lesson belonging to a class, matched by class_id OR class_name.
+// We run separate .eq() queries and merge rather than using .or(), because
+// class names contain spaces and commas that break PostgREST's or() parsing —
+// that was silently returning zero lessons. Deduped by lesson_id.
+async function fetchLessonsForClass(className){
+  if(!db.isConnected()) return [];
+  const entry = getOrCreateClassEntry(className);
+  const classId = entry && entry.classId;
+  const byId = {};
+  // by class_name (always)
+  try{
+    const r1 = await db.client.from('lessons').select('*').eq('class_name', className);
+    if(r1.error) throw r1.error;
+    (r1.data || []).forEach(l => { byId[l.lesson_id] = l; });
+  }catch(e){
+    if(/does not exist/i.test(e.message||'')) state.lessonsTableMissing = true;
+    else console.error('Lesson load by name failed:', e);
+  }
+  // by class_id (if we have one) — catches lessons where the name drifted
+  if(classId){
+    try{
+      const r2 = await db.client.from('lessons').select('*').eq('class_id', classId);
+      if(!r2.error) (r2.data || []).forEach(l => { byId[l.lesson_id] = l; });
+    }catch(e){ console.error('Lesson load by id failed:', e); }
+  }
+  const all = Object.values(byId);
+  all.sort((a,b) => new Date(b.started_at||0) - new Date(a.started_at||0));
+  return all;
+}
+
 // Pull this week's lessons for the class and index points/attendance/notes by
 // student name and by day. Cached on the week so the grid renders instantly.
 async function gbLoadLiveForWeek(wk){
   if(!wk || !db.isConnected()) return;
   try{
-    const entry = getOrCreateClassEntry(wk.class_name);
-    let q = db.client.from('lessons').select('*').order('started_at', { ascending:true });
-    q = (entry && entry.classId)
-      ? q.or('class_id.eq.'+entry.classId+',class_name.eq.'+wk.class_name)
-      : q.eq('class_name', wk.class_name);
-    const { data, error } = await q;
-    if(error) throw error;
-    const lessons = data || [];
+    const lessons = await fetchLessonsForClass(wk.class_name);
     // Optionally bound to the week if week_start is set (Mon–Sun)
     let inWindow = lessons;
     if(wk.week_start){
@@ -3805,9 +3828,13 @@ function renderLessonHistory(className){
       <p style="color:var(--ink-faint);font-size:13px;">Loading lessons…</p>`;
   }
   if(!lessons.length){
-    return `<h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Lesson History</h2>
+    const entry = getOrCreateClassEntry(className);
+    return `<h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Lesson History
+      <button class="btn btn-ghost btn-sm no-print" style="margin-left:10px;" onclick="App.reloadLessons('${escapeAttr(className)}')">↻ Refresh</button>
+      <button class="btn btn-ghost btn-sm no-print" onclick="App.gbDiagnoseLessons('${escapeAttr(className)}')">🔍 Diagnose</button></h2>
       <div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;line-height:1.6;">
-        No lessons recorded yet. When you end a lesson in the Live Classroom app, it will appear here with attendance, notes, and student activity.
+        No lessons recorded yet for this class. When you end a lesson in the Live Classroom app, it appears here.
+        <div style="margin-top:8px;font-size:12px;">This class matches on name <strong>"${escapeHtml(className)}"</strong>${entry&&entry.classId?` or code <strong>${escapeHtml(entry.classId)}</strong>`:''}. If you\u2019ve run lessons but they\u2019re not showing, click <strong>Diagnose</strong> — the class name in the classroom app may differ.</div>
       </div>`;
   }
 
@@ -6554,23 +6581,7 @@ const App = {
       App.repaintLessons(className);
       return;
     }
-    try{
-      // Match on the class code when we have one, otherwise on the name.
-      const entry = getOrCreateClassEntry(className);
-      let q = db.client.from('lessons').select('*').order('started_at', { ascending: false });
-      q = (entry && entry.classId)
-        ? q.or('class_id.eq.' + entry.classId + ',class_name.eq.' + className)
-        : q.eq('class_name', className);
-      const { data, error } = await q;
-      if(error) throw error;
-      state.lessonsByClass[className] = data || [];
-    }catch(e){
-      console.error('Lesson load failed:', e);
-      state.lessonsByClass[className] = [];
-      if(/does not exist/i.test(e.message || '')){
-        state.lessonsTableMissing = true;
-      }
-    }
+    state.lessonsByClass[className] = await fetchLessonsForClass(className);
     App.repaintLessons(className);
   },
 
@@ -6587,6 +6598,35 @@ const App = {
     delete state.lessonsByClass[className];
     App.repaintLessons(className);
     App.loadLessonsForClass(className);
+  },
+
+  async gbDiagnoseLessons(className){
+    if(!db.isConnected()){ alert('Connect to the database first.'); return; }
+    const entry = getOrCreateClassEntry(className);
+    try{
+      // Pull ALL lessons this user owns, to compare tags
+      const { data, error } = await db.client.from('lessons').select('lesson_id, name, class_name, class_id, started_at').order('started_at', { ascending:false }).limit(50);
+      if(error) throw error;
+      const all = data || [];
+      if(!all.length){
+        alert('No lessons exist in the database at all.\n\nThis means the classroom app hasn\u2019t successfully posted any lesson yet. End a lesson in Live Classroom (make sure you\u2019re signed in there), then refresh here.');
+        return;
+      }
+      const matches = all.filter(l => l.class_name === className || (entry && entry.classId && l.class_id === entry.classId));
+      const names = [...new Set(all.map(l => l.class_name || '(blank)'))];
+      let msg = `This class here is: "${className}"${entry&&entry.classId?` / code ${entry.classId}`:''}\n\n`;
+      msg += `Lessons in the database: ${all.length}\n`;
+      msg += `Matching this class: ${matches.length}\n\n`;
+      if(matches.length){
+        msg += 'They should be showing — try Refresh.\n';
+      } else {
+        msg += 'Class names found on your lessons:\n  ' + names.map(n => '"'+n+'"').join('\n  ') + '\n\n';
+        msg += 'None match "' + className + '". In the Live Classroom app, set the class name field to exactly "' + className + '" before running the lesson, or rename this class to match one above.';
+      }
+      alert(msg);
+    }catch(e){
+      alert('Diagnose failed: ' + e.message);
+    }
   },
 
   /* ── Gradebook ── */
