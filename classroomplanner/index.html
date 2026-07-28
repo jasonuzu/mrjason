@@ -4930,7 +4930,16 @@
                 name: name || 'Untitled Lesson',
                 startedAt: Date.now(),
                 attendance: attendance,
-                attendanceTakenAt: null
+                attendanceTakenAt: null,
+                pointsBaseline: (function() {
+                    // Remember each student's running total now, so at lesson end we
+                    // can record the CHANGE during this lesson, not the grand total.
+                    var base = {};
+                    Object.keys(liveState.studentData || {}).forEach(function(nm) {
+                        base[nm] = (liveState.studentData[nm] && liveState.studentData[nm].points) || 0;
+                    });
+                    return base;
+                })()
             };
             warnedAboutNoLesson = false; // fresh start — reset for whenever this lesson eventually ends
             logEvent('lesson_started', { name: name, studentCount: students.length });
@@ -5002,7 +5011,8 @@
                 durationMs: durationMs,
                 notes: lessonNotes || '',
                 attendance: JSON.parse(JSON.stringify(al.attendance || {})),
-                attendanceTakenAt: al.attendanceTakenAt
+                attendanceTakenAt: al.attendanceTakenAt,
+                pointsBaseline: al.pointsBaseline || {}
             };
             liveState.completedLessons = liveState.completedLessons || [];
             liveState.completedLessons.push(completed);
@@ -5057,14 +5067,17 @@
             resolveLPClassId(function(classId, className) {
                 // Snapshot each student's points and notes from this session
                 var sd = {};
+                var baseline = completed.pointsBaseline || {};
                 Object.keys(liveState.studentData || {}).forEach(function(nm) {
                     var d = liveState.studentData[nm] || {};
-                    var pts = d.points || 0;
+                    var total = d.points || 0;
+                    // The points CHANGED during this lesson = now minus the start baseline.
+                    var delta = total - (baseline[nm] || 0);
                     var ns = (d.notes || []).filter(function(n) {
                         return n.ts >= completed.startedAt && n.ts <= completed.endedAt;
                     });
-                    if (pts || ns.length) {
-                        sd[nm] = { points: pts, notes: ns.map(function(n) { return { text: n.text, ts: n.ts }; }) };
+                    if (delta || ns.length) {
+                        sd[nm] = { points: delta, notes: ns.map(function(n) { return { text: n.text, ts: n.ts }; }) };
                     }
                 });
 
