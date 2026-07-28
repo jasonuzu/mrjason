@@ -4374,7 +4374,7 @@ function gbAssessFormHtml(){
         <div class="gb-form-group">
           <label class="gb-form-label">Assignment name</label>
           <input type="text" class="input" style="width:100%;" placeholder="e.g. Task 1, Weekend Homework"
-            value="${escapeAttr(f.name)}" oninput="App.gbAssessFormSet('name',this.value)">
+            value="${escapeAttr(f.name)}" oninput="App.gbAssessFormText('name',this.value)">
         </div>
 
         <div class="gb-form-group">
@@ -4390,7 +4390,7 @@ function gbAssessFormHtml(){
               Other…
             </label>
           </div>
-          ${f.type==='__custom__' ? `<input type="text" class="input" style="width:100%;margin-top:6px;" placeholder="Your own type" value="${escapeAttr(f.customType)}" oninput="App.gbAssessFormSet('customType',this.value)">` : ''}
+          ${f.type==='__custom__' ? `<input type="text" class="input" style="width:100%;margin-top:6px;" placeholder="Your own type" value="${escapeAttr(f.customType)}" oninput="App.gbAssessFormText('customType',this.value)">` : ''}
         </div>
 
         <div class="gb-form-group">
@@ -4406,15 +4406,15 @@ function gbAssessFormHtml(){
             </label>
           </div>
           ${f.completionMode==='points'
-            ? `<input type="text" inputmode="numeric" class="input" style="width:100%;margin-top:6px;" placeholder="Total points, e.g. 10 or 100" value="${escapeAttr(f.total)}" oninput="App.gbAssessFormSet('total',this.value)">`
+            ? `<input type="text" inputmode="numeric" class="input" style="width:100%;margin-top:6px;" placeholder="Total points, e.g. 10 or 100" value="${escapeAttr(f.total)}" oninput="App.gbAssessFormText('total',this.value)">`
             : `<div style="margin-top:6px;font-size:12.5px;color:var(--ink-soft);">Students get a mark you choose when complete:
-                <input type="text" class="input" style="width:70px;margin-left:6px;" value="${escapeAttr(f.checkLabel)}" placeholder="✓" oninput="App.gbAssessFormSet('checkLabel',this.value)"> (a check, emoji, or text)</div>`}
+                <input type="text" class="input" style="width:70px;margin-left:6px;" value="${escapeAttr(f.checkLabel)}" placeholder="✓" oninput="App.gbAssessFormText('checkLabel',this.value)"> (a check, emoji, or text)</div>`}
         </div>
 
         <div class="gb-form-group">
           <label class="gb-form-label">Short description <span style="color:var(--ink-faint);font-weight:400;">(optional)</span></label>
           <textarea class="input" style="width:100%;min-height:56px;font-family:inherit;" placeholder="What is this assignment about?"
-            oninput="App.gbAssessFormSet('description',this.value)">${escapeHtml(f.description)}</textarea>
+            oninput="App.gbAssessFormText('description',this.value)">${escapeHtml(f.description)}</textarea>
         </div>
 
         <div class="gb-form-group">
@@ -7016,6 +7016,11 @@ const App = {
     if(!state.gbAssessForm) return;
     state.gbAssessForm[field] = val;
     render({preserveScroll:true});
+  },
+  // Text fields: store the value without re-rendering, so focus isn't lost.
+  gbAssessFormText(field, val){
+    if(!state.gbAssessForm) return;
+    state.gbAssessForm[field] = val;
   },
 
   gbAssessToggleStudent(sid){
