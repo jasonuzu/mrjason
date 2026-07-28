@@ -637,6 +637,16 @@
     background: var(--paper); cursor: pointer; font-size: 14px; color: var(--ink-faint);
   }
   .gb-check-cell.done { background: var(--green-bg); color: var(--green); border-color: var(--green); font-weight: 700; }
+  .gb-analytics-card { border: 1px solid var(--rule); border-radius: 10px; padding: 16px; background: var(--paper-raised); }
+  .gb-insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .gb-insight { background: var(--paper); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 9px 11px; }
+  .gb-insight-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--ink-faint); font-weight: 700; }
+  .gb-insight-val { font-size: 19px; font-weight: 800; color: var(--ink); margin-top: 2px; }
+  .gb-insight-sub { font-size: 10.5px; color: var(--ink-faint); margin-top: 1px; }
+  .gb-trend-up { color: var(--green); font-size: 14px; }
+  .gb-trend-down { color: var(--red); font-size: 14px; }
+  .gb-trend-flat { color: var(--ink-soft); font-size: 14px; }
+  .gb-analytics-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .gb-fb-btn {
     margin-top: 3px; font-size: 9.5px; padding: 2px 6px; border-radius: 4px;
     border: 1px solid var(--rule); background: var(--paper); color: var(--ink-faint);
@@ -1956,6 +1966,155 @@ const gbSaver = {
     }
   },
 };
+
+/* ══════════════════════════════════════════════════════════════
+   GRADEBOOK ANALYTICS — deterministic, no AI. Aggregates a student's
+   record across every week to surface trends for teachers & parents.
+   ══════════════════════════════════════════════════════════════ */
+
+const GB_RATING_SCORE = { excellent:4, good:3, improve:2, distract:1, absent:0 };
+
+// Pull the per-week row for a student out of a week object.
+function gbStudentInWeek(wk, studentId){
+  return (wk.data.students || []).find(s => s.student_id === studentId) || null;
+}
+
+// Resolve a student's participation ratings for a week into a list of ratings.
+// Uses the frozen _rating map if present (published weeks), else recomputes
+// from the live column cache when available.
+function gbWeekRatings(wk, srow){
+  const out = [];
+  if(srow._rating && typeof srow._rating === 'object'){
+    Object.values(srow._rating).forEach(r => { if(r) out.push(r); });
+    if(out.length) return out;
+  }
+  // fall back to participation overrides only (best effort for unpublished)
+  if(srow.participation && typeof srow.participation === 'object'){
+    Object.values(srow.participation).forEach(r => { if(r) out.push(r); });
+  }
+  return out;
+}
+
+// The core: compute a full analytics profile across weeks for one student.
+function gbComputeAnalytics(weeks, studentId){
+  const weekly = [];   // per-week summary, chronological
+  const typeScores = {};   // assignmentType -> {sumPct, n}
+  let assignedTotal = 0, submittedTotal = 0, missedTotal = 0;
+  let attendPresent = 0, attendLate = 0, attendAbsent = 0, attendTotal = 0;
+  const ratingCounts = { excellent:0, good:0, improve:0, distract:0, absent:0 };
+  let ratingN = 0;
+
+  // oldest → newest
+  const sorted = weeks.slice().sort((a,b) => {
+    const ta = a.week_start ? new Date(a.week_start).getTime() : (a.updatedAt||0);
+    const tb = b.week_start ? new Date(b.week_start).getTime() : (b.updatedAt||0);
+    return ta - tb;
+  });
+
+  sorted.forEach(wk => {
+    const srow = gbStudentInWeek(wk, studentId);
+    if(!srow) return;
+    const assessments = wk.data.assessments || [];
+
+    // scores by assignment (only ones assigned to this student)
+    let wkScorePctSum = 0, wkScorePctN = 0, wkAssigned = 0, wkSubmitted = 0, wkMissed = 0;
+    assessments.forEach(a => {
+      const assigned = !a.assignedTo || a.assignedTo.includes(studentId);
+      if(!assigned) return;
+      wkAssigned++; assignedTotal++;
+      const raw = (srow.scores||{})[a.id];
+      const has = raw !== undefined && raw !== null && String(raw).trim() !== '';
+      if(has){ wkSubmitted++; submittedTotal++; } else { wkMissed++; missedTotal++; }
+      if(a.completionMode !== 'check' && has){
+        const num = parseFloat(raw), tot = parseFloat(a.total);
+        if(isFinite(num) && isFinite(tot) && tot > 0){
+          const pct = Math.max(0, Math.min(100, (num/tot)*100));
+          wkScorePctSum += pct; wkScorePctN++;
+          const ty = a.type || 'Other';
+          typeScores[ty] = typeScores[ty] || { sumPct:0, n:0 };
+          typeScores[ty].sumPct += pct; typeScores[ty].n++;
+        }
+      }
+    });
+
+    // participation ratings
+    const ratings = gbWeekRatings(wk, srow);
+    let wkRatingSum = 0, wkRatingN = 0;
+    ratings.forEach(r => {
+      if(r in ratingCounts){ ratingCounts[r]++; ratingN++; }
+      if(r in GB_RATING_SCORE){ wkRatingSum += GB_RATING_SCORE[r]; wkRatingN++; }
+      if(r === 'absent'){ attendAbsent++; attendTotal++; }
+      else if(r === 'present' || r === 'good' || r === 'excellent' || r === 'improve' || r === 'distract'){ attendPresent++; attendTotal++; }
+    });
+
+    // points earned this week (sum of per-lesson deltas we stored)
+    let wkPoints = 0, hasPoints = false;
+    if(srow._live_points && typeof srow._live_points === 'object'){
+      Object.values(srow._live_points).forEach(p => { const n=parseFloat(p); if(isFinite(n)){ wkPoints += n; hasPoints = true; } });
+    }
+    if(!hasPoints && srow.points_total !== undefined && String(srow.points_total).trim() !== ''){
+      const n = parseFloat(srow.points_total); if(isFinite(n)){ wkPoints = n; hasPoints = true; }
+    }
+
+    weekly.push({
+      title: wk.title || '',
+      scorePct: wkScorePctN ? Math.round(wkScorePctSum/wkScorePctN) : null,
+      ratingAvg: wkRatingN ? (wkRatingSum/wkRatingN) : null,   // 0..4
+      points: hasPoints ? wkPoints : null,
+      assigned: wkAssigned, submitted: wkSubmitted, missed: wkMissed,
+    });
+  });
+
+  // Derived headline metrics
+  const submissionRate = assignedTotal ? Math.round((submittedTotal/assignedTotal)*100) : null;
+  const attendanceRate = attendTotal ? Math.round((attendPresent/attendTotal)*100) : null;
+  const typeAverages = Object.keys(typeScores).map(ty => ({
+    type: ty, avg: Math.round(typeScores[ty].sumPct/typeScores[ty].n), n: typeScores[ty].n,
+  })).sort((a,b) => b.n - a.n);
+
+  // Overall score average across all graded work
+  const allScorePcts = weekly.map(w => w.scorePct).filter(v => v !== null);
+  const scoreAvg = allScorePcts.length ? Math.round(allScorePcts.reduce((a,b)=>a+b,0)/allScorePcts.length) : null;
+
+  // Trend: compare first half vs second half of weekly score %
+  function trendOf(series){
+    const vals = series.filter(v => v !== null && v !== undefined);
+    if(vals.length < 2) return null;
+    const mid = Math.floor(vals.length/2);
+    const firstHalf = vals.slice(0, mid || 1);
+    const secondHalf = vals.slice(mid);
+    const avg = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
+    const diff = avg(secondHalf) - avg(firstHalf);
+    return diff;
+  }
+  const scoreTrend = trendOf(weekly.map(w => w.scorePct));
+  const ratingTrend = trendOf(weekly.map(w => w.ratingAvg));
+  const pointsTrend = trendOf(weekly.map(w => w.points));
+
+  // Participation distribution as percentages
+  const ratingPct = {};
+  Object.keys(ratingCounts).forEach(k => { ratingPct[k] = ratingN ? Math.round((ratingCounts[k]/ratingN)*100) : 0; });
+
+  return {
+    weeksTracked: weekly.length,
+    weekly,
+    scoreAvg, scoreTrend,
+    ratingTrend, pointsTrend,
+    submissionRate, missedTotal, assignedTotal, submittedTotal,
+    attendanceRate, attendAbsent, attendTotal,
+    typeAverages,
+    ratingCounts, ratingPct, ratingN,
+  };
+}
+
+// Turn a trend number into a human label + arrow (no AI, pure thresholds).
+function gbTrendLabel(diff, unit){
+  if(diff === null || diff === undefined) return { text:'Not enough data yet', arrow:'', cls:'flat' };
+  const u = unit || '';
+  if(Math.abs(diff) < (unit === 'pts' ? 0.5 : 3)) return { text:'Holding steady', arrow:'→', cls:'flat' };
+  if(diff > 0) return { text:'Improving (+' + (Math.round(diff*10)/10) + u + ')', arrow:'▲', cls:'up' };
+  return { text:'Declining (' + (Math.round(diff*10)/10) + u + ')', arrow:'▼', cls:'down' };
+}
 
 async function gbLoadWeeksForClass(className){
   if(db.isConnected() && state.userId){
@@ -3689,6 +3848,11 @@ function renderPrintSummary(rec, lvl){
     </div>
     ` : ''}
 
+    <div class="ps-section" id="ps-analytics-section">
+      <div class="ps-section-title">📈 Gradebook Progress</div>
+      ${renderProfileAnalytics(rec)}
+    </div>
+
     ${posts.length ? `
     <div class="ps-section">
       <div class="ps-section-title">Posts &amp; Updates (${posts.length})</div>
@@ -4153,6 +4317,169 @@ function renderParentReport(){
   `);
 }
 
+// Profile-page analytics for one student (loads that student's class weeks).
+function renderProfileAnalytics(rec){
+  const className = rec.className || '';
+  const weeks = state.gbAnalyticsWeeks && state.gbAnalyticsWeeks[className];
+  if(weeks === undefined){
+    return `<div style="color:var(--ink-faint);font-size:13px;">Loading gradebook history…</div>`;
+  }
+  if(!weeks.length){
+    return `<div style="color:var(--ink-faint);font-size:13px;">No gradebook data yet. As weekly records are filled in, ${escapeHtml(rec.name||'this student')}\u2019s progress trends appear here.</div>`;
+  }
+  const analytics = gbComputeAnalytics(weeks, rec.id);
+  return gbAnalyticsHtml(analytics, rec.name);
+}
+
+// Class-overview analytics: student picker + one student's progress.
+function renderClassAnalytics(className){
+  const weeks = state.gbAnalyticsWeeks && state.gbAnalyticsWeeks[className];
+  if(weeks === undefined){
+    return `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">Loading gradebook history… <button class="btn btn-ghost btn-sm" onclick="App.loadClassAnalytics('${escapeAttr(className)}')">Load now</button></div>`;
+  }
+  if(!weeks.length){
+    return `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">No gradebook weeks yet. Create weeks in the Gradebook and the analytics will build automatically.</div>`;
+  }
+  const students = state.students.filter(s => (s.className||'') === className)
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  if(!students.length) return `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">No students in this class.</div>`;
+
+  const selId = state.gbAnalyticsStudent || students[0].id;
+  const sel = students.find(s => s.id === selId) || students[0];
+  const analytics = gbComputeAnalytics(weeks, sel.id);
+
+  return `
+    <div class="gb-analytics-picker">
+      ${students.map(s => `<button class="btn ${s.id===sel.id?'btn-primary':'btn-ghost'} btn-sm" onclick="App.gbPickAnalyticsStudent('${escapeAttr(s.id)}')">${escapeHtml(s.name)}</button>`).join('')}
+    </div>
+    ${gbAnalyticsHtml(analytics, sel.name)}`;
+}
+
+// A compact multi-metric progress chart (SVG) + insight cards for one student.
+// `compact` trims it for the profile page.
+function gbAnalyticsHtml(analytics, studentName, opts){
+  opts = opts || {};
+  const a = analytics;
+  if(!a || !a.weeksTracked){
+    return `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">
+      No gradebook data yet for ${escapeHtml(studentName||'this student')}. Once weeks are filled in, progress trends appear here.</div>`;
+  }
+
+  // ── line chart of weekly score % and participation (0-100 scaled) ──
+  const W = 620, H = 180, padL = 34, padR = 12, padT = 14, padB = 26;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = a.weekly.length;
+  const xFor = i => padL + (n <= 1 ? innerW/2 : (i/(n-1))*innerW);
+  const yFor = v => padT + innerH - (v/100)*innerH;   // v is 0..100
+
+  // gridlines
+  let grid = '';
+  [0,25,50,75,100].forEach(v => {
+    const y = yFor(v);
+    grid += `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--rule-soft)" stroke-width="1"/>
+             <text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--ink-faint)">${v}</text>`;
+  });
+
+  function polyline(series, scaleTo100, color){
+    const pts = [];
+    a.weekly.forEach((w,i) => {
+      let v = series(w);
+      if(v === null || v === undefined) return;
+      if(scaleTo100) v = scaleTo100(v);
+      pts.push([xFor(i), yFor(Math.max(0,Math.min(100,v)))]);
+    });
+    if(pts.length < 1) return '';
+    const path = pts.map((p,i) => (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${color}"/>`).join('');
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}`;
+  }
+
+  // week labels on x
+  let xLabels = '';
+  a.weekly.forEach((w,i) => {
+    if(n > 8 && i % 2 !== 0 && i !== n-1) return; // thin out
+    const short = (w.title||('W'+(i+1))).replace(/^Week of /,'').slice(0,8);
+    xLabels += `<text x="${xFor(i)}" y="${H-8}" text-anchor="middle" font-size="8.5" fill="var(--ink-faint)">${escapeHtml(short)}</text>`;
+  });
+
+  const scoreLine = polyline(w => w.scorePct, null, '#2D5FA6');
+  const partLine = polyline(w => w.ratingAvg, v => (v/4)*100, '#1565C0');   // 0..4 → 0..100
+  // points scaled relative to max for shape
+  const maxPts = Math.max(1, ...a.weekly.map(w => Math.abs(w.points||0)));
+  const pointsLine = polyline(w => w.points, v => 50 + (v/maxPts)*45, '#2E7D32');
+
+  const chart = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:${W}px;" role="img" aria-label="Progress chart">
+      ${grid}${scoreLine}${partLine}${pointsLine}${xLabels}
+    </svg>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;margin-top:2px;">
+      <span style="color:#2D5FA6;">■ Assignment score %</span>
+      <span style="color:#1565C0;">■ Participation level</span>
+      <span style="color:#2E7D32;">■ Points earned</span>
+    </div>`;
+
+  // ── headline insight chips ──
+  const st = gbTrendLabel(a.scoreTrend, '%');
+  const pt = gbTrendLabel(a.ratingTrend, '');
+  const trendChip = (label, t) => `
+    <div class="gb-insight">
+      <div class="gb-insight-label">${label}</div>
+      <div class="gb-insight-val gb-trend-${t.cls}">${t.arrow} ${escapeHtml(t.text)}</div>
+    </div>`;
+
+  const pct = (v) => v===null||v===undefined ? '—' : v + '%';
+  const cards = `
+    <div class="gb-insight-grid">
+      <div class="gb-insight"><div class="gb-insight-label">Overall average</div><div class="gb-insight-val">${pct(a.scoreAvg)}</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Work submitted</div><div class="gb-insight-val">${pct(a.submissionRate)}</div><div class="gb-insight-sub">${a.submittedTotal}/${a.assignedTotal} assignments</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Attendance</div><div class="gb-insight-val">${pct(a.attendanceRate)}</div><div class="gb-insight-sub">${a.attendAbsent} absence${a.attendAbsent===1?'':'s'} in ${a.weeksTracked} wk</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Missed work</div><div class="gb-insight-val">${a.missedTotal}</div><div class="gb-insight-sub">over ${a.weeksTracked} week${a.weeksTracked===1?'':'s'}</div></div>
+      ${trendChip('Score trend', st)}
+      ${trendChip('Participation trend', pt)}
+    </div>`;
+
+  // ── participation distribution bar ──
+  const rp = a.ratingPct;
+  const segs = [
+    ['excellent','#1565C0','Excellent'],['good','#2E7D32','Good'],
+    ['improve','#B35C00','Needs Improvement'],['distract','#B23A34','Distracted'],['absent','#546E7A','Absent'],
+  ].filter(s => rp[s[0]] > 0);
+  const partBar = a.ratingN ? `
+    <div style="margin-top:6px;">
+      <div class="gb-insight-label" style="margin-bottom:4px;">Participation breakdown</div>
+      <div style="display:flex;height:22px;border-radius:5px;overflow:hidden;border:1px solid var(--rule);">
+        ${segs.map(s => `<div title="${s[2]}: ${rp[s[0]]}%" style="width:${rp[s[0]]}%;background:${s[1]};"></div>`).join('')}
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;margin-top:4px;">
+        ${segs.map(s => `<span style="color:${s[1]};">■ ${s[2]} ${rp[s[0]]}%</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  // ── assignment-type averages ──
+  const typeRows = a.typeAverages.length ? `
+    <div style="margin-top:10px;">
+      <div class="gb-insight-label" style="margin-bottom:4px;">Average by assignment type</div>
+      ${a.typeAverages.map(t => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+          <span style="font-size:11.5px;min-width:90px;">${escapeHtml(t.type)}</span>
+          <div style="flex:1;background:var(--rule-soft);border-radius:4px;height:10px;overflow:hidden;">
+            <div style="width:${t.avg}%;height:100%;background:var(--accent);"></div>
+          </div>
+          <span style="font-size:11px;font-weight:700;min-width:34px;text-align:right;">${t.avg}%</span>
+          <span style="font-size:10px;color:var(--ink-faint);">(${t.n})</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  return `
+    <div class="gb-analytics-card">
+      ${cards}
+      <div style="margin-top:12px;">${chart}</div>
+      ${partBar}
+      ${typeRows}
+      <div style="font-size:10.5px;color:var(--ink-faint);margin-top:10px;">Calculated directly from ${a.weeksTracked} week${a.weeksTracked===1?'':'s'} of gradebook records.</div>
+    </div>`;
+}
+
 /* ── Gradebook: list of weeks for a class ── */
 function renderGradebook(){
   const className = state.gbClassName || '';
@@ -4170,12 +4497,13 @@ function renderGradebook(){
     ${weeks === undefined ? `<p style="color:var(--ink-faint);font-size:13px;">Loading weeks…</p>`
       : !weeks.length ? `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">No weeks yet. Click <strong>New Week</strong> to start — your students in ${escapeHtml(className)} will be added automatically.</div>`
       : weeks.map(wk => `
-        <div class="gb-week-card" onclick="App.gbOpenWeek('${escapeAttr(wk.week_id)}')">
-          <div style="flex:1;">
+        <div class="gb-week-card">
+          <div style="flex:1;cursor:pointer;" onclick="App.gbOpenWeek('${escapeAttr(wk.week_id)}')">
             <div class="gb-week-title">${escapeHtml(wk.title || 'Untitled week')}</div>
-            <div class="gb-week-meta">${(wk.data.students||[]).length} students · ${(wk.data.assessments||[]).length} assessment${(wk.data.assessments||[]).length===1?'':'s'}</div>
+            <div class="gb-week-meta">${(wk.data.students||[]).length} students · ${(wk.data.assessments||[]).length} assignment${(wk.data.assessments||[]).length===1?'':'s'}</div>
           </div>
           <span class="gb-live-dot ${wk.is_published?'live':'draft'}">${wk.is_published?'● Live':'Draft'}</span>
+          <button class="btn btn-danger-ghost btn-sm no-print" title="Delete this week" onclick="event.stopPropagation();App.gbDeleteWeek('${escapeAttr(wk.week_id)}')">🗑</button>
         </div>`).join('')}
   `;
 }
@@ -4597,6 +4925,11 @@ function renderClassOverview(){
     </div>
 
     <div id="lesson-history-section">${renderLessonHistory(className)}</div>
+
+    <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">📈 Student Progress Analytics
+      <span style="font-weight:400;color:var(--ink-faint);font-size:13px;">from the gradebook</span>
+    </h2>
+    <div id="gb-analytics-section">${renderClassAnalytics(className)}</div>
 
     <h2 style="font-size:16px;font-family:Georgia,serif;margin:24px 0 12px;">Distribution across domains</h2>
     <div class="stat-grid">
@@ -6132,6 +6465,10 @@ const App = {
     const opening = state.students.find(s => s.id === id);
     state.nameAtOpen = opening ? (opening.name || '') : '';
     render();
+    // Load that student's class gradebook weeks for the profile analytics
+    if(opening && opening.className){
+      App.loadProfileAnalytics(opening.className);
+    }
     if(!db.isConnected()) return;
     // Make sure any edits still queued for this student have reached the database
     // BEFORE we read it back — otherwise the read returns a stale row and
@@ -6836,8 +7173,36 @@ const App = {
     if(!state.lessonsByClass) state.lessonsByClass = {};
     // Clear so the section shows "Loading…" then fills in
     delete state.lessonsByClass[className];
+    if(state.gbAnalyticsWeeks) delete state.gbAnalyticsWeeks[className];
     render();
     App.loadLessonsForClass(className);
+    App.loadClassAnalytics(className);
+  },
+
+  async loadClassAnalytics(className){
+    if(!state.gbAnalyticsWeeks) state.gbAnalyticsWeeks = {};
+    const weeks = await gbLoadWeeksForClass(className);
+    state.gbAnalyticsWeeks[className] = weeks || [];
+    const el = document.getElementById('gb-analytics-section');
+    if(el) el.innerHTML = renderClassAnalytics(className);
+  },
+
+  gbPickAnalyticsStudent(sid){
+    state.gbAnalyticsStudent = sid;
+    const el = document.getElementById('gb-analytics-section');
+    if(el) el.innerHTML = renderClassAnalytics(state.activeClassName);
+  },
+
+  async loadProfileAnalytics(className){
+    if(!state.gbAnalyticsWeeks) state.gbAnalyticsWeeks = {};
+    if(state.gbAnalyticsWeeks[className] === undefined){
+      state.gbAnalyticsWeeks[className] = await gbLoadWeeksForClass(className);
+    }
+    const el = document.getElementById('ps-analytics-section');
+    if(el && state.view === 'report'){
+      const rec = state.students.find(s => s.id === state.activeId);
+      if(rec) el.innerHTML = '<div class="ps-section-title">📈 Gradebook Progress</div>' + renderProfileAnalytics(rec);
+    }
   },
 
   async loadLessonsForClass(className){
@@ -6922,6 +7287,22 @@ const App = {
     if(!(state.gbWeeks)) state.gbWeeks = [];
     await gbLoadLiveForWeek(wk);
     if(state.view === 'gradebookWeek') render({preserveScroll:true});
+  },
+
+  async gbDeleteWeek(weekId){
+    const wk = (state.gbWeeks||[]).find(w => w.week_id === weekId);
+    const label = wk ? (wk.title || 'this week') : 'this week';
+    if(!confirm(`Delete "${label}"?\n\nThis permanently removes the week and its shared parent report. Student profiles and lesson history are not affected.`)) return;
+    // remove locally
+    state.gbWeeks = (state.gbWeeks||[]).filter(w => w.week_id !== weekId);
+    try{ local.del('gbweek:'+weekId); }catch(e){}
+    render({preserveScroll:true});
+    if(db.isConnected() && state.userId){
+      try{
+        const { error } = await db.client.from('gradebook_weeks').delete().eq('week_id', weekId);
+        if(error) throw error;
+      }catch(e){ alert('Could not delete from the database: ' + e.message); }
+    }
   },
 
   async gbOpenWeek(weekId){
