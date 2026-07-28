@@ -612,6 +612,7 @@
   .gb-rate.excellent { background: var(--blue-rate-bg); color: var(--blue-rate); border-color: var(--blue-rate); }
   .gb-rate.improve { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow); }
   .gb-rate.distract { background: var(--red-bg); color: var(--red); border-color: var(--red); }
+  .gb-rate.absent { background: #ECEFF1; color: #546E7A; border-color: #B0BEC5; }
   .gb-modal-overlay { position: fixed; inset: 0; background: rgba(20,28,36,0.45); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; }
   .gb-modal { background: var(--paper-raised); border-radius: 12px; max-width: 460px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
   .gb-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
@@ -1987,25 +1988,31 @@ const GB_RATING = {
   good:      { label:'Good', cls:'good', cn:'良好' },
   improve:   { label:'Needs Improvement', cls:'improve', cn:'需改进' },
   distract:  { label:'Distracted', cls:'distract', cn:'分心' },
+  absent:    { label:'Absent', cls:'absent', cn:'缺席' },
 };
 
 // Points a student earned on a given participation day, pulled from the
 // week's Classroom Live cache (keyed by student name → day → net points).
-function gbLivePointsFor(st, col){
+function gbLivePointsFor(st, colId){
   const cache = (state.gbWeek && state.gbWeek._liveByStudent) || {};
   const rec = cache[st.name];
-  if(!rec || !rec.days || !(col in rec.days)) return { has:false, points:0 };
-  return { has:true, points: rec.days[col] };
+  if(!rec || !rec.lessons || !(colId in rec.lessons)) return { has:false, points:0, attendance:'' };
+  const l = rec.lessons[colId];
+  return { has:true, points: l.points || 0, attendance: l.attendance || '' };
 }
 
-function gbRatingForCell(st, col){
-  const override = (st.participation && st.participation[col]) || '';
-  const live = gbLivePointsFor(st, col);
+function gbRatingForCell(st, colId){
+  const override = (st.participation && st.participation[colId]) || '';
+  const live = gbLivePointsFor(st, colId);
+  // Absent in the lesson => ABSENT, unless the teacher has overridden it.
+  if(!override && live.attendance === 'absent'){
+    return { rating: 'absent', overridden:false, hasPoints:false, points:0, attendance:'absent' };
+  }
   if(override){
-    return { rating: override, overridden: true, hasPoints: live.has, points: live.points };
+    return { rating: override, overridden: true, hasPoints: live.has, points: live.points, attendance: live.attendance };
   }
   return { rating: gbRatingFromPoints(live.has ? live.points : 0),
-           overridden: false, hasPoints: live.has, points: live.points };
+           overridden: false, hasPoints: live.has, points: live.points, attendance: live.attendance };
 }
 
 // Fetch every lesson belonging to a class, matched by class_id OR class_name.
@@ -2055,31 +2062,42 @@ async function gbLoadLiveForWeek(wk){
         return t >= start && t < end;
       });
     }
+    // Oldest first so columns read left-to-right in time order
+    inWindow.sort((a,b) => new Date(a.started_at||0) - new Date(b.started_at||0));
+
+    // One column per lesson. Two Tuesday lessons => two columns.
+    const columns = inWindow.map(les => {
+      const t = les.started_at ? new Date(les.started_at) : null;
+      const day = t ? t.toLocaleDateString(undefined,{weekday:'short'}) : 'Lesson';
+      const time = t ? t.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) : '';
+      return { id: les.lesson_id, label: day, sublabel: time, lessonName: les.name || '', date: les.started_at };
+    });
+
+    // Index by student -> lessonId -> {points, attendance, notes}
     const byStudent = {};
     inWindow.forEach(les => {
-      const day = les.started_at ? new Date(les.started_at).toLocaleDateString(undefined,{weekday:'long'}) : null;
+      const lid = les.lesson_id;
       const sd = les.student_data || {};
       const att = les.attendance || {};
-      Object.keys(sd).forEach(nm => {
-        byStudent[nm] = byStudent[nm] || { days:{}, notes:[], totalPoints:0, lessons:[] };
-        const pts = sd[nm].points || 0;
-        if(day) byStudent[nm].days[day] = (byStudent[nm].days[day] || 0) + pts;
-        byStudent[nm].totalPoints += pts;
-        (sd[nm].notes || []).forEach(n => byStudent[nm].notes.push({ text: n.text, ts: n.ts, lesson: les.name, day }));
-        byStudent[nm].lessons.push({ name: les.name, day, points: pts, date: les.started_at });
-      });
-      Object.keys(att).forEach(nm => {
-        byStudent[nm] = byStudent[nm] || { days:{}, notes:[], totalPoints:0, lessons:[] };
-        if(day){
-          byStudent[nm].att = byStudent[nm].att || {};
-          byStudent[nm].att[day] = att[nm];
-        }
+      const names = new Set([...Object.keys(sd), ...Object.keys(att)]);
+      names.forEach(nm => {
+        byStudent[nm] = byStudent[nm] || { lessons:{}, notes:[] };
+        const pts = (sd[nm] && sd[nm].points) || 0;
+        byStudent[nm].lessons[lid] = {
+          points: pts,
+          attendance: att[nm] || '',
+          lessonName: les.name || '',
+        };
+        ((sd[nm] && sd[nm].notes) || []).forEach(n =>
+          byStudent[nm].notes.push({ text: n.text, ts: n.ts, lesson: les.name }));
       });
     });
+    wk._liveColumns = columns;
     wk._liveByStudent = byStudent;
     wk._liveLoaded = true;
   }catch(e){
     console.error('Live load for week failed:', e);
+    wk._liveColumns = [];
     wk._liveByStudent = {};
     wk._liveLoaded = true;
   }
@@ -3876,6 +3894,9 @@ function renderLessonHistory(className){
       Lesson History <span style="font-weight:400;color:var(--ink-faint);font-size:13px;">(${lessons.length})</span>
       <button class="btn btn-ghost btn-sm no-print" style="margin-left:10px;" onclick="App.reloadLessons('${escapeAttr(className)}')">↻ Refresh</button>
     </h2>
+    <div class="card no-print" style="padding:11px 14px;margin-bottom:12px;background:var(--yellow-bg);border-color:var(--yellow-border);font-size:12.5px;line-height:1.5;color:var(--ink);">
+      ⚠️ <strong>The lesson history here is used for this week\u2019s gradebook data.</strong> Do not delete these lessons if you plan to use them for your gradebook this week — the participation columns and points come from them.
+    </div>
     ${lessons.map(l => renderLessonCard(l)).join('')}
   `;
 }
@@ -4055,19 +4076,23 @@ function renderParentReport(){
         ? '<span style="color:var(--yellow);font-weight:700;">Needs Improvement 需改进</span>'
       : v==='distract'
         ? '<span style="color:var(--red);font-weight:700;">Distracted 分心</span>'
+      : v==='absent'
+        ? '<span style="color:#546E7A;font-weight:700;">Absent 缺席</span>'
         : '<span style="color:var(--green);font-weight:700;">Good 良好</span>';
     partBlock = `<div style="margin-bottom:18px;">
       <div style="font-weight:700;font-size:14px;margin-bottom:8px;">This week  <span style="color:var(--ink-faint);font-weight:400;">本周表现</span></div>
       <div class="card" style="padding:12px 14px;">
         <table style="width:100%;font-size:13px;border-collapse:collapse;">
           <tr style="color:var(--ink-faint);font-size:11px;text-transform:uppercase;">
-            <th style="text-align:left;padding:3px;">Day 日</th>
+            <th style="text-align:left;padding:3px;">Lesson 课</th>
             <th style="text-align:center;padding:3px;">Participation 参与</th>
           </tr>
           ${part.map(c => {
-            const v = rating[c] || 'good';
+            const cid = (typeof c === 'object') ? c.id : c;
+            const clabel = (typeof c === 'object') ? (c.label + (c.sublabel?' '+c.sublabel:'')) : c;
+            const v = rating[cid] || 'good';
             return `<tr style="border-top:1px solid var(--rule-soft);">
-              <td style="padding:6px 3px;">${escapeHtml(c)}</td>
+              <td style="padding:6px 3px;">${escapeHtml(clabel)}</td>
               <td style="text-align:center;padding:6px 3px;">${rlabel(v)}</td>
             </tr>`;
           }).join('')}
@@ -4178,7 +4203,7 @@ function renderGradebookWeek(){
   const wk = state.gbWeek;
   if(!wk) return `<p>No week open.</p>`;
   const assess = wk.data.assessments || [];
-  const partCols = (wk.data.participation && wk.data.participation.columns) || [];
+  const partCols = (wk._liveColumns || []);
   const students = wk.data.students || [];
   const share = wk.data.share || {};
 
@@ -4191,13 +4216,17 @@ function renderGradebookWeek(){
   });
   head += `<th class="gb-assess-head" rowspan="2"><button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button></th>`;
   if(share.showParticipation !== false){
-    partCols.forEach(c => { head += `<th class="gb-part-head">${escapeHtml(c)}</th>`; });
+    if(partCols.length){
+      partCols.forEach(c => { head += `<th class="gb-part-head" title="${escapeAttr(c.lessonName||'')}">${escapeHtml(c.label)}${c.sublabel?`<div style="font-weight:400;color:var(--ink-faint);font-size:9px;">${escapeHtml(c.sublabel)}</div>`:''}</th>`; });
+    } else {
+      head += `<th class="gb-part-head" rowspan="2" style="font-weight:400;color:var(--ink-faint);font-size:10px;max-width:150px;white-space:normal;">Participation appears here per lesson once Live Classroom lessons are recorded this week</th>`;
+    }
   }
   head += `<th rowspan="2">Points<br>total</th><th rowspan="2">Weekly<br>feedback</th><th rowspan="2">Actions</th></tr>`;
   // header row 2: sub labels
   head += `<tr>`;
   assess.forEach(() => { head += `<th class="gb-assess-head" style="font-weight:400;color:var(--ink-faint);">score</th>`; });
-  if(share.showParticipation !== false){
+  if(share.showParticipation !== false && partCols.length){
     partCols.forEach(() => { head += `<th class="gb-part-head" style="font-weight:400;color:var(--ink-faint);font-size:10px;">participation</th>`; });
   }
   head += `</tr>`;
@@ -4214,16 +4243,18 @@ function renderGradebookWeek(){
     });
     row += `<td></td>`; // under the +Assessment column
     if(share.showParticipation !== false){
-      partCols.forEach(c => {
-        const info = gbRatingForCell(st, c);
+      if(!partCols.length){
+        row += `<td></td>`;
+      } else partCols.forEach(c => {
+        const info = gbRatingForCell(st, c.id);
         const rr = GB_RATING[info.rating] || GB_RATING.good;
         const cls = rr.cls;
         const label = rr.label;
         row += `<td>
           <div class="gb-part-cell">
-            <div class="gb-rate ${cls}" title="Click to change" onclick="App.gbCycleRating(${si},'${escapeAttr(c)}')">${label}</div>
+            <div class="gb-rate ${cls}" title="Click to change" onclick="App.gbCycleRating(${si},'${escapeAttr(c.id)}')">${label}</div>
             ${info.hasPoints ? `<div class="gb-rate-pts">${info.points>0?'+':''}${info.points} pt${Math.abs(info.points)===1?'':'s'}</div>` : ''}
-            ${info.overridden ? `<div class="gb-rate-auto">manual · <span style="cursor:pointer;text-decoration:underline;" onclick="App.gbClearRating(${si},'${escapeAttr(c)}')">auto</span></div>` : (info.hasPoints ? `<div class="gb-rate-auto">from Live</div>` : '')}
+            ${info.overridden ? `<div class="gb-rate-auto">manual · <span style="cursor:pointer;text-decoration:underline;" onclick="App.gbClearRating(${si},'${escapeAttr(c.id)}')">auto</span></div>` : (info.attendance==='absent' ? `<div class="gb-rate-auto">from Live</div>` : (info.hasPoints ? `<div class="gb-rate-auto">from Live</div>` : ''))}
           </div>
         </td>`;
       });
@@ -4240,7 +4271,7 @@ function renderGradebookWeek(){
     let avg = `<tr class="gb-avg-row"><td class="gb-name-col">Class average</td>`;
     assess.forEach(a => { avg += `<td>${escapeHtml(gbAssessAverage(wk, a.id))}</td>`; });
     avg += `<td></td>`;
-    if(share.showParticipation !== false){ partCols.forEach(() => avg += `<td></td>`); }
+    if(share.showParticipation !== false){ (partCols.length?partCols:[0]).forEach(() => avg += `<td></td>`); }
     avg += `<td></td><td></td><td></td></tr>`;
     bodyRows += avg;
   }
@@ -4260,7 +4291,6 @@ function renderGradebookWeek(){
     <div class="gb-toolbar no-print">
       <button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button>
       <button class="btn btn-ghost btn-sm" onclick="App.gbRefreshLive()">↻ Refresh Live Classroom</button>
-      <button class="btn btn-ghost btn-sm" onclick="App.gbEditColumns()">Participation days…</button>
       <button class="btn btn-ghost btn-sm" onclick="App.gbShareSettings()">What parents see…</button>
       <div style="flex:1;"></div>
       ${wk.is_published
@@ -6786,7 +6816,7 @@ const App = {
   gbCycleRating(si, col){
     const st = state.gbWeek.data.students[si]; if(!st) return;
     // cycle: (auto) → good → improve → distract → back to auto
-    const order = ['excellent','good','improve','distract'];
+    const order = ['excellent','good','improve','distract','absent'];
     const cur = st.participation[col] || '';
     let next;
     if(!cur) next = 'good';
@@ -6994,7 +7024,9 @@ const App = {
     // make sure live data is loaded so ratings resolve correctly
     if(!wk._liveLoaded) await gbLoadLiveForWeek(wk);
     const snapshot = JSON.parse(JSON.stringify(wk.data));
-    const partCols = (snapshot.participation && snapshot.participation.columns) || [];
+    const partCols = (wk._liveColumns || []);
+    // Store the lesson columns (labels) so the parent report can show them.
+    snapshot.participation = { columns: partCols.map(c => ({ id:c.id, label:c.label, sublabel:c.sublabel })) };
     // Precompute class averages here so parents can see them without us ever
     // sending other students' individual scores to the parent RPC.
     const averages = {};
@@ -7004,19 +7036,18 @@ const App = {
         .filter(v => isFinite(v));
       averages[a.id] = vals.length ? (vals.reduce((x,y)=>x+y,0)/vals.length).toFixed(1) : '';
     });
-    // Resolve each student's participation rating per day (auto from Live points,
-    // or the teacher's override), and freeze the day points, so the parent view
-    // shows exactly what the teacher sees without needing the lessons table.
+    // Resolve each student's participation rating per lesson (auto from Live
+    // points/attendance, or the teacher's override) and freeze it, so the parent
+    // view shows exactly what the teacher sees without needing the lessons table.
     (snapshot.students || []).forEach(s => {
       s._averages = averages;
       s._rating = {};
       s._live_points = {};
-      // find the matching gbWeek student to reuse the live cache
       const info = wk.data.students.find(x => x.student_id === s.student_id) || s;
       partCols.forEach(c => {
-        const cell = gbRatingForCell(info, c);
-        s._rating[c] = cell.rating;
-        if(cell.hasPoints) s._live_points[c] = cell.points;
+        const cell = gbRatingForCell(info, c.id);
+        s._rating[c.id] = cell.rating;
+        if(cell.hasPoints) s._live_points[c.id] = cell.points;
       });
     });
     const row = gbWeekToRow(wk);
