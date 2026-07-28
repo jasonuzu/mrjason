@@ -5039,11 +5039,13 @@
                 || (layout && layout.name) || '';
             if (stored) { cb(stored, className); return; }
             if (!sbClient || !className) { cb('', className); return; }
-            sbClient.from('classes').select('class_id, name').eq('name', className).then(function(res) {
-                var found = (!res.error && res.data && res.data[0]) ? res.data[0].class_id : '';
-                if (found && layout) { layout.learnerProfileClassId = found; persistLayouts(); }
-                cb(found || '', className);
-            });
+            try {
+                sbClient.from('classes').select('class_id, name').eq('name', className).then(function(res) {
+                    var found = (!res.error && res.data && res.data[0]) ? res.data[0].class_id : '';
+                    if (found && layout) { layout.learnerProfileClassId = found; persistLayouts(); }
+                    cb(found || '', className);
+                }, function() { cb('', className); });
+            } catch (e) { cb('', className); }
         }
 
         function postLessonToLearnerProfile(completed) {
@@ -5090,6 +5092,10 @@
                         var m = (res.error.message || '').toLowerCase();
                         if (m.indexOf('lessons') !== -1 && m.indexOf('does not exist') !== -1) {
                             completed.lpPostError = 'The lessons table is missing — run LESSONS-SETUP.sql in Supabase.';
+                        } else if (m.indexOf('row-level security') !== -1 || m.indexOf('violates') !== -1 || m.indexOf('policy') !== -1) {
+                            completed.lpPostError = 'Blocked by row-level security. Make sure you are signed in as the class owner. (' + res.error.message + ')';
+                        } else if (m.indexOf('column') !== -1) {
+                            completed.lpPostError = 'Database column mismatch — re-run LESSONS-SETUP.sql. (' + res.error.message + ')';
                         }
                         alert('Lesson saved locally, but could not be sent to the Learner Profile System:\n\n' + completed.lpPostError);
                     } else {
@@ -5098,6 +5104,11 @@
                     }
                     saveLiveState();
                     renderLiveView();
+                }, function(err) {
+                    completed.lpPostError = 'Network or auth error: ' + (err && err.message ? err.message : err);
+                    saveLiveState();
+                    renderLiveView();
+                    alert('Lesson saved locally, but could not be sent:\n\n' + completed.lpPostError);
                 });
             });
         }
