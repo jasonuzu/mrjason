@@ -620,6 +620,22 @@
   .gb-check-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; }
   .gb-check-row:hover { background: var(--accent-light); }
   .gb-check-row input { width: 17px; height: 17px; cursor: pointer; }
+  .gb-form-group { margin-bottom: 14px; }
+  .gb-form-label { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 5px; }
+  .gb-type-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .gb-type-chip {
+    font-size: 12.5px; padding: 6px 12px; border-radius: 16px; cursor: pointer;
+    border: 1.5px solid var(--rule); background: var(--paper); color: var(--ink-soft);
+    text-align: center; user-select: none;
+  }
+  .gb-type-chip:hover { border-color: var(--accent); }
+  .gb-type-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .gb-student-pick { max-height: 180px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 7px; padding: 4px; }
+  .gb-check-cell {
+    width: 34px; height: 26px; border-radius: 5px; border: 1px solid var(--rule);
+    background: var(--paper); cursor: pointer; font-size: 14px; color: var(--ink-faint);
+  }
+  .gb-check-cell.done { background: var(--green-bg); color: var(--green); border-color: var(--green); font-weight: 700; }
   .gb-fb-btn {
     margin-top: 3px; font-size: 9.5px; padding: 2px 6px; border-radius: 4px;
     border: 1px solid var(--rule); background: var(--paper); color: var(--ink-faint);
@@ -1958,7 +1974,10 @@ async function gbLoadWeeksForClass(className){
 
 // Compute a class average for an assessment column (numeric scores only)
 function gbAssessAverage(wk, assessId){
+  const a = (wk.data.assessments||[]).find(x => x.id === assessId);
+  if(a && a.completionMode === 'check') return '';   // no numeric average for check-to-complete
   const vals = wk.data.students
+    .filter(s => !a || !a.assignedTo || a.assignedTo.includes(s.student_id))
     .map(s => parseFloat(s.scores[assessId]))
     .filter(v => isFinite(v));
   if(!vals.length) return '';
@@ -4046,17 +4065,21 @@ function renderParentReport(){
 
   // scores
   let scoreCards = '';
-  if(assess.length){
+  const myAssess = assess.filter(a => !a.assignedTo || a.assignedTo.includes(st.student_id));
+  if(myAssess.length){
     scoreCards = `<div style="margin-bottom:18px;">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Assessments  <span style="color:var(--ink-faint);font-weight:400;">作业与评估</span></div>
-      ${assess.map(a => {
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px;">Assignments  <span style="color:var(--ink-faint);font-weight:400;">作业与评估</span></div>
+      ${myAssess.map(a => {
         const val = (st.scores||{})[a.id];
         const fb = (st.assignment_feedback||{})[a.id];
         const avg = share.showAverages !== false ? ((st._averages||{})[a.id]) : null;
+        const scoreDisplay = a.completionMode === 'check'
+          ? (val ? escapeHtml(String(val)) : '<span style="color:var(--ink-faint);">not yet</span>')
+          : `${val!==undefined&&val!==''?escapeHtml(String(val)):'–'}${a.total?`<span style="font-size:12px;color:var(--ink-faint);font-weight:400;"> / ${escapeHtml(String(a.total))}</span>`:''}`;
         return `<div class="card" style="padding:12px 14px;margin-bottom:8px;">
           <div style="display:flex;align-items:baseline;gap:8px;">
-            <div style="font-weight:700;flex:1;">${escapeHtml(a.name||'')}</div>
-            <div style="font-size:18px;font-weight:800;color:var(--accent);">${val!==undefined&&val!==''?escapeHtml(String(val)):'–'}${a.total?`<span style="font-size:12px;color:var(--ink-faint);font-weight:400;"> / ${escapeHtml(String(a.total))}</span>`:''}</div>
+            <div style="font-weight:700;flex:1;">${escapeHtml(a.name||'')}${a.type?` <span style="font-size:11px;color:var(--ink-faint);font-weight:400;">${escapeHtml(a.type)}</span>`:''}</div>
+            <div style="font-size:18px;font-weight:800;color:var(--accent);">${scoreDisplay}</div>
           </div>
           ${a.description?`<div style="font-size:12px;color:var(--ink-faint);margin-top:2px;">${escapeHtml(a.description)}</div>`:''}
           ${avg!==null&&avg!==undefined&&avg!==''?`<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Class average 班级平均: <strong>${escapeHtml(String(avg))}</strong></div>`:''}
@@ -4211,10 +4234,14 @@ function renderGradebookWeek(){
   let head = `<tr>
     <th class="gb-name-col" rowspan="2">Student</th>`;
   assess.forEach(a => {
-    head += `<th class="gb-assess-head" title="${escapeAttr(a.description||'')}">${escapeHtml(a.name||'Assessment')}<div style="font-weight:400;color:var(--ink-faint);font-size:10px;">/ ${escapeHtml(String(a.total||''))}</div>
+    const sub = a.completionMode === 'check'
+      ? `<div style="font-weight:400;color:var(--ink-faint);font-size:10px;">${escapeHtml(a.type||'')} · check</div>`
+      : `<div style="font-weight:400;color:var(--ink-faint);font-size:10px;">${escapeHtml(a.type||'')}${a.total?` · / ${escapeHtml(String(a.total))}`:''}</div>`;
+    const forWho = a.assignedTo ? `<div style="font-size:9px;color:var(--accent);" title="${escapeAttr(a.assignedTo.map(id=>{const s=students.find(x=>x.student_id===id);return s?s.name:'';}).filter(Boolean).join(', '))}">for ${a.assignedTo.length} student${a.assignedTo.length===1?'':'s'}</div>` : '';
+    head += `<th class="gb-assess-head" title="${escapeAttr(a.description||'')}">${escapeHtml(a.name||'Assignment')}${sub}${forWho}
       <button class="btn btn-ghost" style="font-size:10px;padding:1px 5px;margin-top:2px;" onclick="App.gbEditAssessment('${escapeAttr(a.id)}')">edit</button></th>`;
   });
-  head += `<th class="gb-assess-head" rowspan="2"><button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button></th>`;
+  head += `<th class="gb-assess-head" rowspan="2"><button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assignment</button></th>`;
   if(share.showParticipation !== false){
     if(partCols.length){
       partCols.forEach(c => { head += `<th class="gb-part-head" title="${escapeAttr(c.lessonName||'')}">${escapeHtml(c.label)}${c.sublabel?`<div style="font-weight:400;color:var(--ink-faint);font-size:9px;">${escapeHtml(c.sublabel)}</div>`:''}</th>`; });
@@ -4236,10 +4263,22 @@ function renderGradebookWeek(){
     let row = `<tr>
       <td class="gb-name-col">${escapeHtml(st.name||'')}${st.chinese_name?`<div class="gb-cn">${escapeHtml(st.chinese_name)}</div>`:''}</td>`;
     assess.forEach(a => {
+      const assigned = !a.assignedTo || a.assignedTo.includes(st.student_id);
+      if(!assigned){
+        row += `<td style="background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(0,0,0,0.03) 5px,rgba(0,0,0,0.03) 10px);" title="Not assigned to ${escapeAttr(st.name)}"></td>`;
+        return;
+      }
       const hasFb = !!((st.assignment_feedback||{})[a.id]||'').trim();
-      row += `<td><input type="text" inputmode="decimal" value="${escapeAttr(st.scores[a.id]||'')}"
-        oninput="App.gbSetScore(${si},'${escapeAttr(a.id)}',this.value)" placeholder="–">
-        <div><button class="gb-fb-btn${hasFb?' has':''}" title="${hasFb?'Edit feedback':'Add feedback'} for ${escapeAttr(a.name)}" onclick="App.gbOpenAssignFb(${si},'${escapeAttr(a.id)}')">${hasFb?'✓ feedback':'+ feedback'}</button></div></td>`;
+      const val = st.scores[a.id]||'';
+      if(a.completionMode === 'check'){
+        const done = !!val;
+        row += `<td><button class="gb-check-cell${done?' done':''}" title="${done?'Completed':'Mark complete'}" onclick="App.gbToggleComplete(${si},'${escapeAttr(a.id)}','${escapeAttr(a.checkLabel||'✓')}')">${done?escapeHtml(val):'○'}</button>
+          <div><button class="gb-fb-btn${hasFb?' has':''}" title="${hasFb?'Edit feedback':'Add feedback'}" onclick="App.gbOpenAssignFb(${si},'${escapeAttr(a.id)}')">${hasFb?'✓ feedback':'+ feedback'}</button></div></td>`;
+      } else {
+        row += `<td><input type="text" inputmode="decimal" value="${escapeAttr(val)}"
+          oninput="App.gbSetScore(${si},'${escapeAttr(a.id)}',this.value)" placeholder="–">
+          <div><button class="gb-fb-btn${hasFb?' has':''}" title="${hasFb?'Edit feedback':'Add feedback'} for ${escapeAttr(a.name)}" onclick="App.gbOpenAssignFb(${si},'${escapeAttr(a.id)}')">${hasFb?'✓ feedback':'+ feedback'}</button></div></td>`;
+      }
     });
     row += `<td></td>`; // under the +Assessment column
     if(share.showParticipation !== false){
@@ -4289,7 +4328,7 @@ function renderGradebookWeek(){
     </div>
 
     <div class="gb-toolbar no-print">
-      <button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assessment</button>
+      <button class="btn btn-ghost btn-sm" onclick="App.gbAddAssessment()">+ Assignment</button>
       <button class="btn btn-ghost btn-sm" onclick="App.gbRefreshLive()">↻ Refresh Live Classroom</button>
       <button class="btn btn-ghost btn-sm" onclick="App.gbShareSettings()">What parents see…</button>
       <div style="flex:1;"></div>
@@ -4312,7 +4351,95 @@ function renderGradebookWeek(){
     <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Tip: scroll the grid sideways to see every column. Everything you type saves automatically. Use <strong>Options</strong> on a student for conferences and other notes to post to their profile.</div>
     ${gbActionsModalHtml()}
     ${gbAssignFbModalHtml()}
+    ${gbAssessFormHtml()}
   `;
+}
+
+const GB_ASSIGN_TYPES = ['Assessment','Homework','Worksheet','Test','Quiz','Practice','Presentation'];
+
+function gbAssessFormHtml(){
+  const f = state.gbAssessForm;
+  if(!f) return '';
+  const wk = state.gbWeek; if(!wk) return '';
+  const students = wk.data.students || [];
+  const everyone = f.assignedTo === null;
+  return `
+  <div class="gb-modal-overlay" onclick="if(event.target===this)App.gbCloseAssessForm()">
+    <div class="gb-modal" style="max-width:520px;">
+      <div class="gb-modal-head">
+        <div style="font-weight:700;font-size:15px;">${f.editing?'Edit assignment':'New assignment'}</div>
+        <button class="btn btn-ghost btn-sm" onclick="App.gbCloseAssessForm()">✕ Close</button>
+      </div>
+      <div class="gb-modal-body">
+        <div class="gb-form-group">
+          <label class="gb-form-label">Assignment name</label>
+          <input type="text" class="input" style="width:100%;" placeholder="e.g. Task 1, Weekend Homework"
+            value="${escapeAttr(f.name)}" oninput="App.gbAssessFormSet('name',this.value)">
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Type of assignment</label>
+          <div class="gb-type-grid">
+            ${GB_ASSIGN_TYPES.map(t => `
+              <label class="gb-type-chip ${f.type===t?'on':''}">
+                <input type="radio" name="gbtype" ${f.type===t?'checked':''} onchange="App.gbAssessFormSet('type','${t}')" style="display:none;">
+                ${t}
+              </label>`).join('')}
+            <label class="gb-type-chip ${f.type==='__custom__'?'on':''}">
+              <input type="radio" name="gbtype" ${f.type==='__custom__'?'checked':''} onchange="App.gbAssessFormSet('type','__custom__')" style="display:none;">
+              Other…
+            </label>
+          </div>
+          ${f.type==='__custom__' ? `<input type="text" class="input" style="width:100%;margin-top:6px;" placeholder="Your own type" value="${escapeAttr(f.customType)}" oninput="App.gbAssessFormSet('customType',this.value)">` : ''}
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Grading</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label class="gb-type-chip ${f.completionMode==='points'?'on':''}" style="flex:1;">
+              <input type="radio" name="gbmode" ${f.completionMode==='points'?'checked':''} onchange="App.gbAssessFormSet('completionMode','points')" style="display:none;">
+              Total points
+            </label>
+            <label class="gb-type-chip ${f.completionMode==='check'?'on':''}" style="flex:1;">
+              <input type="radio" name="gbmode" ${f.completionMode==='check'?'checked':''} onchange="App.gbAssessFormSet('completionMode','check')" style="display:none;">
+              Check to complete
+            </label>
+          </div>
+          ${f.completionMode==='points'
+            ? `<input type="text" inputmode="numeric" class="input" style="width:100%;margin-top:6px;" placeholder="Total points, e.g. 10 or 100" value="${escapeAttr(f.total)}" oninput="App.gbAssessFormSet('total',this.value)">`
+            : `<div style="margin-top:6px;font-size:12.5px;color:var(--ink-soft);">Students get a mark you choose when complete:
+                <input type="text" class="input" style="width:70px;margin-left:6px;" value="${escapeAttr(f.checkLabel)}" placeholder="✓" oninput="App.gbAssessFormSet('checkLabel',this.value)"> (a check, emoji, or text)</div>`}
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Short description <span style="color:var(--ink-faint);font-weight:400;">(optional)</span></label>
+          <textarea class="input" style="width:100%;min-height:56px;font-family:inherit;" placeholder="What is this assignment about?"
+            oninput="App.gbAssessFormSet('description',this.value)">${escapeHtml(f.description)}</textarea>
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Who is this for?</label>
+          <label class="gb-check-row" style="padding:6px 8px;">
+            <input type="checkbox" ${everyone?'checked':''} onchange="App.gbAssessSetEveryone()">
+            <span><strong>Everyone</strong> in the class</span>
+          </label>
+          <div style="font-size:12px;color:var(--ink-faint);margin:4px 0 4px 4px;">Or pick specific students — it will show only for them, greyed out for others, and only their parents will see it:</div>
+          <div class="gb-student-pick">
+            ${students.map(s => `
+              <label class="gb-check-row" style="padding:5px 8px;">
+                <input type="checkbox" ${(!everyone && f.assignedTo.includes(s.student_id))?'checked':''} onchange="App.gbAssessToggleStudent('${escapeAttr(s.student_id)}')">
+                <span>${escapeHtml(s.name)}${s.chinese_name?` <span style="color:var(--ink-faint);">${escapeHtml(s.chinese_name)}</span>`:''}</span>
+              </label>`).join('')}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="App.gbAssessSave()">${f.editing?'Save changes':'Add assignment'}</button>
+          ${f.editing?`<button class="btn btn-danger-ghost" onclick="App.gbAssessDelete()">Delete</button>`:''}
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 
 function gbAssignFbModalHtml(){
@@ -6813,6 +6940,12 @@ const App = {
     st.scores[aid] = v; gbSaver.schedule();
     App.gbRepaintAveragesSoon();
   },
+  gbToggleComplete(si, aid, mark){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.scores[aid] = st.scores[aid] ? '' : (mark || '✓');
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
   gbCycleRating(si, col){
     const st = state.gbWeek.data.students[si]; if(!st) return;
     // cycle: (auto) → good → improve → distract → back to auto
@@ -6856,35 +6989,80 @@ const App = {
   },
 
   gbAddAssessment(){
-    const name = prompt('Assessment name (e.g. Task 1, Weekend Homework):');
-    if(name === null) return;
-    const desc = prompt('Short description (optional):') || '';
-    const total = prompt('Total possible score (e.g. 10, 100):') || '';
-    state.gbWeek.data.assessments.push({
-      id: 'as_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-      name: name.trim() || 'Assessment', description: desc.trim(), total: total.trim(),
-    });
-    gbSaver.schedule();
+    state.gbAssessForm = {
+      editing: null,
+      name: '', type: 'Assessment', customType: '',
+      completionMode: 'points', total: '', checkLabel: '✓',
+      description: '', assignedTo: null,
+    };
     render({preserveScroll:true});
   },
 
   gbEditAssessment(aid){
     const a = state.gbWeek.data.assessments.find(x => x.id === aid);
     if(!a) return;
-    const choice = prompt('Edit assessment — type:\n  1 to rename\n  2 to change description\n  3 to change total\n  4 to delete\n\nEnter 1-4:', '1');
-    if(choice === null) return;
-    if(choice === '4'){
-      if(confirm(`Delete "${a.name}"? Scores in this column will be removed.`)){
-        state.gbWeek.data.assessments = state.gbWeek.data.assessments.filter(x => x.id !== aid);
-        state.gbWeek.data.students.forEach(s => { delete s.scores[aid]; delete s.assignment_feedback[aid]; });
-      }
-    } else if(choice === '1'){
-      const v = prompt('New name:', a.name); if(v !== null) a.name = v.trim() || a.name;
-    } else if(choice === '2'){
-      const v = prompt('New description:', a.description||''); if(v !== null) a.description = v.trim();
-    } else if(choice === '3'){
-      const v = prompt('New total:', a.total||''); if(v !== null) a.total = v.trim();
+    state.gbAssessForm = {
+      editing: aid,
+      name: a.name||'', type: a.type||'Assessment', customType: a.customType||'',
+      completionMode: a.completionMode||'points', total: a.total||'', checkLabel: a.checkLabel||'✓',
+      description: a.description||'', assignedTo: a.assignedTo ? a.assignedTo.slice() : null,
+    };
+    render({preserveScroll:true});
+  },
+
+  gbCloseAssessForm(){ state.gbAssessForm = null; render({preserveScroll:true}); },
+
+  gbAssessFormSet(field, val){
+    if(!state.gbAssessForm) return;
+    state.gbAssessForm[field] = val;
+    render({preserveScroll:true});
+  },
+
+  gbAssessToggleStudent(sid){
+    const f = state.gbAssessForm; if(!f) return;
+    if(f.assignedTo === null) f.assignedTo = [];
+    const i = f.assignedTo.indexOf(sid);
+    if(i === -1) f.assignedTo.push(sid); else f.assignedTo.splice(i,1);
+    render({preserveScroll:true});
+  },
+
+  gbAssessSetEveryone(){
+    if(state.gbAssessForm) state.gbAssessForm.assignedTo = null;
+    render({preserveScroll:true});
+  },
+
+  gbAssessDelete(){
+    const f = state.gbAssessForm; if(!f || !f.editing) return;
+    const a = state.gbWeek.data.assessments.find(x => x.id === f.editing);
+    if(!confirm(`Delete "${a?a.name:'this assignment'}"? Scores in this column will be removed.`)) return;
+    state.gbWeek.data.assessments = state.gbWeek.data.assessments.filter(x => x.id !== f.editing);
+    state.gbWeek.data.students.forEach(s => { delete s.scores[f.editing]; if(s.assignment_feedback) delete s.assignment_feedback[f.editing]; });
+    state.gbAssessForm = null;
+    gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+
+  gbAssessSave(){
+    const f = state.gbAssessForm; if(!f) return;
+    if(!f.name.trim()){ alert('Please give the assignment a name.'); return; }
+    const rec = {
+      name: f.name.trim(),
+      type: f.type === '__custom__' ? (f.customType.trim()||'Assignment') : f.type,
+      customType: f.type === '__custom__' ? f.customType.trim() : '',
+      completionMode: f.completionMode,
+      total: f.completionMode === 'points' ? f.total.trim() : '',
+      checkLabel: f.completionMode === 'check' ? (f.checkLabel.trim()||'✓') : '',
+      description: f.description.trim(),
+      assignedTo: (f.assignedTo && f.assignedTo.length) ? f.assignedTo.slice() : null,
+    };
+    if(f.editing){
+      const a = state.gbWeek.data.assessments.find(x => x.id === f.editing);
+      if(a) Object.assign(a, rec);
+    } else {
+      rec.id = 'as_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+      state.gbWeek.data.assessments.push(rec);
     }
+    state.gbAssessForm = null;
     gbSaver.schedule();
     render({preserveScroll:true});
   },
