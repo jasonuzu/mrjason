@@ -619,6 +619,13 @@
   .gb-check-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; }
   .gb-check-row:hover { background: var(--accent-light); }
   .gb-check-row input { width: 17px; height: 17px; cursor: pointer; }
+  .gb-fb-btn {
+    margin-top: 3px; font-size: 9.5px; padding: 2px 6px; border-radius: 4px;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink-faint);
+    cursor: pointer; white-space: nowrap;
+  }
+  .gb-fb-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .gb-fb-btn.has { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
   .gb-rate-auto { font-size: 9px; color: var(--ink-faint); font-weight: 400; }
   .gb-rate-pts { font-size: 9.5px; color: var(--ink-faint); }
   /* Live Classroom panel */
@@ -4144,13 +4151,10 @@ function gbLivePanelHtml(wk){
 
   const body = names.map(nm => {
     const r = cache[nm];
-    const pts = r.totalPoints || 0;
     const dayBits = Object.keys(r.days || {}).map(d => `${d}: ${r.days[d]>0?'+':''}${r.days[d]}`).join(' · ');
     const notes = (r.notes || []).slice().sort((a,b)=>(a.ts||0)-(b.ts||0));
     return `<div class="gb-live-student">
-      <div style="font-weight:700;font-size:13px;">${escapeHtml(nm)}
-        <span style="font-weight:400;color:${pts<0?'var(--red)':'var(--green)'};">· ${pts>0?'+':''}${pts} pt${Math.abs(pts)===1?'':'s'} this week</span>
-      </div>
+      <div style="font-weight:700;font-size:13px;">${escapeHtml(nm)}</div>
       ${dayBits ? `<div style="font-size:11.5px;color:var(--ink-faint);margin:2px 0;">${escapeHtml(dayBits)}</div>` : ''}
       ${notes.length ? `<div style="margin-top:4px;">${notes.map(n => `<div style="font-size:12.5px;padding:2px 0;">${n.lesson?`<span class="gb-live-lesson-tag">${escapeHtml(n.lesson)}</span>`:''}${escapeHtml(n.text)}</div>`).join('')}</div>` : `<div style="font-size:12px;color:var(--ink-faint);">No notes logged.</div>`}
     </div>`;
@@ -4203,8 +4207,10 @@ function renderGradebookWeek(){
     let row = `<tr>
       <td class="gb-name-col">${escapeHtml(st.name||'')}${st.chinese_name?`<div class="gb-cn">${escapeHtml(st.chinese_name)}</div>`:''}</td>`;
     assess.forEach(a => {
+      const hasFb = !!((st.assignment_feedback||{})[a.id]||'').trim();
       row += `<td><input type="text" inputmode="decimal" value="${escapeAttr(st.scores[a.id]||'')}"
-        oninput="App.gbSetScore(${si},'${escapeAttr(a.id)}',this.value)" placeholder="–"></td>`;
+        oninput="App.gbSetScore(${si},'${escapeAttr(a.id)}',this.value)" placeholder="–">
+        <div><button class="gb-fb-btn${hasFb?' has':''}" title="${hasFb?'Edit feedback':'Add feedback'} for ${escapeAttr(a.name)}" onclick="App.gbOpenAssignFb(${si},'${escapeAttr(a.id)}')">${hasFb?'✓ feedback':'+ feedback'}</button></div></td>`;
     });
     row += `<td></td>`; // under the +Assessment column
     if(share.showParticipation !== false){
@@ -4223,8 +4229,8 @@ function renderGradebookWeek(){
       });
     }
     row += `<td><input type="text" inputmode="numeric" value="${escapeAttr(st.points_total||'')}" placeholder="–" oninput="App.gbSetPointsTotal(${si},this.value)" style="width:52px;"></td>`;
-    row += `<td><input type="text" class="gb-fb" value="${escapeAttr(st.week_feedback||'')}" placeholder="Add feedback…" oninput="App.gbSetWeekFeedback(${si},this.value)"></td>`;
-    row += `<td><button class="btn btn-ghost btn-sm" onclick="App.gbOpenActions(${si})">Options</button></td>`;
+    row += `<td><input type="text" id="gb-wf-${si}" class="gb-fb" value="${escapeAttr(st.week_feedback||'')}" placeholder="Add feedback…" oninput="App.gbSetWeekFeedback(${si},this.value)"></td>`;
+    row += `<td><button class="btn btn-ghost btn-sm" onclick="App.gbOpenActions(${si})">Give Weekly Feedback</button></td>`;
     row += `</tr>`;
     return row;
   }).join('');
@@ -4275,7 +4281,32 @@ function renderGradebookWeek(){
     </div>
     <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Tip: scroll the grid sideways to see every column. Everything you type saves automatically. Use <strong>Options</strong> on a student for conferences and other notes to post to their profile.</div>
     ${gbActionsModalHtml()}
+    ${gbAssignFbModalHtml()}
   `;
+}
+
+function gbAssignFbModalHtml(){
+  const m = state.gbAssignFbModal;
+  if(!m) return '';
+  const wk = state.gbWeek; if(!wk) return '';
+  const st = wk.data.students[m.si]; if(!st) return '';
+  const a = (wk.data.assessments||[]).find(x => x.id === m.aid); if(!a) return '';
+  return `
+  <div class="gb-modal-overlay" onclick="if(event.target===this)App.gbCloseAssignFb()">
+    <div class="gb-modal">
+      <div class="gb-modal-head">
+        <div style="font-weight:700;font-size:15px;">${escapeHtml(a.name)} — ${escapeHtml(st.name)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="App.gbCloseAssignFb()">✕ Close</button>
+      </div>
+      <div class="gb-modal-body">
+        <div class="lesson-sub" style="margin-top:0;">Feedback on this assignment</div>
+        <textarea class="input" style="width:100%;min-height:110px;font-family:inherit;" placeholder="Feedback on ${escapeAttr(a.name)} for ${escapeAttr(st.name)}…"
+          oninput="App.gbSetAssignFb(${m.si},'${escapeAttr(a.id)}',this.value)">${escapeHtml((st.assignment_feedback||{})[a.id]||'')}</textarea>
+        <div style="font-size:11.5px;color:var(--ink-faint);margin-top:5px;">This appears with the ${escapeHtml(a.name)} score on the parent report.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="App.gbCloseAssignFb()">Done</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function gbActionsModalHtml(){
@@ -4294,7 +4325,12 @@ function gbActionsModalHtml(){
         <button class="btn btn-ghost btn-sm" onclick="App.gbCloseActions()">✕ Close</button>
       </div>
       <div class="gb-modal-body">
-        <div class="lesson-sub" style="margin-top:0;">Options — tick any that apply</div>
+        <div class="lesson-sub" style="margin-top:0;">Weekly feedback</div>
+        <textarea class="input" style="width:100%;min-height:90px;font-family:inherit;" placeholder="Write detailed feedback for ${escapeAttr(st.name)} this week…"
+          oninput="App.gbSetWeekFeedbackModal(${si},this.value)">${escapeHtml(st.week_feedback||'')}</textarea>
+        <div style="font-size:11.5px;color:var(--ink-faint);margin:4px 0 6px;">This appears in the Weekly feedback column on the gradebook.</div>
+
+        <div class="lesson-sub">Quick options — tick any that apply</div>
         <div>
           ${GB_ACTIONS.map(a => `
             <label class="gb-check-row">
@@ -4303,17 +4339,6 @@ function gbActionsModalHtml(){
             </label>`).join('')}
         </div>
         <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="App.gbPostActions(${si})">Post ticked options to profile</button>
-
-        ${assess.length ? `
-          <div class="lesson-sub">Assignment feedback</div>
-          ${assess.map(a => `
-            <div style="margin-bottom:8px;">
-              <div style="font-size:12px;font-weight:600;margin-bottom:3px;">${escapeHtml(a.name)}</div>
-              <input type="text" class="input" style="width:100%;" placeholder="Feedback on ${escapeAttr(a.name)}…"
-                value="${escapeAttr((st.assignment_feedback||{})[a.id]||'')}"
-                oninput="App.gbSetAssignFb(${si},'${escapeAttr(a.id)}',this.value)">
-            </div>`).join('')}
-        ` : ''}
 
         ${liveNotes.length ? `
           <div class="lesson-sub">Notes from Live Classroom this week</div>
@@ -6859,6 +6884,14 @@ const App = {
     render({preserveScroll:true});
   },
 
+  gbOpenAssignFb(si, aid){
+    state.gbAssignFbModal = { si, aid };
+    render({preserveScroll:true});
+  },
+  gbCloseAssignFb(){
+    state.gbAssignFbModal = null;
+    render({preserveScroll:true});
+  },
   gbOpenActions(si){
     state.gbActionsModal = si;
     render({preserveScroll:true});
@@ -6880,6 +6913,14 @@ const App = {
     st.assignment_feedback = st.assignment_feedback || {};
     st.assignment_feedback[aid] = val;
     gbSaver.schedule();
+  },
+  gbSetWeekFeedbackModal(si, val){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.week_feedback = val;
+    gbSaver.schedule();
+    // update the grid's feedback input live without closing the modal
+    const inp = document.getElementById('gb-wf-'+si);
+    if(inp) inp.value = val;
   },
   gbPostActions(si){
     const st = state.gbWeek.data.students[si]; if(!st) return;
