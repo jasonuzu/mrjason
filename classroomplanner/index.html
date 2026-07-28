@@ -5030,7 +5030,13 @@
         function resolveLPClassId(cb) {
             var layout = getCurrentLayout();
             var stored = layout && layout.learnerProfileClassId;
-            var className = (layout && layout.learnerProfileClass) || (layout && layout.name) || '';
+            // Prefer the class name the teacher actually set in the designer/live
+            // field, then the imported LP class, then the layout name. This is the
+            // name the Learner Profile matches lessons on, so it must line up with
+            // what appears there — otherwise lessons post but never show up.
+            var className = (liveState.className || '').trim()
+                || (layout && layout.learnerProfileClass)
+                || (layout && layout.name) || '';
             if (stored) { cb(stored, className); return; }
             if (!sbClient || !className) { cb('', className); return; }
             sbClient.from('classes').select('class_id, name').eq('name', className).then(function(res) {
