@@ -647,6 +647,20 @@
   .gb-trend-down { color: var(--red); font-size: 14px; }
   .gb-trend-flat { color: var(--ink-soft); font-size: 14px; }
   .gb-analytics-picker { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .gb-flag-dot { display:inline-block; background:var(--red); color:#fff; border-radius:9px; font-size:9.5px; padding:0 5px; margin-left:4px; font-weight:700; }
+  .gb-obs { border-left: 3px solid var(--rule); padding: 8px 10px; margin-bottom: 7px; border-radius: 0 6px 6px 0; background: var(--paper); }
+  .gb-obs-head { display:flex; align-items:center; gap:7px; font-size:13px; }
+  .gb-obs-icon { font-size: 11px; }
+  .gb-obs-tag { margin-left:auto; font-size:9.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--ink-faint); font-weight:700; }
+  .gb-obs-detail { font-size:12.5px; color:var(--ink-soft); margin-top:3px; line-height:1.5; }
+  .gb-obs-advice { font-size:12.5px; color:var(--ink); margin-top:5px; line-height:1.5; font-style:italic; }
+  .gb-obs.sev-concern { border-left-color: var(--red); background: var(--red-bg); }
+  .gb-obs.sev-concern .gb-obs-icon { color: var(--red); }
+  .gb-obs.sev-watch { border-left-color: var(--yellow); background: var(--yellow-bg); }
+  .gb-obs.sev-watch .gb-obs-icon { color: var(--yellow); }
+  .gb-obs.sev-positive { border-left-color: var(--green); background: var(--green-bg); }
+  .gb-obs.sev-positive .gb-obs-icon { color: var(--green); }
+  .gb-obs.sev-info { border-left-color: var(--rule); }
   .gb-fb-btn {
     margin-top: 3px; font-size: 9.5px; padding: 2px 6px; border-radius: 4px;
     border: 1px solid var(--rule); background: var(--paper); color: var(--ink-faint);
@@ -1974,146 +1988,461 @@ const gbSaver = {
 
 const GB_RATING_SCORE = { excellent:4, good:3, improve:2, distract:1, absent:0 };
 
+/* ── Pure statistics helpers (deterministic, computed in-page) ── */
+const GBStat = {
+  mean(a){ return a.length ? a.reduce((x,y)=>x+y,0)/a.length : null; },
+  median(a){
+    if(!a.length) return null;
+    const s = a.slice().sort((x,y)=>x-y), m = Math.floor(s.length/2);
+    return s.length % 2 ? s[m] : (s[m-1]+s[m])/2;
+  },
+  // sample standard deviation (n-1); 0 when a single point
+  sd(a){
+    if(a.length < 2) return 0;
+    const m = GBStat.mean(a);
+    return Math.sqrt(a.reduce((acc,v)=>acc+(v-m)*(v-m),0)/(a.length-1));
+  },
+  // Least-squares fit. Returns slope per x-unit and r² (fit quality).
+  regression(xs, ys){
+    const n = xs.length;
+    if(n < 2) return { slope:null, intercept:null, r2:null, n };
+    const mx = GBStat.mean(xs), my = GBStat.mean(ys);
+    let sxy = 0, sxx = 0, syy = 0;
+    for(let i=0;i<n;i++){
+      const dx = xs[i]-mx, dy = ys[i]-my;
+      sxy += dx*dy; sxx += dx*dx; syy += dy*dy;
+    }
+    if(sxx === 0) return { slope:0, intercept:my, r2:null, n };
+    const slope = sxy/sxx;
+    const r2 = syy === 0 ? null : (sxy*sxy)/(sxx*syy);
+    return { slope, intercept: my - slope*mx, r2, n };
+  },
+  // Pearson correlation between two aligned series
+  pearson(xs, ys){
+    const n = xs.length;
+    if(n < 3) return null;
+    const mx = GBStat.mean(xs), my = GBStat.mean(ys);
+    let sxy = 0, sxx = 0, syy = 0;
+    for(let i=0;i<n;i++){
+      const dx = xs[i]-mx, dy = ys[i]-my;
+      sxy += dx*dy; sxx += dx*dx; syy += dy*dy;
+    }
+    if(sxx === 0 || syy === 0) return null;
+    return sxy/Math.sqrt(sxx*syy);
+  },
+  // Exponentially weighted mean — recent weeks count for more
+  ewma(a, alpha){
+    if(!a.length) return null;
+    let acc = a[0];
+    for(let i=1;i<a.length;i++) acc = alpha*a[i] + (1-alpha)*acc;
+    return acc;
+  },
+  // Longest run of consecutive items matching a test, plus the current run
+  runs(arr, test){
+    let best = 0, cur = 0, tail = 0;
+    arr.forEach(v => { if(test(v)){ cur++; if(cur>best) best=cur; } else cur=0; });
+    for(let i=arr.length-1;i>=0;i--){ if(test(arr[i])) tail++; else break; }
+    return { longest: best, current: tail };
+  },
+  // Percentile rank of v within population (ties count half)
+  percentile(v, pop){
+    if(!pop.length) return null;
+    let below = 0, equal = 0;
+    pop.forEach(p => { if(p < v) below++; else if(p === v) equal++; });
+    return Math.round(((below + equal/2)/pop.length)*100);
+  },
+};
+
 // Pull the per-week row for a student out of a week object.
 function gbStudentInWeek(wk, studentId){
   return (wk.data.students || []).find(s => s.student_id === studentId) || null;
 }
 
 // Resolve a student's participation ratings for a week into a list of ratings.
-// Uses the frozen _rating map if present (published weeks), else recomputes
-// from the live column cache when available.
 function gbWeekRatings(wk, srow){
   const out = [];
   if(srow._rating && typeof srow._rating === 'object'){
     Object.values(srow._rating).forEach(r => { if(r) out.push(r); });
     if(out.length) return out;
   }
-  // fall back to participation overrides only (best effort for unpublished)
   if(srow.participation && typeof srow.participation === 'object'){
     Object.values(srow.participation).forEach(r => { if(r) out.push(r); });
   }
   return out;
 }
 
-// The core: compute a full analytics profile across weeks for one student.
-function gbComputeAnalytics(weeks, studentId){
-  const weekly = [];   // per-week summary, chronological
-  const typeScores = {};   // assignmentType -> {sumPct, n}
-  let assignedTotal = 0, submittedTotal = 0, missedTotal = 0;
-  let attendPresent = 0, attendLate = 0, attendAbsent = 0, attendTotal = 0;
-  const ratingCounts = { excellent:0, good:0, improve:0, distract:0, absent:0 };
-  let ratingN = 0;
-
-  // oldest → newest
-  const sorted = weeks.slice().sort((a,b) => {
+function gbSortWeeks(weeks){
+  return weeks.slice().sort((a,b) => {
     const ta = a.week_start ? new Date(a.week_start).getTime() : (a.updatedAt||0);
     const tb = b.week_start ? new Date(b.week_start).getTime() : (b.updatedAt||0);
     return ta - tb;
   });
+}
 
-  sorted.forEach(wk => {
+/* ══════════════════════════════════════════════════════════════
+   The engine: aggregate one student across every week and derive
+   statistically-grounded measures. Everything here is arithmetic —
+   no model, no network, no AI.
+   ══════════════════════════════════════════════════════════════ */
+function gbComputeAnalytics(weeks, studentId){
+  const weekly = [];
+  const typeScores = {};
+  const typeMissed = {};
+  let assignedTotal = 0, submittedTotal = 0, missedTotal = 0;
+  let attendPresent = 0, attendAbsent = 0, attendTotal = 0;
+  const ratingCounts = { excellent:0, good:0, improve:0, distract:0, absent:0 };
+  let ratingN = 0;
+
+  gbSortWeeks(weeks).forEach((wk, wi) => {
     const srow = gbStudentInWeek(wk, studentId);
     if(!srow) return;
     const assessments = wk.data.assessments || [];
 
-    // scores by assignment (only ones assigned to this student)
-    let wkScorePctSum = 0, wkScorePctN = 0, wkAssigned = 0, wkSubmitted = 0, wkMissed = 0;
+    let wkPctSum = 0, wkPctN = 0, wkAssigned = 0, wkSubmitted = 0, wkMissed = 0;
     assessments.forEach(a => {
-      const assigned = !a.assignedTo || a.assignedTo.includes(studentId);
-      if(!assigned) return;
+      if(a.assignedTo && !a.assignedTo.includes(studentId)) return;
       wkAssigned++; assignedTotal++;
       const raw = (srow.scores||{})[a.id];
       const has = raw !== undefined && raw !== null && String(raw).trim() !== '';
-      if(has){ wkSubmitted++; submittedTotal++; } else { wkMissed++; missedTotal++; }
+      const ty = a.type || 'Other';
+      if(has){ wkSubmitted++; submittedTotal++; }
+      else {
+        wkMissed++; missedTotal++;
+        typeMissed[ty] = (typeMissed[ty]||0) + 1;
+      }
       if(a.completionMode !== 'check' && has){
         const num = parseFloat(raw), tot = parseFloat(a.total);
         if(isFinite(num) && isFinite(tot) && tot > 0){
           const pct = Math.max(0, Math.min(100, (num/tot)*100));
-          wkScorePctSum += pct; wkScorePctN++;
-          const ty = a.type || 'Other';
-          typeScores[ty] = typeScores[ty] || { sumPct:0, n:0 };
-          typeScores[ty].sumPct += pct; typeScores[ty].n++;
+          wkPctSum += pct; wkPctN++;
+          typeScores[ty] = typeScores[ty] || { pcts:[] };
+          typeScores[ty].pcts.push(pct);
         }
       }
     });
 
-    // participation ratings
     const ratings = gbWeekRatings(wk, srow);
-    let wkRatingSum = 0, wkRatingN = 0;
+    let wkRateSum = 0, wkRateN = 0, wkAbsent = 0;
     ratings.forEach(r => {
       if(r in ratingCounts){ ratingCounts[r]++; ratingN++; }
-      if(r in GB_RATING_SCORE){ wkRatingSum += GB_RATING_SCORE[r]; wkRatingN++; }
-      if(r === 'absent'){ attendAbsent++; attendTotal++; }
-      else if(r === 'present' || r === 'good' || r === 'excellent' || r === 'improve' || r === 'distract'){ attendPresent++; attendTotal++; }
+      if(r in GB_RATING_SCORE){ wkRateSum += GB_RATING_SCORE[r]; wkRateN++; }
+      if(r === 'absent'){ attendAbsent++; attendTotal++; wkAbsent++; }
+      else if(r in GB_RATING_SCORE){ attendPresent++; attendTotal++; }
     });
 
-    // points earned this week (sum of per-lesson deltas we stored)
     let wkPoints = 0, hasPoints = false;
     if(srow._live_points && typeof srow._live_points === 'object'){
-      Object.values(srow._live_points).forEach(p => { const n=parseFloat(p); if(isFinite(n)){ wkPoints += n; hasPoints = true; } });
+      Object.values(srow._live_points).forEach(p => {
+        const n = parseFloat(p); if(isFinite(n)){ wkPoints += n; hasPoints = true; }
+      });
     }
-    if(!hasPoints && srow.points_total !== undefined && String(srow.points_total).trim() !== ''){
+    if(!hasPoints && String(srow.points_total||'').trim() !== ''){
       const n = parseFloat(srow.points_total); if(isFinite(n)){ wkPoints = n; hasPoints = true; }
     }
 
     weekly.push({
+      idx: wi,
       title: wk.title || '',
-      scorePct: wkScorePctN ? Math.round(wkScorePctSum/wkScorePctN) : null,
-      ratingAvg: wkRatingN ? (wkRatingSum/wkRatingN) : null,   // 0..4
+      scorePct: wkPctN ? Math.round(wkPctSum/wkPctN) : null,
+      ratingAvg: wkRateN ? (wkRateSum/wkRateN) : null,
       points: hasPoints ? wkPoints : null,
       assigned: wkAssigned, submitted: wkSubmitted, missed: wkMissed,
+      absences: wkAbsent,
     });
   });
 
-  // Derived headline metrics
+  // ── series extraction (index-aware so gaps don't distort slopes) ──
+  const sIdx = [], sVal = [];
+  weekly.forEach(w => { if(w.scorePct !== null){ sIdx.push(w.idx); sVal.push(w.scorePct); } });
+  const pIdx = [], pVal = [];
+  weekly.forEach(w => { if(w.ratingAvg !== null){ pIdx.push(w.idx); pVal.push(w.ratingAvg); } });
+  const ptIdx = [], ptVal = [];
+  weekly.forEach(w => { if(w.points !== null){ ptIdx.push(w.idx); ptVal.push(w.points); } });
+
+  const scoreReg = GBStat.regression(sIdx, sVal);
+  const partReg  = GBStat.regression(pIdx, pVal);
+  const ptsReg   = GBStat.regression(ptIdx, ptVal);
+
+  const scoreAvg = sVal.length ? Math.round(GBStat.mean(sVal)) : null;
+  const scoreMedian = sVal.length ? Math.round(GBStat.median(sVal)) : null;
+  const scoreSD = sVal.length > 1 ? GBStat.sd(sVal) : null;
+  // coefficient of variation — consistency independent of level
+  const scoreCV = (scoreSD !== null && scoreAvg) ? (scoreSD/scoreAvg)*100 : null;
+  // recency-weighted average: latest weeks carry the most weight
+  const recentAvg = sVal.length ? Math.round(GBStat.ewma(sVal, 0.5)) : null;
+
+  // momentum: mean of last up-to-3 vs the ones before
+  let momentum = null;
+  if(sVal.length >= 4){
+    const k = Math.min(3, Math.floor(sVal.length/2));
+    const recent = sVal.slice(-k), prior = sVal.slice(0, sVal.length-k);
+    momentum = GBStat.mean(recent) - GBStat.mean(prior);
+  }
+
+  // correlations: does participation / points move with achievement?
+  const alignedP = [], alignedPS = [];
+  weekly.forEach(w => { if(w.ratingAvg !== null && w.scorePct !== null){ alignedP.push(w.ratingAvg); alignedPS.push(w.scorePct); } });
+  const corrPartScore = GBStat.pearson(alignedP, alignedPS);
+
+  const alignedPt = [], alignedPtS = [];
+  weekly.forEach(w => { if(w.points !== null && w.scorePct !== null){ alignedPt.push(w.points); alignedPtS.push(w.scorePct); } });
+  const corrPointsScore = GBStat.pearson(alignedPt, alignedPtS);
+
+  // absence impact: mean score in weeks containing an absence vs weeks without
+  const withAbs = weekly.filter(w => w.absences > 0 && w.scorePct !== null).map(w => w.scorePct);
+  const noAbs   = weekly.filter(w => w.absences === 0 && w.scorePct !== null).map(w => w.scorePct);
+  const absenceImpact = (withAbs.length >= 1 && noAbs.length >= 1)
+    ? (GBStat.mean(withAbs) - GBStat.mean(noAbs)) : null;
+
+  // streaks
+  const missStreak = GBStat.runs(weekly, w => w.missed > 0);
+  const declineRun = (function(){
+    let cur = 0;
+    for(let i=sVal.length-1;i>0;i--){ if(sVal[i] < sVal[i-1]) cur++; else break; }
+    return cur;
+  })();
+  const gainRun = (function(){
+    let cur = 0;
+    for(let i=sVal.length-1;i>0;i--){ if(sVal[i] > sVal[i-1]) cur++; else break; }
+    return cur;
+  })();
+
   const submissionRate = assignedTotal ? Math.round((submittedTotal/assignedTotal)*100) : null;
   const attendanceRate = attendTotal ? Math.round((attendPresent/attendTotal)*100) : null;
-  const typeAverages = Object.keys(typeScores).map(ty => ({
-    type: ty, avg: Math.round(typeScores[ty].sumPct/typeScores[ty].n), n: typeScores[ty].n,
-  })).sort((a,b) => b.n - a.n);
 
-  // Overall score average across all graded work
-  const allScorePcts = weekly.map(w => w.scorePct).filter(v => v !== null);
-  const scoreAvg = allScorePcts.length ? Math.round(allScorePcts.reduce((a,b)=>a+b,0)/allScorePcts.length) : null;
+  const typeAverages = Object.keys(typeScores).map(ty => {
+    const pcts = typeScores[ty].pcts;
+    return { type:ty, avg:Math.round(GBStat.mean(pcts)), n:pcts.length, sd:GBStat.sd(pcts) };
+  }).sort((a,b) => b.avg - a.avg);
 
-  // Trend: compare first half vs second half of weekly score %
-  function trendOf(series){
-    const vals = series.filter(v => v !== null && v !== undefined);
-    if(vals.length < 2) return null;
-    const mid = Math.floor(vals.length/2);
-    const firstHalf = vals.slice(0, mid || 1);
-    const secondHalf = vals.slice(mid);
-    const avg = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
-    const diff = avg(secondHalf) - avg(firstHalf);
-    return diff;
-  }
-  const scoreTrend = trendOf(weekly.map(w => w.scorePct));
-  const ratingTrend = trendOf(weekly.map(w => w.ratingAvg));
-  const pointsTrend = trendOf(weekly.map(w => w.points));
-
-  // Participation distribution as percentages
   const ratingPct = {};
   Object.keys(ratingCounts).forEach(k => { ratingPct[k] = ratingN ? Math.round((ratingCounts[k]/ratingN)*100) : 0; });
+  const engagedPct = ratingN
+    ? Math.round(((ratingCounts.excellent + ratingCounts.good)/ratingN)*100) : null;
 
   return {
+    studentId,
     weeksTracked: weekly.length,
     weekly,
-    scoreAvg, scoreTrend,
-    ratingTrend, pointsTrend,
-    submissionRate, missedTotal, assignedTotal, submittedTotal,
+    scoreAvg, scoreMedian, scoreSD, scoreCV, recentAvg, momentum,
+    scoreSlope: scoreReg.slope, scoreR2: scoreReg.r2, scoreN: sVal.length,
+    partSlope: partReg.slope, partR2: partReg.r2,
+    pointsSlope: ptsReg.slope,
+    corrPartScore, corrPointsScore, absenceImpact,
+    missStreak, declineRun, gainRun,
+    submissionRate, missedTotal, assignedTotal, submittedTotal, typeMissed,
     attendanceRate, attendAbsent, attendTotal,
-    typeAverages,
-    ratingCounts, ratingPct, ratingN,
+    typeAverages, ratingCounts, ratingPct, ratingN, engagedPct,
   };
 }
 
-// Turn a trend number into a human label + arrow (no AI, pure thresholds).
+/* ── Class context: lets us say how a student sits against their peers ── */
+function gbClassContext(weeks, students){
+  const per = {};
+  const scoreAvgs = [], subRates = [], attRates = [], engaged = [];
+  students.forEach(st => {
+    const a = gbComputeAnalytics(weeks, st.id);
+    per[st.id] = a;
+    if(a.scoreAvg !== null) scoreAvgs.push(a.scoreAvg);
+    if(a.submissionRate !== null) subRates.push(a.submissionRate);
+    if(a.attendanceRate !== null) attRates.push(a.attendanceRate);
+    if(a.engagedPct !== null) engaged.push(a.engagedPct);
+  });
+  return {
+    per, n: students.length,
+    scoreMean: scoreAvgs.length ? GBStat.mean(scoreAvgs) : null,
+    scoreSD: scoreAvgs.length > 1 ? GBStat.sd(scoreAvgs) : null,
+    scorePop: scoreAvgs,
+    subMean: subRates.length ? GBStat.mean(subRates) : null,
+    attMean: attRates.length ? GBStat.mean(attRates) : null,
+    engagedMean: engaged.length ? GBStat.mean(engaged) : null,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Observations engine — an explicit rule table. Each rule states its
+   own evidence threshold, so nothing fires on thin data. Output is
+   ranked: concerns first, then things to watch, then strengths.
+   ══════════════════════════════════════════════════════════════ */
+function gbGenerateInsights(a, ctx){
+  const out = [];
+  const r1 = v => Math.round(v*10)/10;
+  const add = (sev, title, detail, advice, weight) =>
+    out.push({ sev, title, detail, advice, weight: weight || 0 });
+
+  if(!a || !a.weeksTracked) return out;
+
+  const enoughTrend = a.scoreN >= 3;
+  const solidFit = a.scoreR2 !== null && a.scoreR2 >= 0.5;
+
+  /* — achievement trend — */
+  if(enoughTrend && a.scoreSlope !== null){
+    const perWeek = r1(a.scoreSlope);
+    if(a.scoreSlope >= 2){
+      add('positive', 'Scores are climbing',
+        `Rising about ${perWeek} percentage points per week${solidFit?' on a consistent trend':''} (average ${a.scoreAvg}%).`,
+        'Name what is working out loud to the student — students sustain gains better when they can identify the cause.', 3);
+    } else if(a.scoreSlope <= -2){
+      add('concern', 'Scores are sliding',
+        `Falling about ${Math.abs(perWeek)} percentage points per week${solidFit?', a steady downward trend':''}. Recent weighted average is ${a.recentAvg}% against an overall ${a.scoreAvg}%.`,
+        'Worth a short one-to-one this week to find the cause before the gap widens. Check whether the drop tracks a change in topic, seating, or attendance.', 10);
+    } else if(Math.abs(a.scoreSlope) < 1 && a.scoreN >= 4){
+      add('info', 'Performance is stable',
+        `Holding steady near ${a.scoreAvg}% with little week-to-week drift.`,
+        a.scoreAvg !== null && a.scoreAvg < 60
+          ? 'Stable but low — a plateau usually needs a change of method rather than more of the same.'
+          : 'A reliable performer. Consider stretch tasks to move the ceiling.', 2);
+    }
+  }
+
+  /* — momentum vs overall (turning a corner, or slipping recently) — */
+  if(a.momentum !== null && Math.abs(a.momentum) >= 8){
+    if(a.momentum > 0){
+      add('positive', 'Recent upturn',
+        `The last few weeks average ${r1(a.momentum)} points higher than earlier weeks.`,
+        'Recognise the shift explicitly — recent improvement is the most motivating thing to name.', 4);
+    } else {
+      add('concern', 'Recent dip',
+        `The last few weeks average ${r1(Math.abs(a.momentum))} points below this student\u2019s earlier work.`,
+        'A late dip in an otherwise solid record often signals something outside the classroom. Ask before re-teaching.', 8);
+    }
+  }
+
+  /* — consistency — */
+  if(a.scoreCV !== null && a.scoreN >= 3){
+    if(a.scoreCV >= 30){
+      add('watch', 'Uneven week to week',
+        `Scores swing widely (±${r1(a.scoreSD)} points around ${a.scoreAvg}%). High variability often points to conditions rather than ability.`,
+        'Compare the strongest and weakest weeks: task type, group, day of week, attendance. The difference is usually visible in the record.', 6);
+    } else if(a.scoreCV <= 12 && a.scoreN >= 4){
+      add('positive', 'Very consistent',
+        `Scores vary by only ±${r1(a.scoreSD)} points — a dependable pattern.`,
+        'Predictable output makes this student a good anchor for group work.', 2);
+    }
+  }
+
+  /* — participation as a lever — */
+  if(a.corrPartScore !== null && Math.abs(a.corrPartScore) >= 0.5){
+    const strength = Math.abs(a.corrPartScore) >= 0.7 ? 'strong' : 'moderate';
+    if(a.corrPartScore > 0){
+      add('info', 'Participation tracks achievement',
+        `Weeks with higher participation coincide with higher scores (${strength} correlation, r = ${r1(a.corrPartScore)}).`,
+        'Engagement is a usable lever here — raising participation is likely to move results, not just behaviour.', 5);
+    } else {
+      add('watch', 'Participation and results diverge',
+        `Higher participation weeks do not coincide with higher scores (r = ${r1(a.corrPartScore)}).`,
+        'Verbal engagement may be masking a gap in written work. Check whether the difficulty sits in output rather than understanding.', 5);
+    }
+  }
+
+  /* — submission reliability — */
+  if(a.assignedTotal >= 3){
+    if(a.submissionRate === 100){
+      add('positive', 'Everything handed in',
+        `All ${a.assignedTotal} assignments submitted across ${a.weeksTracked} week${a.weeksTracked===1?'':'s'}.`,
+        'Reliable submission is worth naming in a report — it is a habit, not a given.', 3);
+    } else if(a.submissionRate !== null && a.submissionRate < 70){
+      add('concern', 'Work often not handed in',
+        `${a.missedTotal} of ${a.assignedTotal} assignments missing (${100-a.submissionRate}% not submitted).`,
+        'Missed submission usually beats low scores as a priority — the work cannot be assessed at all. Consider a check-in at the point the task is set, not when it is due.', 9);
+    } else if(a.missStreak.current >= 2){
+      add('concern', 'Missing work is becoming a pattern',
+        `Assignments have been missed in the last ${a.missStreak.current} consecutive weeks.`,
+        'A run rather than a one-off. Worth contacting home before it becomes established.', 8);
+    }
+  }
+
+  /* — misses clustered in one type — */
+  const missTypes = Object.keys(a.typeMissed||{});
+  if(missTypes.length){
+    const worst = missTypes.sort((x,y) => a.typeMissed[y]-a.typeMissed[x])[0];
+    if(a.typeMissed[worst] >= 2 && a.missedTotal >= 2 && (a.typeMissed[worst]/a.missedTotal) >= 0.6){
+      add('watch', `Missed work concentrates in ${worst}`,
+        `${a.typeMissed[worst]} of ${a.missedTotal} missing items are ${worst.toLowerCase()} tasks.`,
+        `The avoidance is specific rather than general. Look at what makes ${worst.toLowerCase()} different — length, setting, or independence required.`, 6);
+    }
+  }
+
+  /* — attendance — */
+  if(a.attendTotal >= 4 && a.attendanceRate !== null){
+    if(a.attendanceRate < 85){
+      add('concern', 'Attendance is affecting exposure',
+        `Present for ${a.attendanceRate}% of lessons (${a.attendAbsent} absence${a.attendAbsent===1?'':'s'} recorded).`,
+        'Below roughly 90% attendance, missed content compounds. Flag to whoever tracks attendance formally.', 7);
+    } else if(a.attendanceRate === 100 && a.attendTotal >= 6){
+      add('positive', 'Full attendance', `Present for every one of the ${a.attendTotal} lessons recorded.`,
+        '', 1);
+    }
+  }
+  if(a.absenceImpact !== null && a.absenceImpact <= -8){
+    add('watch', 'Absence coincides with weaker weeks',
+      `Scores average ${r1(Math.abs(a.absenceImpact))} points lower in weeks containing an absence.`,
+      'Catch-up material after an absence looks worthwhile for this student specifically — the effect is visible in the data.', 6);
+  }
+
+  /* — engagement profile — */
+  if(a.ratingN >= 4){
+    const off = (a.ratingPct.distract||0) + (a.ratingPct.improve||0);
+    if((a.ratingPct.distract||0) >= 30){
+      add('concern', 'Frequently off task',
+        `Rated distracted in ${a.ratingPct.distract}% of lessons.`,
+        'Try a seating or grouping change before an individual conversation — the environment is the cheaper variable to test first.', 8);
+    } else if(off >= 40){
+      add('watch', 'Engagement is inconsistent',
+        `${off}% of lessons rated needs-improvement or distracted.`,
+        'Look for the lesson types where engagement holds; replicate that structure where it drops.', 5);
+    } else if((a.ratingPct.excellent||0) >= 40){
+      add('positive', 'Strong classroom engagement',
+        `Rated excellent in ${a.ratingPct.excellent}% of lessons.`,
+        'A candidate for peer-support or leadership roles in group tasks.', 3);
+    }
+  }
+
+  /* — subject/type profile — */
+  if(a.typeAverages.length >= 2){
+    const best = a.typeAverages[0], worst = a.typeAverages[a.typeAverages.length-1];
+    const gap = best.avg - worst.avg;
+    if(gap >= 20 && best.n >= 2 && worst.n >= 2){
+      add('watch', `Uneven across task types`,
+        `Strongest in ${best.type} (${best.avg}%), weakest in ${worst.type} (${worst.avg}%) — a ${gap}-point gap.`,
+        `The gap is in format, not ability. Practising ${worst.type.toLowerCase()} conditions specifically is likely to close it faster than more content.`, 6);
+    }
+  }
+
+  /* — comparison with the class — */
+  if(ctx && ctx.scoreMean !== null && a.scoreAvg !== null && ctx.n >= 4){
+    const z = (ctx.scoreSD && ctx.scoreSD > 0) ? (a.scoreAvg - ctx.scoreMean)/ctx.scoreSD : 0;
+    const pct = GBStat.percentile(a.scoreAvg, ctx.scorePop);
+    if(z <= -1){
+      add('watch', 'Below the class pattern',
+        `Averaging ${a.scoreAvg}% against a class average of ${Math.round(ctx.scoreMean)}% (${r1(Math.abs(z))} standard deviations below, ${pct}th percentile).`,
+        'A gap this size is usually structural rather than effort-based. Check prerequisite skills before adding workload.', 7);
+    } else if(z >= 1){
+      add('positive', 'Above the class pattern',
+        `Averaging ${a.scoreAvg}% against a class average of ${Math.round(ctx.scoreMean)}% (${pct}th percentile).`,
+        'Has headroom — extension work will be better received than more of the same.', 3);
+    }
+  }
+
+  /* — evidence caveat — */
+  if(a.weeksTracked < 3){
+    add('info', 'Early data',
+      `Based on ${a.weeksTracked} week${a.weeksTracked===1?'':'s'} only. Trends are provisional until about four weeks of records exist.`,
+      '', -1);
+  }
+
+  const order = { concern:0, watch:1, positive:2, info:3 };
+  out.sort((x,y) => (order[x.sev]-order[y.sev]) || (y.weight-x.weight));
+  return out;
+}
+
+// Trend label kept for compatibility with the summary cards.
 function gbTrendLabel(diff, unit){
   if(diff === null || diff === undefined) return { text:'Not enough data yet', arrow:'', cls:'flat' };
   const u = unit || '';
-  if(Math.abs(diff) < (unit === 'pts' ? 0.5 : 3)) return { text:'Holding steady', arrow:'→', cls:'flat' };
-  if(diff > 0) return { text:'Improving (+' + (Math.round(diff*10)/10) + u + ')', arrow:'▲', cls:'up' };
-  return { text:'Declining (' + (Math.round(diff*10)/10) + u + ')', arrow:'▼', cls:'down' };
+  if(Math.abs(diff) < (unit === 'pts' ? 0.5 : 1)) return { text:'Holding steady', arrow:'\u2192', cls:'flat' };
+  if(diff > 0) return { text:'+' + (Math.round(diff*10)/10) + u + ' / week', arrow:'\u25B2', cls:'up' };
+  return { text:(Math.round(diff*10)/10) + u + ' / week', arrow:'\u25BC', cls:'down' };
 }
 
 async function gbLoadWeeksForClass(className){
@@ -4327,8 +4656,10 @@ function renderProfileAnalytics(rec){
   if(!weeks.length){
     return `<div style="color:var(--ink-faint);font-size:13px;">No gradebook data yet. As weekly records are filled in, ${escapeHtml(rec.name||'this student')}\u2019s progress trends appear here.</div>`;
   }
-  const analytics = gbComputeAnalytics(weeks, rec.id);
-  return gbAnalyticsHtml(analytics, rec.name);
+  const peers = state.students.filter(s => (s.className||'') === className);
+  const ctx = peers.length >= 4 ? gbClassContext(weeks, peers) : null;
+  const analytics = (ctx && ctx.per[rec.id]) || gbComputeAnalytics(weeks, rec.id);
+  return gbAnalyticsHtml(analytics, rec.name, ctx);
 }
 
 // Class-overview analytics: student picker + one student's progress.
@@ -4346,33 +4677,45 @@ function renderClassAnalytics(className){
 
   const selId = state.gbAnalyticsStudent || students[0].id;
   const sel = students.find(s => s.id === selId) || students[0];
-  const analytics = gbComputeAnalytics(weeks, sel.id);
+  const ctx = gbClassContext(weeks, students);
+  const analytics = ctx.per[sel.id] || gbComputeAnalytics(weeks, sel.id);
+
+  // flag students the rules engine marks as needing attention, so the teacher
+  // can see at a glance who to look at without clicking through everyone
+  const flags = {};
+  students.forEach(st => {
+    const ins = gbGenerateInsights(ctx.per[st.id], ctx);
+    flags[st.id] = ins.filter(i => i.sev === 'concern').length;
+  });
 
   return `
     <div class="gb-analytics-picker">
-      ${students.map(s => `<button class="btn ${s.id===sel.id?'btn-primary':'btn-ghost'} btn-sm" onclick="App.gbPickAnalyticsStudent('${escapeAttr(s.id)}')">${escapeHtml(s.name)}</button>`).join('')}
+      ${students.map(s => {
+        const f = flags[s.id] || 0;
+        return `<button class="btn ${s.id===sel.id?'btn-primary':'btn-ghost'} btn-sm" onclick="App.gbPickAnalyticsStudent('${escapeAttr(s.id)}')">${escapeHtml(s.name)}${f?` <span class="gb-flag-dot" title="${f} item${f===1?'':'s'} needing attention">${f}</span>`:''}</button>`;
+      }).join('')}
     </div>
-    ${gbAnalyticsHtml(analytics, sel.name)}`;
+    ${gbAnalyticsHtml(analytics, sel.name, ctx)}`;
 }
 
 // A compact multi-metric progress chart (SVG) + insight cards for one student.
 // `compact` trims it for the profile page.
-function gbAnalyticsHtml(analytics, studentName, opts){
-  opts = opts || {};
+function gbAnalyticsHtml(analytics, studentName, ctx){
   const a = analytics;
   if(!a || !a.weeksTracked){
     return `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">
       No gradebook data yet for ${escapeHtml(studentName||'this student')}. Once weeks are filled in, progress trends appear here.</div>`;
   }
+  const r1 = v => Math.round(v*10)/10;
+  const pct = v => (v===null||v===undefined) ? '\u2014' : v + '%';
 
-  // ── line chart of weekly score % and participation (0-100 scaled) ──
-  const W = 620, H = 180, padL = 34, padR = 12, padT = 14, padB = 26;
+  /* ── chart ── */
+  const W = 620, H = 190, padL = 34, padR = 12, padT = 14, padB = 26;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = a.weekly.length;
   const xFor = i => padL + (n <= 1 ? innerW/2 : (i/(n-1))*innerW);
-  const yFor = v => padT + innerH - (v/100)*innerH;   // v is 0..100
+  const yFor = v => padT + innerH - (v/100)*innerH;
 
-  // gridlines
   let grid = '';
   [0,25,50,75,100].forEach(v => {
     const y = yFor(v);
@@ -4380,103 +4723,160 @@ function gbAnalyticsHtml(analytics, studentName, opts){
              <text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--ink-faint)">${v}</text>`;
   });
 
-  function polyline(series, scaleTo100, color){
+  function polyline(get, scale, color, dash){
     const pts = [];
     a.weekly.forEach((w,i) => {
-      let v = series(w);
+      let v = get(w);
       if(v === null || v === undefined) return;
-      if(scaleTo100) v = scaleTo100(v);
+      if(scale) v = scale(v);
       pts.push([xFor(i), yFor(Math.max(0,Math.min(100,v)))]);
     });
-    if(pts.length < 1) return '';
+    if(!pts.length) return '';
     const path = pts.map((p,i) => (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
     const dots = pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${color}"/>`).join('');
-    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"/>${dots}`;
+    return `<path d="${path}" fill="none" stroke="${color}" stroke-width="2.5"${dash?' stroke-dasharray="4 3"':''}/>${dots}`;
   }
 
-  // week labels on x
+  // regression line for scores — the actual fitted trend, drawn faintly
+  let trendLine = '';
+  if(a.scoreSlope !== null && a.scoreN >= 3){
+    const idxs = a.weekly.filter(w => w.scorePct !== null).map(w => w.idx);
+    const mnI = Math.min(...idxs), mxI = Math.max(...idxs);
+    const meanX = idxs.reduce((x,y)=>x+y,0)/idxs.length;
+    const meanY = a.weekly.filter(w=>w.scorePct!==null).reduce((s2,w)=>s2+w.scorePct,0)/idxs.length;
+    const y1 = meanY + a.scoreSlope*(mnI-meanX), y2 = meanY + a.scoreSlope*(mxI-meanX);
+    const cl = v => Math.max(0,Math.min(100,v));
+    trendLine = `<line x1="${xFor(mnI)}" y1="${yFor(cl(y1))}" x2="${xFor(mxI)}" y2="${yFor(cl(y2))}"
+      stroke="#2D5FA6" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.55"/>`;
+  }
+
   let xLabels = '';
   a.weekly.forEach((w,i) => {
-    if(n > 8 && i % 2 !== 0 && i !== n-1) return; // thin out
+    if(n > 8 && i % 2 !== 0 && i !== n-1) return;
     const short = (w.title||('W'+(i+1))).replace(/^Week of /,'').slice(0,8);
     xLabels += `<text x="${xFor(i)}" y="${H-8}" text-anchor="middle" font-size="8.5" fill="var(--ink-faint)">${escapeHtml(short)}</text>`;
   });
 
-  const scoreLine = polyline(w => w.scorePct, null, '#2D5FA6');
-  const partLine = polyline(w => w.ratingAvg, v => (v/4)*100, '#1565C0');   // 0..4 → 0..100
-  // points scaled relative to max for shape
   const maxPts = Math.max(1, ...a.weekly.map(w => Math.abs(w.points||0)));
-  const pointsLine = polyline(w => w.points, v => 50 + (v/maxPts)*45, '#2E7D32');
-
   const chart = `
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:${W}px;" role="img" aria-label="Progress chart">
-      ${grid}${scoreLine}${partLine}${pointsLine}${xLabels}
+      ${grid}${trendLine}
+      ${polyline(w => w.scorePct, null, '#2D5FA6')}
+      ${polyline(w => w.ratingAvg, v => (v/4)*100, '#1565C0')}
+      ${polyline(w => w.points, v => 50 + (v/maxPts)*45, '#2E7D32', true)}
+      ${xLabels}
     </svg>
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;margin-top:2px;">
-      <span style="color:#2D5FA6;">■ Assignment score %</span>
-      <span style="color:#1565C0;">■ Participation level</span>
-      <span style="color:#2E7D32;">■ Points earned</span>
+      <span style="color:#2D5FA6;">\u25A0 Assignment score %</span>
+      <span style="color:#1565C0;">\u25A0 Participation level</span>
+      <span style="color:#2E7D32;">\u25A0 Points earned</span>
+      ${trendLine?'<span style="color:#2D5FA6;opacity:0.6;">\u254C fitted trend</span>':''}
     </div>`;
 
-  // ── headline insight chips ──
-  const st = gbTrendLabel(a.scoreTrend, '%');
-  const pt = gbTrendLabel(a.ratingTrend, '');
-  const trendChip = (label, t) => `
-    <div class="gb-insight">
-      <div class="gb-insight-label">${label}</div>
-      <div class="gb-insight-val gb-trend-${t.cls}">${t.arrow} ${escapeHtml(t.text)}</div>
-    </div>`;
+  /* ── headline cards ── */
+  const slopeT = gbTrendLabel(a.scoreSlope, '%');
+  const consistency = a.scoreCV === null ? null
+    : a.scoreCV <= 12 ? 'Very consistent'
+    : a.scoreCV <= 22 ? 'Fairly consistent'
+    : a.scoreCV <= 30 ? 'Variable' : 'Highly variable';
 
-  const pct = (v) => v===null||v===undefined ? '—' : v + '%';
+  let classCard = '';
+  if(ctx && ctx.scoreMean !== null && a.scoreAvg !== null && ctx.n >= 4){
+    const p = GBStat.percentile(a.scoreAvg, ctx.scorePop);
+    const diff = a.scoreAvg - ctx.scoreMean;
+    classCard = `<div class="gb-insight">
+      <div class="gb-insight-label">Vs class</div>
+      <div class="gb-insight-val gb-trend-${diff>2?'up':diff<-2?'down':'flat'}">${diff>0?'+':''}${r1(diff)} pts</div>
+      <div class="gb-insight-sub">${p}th percentile · class avg ${Math.round(ctx.scoreMean)}%</div>
+    </div>`;
+  }
+
   const cards = `
     <div class="gb-insight-grid">
-      <div class="gb-insight"><div class="gb-insight-label">Overall average</div><div class="gb-insight-val">${pct(a.scoreAvg)}</div></div>
-      <div class="gb-insight"><div class="gb-insight-label">Work submitted</div><div class="gb-insight-val">${pct(a.submissionRate)}</div><div class="gb-insight-sub">${a.submittedTotal}/${a.assignedTotal} assignments</div></div>
-      <div class="gb-insight"><div class="gb-insight-label">Attendance</div><div class="gb-insight-val">${pct(a.attendanceRate)}</div><div class="gb-insight-sub">${a.attendAbsent} absence${a.attendAbsent===1?'':'s'} in ${a.weeksTracked} wk</div></div>
-      <div class="gb-insight"><div class="gb-insight-label">Missed work</div><div class="gb-insight-val">${a.missedTotal}</div><div class="gb-insight-sub">over ${a.weeksTracked} week${a.weeksTracked===1?'':'s'}</div></div>
-      ${trendChip('Score trend', st)}
-      ${trendChip('Participation trend', pt)}
+      <div class="gb-insight"><div class="gb-insight-label">Overall average</div><div class="gb-insight-val">${pct(a.scoreAvg)}</div>
+        <div class="gb-insight-sub">${a.recentAvg!==null?`recent-weighted ${a.recentAvg}%`:''}</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Trend</div>
+        <div class="gb-insight-val gb-trend-${slopeT.cls}" style="font-size:15px;">${slopeT.arrow} ${escapeHtml(slopeT.text)}</div>
+        <div class="gb-insight-sub">${a.scoreR2!==null?`fit r\u00B2 ${r1(a.scoreR2)}`:'needs 3+ weeks'}</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Consistency</div>
+        <div class="gb-insight-val" style="font-size:15px;">${consistency||'\u2014'}</div>
+        <div class="gb-insight-sub">${a.scoreSD!==null?`\u00B1${r1(a.scoreSD)} pts`:''}</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Work submitted</div><div class="gb-insight-val">${pct(a.submissionRate)}</div>
+        <div class="gb-insight-sub">${a.submittedTotal}/${a.assignedTotal} assignments</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Attendance</div><div class="gb-insight-val">${pct(a.attendanceRate)}</div>
+        <div class="gb-insight-sub">${a.attendAbsent} absence${a.attendAbsent===1?'':'s'}</div></div>
+      <div class="gb-insight"><div class="gb-insight-label">Engaged lessons</div><div class="gb-insight-val">${pct(a.engagedPct)}</div>
+        <div class="gb-insight-sub">excellent or good</div></div>
+      ${classCard}
     </div>`;
 
-  // ── participation distribution bar ──
+  /* ── participation distribution ── */
   const rp = a.ratingPct;
   const segs = [
     ['excellent','#1565C0','Excellent'],['good','#2E7D32','Good'],
     ['improve','#B35C00','Needs Improvement'],['distract','#B23A34','Distracted'],['absent','#546E7A','Absent'],
-  ].filter(s => rp[s[0]] > 0);
+  ].filter(x => rp[x[0]] > 0);
   const partBar = a.ratingN ? `
-    <div style="margin-top:6px;">
-      <div class="gb-insight-label" style="margin-bottom:4px;">Participation breakdown</div>
+    <div style="margin-top:12px;">
+      <div class="gb-insight-label" style="margin-bottom:4px;">Participation breakdown \u00b7 ${a.ratingN} lessons</div>
       <div style="display:flex;height:22px;border-radius:5px;overflow:hidden;border:1px solid var(--rule);">
-        ${segs.map(s => `<div title="${s[2]}: ${rp[s[0]]}%" style="width:${rp[s[0]]}%;background:${s[1]};"></div>`).join('')}
+        ${segs.map(x => `<div title="${x[2]}: ${rp[x[0]]}%" style="width:${rp[x[0]]}%;background:${x[1]};"></div>`).join('')}
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;margin-top:4px;">
-        ${segs.map(s => `<span style="color:${s[1]};">■ ${s[2]} ${rp[s[0]]}%</span>`).join('')}
+        ${segs.map(x => `<span style="color:${x[1]};">\u25A0 ${x[2]} ${rp[x[0]]}%</span>`).join('')}
       </div>
     </div>` : '';
 
-  // ── assignment-type averages ──
+  /* ── type averages ── */
   const typeRows = a.typeAverages.length ? `
-    <div style="margin-top:10px;">
+    <div style="margin-top:12px;">
       <div class="gb-insight-label" style="margin-bottom:4px;">Average by assignment type</div>
       ${a.typeAverages.map(t => `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-          <span style="font-size:11.5px;min-width:90px;">${escapeHtml(t.type)}</span>
+          <span style="font-size:11.5px;min-width:92px;">${escapeHtml(t.type)}</span>
           <div style="flex:1;background:var(--rule-soft);border-radius:4px;height:10px;overflow:hidden;">
             <div style="width:${t.avg}%;height:100%;background:var(--accent);"></div>
           </div>
           <span style="font-size:11px;font-weight:700;min-width:34px;text-align:right;">${t.avg}%</span>
-          <span style="font-size:10px;color:var(--ink-faint);">(${t.n})</span>
+          <span style="font-size:10px;color:var(--ink-faint);min-width:44px;">n=${t.n}${t.n>1?` \u00B1${r1(t.sd)}`:''}</span>
         </div>`).join('')}
+    </div>` : '';
+
+  /* ── observations ── */
+  const insights = gbGenerateInsights(a, ctx);
+  const sevMeta = {
+    concern:  { icon:'\u25CF', label:'Needs attention', cls:'sev-concern' },
+    watch:    { icon:'\u25CB', label:'Worth watching',  cls:'sev-watch' },
+    positive: { icon:'\u2726', label:'Strength',        cls:'sev-positive' },
+    info:     { icon:'\u2139', label:'Note',            cls:'sev-info' },
+  };
+  const insightBlock = insights.length ? `
+    <div style="margin-top:14px;">
+      <div class="gb-insight-label" style="margin-bottom:6px;">What the data shows</div>
+      ${insights.map(o => {
+        const m = sevMeta[o.sev] || sevMeta.info;
+        return `<div class="gb-obs ${m.cls}">
+          <div class="gb-obs-head"><span class="gb-obs-icon">${m.icon}</span>
+            <strong>${escapeHtml(o.title)}</strong>
+            <span class="gb-obs-tag">${m.label}</span></div>
+          <div class="gb-obs-detail">${escapeHtml(o.detail)}</div>
+          ${o.advice?`<div class="gb-obs-advice">\u2192 ${escapeHtml(o.advice)}</div>`:''}
+        </div>`;
+      }).join('')}
     </div>` : '';
 
   return `
     <div class="gb-analytics-card">
       ${cards}
-      <div style="margin-top:12px;">${chart}</div>
+      <div style="margin-top:14px;">${chart}</div>
       ${partBar}
       ${typeRows}
-      <div style="font-size:10.5px;color:var(--ink-faint);margin-top:10px;">Calculated directly from ${a.weeksTracked} week${a.weeksTracked===1?'':'s'} of gradebook records.</div>
+      ${insightBlock}
+      <div style="font-size:10.5px;color:var(--ink-faint);margin-top:12px;line-height:1.5;">
+        Calculated in this page from ${a.weeksTracked} week${a.weeksTracked===1?'':'s'} of gradebook records
+        (least-squares trend, standard deviation, and correlation). These are screening indicators to prompt a
+        professional judgement, not a measure of ability.
+      </div>
     </div>`;
 }
 
