@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learner Profile System</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   :root {
     --paper: #F7F5F0;
@@ -4333,7 +4334,8 @@ function renderGradebookWeek(){
       <button class="btn btn-ghost btn-sm" onclick="App.gbShareSettings()">What parents see…</button>
       <div style="flex:1;"></div>
       ${wk.is_published
-        ? `<button class="btn btn-ghost btn-sm" onclick="App.gbRepublish()">↻ Update live report</button>
+        ? `<button class="btn btn-ghost btn-sm" onclick="App.gbExportImage(event)">🖼 Export image</button>
+           <button class="btn btn-ghost btn-sm" onclick="App.gbRepublish()">↻ Update live report</button>
            <button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="App.gbUnpublish()">Take offline</button>`
         : `<button class="btn btn-primary btn-sm" onclick="App.gbGoLive()">● Go Live</button>`}
     </div>
@@ -4342,7 +4344,7 @@ function renderGradebookWeek(){
 
     ${gbLivePanelHtml(wk)}
 
-    <div class="gb-grid-wrap">
+    <div class="gb-grid-wrap" id="gb-grid-wrap">
       <table class="gb-grid">
         <thead>${head}</thead>
         <tbody>${bodyRows || `<tr><td colspan="99" style="padding:16px;color:var(--ink-faint);">No students in this class yet.</td></tr>`}</tbody>
@@ -4420,14 +4422,14 @@ function gbAssessFormHtml(){
         <div class="gb-form-group">
           <label class="gb-form-label">Who is this for?</label>
           <label class="gb-check-row" style="padding:6px 8px;">
-            <input type="checkbox" ${everyone?'checked':''} onchange="App.gbAssessSetEveryone()">
+            <input type="checkbox" id="gb-assess-everyone" ${everyone?'checked':''} onchange="App.gbAssessSetEveryone()">
             <span><strong>Everyone</strong> in the class</span>
           </label>
           <div style="font-size:12px;color:var(--ink-faint);margin:4px 0 4px 4px;">Or pick specific students — it will show only for them, greyed out for others, and only their parents will see it:</div>
           <div class="gb-student-pick">
             ${students.map(s => `
               <label class="gb-check-row" style="padding:5px 8px;">
-                <input type="checkbox" ${(!everyone && f.assignedTo.includes(s.student_id))?'checked':''} onchange="App.gbAssessToggleStudent('${escapeAttr(s.student_id)}')">
+                <input type="checkbox" id="gb-assess-stu-${escapeAttr(s.student_id)}" ${(!everyone && f.assignedTo.includes(s.student_id))?'checked':''} onchange="App.gbAssessToggleStudent('${escapeAttr(s.student_id)}')">
                 <span>${escapeHtml(s.name)}${s.chinese_name?` <span style="color:var(--ink-faint);">${escapeHtml(s.chinese_name)}</span>`:''}</span>
               </label>`).join('')}
           </div>
@@ -7028,12 +7030,23 @@ const App = {
     if(f.assignedTo === null) f.assignedTo = [];
     const i = f.assignedTo.indexOf(sid);
     if(i === -1) f.assignedTo.push(sid); else f.assignedTo.splice(i,1);
-    render({preserveScroll:true});
+    // Don't re-render — the checkbox already shows its new state natively, and
+    // re-rendering resets the modal's scroll position. Just sync the "Everyone"
+    // box: it should be unchecked whenever any individual is selected.
+    const everyoneBox = document.getElementById('gb-assess-everyone');
+    if(everyoneBox) everyoneBox.checked = (f.assignedTo.length === 0);
   },
 
   gbAssessSetEveryone(){
-    if(state.gbAssessForm) state.gbAssessForm.assignedTo = null;
-    render({preserveScroll:true});
+    const f = state.gbAssessForm; if(!f) return;
+    f.assignedTo = null;   // everyone
+    // Uncheck all individual boxes without a full re-render.
+    (state.gbWeek.data.students||[]).forEach(s => {
+      const b = document.getElementById('gb-assess-stu-' + s.student_id);
+      if(b) b.checked = false;
+    });
+    const everyoneBox = document.getElementById('gb-assess-everyone');
+    if(everyoneBox) everyoneBox.checked = true;
   },
 
   gbAssessDelete(){
@@ -7255,6 +7268,65 @@ const App = {
       try{ await db.client.from('gradebook_weeks').update({ is_published:false }).eq('week_id', wk.week_id); }catch(e){}
     }
     render({preserveScroll:true});
+  },
+
+  async gbExportImage(ev){
+    const wk = state.gbWeek; if(!wk) return;
+    if(typeof html2canvas === 'undefined'){ alert('Image library still loading — please try again in a moment (needs internet the first time).'); return; }
+    const src = document.getElementById('gb-grid-wrap');
+    if(!src){ alert('Gradebook grid not found.'); return; }
+
+    // Build an off-screen, fully-expanded copy so nothing is clipped by the
+    // horizontal scroll box — the whole grid is captured no matter how wide.
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-99999px;top:0;background:#ffffff;padding:24px;z-index:-1;';
+    const title = document.createElement('div');
+    title.style.cssText = 'font-family:Georgia,serif;font-size:20px;font-weight:700;color:#1F2A37;margin-bottom:4px;';
+    title.textContent = (wk.title||'Gradebook') + ' — ' + (wk.class_name||'');
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:12px;color:#8A97A3;margin-bottom:14px;';
+    sub.textContent = 'Generated ' + new Date().toLocaleString();
+    holder.appendChild(title); holder.appendChild(sub);
+
+    const clone = src.cloneNode(true);
+    clone.style.overflow = 'visible';
+    clone.style.width = 'auto';
+    // strip interactive-only bits from the copy
+    clone.querySelectorAll('.gb-fb-btn, .gb-rate-auto').forEach(el => el.remove());
+    clone.querySelectorAll('button').forEach(b => { if(/edit|feedback/i.test(b.textContent)) b.remove(); });
+    // freeze input values into text so they render in the image
+    clone.querySelectorAll('input').forEach(inp => {
+      const span = document.createElement('span');
+      span.textContent = inp.value || '';
+      span.style.cssText = 'font-size:12.5px;color:#1F2A37;';
+      inp.parentNode.replaceChild(span, inp);
+    });
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+
+    const btn = ev && ev.target;
+    const oldTxt = btn ? btn.textContent : '';
+    if(btn) btn.textContent = 'Rendering…';
+    try{
+      const fullW = clone.scrollWidth + 48;
+      const canvas = await html2canvas(holder, {
+        backgroundColor: '#ffffff',
+        scale: 2,                 // crisp
+        width: fullW,
+        windowWidth: fullW,
+        useCORS: true,
+      });
+      const link = document.createElement('a');
+      const safe = (wk.title||'gradebook').replace(/[^\w\-]+/g,'_');
+      link.download = safe + '_' + (wk.class_name||'').replace(/[^\w\-]+/g,'_') + '.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }catch(e){
+      alert('Could not create the image: ' + e.message);
+    }finally{
+      document.body.removeChild(holder);
+      if(btn) btn.textContent = oldTxt;
+    }
   },
 
   /* ── Parent report (no login) ── */
