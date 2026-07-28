@@ -34,6 +34,9 @@
     --red: #B23A34;
     --red-bg: #FBEAE9;
     --red-border: #E8A8A3;
+    --blue-rate: #1565C0;
+    --blue-rate-bg: #E3F0FB;
+    --blue-rate-border: #90C2EC;
     --shadow: 0 1px 2px rgba(30,42,50,0.06), 0 4px 12px rgba(30,42,50,0.06);
   }
   * { box-sizing: border-box; }
@@ -606,8 +609,16 @@
     line-height: 1.15;
   }
   .gb-rate.good { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+  .gb-rate.excellent { background: var(--blue-rate-bg); color: var(--blue-rate); border-color: var(--blue-rate); }
   .gb-rate.improve { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow); }
   .gb-rate.distract { background: var(--red-bg); color: var(--red); border-color: var(--red); }
+  .gb-modal-overlay { position: fixed; inset: 0; background: rgba(20,28,36,0.45); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .gb-modal { background: var(--paper-raised); border-radius: 12px; max-width: 460px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+  .gb-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+  .gb-modal-body { padding: 14px 16px; overflow-y: auto; }
+  .gb-check-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; }
+  .gb-check-row:hover { background: var(--accent-light); }
+  .gb-check-row input { width: 17px; height: 17px; cursor: pointer; }
   .gb-rate-auto { font-size: 9px; color: var(--ink-faint); font-weight: 400; }
   .gb-rate-pts { font-size: 9.5px; color: var(--ink-faint); }
   /* Live Classroom panel */
@@ -1951,10 +1962,25 @@ function gbAssessAverage(wk, assessId){
 //   0 or positive → good, exactly -1 → improve, -2 or lower → distract.
 // A teacher tap overrides the auto value; the override is stored on the student.
 function gbRatingFromPoints(pts){
+  if(pts >= 2) return 'excellent';
   if(pts <= -2) return 'distract';
   if(pts === -1) return 'improve';
-  return 'good';
+  return 'good';  // 0 or +1
 }
+const GB_ACTIONS = [
+  { id:'conference', label:'Suggest a student–teacher conference' },
+  { id:'praise', label:'Praise — great week' },
+  { id:'improving', label:'Noticeable improvement' },
+  { id:'concern', label:'Area of concern to discuss' },
+  { id:'homework', label:'Missing / incomplete homework' },
+  { id:'support', label:'Would benefit from extra support' },
+];
+const GB_RATING = {
+  excellent: { label:'Excellent', cls:'excellent', cn:'优秀' },
+  good:      { label:'Good', cls:'good', cn:'良好' },
+  improve:   { label:'Needs Improvement', cls:'improve', cn:'需改进' },
+  distract:  { label:'Distracted', cls:'distract', cn:'分心' },
+};
 
 // Points a student earned on a given participation day, pulled from the
 // week's Classroom Live cache (keyed by student name → day → net points).
@@ -3869,6 +3895,7 @@ function renderLessonCard(l){
         <div class="lesson-date">${dateStr} · ${formatLessonDuration(l.duration_ms)}</div>
       </div>
       <div class="att-pills">
+        ${(() => { const tot = Object.keys(sd).reduce((s,n)=>s+(sd[n].points||0),0); return tot ? `<span class="att-pill" style="background:var(--accent-light);color:var(--accent);">${tot>0?'+':''}${tot} pts</span>` : ''; })()}
         <span class="att-pill present">${l.present_count||0} present</span>
         ${l.late_count ? `<span class="att-pill late">${l.late_count} late</span>` : ''}
         ${l.absent_count ? `<span class="att-pill absent">${l.absent_count} absent</span>` : ''}
@@ -3897,7 +3924,7 @@ function renderLessonCard(l){
             return `
             <div class="lesson-student-row">
               <strong style="min-width:110px;">${escapeHtml(n)}</strong>
-              ${d.points ? `<span class="lesson-pts">${d.points} pt${d.points===1?'':'s'}</span>` : ''}
+              ${d.points ? `<span class="lesson-pts" style="${d.points<0?'background:var(--red-bg);color:var(--red);':''}">${d.points>0?'+':''}${d.points} pt${Math.abs(d.points)===1?'':'s'}</span>` : ''}
               <span style="color:var(--ink-soft);flex:1;">${notes.length ? notes.map(x => escapeHtml(x.text)).join(' · ') : ''}</span>
             </div>`;
           }).join('')}
@@ -4015,7 +4042,9 @@ function renderParentReport(){
   let partBlock = '';
   if(share.showParticipation !== false && part.length){
     const rating = st._rating || {};
-    const rlabel = (v) => v==='improve'
+    const rlabel = (v) => v==='excellent'
+        ? '<span style="color:var(--blue-rate);font-weight:700;">Excellent 优秀</span>'
+      : v==='improve'
         ? '<span style="color:var(--yellow);font-weight:700;">Needs Improvement 需改进</span>'
       : v==='distract'
         ? '<span style="color:var(--red);font-weight:700;">Distracted 分心</span>'
@@ -4181,8 +4210,9 @@ function renderGradebookWeek(){
     if(share.showParticipation !== false){
       partCols.forEach(c => {
         const info = gbRatingForCell(st, c);
-        const cls = info.rating === 'improve' ? 'improve' : info.rating === 'distract' ? 'distract' : 'good';
-        const label = info.rating === 'improve' ? 'Needs Improvement' : info.rating === 'distract' ? 'Distracted' : 'Good';
+        const rr = GB_RATING[info.rating] || GB_RATING.good;
+        const cls = rr.cls;
+        const label = rr.label;
         row += `<td>
           <div class="gb-part-cell">
             <div class="gb-rate ${cls}" title="Click to change" onclick="App.gbCycleRating(${si},'${escapeAttr(c)}')">${label}</div>
@@ -4244,7 +4274,59 @@ function renderGradebookWeek(){
       </table>
     </div>
     <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Tip: scroll the grid sideways to see every column. Everything you type saves automatically. Use <strong>Options</strong> on a student for conferences and other notes to post to their profile.</div>
+    ${gbActionsModalHtml()}
   `;
+}
+
+function gbActionsModalHtml(){
+  const si = state.gbActionsModal;
+  if(si === null || si === undefined) return '';
+  const wk = state.gbWeek; if(!wk) return '';
+  const st = wk.data.students[si]; if(!st) return '';
+  const actions = st.actions || [];
+  const assess = wk.data.assessments || [];
+  const liveNotes = ((wk._liveByStudent||{})[st.name] || {}).notes || [];
+  return `
+  <div class="gb-modal-overlay" onclick="if(event.target===this)App.gbCloseActions()">
+    <div class="gb-modal">
+      <div class="gb-modal-head">
+        <div style="font-weight:700;font-size:15px;">${escapeHtml(st.name)}${st.chinese_name?` <span style="color:var(--ink-faint);font-weight:400;">${escapeHtml(st.chinese_name)}</span>`:''}</div>
+        <button class="btn btn-ghost btn-sm" onclick="App.gbCloseActions()">✕ Close</button>
+      </div>
+      <div class="gb-modal-body">
+        <div class="lesson-sub" style="margin-top:0;">Options — tick any that apply</div>
+        <div>
+          ${GB_ACTIONS.map(a => `
+            <label class="gb-check-row">
+              <input type="checkbox" ${actions.includes(a.id)?'checked':''} onchange="App.gbToggleAction(${si},'${escapeAttr(a.id)}')">
+              <span>${escapeHtml(a.label)}</span>
+            </label>`).join('')}
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="App.gbPostActions(${si})">Post ticked options to profile</button>
+
+        ${assess.length ? `
+          <div class="lesson-sub">Assignment feedback</div>
+          ${assess.map(a => `
+            <div style="margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:3px;">${escapeHtml(a.name)}</div>
+              <input type="text" class="input" style="width:100%;" placeholder="Feedback on ${escapeAttr(a.name)}…"
+                value="${escapeAttr((st.assignment_feedback||{})[a.id]||'')}"
+                oninput="App.gbSetAssignFb(${si},'${escapeAttr(a.id)}',this.value)">
+            </div>`).join('')}
+        ` : ''}
+
+        ${liveNotes.length ? `
+          <div class="lesson-sub">Notes from Live Classroom this week</div>
+          <div style="max-height:160px;overflow-y:auto;">
+            ${liveNotes.slice().sort((a,b)=>(a.ts||0)-(b.ts||0)).map(n => `
+              <div style="font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--rule-soft);">
+                ${n.lesson?`<span class="gb-live-lesson-tag">${escapeHtml(n.lesson)}</span>`:''}${escapeHtml(n.text)}
+              </div>`).join('')}
+          </div>
+        ` : `<div class="lesson-sub">Notes from Live Classroom this week</div><div style="font-size:12px;color:var(--ink-faint);">No notes logged for ${escapeHtml(st.name)} this week.</div>`}
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderClassOverview(){
@@ -6679,7 +6761,7 @@ const App = {
   gbCycleRating(si, col){
     const st = state.gbWeek.data.students[si]; if(!st) return;
     // cycle: (auto) → good → improve → distract → back to auto
-    const order = ['good','improve','distract'];
+    const order = ['excellent','good','improve','distract'];
     const cur = st.participation[col] || '';
     let next;
     if(!cur) next = 'good';
@@ -6778,59 +6860,33 @@ const App = {
   },
 
   gbOpenActions(si){
-    const st = state.gbWeek.data.students[si]; if(!st) return;
-    const ACTIONS = [
-      { id:'conference', label:'Suggest a student–teacher conference' },
-      { id:'praise', label:'Praise — great week' },
-      { id:'improving', label:'Noticeable improvement' },
-      { id:'concern', label:'Area of concern to discuss' },
-      { id:'homework', label:'Missing / incomplete homework' },
-      { id:'support', label:'Would benefit from extra support' },
-    ];
-    const current = st.actions || [];
-    const menu = ACTIONS.map((a,i) => `${i+1}. [${current.includes(a.id)?'x':' '}] ${a.label}`).join('\n');
-    const pick = prompt(`Options for ${st.name} — these appear on the weekly report and can post to the profile.\n\n${menu}\n\nEnter numbers to toggle (e.g. 1,3), or:\n  F = write assignment feedback\n  0 = clear all`, '');
-    if(pick === null) return;
-    if(pick.toLowerCase().includes('f')){
-      App.gbAssignmentFeedback(si);
-      return;
-    }
-    if(pick.trim() === '0'){ st.actions = []; }
-    else {
-      pick.split(',').forEach(tok => {
-        const n = parseInt(tok.trim(),10);
-        if(n>=1 && n<=ACTIONS.length){
-          const id = ACTIONS[n-1].id;
-          const idx = current.indexOf(id);
-          if(idx===-1) current.push(id); else current.splice(idx,1);
-        }
-      });
-      st.actions = current;
-    }
-    gbSaver.schedule();
-    // Offer to post the actions to the student's profile timeline
-    if(st.actions.length && confirm(`Post these notes to ${st.name}'s profile as an update?`)){
-      const labels = st.actions.map(id => (ACTIONS.find(a=>a.id===id)||{}).label).filter(Boolean);
-      App.gbPostToProfile(st, 'Weekly report — ' + state.gbWeek.title + '\n' + labels.map(l=>'• '+l).join('\n'));
-    }
+    state.gbActionsModal = si;
     render({preserveScroll:true});
   },
-
-  gbAssignmentFeedback(si){
+  gbCloseActions(){
+    state.gbActionsModal = null;
+    render({preserveScroll:true});
+  },
+  gbToggleAction(si, id){
     const st = state.gbWeek.data.students[si]; if(!st) return;
-    const assess = state.gbWeek.data.assessments;
-    if(!assess.length){ alert('Add an assessment first.'); return; }
-    const list = assess.map((a,i) => `${i+1}. ${a.name}`).join('\n');
-    const which = prompt(`Feedback for ${st.name} on which assessment?\n\n${list}\n\nEnter a number:`, '1');
-    if(which === null) return;
-    const idx = parseInt(which,10) - 1;
-    if(idx < 0 || idx >= assess.length) return;
-    const a = assess[idx];
-    const existing = st.assignment_feedback[a.id] || '';
-    const fb = prompt(`Feedback on "${a.name}" for ${st.name}:`, existing);
-    if(fb === null) return;
-    st.assignment_feedback[a.id] = fb.trim();
+    st.actions = st.actions || [];
+    const idx = st.actions.indexOf(id);
+    if(idx === -1) st.actions.push(id); else st.actions.splice(idx,1);
     gbSaver.schedule();
+    render({preserveScroll:true});
+  },
+  gbSetAssignFb(si, aid, val){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    st.assignment_feedback = st.assignment_feedback || {};
+    st.assignment_feedback[aid] = val;
+    gbSaver.schedule();
+  },
+  gbPostActions(si){
+    const st = state.gbWeek.data.students[si]; if(!st) return;
+    const labels = (st.actions||[]).map(id => (GB_ACTIONS.find(a=>a.id===id)||{}).label).filter(Boolean);
+    if(!labels.length){ alert('Tick at least one option to post.'); return; }
+    App.gbPostToProfile(st, 'Weekly report — ' + state.gbWeek.title + '\n' + labels.map(l=>'• '+l).join('\n'));
+    alert('Posted to ' + st.name + '\u2019s profile.');
   },
 
   async gbPostToProfile(st, content){
