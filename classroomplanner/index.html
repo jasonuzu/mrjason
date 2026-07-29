@@ -1051,7 +1051,10 @@
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
+            /* The universal dialog layer: must sit above the calendar (2600) and
+               the full-screen tool overlay (3000), so any dialog opened from
+               inside those appears on top rather than behind them. */
+            z-index: 3100;
             backdrop-filter: blur(2px);
         }
         #modal-backdrop.show { display: flex; }
