@@ -242,6 +242,17 @@
   .obs-field label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
   .match-note { font-size: 12.5px; padding: 10px 12px; border-radius: 6px; margin-top: 10px; }
 
+  .brand-company {
+    display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px;
+    text-transform: uppercase; color: var(--accent); line-height: 1; margin-bottom: 3px;
+  }
+  .site-footer { border-top: 1px solid var(--rule); margin-top: 48px; padding: 18px 0 26px; background: var(--paper); }
+  .site-footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .site-footer-brand { font-size: 12px; color: var(--ink-faint); }
+  .site-footer-brand strong { color: var(--accent); letter-spacing: 0.8px; }
+  .site-footer-links { display: flex; gap: 18px; flex-wrap: wrap; }
+  .site-footer-links a { font-size: 12.5px; color: var(--ink-soft); cursor: pointer; text-decoration: none; }
+  .site-footer-links a:hover { color: var(--accent); text-decoration: underline; }
   .disclaimer-footer { font-size: 11px; color: var(--ink-faint); line-height: 1.6; padding-top: 18px; border-top: 1px solid var(--rule); margin-top: 8px; }
 
   .action-row { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
@@ -3038,11 +3049,28 @@ function render(opts){
   else if(state.view === 'parentRoster') body = renderParentRoster();
   else if(state.view === 'parentReport') body = renderParentReport();
 
+  const chrome = (state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup' && !state.parentMode);
   app.innerHTML = `
-    ${(state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup' && !state.parentMode) ? renderTopbar() : ''}
+    ${chrome ? renderTopbar() : ''}
     ${body}
+    ${chrome ? renderSiteFooter() : ''}
   `;
   if(!opts.preserveScroll) window.scrollTo(0,0);
+}
+
+function renderSiteFooter(){
+  return `
+  <div class="site-footer no-print">
+    <div class="wrap site-footer-inner">
+      <div class="site-footer-brand">
+        <strong>Atlas Orion</strong> · Learner Profile Record System
+      </div>
+      <div class="site-footer-links">
+        <a onclick="App.goData()">Data</a>
+        <a onclick="App.goResearch()">Research &amp; Methodology</a>
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderTopbar(){
@@ -3060,13 +3088,14 @@ function renderTopbar(){
   <div class="topbar">
     <div class="wrap topbar-inner">
       <div class="brand" onclick="App.goDashboard()">
+        <span class="brand-company">Atlas Orion</span>
         <span class="brand-mark">Learner Profile</span>
         <span class="brand-sub">Record System</span>
       </div>
       <div class="topbar-nav">
         <a onclick="App.goDashboard()">Records</a>
-        <a onclick="App.goData()">Data</a>
-        <a onclick="App.goResearch()">Research &amp; Methodology</a>
+        <a onclick="App.navClassOverview()">Class Overview</a>
+        <a onclick="App.navGradebook()">Gradebook</a>
       </div>
     </div>
   </div>`;
@@ -7573,6 +7602,36 @@ const App = {
 
   /* ── New views ── */
   goData(){ state.view = 'data'; render(); },
+
+  // Top-nav shortcuts. With one class, go straight there; with several, use the
+  // class you were last in, otherwise send them to the records list to choose.
+  navClassOverview(){
+    const classes = getAllClassNames();
+    if(!classes.length){
+      alert('No classes yet.\n\nAdd a class name to a student record and it will appear here.');
+      return;
+    }
+    const target = (state.activeClassName && classes.includes(state.activeClassName))
+      ? state.activeClassName
+      : (classes.length === 1 ? classes[0] : null);
+    if(target){ App.openClassOverview(target); return; }
+    App.goDashboard();
+    setTimeout(() => alert('You teach several classes — choose one from the list to open its overview.'), 60);
+  },
+
+  navGradebook(){
+    const classes = getAllClassNames();
+    if(!classes.length){
+      alert('No classes yet.\n\nAdd a class name to a student record and its gradebook will appear here.');
+      return;
+    }
+    const target = (state.activeClassName && classes.includes(state.activeClassName))
+      ? state.activeClassName
+      : (classes.length === 1 ? classes[0] : null);
+    if(target){ App.openGradebook(target); return; }
+    App.goDashboard();
+    setTimeout(() => alert('You teach several classes — open a class first, then its gradebook.'), 60);
+  },
 
   openClassOverview(className){
     state.activeClassName = className;
