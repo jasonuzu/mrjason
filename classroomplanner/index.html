@@ -2279,6 +2279,7 @@
                 <div id="groups-header">
                     <h3>Groups</h3>
                     <div style="display:flex;gap:6px;">
+                        <button onclick="pickRandomGroup()" title="Pick one group at random">🎲 Random Group</button>
                         <button onclick="openAutoSortModal()" title="Randomly distribute all students into groups">⚡ Auto-Sort</button>
                         <button onclick="createGroup()">+ New Group</button>
                     </div>
@@ -4763,6 +4764,8 @@
                 html += '<input type="color" value="' + g.color + '" onchange="recolorGroup(\'' + g.id + '\', this.value)" title="Group color">';
                 html += '<input type="text" class="grp-name" value="' + escapeHtml(g.name) + '" onchange="renameGroup(\'' + g.id + '\', this.value)">';
                 html += '<span class="grp-total" title="Group total points">' + total + ' pts</span>';
+                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', -1)" title="Give every member −1">−1</button>';
+                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', 1)" title="Give every member +1">+1</button>';
                 html += '<button class="icon-btn" onclick="pickFromGroup(\'' + g.id + '\')" title="Pick random from this group">🎲</button>';
                 html += '<button class="icon-btn" onclick="deleteGroup(\'' + g.id + '\')" title="Delete group">✕</button>';
                 html += '</div>';
@@ -6494,6 +6497,92 @@
         function pickRandom(count) {
             pickRandomFromPool(null, count);
         }
+        // ── Random group picker ──
+        // Picks one group at random, then offers to award points to everyone in
+        // it at once. Groups with no members are skipped; during a lesson,
+        // absent students are excluded from the award (as with random picks).
+        function pickRandomGroup() {
+            var groups = (liveState.groups || []).filter(function(g) { return g.members.length > 0; });
+            if (!groups.length) {
+                alert('No groups with students yet.\n\nCreate a group, or use Auto-Sort to split the class.');
+                return;
+            }
+            var g = groups[Math.floor(Math.random() * groups.length)];
+            logEvent('random_group_picked', { name: g.name, size: g.members.length });
+            saveLiveState();
+            showRandomGroupModal(g.id);
+        }
+
+        function showRandomGroupModal(gid) {
+            var g = (liveState.groups || []).find(function(x) { return x.id === gid; });
+            if (!g) return;
+            var eligible = g.members.filter(isEligibleForPick);
+            var skipped = g.members.length - eligible.length;
+
+            var html = '<div class="modal-title">🎲 ' + escapeHtml(g.name) + '</div>';
+            html += '<div style="height:6px;border-radius:3px;background:' + g.color + ';margin-bottom:12px;"></div>';
+            html += '<div style="font-size:0.82rem;color:#64748b;margin-bottom:8px;">' +
+                    g.members.length + ' student' + (g.members.length === 1 ? '' : 's') + ' in this group' +
+                    (skipped ? ' · ' + skipped + ' absent and excluded' : '') + '</div>';
+
+            html += '<div style="max-height:220px;overflow-y:auto;margin-bottom:12px;">';
+            g.members.forEach(function(m) {
+                var pts = (liveState.studentData[m] && liveState.studentData[m].points) || 0;
+                var out = !isEligibleForPick(m);
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid #e2e8f0;' +
+                        'border-radius:6px;margin-bottom:5px;background:' + (out ? '#f8fafc' : '#fff') +
+                        (out ? ';opacity:0.55' : '') + ';">';
+                html += '<span style="flex:1;font-size:0.9rem;font-weight:600;color:#2c3e50;">' + escapeHtml(m) +
+                        (out ? ' <span style="font-weight:400;color:#94a3b8;font-size:0.78rem;">(absent)</span>' : '') + '</span>';
+                html += '<span style="font-size:0.85rem;color:#64748b;font-variant-numeric:tabular-nums;">' + pts + ' pts</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+
+            html += '<div style="font-size:0.8rem;font-weight:700;color:#475569;margin-bottom:6px;">Award to the whole group</div>';
+            html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+            [-2, -1, 1, 2, 3].forEach(function(n) {
+                var isNeg = n < 0;
+                html += '<button class="' + (isNeg ? 'danger' : 'automation') + '" style="flex:1;min-width:56px;" ' +
+                        'onclick="awardGroupPoints(\'' + g.id + '\', ' + n + ', true)">' +
+                        (n > 0 ? '+' : '') + n + '</button>';
+            });
+            html += '</div>';
+
+            html += '<div class="modal-actions">';
+            html += '<button class="export-btn" onclick="closeModal()">Close</button>';
+            html += '<button class="export-btn" onclick="pickRandomGroup()">🎲 Pick another</button>';
+            html += '<button class="automation" onclick="pickFromGroup(\'' + g.id + '\')">Pick a student from this group</button>';
+            html += '</div>';
+            openModal(html);
+        }
+
+        // Give every eligible member of a group the same points in one action.
+        function awardGroupPoints(gid, delta, fromModal) {
+            var g = (liveState.groups || []).find(function(x) { return x.id === gid; });
+            if (!g) return;
+            var eligible = g.members.filter(isEligibleForPick);
+            if (!eligible.length) {
+                alert('Nobody in "' + g.name + '" is available to receive points.');
+                return;
+            }
+            checkLessonWarning(function() {
+                // Mutate every member first, then render once — calling the
+                // single-student helper per member would re-render N times.
+                eligible.forEach(function(m) {
+                    if (!liveState.studentData[m]) liveState.studentData[m] = { points: 0, notes: [] };
+                    liveState.studentData[m].points += delta;
+                    logEvent(delta > 0 ? 'points_added' : 'points_removed', {
+                        student: m, delta: delta, total: liveState.studentData[m].points, viaGroup: g.name
+                    });
+                });
+                logEvent('group_points', { group: g.name, delta: delta, count: eligible.length });
+                saveLiveState();
+                renderLiveView();
+                if (fromModal) showRandomGroupModal(gid);
+            });
+        }
+
         function pickFromGroup(gid) {
             var g = liveState.groups.find(x => x.id === gid);
             if (!g) return;
