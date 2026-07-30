@@ -847,14 +847,27 @@
             padding: 14px 16px;
             border-bottom: 1px solid var(--border);
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
             flex-shrink: 0;
         }
         #groups-header h3 { font-size: 1rem; color: #2c3e50; }
+        /* Three actions will not fit beside the title in a 340px panel, so the
+           buttons get their own row and share the width evenly. */
+        #groups-header-actions {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
         #groups-header button {
-            padding: 6px 12px;
-            font-size: 0.75rem;
+            padding: 7px 8px;
+            font-size: 0.74rem;
+            flex: 1 1 0;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         #groups-list {
             flex: 1;
@@ -2278,10 +2291,10 @@
             <div id="groups-panel">
                 <div id="groups-header">
                     <h3>Groups</h3>
-                    <div style="display:flex;gap:6px;">
-                        <button onclick="pickRandomGroup()" title="Pick one group at random">🎲 Random Group</button>
+                    <div id="groups-header-actions">
+                        <button onclick="pickRandomGroup()" title="Pick one group at random">🎲 Random</button>
                         <button onclick="openAutoSortModal()" title="Randomly distribute all students into groups">⚡ Auto-Sort</button>
-                        <button onclick="createGroup()">+ New Group</button>
+                        <button onclick="createGroup()" title="Create an empty group">+ New</button>
                     </div>
                 </div>
                 <div id="groups-list"></div>
