@@ -1383,6 +1383,17 @@
         .call-card.collapsed .call-body { display: none; }
         .call-card.completed { background: #f0fdf4; border-color: #86efac; }
         .call-card.completed .call-name { color: #166534; }
+        /* Colour-coded order lists, matching the to-do cards */
+        .call-card { border-left-width: 6px; }
+        .call-card[data-color] { border-left-color: var(--cl-color); }
+        .call-card[data-color] .call-name { color: var(--cl-color); }
+        .call-card.completed[data-color] .call-name { color: #166534; }
+        .call-header .call-menu-btn {
+            background: transparent; border: none; color: #075985;
+            width: 24px; height: 24px; padding: 0; cursor: pointer;
+            border-radius: 4px; font-size: 1rem; flex-shrink: 0;
+        }
+        .call-header .call-menu-btn:hover { background: rgba(0,0,0,0.08); }
 
         .call-card .call-header {
             display: flex;
@@ -2036,6 +2047,8 @@
         .todo-actions button:hover { background: rgba(255,255,255,0.9); }
         .todo-actions button.todo-danger { color: #991b1b; border-color: rgba(153,27,27,0.2); }
         .todo-actions button.todo-danger:hover { background: #fee2e2; }
+        .call-actions button.call-danger { color: #991b1b; border-color: rgba(153,27,27,0.2); }
+        .call-actions button.call-danger:hover { background: #fee2e2; }
 
         /* Create/edit to-do modal */
         .todo-items-input {
@@ -6768,6 +6781,8 @@
                 var html = '<div class="sh-launcher-section"><h4>📂 Saved Lists</h4>';
                 saved.slice().reverse().forEach(function(sl) {
                     html += '<div class="sh-launcher-row">';
+                    html += '<span style="width:11px;height:11px;border-radius:50%;flex-shrink:0;background:' +
+                            todoHex(sl.color || 'blue') + ';"></span>';
                     html += '<div class="sh-lr-info">';
                     html += '<div class="sh-lr-name">' + escapeHtml(sl.name) + '</div>';
                     html += '<div class="sh-lr-meta">' + sl.students.length + ' students · Saved ' + formatTs(sl.createdAt) + '</div>';
@@ -6949,11 +6964,124 @@
         }
 
         // --- Active call lists on the left ---
+
+        var callDraftColor = 'blue';
+
+        // Edit an order list: rename, recolour, and reorder or remove students.
+        // Called state is kept for any name that is still on the list.
+        function openEditCallListModal(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var namesText = al.students.map(function(s) { return s.name; }).join('\n');
+            var cur = al.color || 'blue';
+
+            var html = '<div class="modal-title">✏️ Edit Call Order</div>';
+            html += '<label>List name</label>';
+            html += '<input type="text" id="cl-name-input" value="' + escapeAttrHtml(al.name) + '">';
+            html += '<label>Order (one student per line — reorder or remove lines)</label>';
+            html += '<textarea class="todo-items-input" id="cl-names-input">' + escapeHtml(namesText) + '</textarea>';
+            html += '<div style="font-size:0.75rem;color:#64748b;margin-top:4px;">The order here is the calling order. Students already called stay checked if their name remains.</div>';
+            html += '<label style="margin-top:12px;">Colour</label>';
+            html += '<div class="todo-swatch-row">';
+            TODO_COLORS.forEach(function(c) {
+                html += '<span class="todo-swatch' + (c.id === cur ? ' on' : '') + '" title="' + c.name +
+                        '" style="background:' + c.hex + ';" onclick="callPickColor(\'' + c.id + '\',\'' + listId + '\')"></span>';
+            });
+            html += '</div>';
+            html += '<div class="modal-actions">';
+            html += '<button class="export-btn" onclick="closeModal()">Cancel</button>';
+            html += '<button class="automation" onclick="saveCallListEdit(\'' + listId + '\')">Save Changes</button>';
+            html += '</div>';
+            openModal(html);
+            setTimeout(function() {
+                var el = document.getElementById('cl-name-input');
+                if (el) el.focus();
+            }, 100);
+        }
+
+        function callPickColor(colorId, listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var nameEl = document.getElementById('cl-name-input');
+            var namesEl = document.getElementById('cl-names-input');
+            var keptName = nameEl ? nameEl.value : '';
+            var keptNames = namesEl ? namesEl.value : '';
+            al.color = colorId;
+            saveLiveState();
+            openEditCallListModal(listId);
+            setTimeout(function() {
+                var n = document.getElementById('cl-name-input');
+                var i = document.getElementById('cl-names-input');
+                if (n) n.value = keptName;
+                if (i) i.value = keptNames;
+                if (n) n.focus();
+            }, 40);
+        }
+
+        function saveCallListEdit(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var name = (document.getElementById('cl-name-input').value || '').trim();
+            var namesText = document.getElementById('cl-names-input').value || '';
+            if (!name) { alert("Please give the list a name."); return; }
+            var newNames = namesText.split(/\r?\n/).map(function(x) { return x.trim(); })
+                                    .filter(function(x) { return x.length > 0; });
+            if (!newNames.length) { alert("The list needs at least one student."); return; }
+            // remember who had been called
+            var calledMap = {};
+            al.students.forEach(function(st) { if (st.called) calledMap[st.name] = true; });
+            al.name = name;
+            al.students = newNames.map(function(n) { return { name: n, called: !!calledMap[n] }; });
+            logEvent('list_edited', { name: name, count: newNames.length });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+
+        // Save the current order into this class's Saved Lists for reuse
+        function saveCallListToSaved(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            if (!liveState.savedLists) liveState.savedLists = [];
+            var existing = liveState.savedLists.filter(function(x) { return x.name === al.name; })[0];
+            if (existing) {
+                if (!confirm('A saved list called "' + al.name + '" already exists.\n\nReplace it?')) return;
+                liveState.savedLists = liveState.savedLists.filter(function(x) { return x.id !== existing.id; });
+            }
+            liveState.savedLists.push({
+                id: 'sl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: al.name,
+                color: al.color || 'blue',
+                students: al.students.map(function(s) { return s.name; }),
+                createdAt: Date.now()
+            });
+            logEvent('list_saved', { name: al.name, count: al.students.length });
+            saveLiveState();
+            updateClassToolsMenuBadges();
+            alert('"' + al.name + '" saved.\n\nFind it under Saved Lists in Generate Order List.');
+        }
+
+        // Remove an active list outright (Finish archives instead)
+        function deleteCallList(listId) {
+            var al = findActiveList(listId);
+            if (!al) return;
+            var called = al.students.filter(function(s) { return s.called; }).length;
+            if (!confirm('Delete "' + al.name + '"?\n\n' + called + ' of ' + al.students.length +
+                         ' called. This removes it without archiving. Saved copies are not affected.')) return;
+            liveState.activeLists = (liveState.activeLists || []).filter(function(x) { return x.id !== listId; });
+            logEvent('list_deleted', { name: al.name, calledCount: called, total: al.students.length });
+            saveLiveState();
+            renderTodoLists();
+            renderCallLists();
+            updateClassToolsMenuBadges();
+        }
+
         function makeActiveList(name, orderedNames, sourceId) {
             var newList = {
                 id: 'al_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                 sourceId: sourceId || null,
                 name: name || 'Untitled Order',
+                color: callDraftColor,
                 students: orderedNames.map(function(n) { return { name: n, called: false }; }),
                 collapsed: false,
                 createdAt: Date.now()
@@ -7091,11 +7219,16 @@
                 var isCollapsed = al.collapsed === true;
                 var caret = isCollapsed ? '▶' : '▼';
 
-                html += '<div class="call-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') + '" data-alid="' + al.id + '">';
+                var ccol = todoHex(al.color || 'blue');
+                html += '<div class="call-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') +
+                        '" data-alid="' + al.id + '" data-color="' + (al.color || 'blue') + '" style="--cl-color:' + ccol + ';">';
                 html += '<div class="call-header" onclick="toggleCallCollapse(\'' + al.id + '\')">';
                 html += '<span class="call-caret">' + caret + '</span>';
                 html += '<div class="call-name" title="' + escapeAttrHtml(al.name) + '">📋 ' + escapeHtml(al.name) + '</div>';
                 html += '<span class="call-count">' + called + '/' + total + '</span>';
+                html += '<button class="call-menu-btn" onclick="event.stopPropagation();openEditCallListModal(\'' + al.id + '\')" title="Edit list">✏️</button>';
+                html += '<button class="call-menu-btn" onclick="event.stopPropagation();saveCallListToSaved(\'' + al.id + '\')" title="Save for reuse">💾</button>';
+                html += '<button class="call-menu-btn" onclick="event.stopPropagation();deleteCallList(\'' + al.id + '\')" title="Delete this list">🗑</button>';
                 html += '</div>';
                 html += '<div class="call-body">';
                 html += '<div class="call-progress"><div class="call-progress-bar" style="width:' + pct + '%;"></div></div>';
@@ -7109,7 +7242,9 @@
                 });
                 html += '<div class="call-actions">';
                 html += '<button onclick="resetCallList(\'' + al.id + '\')" title="Uncheck all">Reset</button>';
+                html += '<button onclick="saveCallListToSaved(\'' + al.id + '\')" title="Save for reuse">💾 Save</button>';
                 html += '<button class="call-finish" onclick="finishCallList(\'' + al.id + '\')" title="Archive this list">✓ Finish</button>';
+                html += '<button class="call-danger" onclick="deleteCallList(\'' + al.id + '\')" title="Delete without archiving">Delete</button>';
                 html += '</div>';
                 html += '</div>';
                 html += '</div>';
@@ -7163,6 +7298,8 @@
         function loadSavedList(id) {
             var sl = (liveState.savedLists || []).find(function(x) { return x.id === id; });
             if (!sl) return;
+            // Reuse the colour it was saved with
+            callDraftColor = sl.color || 'blue';
             // New list adds to the stack rather than replacing anything
             makeActiveList(sl.name, sl.students, sl.id);
             closeModal();
