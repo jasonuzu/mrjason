@@ -1900,10 +1900,27 @@
             margin-bottom: 10px;
             overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            border-left-width: 6px;
         }
         .todo-card.collapsed .todo-body { display: none; }
         .todo-card.completed { background: #f0fdf4; border-color: #86efac; }
         .todo-card.completed .todo-name { color: #166534; }
+        /* Colour-coded lists: the left edge and title take the chosen colour,
+           while the completed state still wins so finished lists read green. */
+        .todo-card[data-color] { border-left-color: var(--tl-color); }
+        .todo-card[data-color] .todo-name { color: var(--tl-color); }
+        .todo-card.completed[data-color] .todo-name { color: #166534; }
+        .todo-swatch-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
+        .todo-swatch {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            border: 3px solid transparent; display: inline-block;
+        }
+        .todo-swatch.on { border-color: #2c3e50; }
+        .todo-lib-row {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; margin-bottom: 6px;
+        }
+        .todo-lib-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 
         .todo-header {
             display: flex;
@@ -7243,6 +7260,111 @@
         //  CLASS TO-DO LISTS (right-side collapsible cards)
         // ============================================================
 
+        var TODO_COLORS = [
+            { id:'amber',  hex:'#d97706', name:'Amber' },
+            { id:'blue',   hex:'#2563eb', name:'Blue' },
+            { id:'green',  hex:'#16a34a', name:'Green' },
+            { id:'red',    hex:'#dc2626', name:'Red' },
+            { id:'purple', hex:'#7c3aed', name:'Purple' },
+            { id:'teal',   hex:'#0d9488', name:'Teal' },
+            { id:'pink',   hex:'#db2777', name:'Pink' },
+            { id:'slate',  hex:'#475569', name:'Slate' },
+        ];
+        var TODO_LIB_KEY = 'cd_todo_library_v1';
+        var todoDraftColor = 'amber';
+
+        function todoHex(colorId) {
+            var c = TODO_COLORS.filter(function(x){ return x.id === colorId; })[0];
+            return c ? c.hex : TODO_COLORS[0].hex;
+        }
+
+        // Saved lists live outside the per-layout session, so a list saved while
+        // teaching one class is available to every other class too.
+        function loadTodoLibrary() {
+            try {
+                var raw = localStorage.getItem(TODO_LIB_KEY);
+                var arr = raw ? JSON.parse(raw) : [];
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) { return []; }
+        }
+
+        function saveTodoLibrary(arr) {
+            try { localStorage.setItem(TODO_LIB_KEY, JSON.stringify(arr)); } catch (e) {}
+        }
+
+        // Keep the colour choice when the modal re-renders
+        function todoPickColor(colorId, editId) {
+            var nameEl = document.getElementById('todo-name-input');
+            var itemsEl = document.getElementById('todo-items-input');
+            var keptName = nameEl ? nameEl.value : '';
+            var keptItems = itemsEl ? itemsEl.value : '';
+            if (editId) {
+                var list = (liveState.todoLists || []).find(function(x){ return x.id === editId; });
+                if (list) list.color = colorId;
+            } else {
+                todoDraftColor = colorId;
+            }
+            openCreateTodoModal(editId);
+            setTimeout(function() {
+                var n = document.getElementById('todo-name-input');
+                var i = document.getElementById('todo-items-input');
+                if (n) n.value = keptName;
+                if (i) i.value = keptItems;
+                if (n) n.focus();
+            }, 40);
+        }
+
+        // Save a live list into the reusable library
+        function saveTodoToLibrary(listId) {
+            var list = (liveState.todoLists || []).find(function(x){ return x.id === listId; });
+            if (!list) return;
+            var lib = loadTodoLibrary();
+            var existing = lib.filter(function(x){ return x.name === list.name; })[0];
+            if (existing) {
+                if (!confirm('A saved list called "' + list.name + '" already exists.\n\nReplace it?')) return;
+                lib = lib.filter(function(x){ return x.id !== existing.id; });
+            }
+            lib.push({
+                id: 'stl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: list.name,
+                color: list.color || 'amber',
+                items: list.items.map(function(it){ return it.text; }),
+                savedAt: Date.now()
+            });
+            saveTodoLibrary(lib);
+            alert('"' + list.name + '" saved.\n\nIt will appear under Saved Lists whenever you create a new to-do list, for any class.');
+        }
+
+        // Drop a saved list onto the current class, unchecked and ready
+        function useSavedTodo(savedId) {
+            var sl = loadTodoLibrary().filter(function(x){ return x.id === savedId; })[0];
+            if (!sl) return;
+            if (!liveState.todoLists) liveState.todoLists = [];
+            liveState.todoLists.push({
+                id: 'tl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: sl.name,
+                color: sl.color || 'amber',
+                items: (sl.items || []).map(function(t, i) {
+                    return { id: 'ti_' + Date.now() + '_' + i, text: t, done: false };
+                }),
+                collapsed: false,
+                createdAt: Date.now()
+            });
+            logEvent('todo_loaded_from_library', { name: sl.name });
+            saveLiveState();
+            closeModal();
+            renderLiveView();
+        }
+
+        function deleteSavedTodo(savedId) {
+            var lib = loadTodoLibrary();
+            var sl = lib.filter(function(x){ return x.id === savedId; })[0];
+            if (!sl) return;
+            if (!confirm('Delete the saved list "' + sl.name + '"?\n\nLists already on screen are not affected.')) return;
+            saveTodoLibrary(lib.filter(function(x){ return x.id !== savedId; }));
+            openCreateTodoModal();
+        }
+
         // Create/edit modal — items entered as one per line (each may be a sentence)
         function openCreateTodoModal(editId) {
             closeClassToolsMenu();
@@ -7265,6 +7387,40 @@
             html += '<label>Items (one per line — each can be up to a full sentence)</label>';
             html += '<textarea class="todo-items-input" id="todo-items-input" placeholder="Set up the projector and test the HDMI connection.&#10;Print handouts for chapter 5.&#10;Return graded quizzes to students.">' + escapeHtml(itemsText) + '</textarea>';
             html += '<div style="font-size:0.75rem;color:#64748b;margin-top:4px;">Empty lines are ignored. Existing checked items are preserved when editing.</div>';
+
+            // colour picker
+            var curColor = editing ? (editing.color || 'amber') : todoDraftColor;
+            html += '<label style="margin-top:12px;">Colour</label>';
+            html += '<div class="todo-swatch-row">';
+            TODO_COLORS.forEach(function(c) {
+                html += '<span class="todo-swatch' + (c.id === curColor ? ' on' : '') + '" title="' + c.name +
+                        '" style="background:' + c.hex + ';" onclick="todoPickColor(\'' + c.id + '\'' +
+                        (editId ? (',\'' + editId + '\'') : '') + ')"></span>';
+            });
+            html += '</div>';
+
+            // saved library — reuse lists across classes and sessions
+            var lib = loadTodoLibrary();
+            if (!editing) {
+                html += '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;">';
+                html += '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">💾 Saved Lists</div>';
+                if (lib.length) {
+                    lib.slice().reverse().forEach(function(sl) {
+                        html += '<div class="todo-lib-row">';
+                        html += '<span class="todo-lib-dot" style="background:' + todoHex(sl.color) + ';"></span>';
+                        html += '<div style="flex:1;font-size:0.85rem;">';
+                        html += '<div style="font-weight:600;color:#2c3e50;">' + escapeHtml(sl.name) + '</div>';
+                        html += '<div style="font-size:0.72rem;color:#64748b;">' + sl.items.length + ' item' + (sl.items.length===1?'':'s') + '</div>';
+                        html += '</div>';
+                        html += '<button class="automation" style="padding:5px 10px;font-size:0.75rem;" onclick="useSavedTodo(\'' + sl.id + '\')">Use</button>';
+                        html += '<button class="danger" style="padding:5px 8px;font-size:0.75rem;" onclick="deleteSavedTodo(\'' + sl.id + '\')" title="Delete from saved lists">✕</button>';
+                        html += '</div>';
+                    });
+                } else {
+                    html += '<div style="font-size:0.78rem;color:#94a3b8;">No saved lists yet. Once a list is on screen, use <strong>Save</strong> on it to keep a reusable copy here.</div>';
+                }
+                html += '</div>';
+            }
 
             if (!editing && archived.length > 0) {
                 html += '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;">';
@@ -7311,6 +7467,7 @@
             var list = {
                 id: 'tl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                 name: name,
+                color: todoDraftColor,
                 items: items.map(function(t, i) {
                     return { id: 'ti_' + Date.now() + '_' + i, text: t, done: false };
                 }),
@@ -7362,12 +7519,16 @@
                 var isCollapsed = list.collapsed === true;
                 var caret = isCollapsed ? '▶' : '▼';
 
-                html += '<div class="todo-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') + '" data-tlid="' + list.id + '">';
+                var col = todoHex(list.color || 'amber');
+                html += '<div class="todo-card ' + (isCollapsed ? 'collapsed' : '') + ' ' + (isCompleted ? 'completed' : '') +
+                        '" data-tlid="' + list.id + '" data-color="' + (list.color || 'amber') + '" style="--tl-color:' + col + ';">';
                 html += '<div class="todo-header" onclick="toggleTodoCollapse(\'' + list.id + '\')">';
                 html += '<span class="todo-caret">' + caret + '</span>';
                 html += '<div class="todo-name">' + escapeHtml(list.name) + '</div>';
                 html += '<span class="todo-count">' + doneCount + '/' + list.items.length + '</span>';
                 html += '<button class="todo-menu-btn" onclick="event.stopPropagation();openCreateTodoModal(\'' + list.id + '\')" title="Edit list">✏️</button>';
+                html += '<button class="todo-menu-btn" onclick="event.stopPropagation();saveTodoToLibrary(\'' + list.id + '\')" title="Save for reuse">💾</button>';
+                html += '<button class="todo-menu-btn" onclick="event.stopPropagation();deleteTodoList(\'' + list.id + '\')" title="Delete this list">🗑</button>';
                 html += '</div>';
                 html += '<div class="todo-body">';
                 html += '<div class="todo-progress"><div class="todo-progress-bar" style="width:' + pct + '%;"></div></div>';
@@ -7379,6 +7540,7 @@
                 });
                 html += '<div class="todo-actions">';
                 html += '<button onclick="resetTodoList(\'' + list.id + '\')">Reset</button>';
+                html += '<button onclick="saveTodoToLibrary(\'' + list.id + '\')">💾 Save</button>';
                 html += '<button onclick="archiveTodoList(\'' + list.id + '\')">📁 Archive</button>';
                 html += '<button class="todo-danger" onclick="deleteTodoList(\'' + list.id + '\')">Delete</button>';
                 html += '</div>';
@@ -7481,6 +7643,7 @@
             liveState.archivedTodoLists.push({
                 id: 'atl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                 name: list.name,
+                color: list.color || 'amber',
                 items: list.items.map(function(it) { return { text: it.text, done: it.done }; }),
                 createdAt: list.createdAt,
                 archivedAt: Date.now()
@@ -7498,6 +7661,7 @@
             var restored = {
                 id: 'tl_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                 name: ar.name,
+                color: ar.color || 'amber',
                 items: ar.items.map(function(it, i) {
                     return { id: 'ti_' + Date.now() + '_' + i, text: it.text, done: !!it.done };
                 }),
