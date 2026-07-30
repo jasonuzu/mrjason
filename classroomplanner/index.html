@@ -894,6 +894,20 @@
             border-color: #4a6fa5;
             background: #edf2f9;
         }
+        /* Random-group roll: mirrors the desk picking/winner animation */
+        .group-card.picking {
+            border-color: #f1c40f;
+            box-shadow: 0 0 0 3px rgba(241,196,15,0.55), 0 0 18px rgba(241,196,15,0.6);
+            transform: scale(1.03);
+        }
+        .group-card.group-winner {
+            animation: groupWinnerPulse 0.6s ease-in-out 3;
+            border-color: #27ae60;
+        }
+        @keyframes groupWinnerPulse {
+            0%, 100% { box-shadow: 0 0 0 3px #27ae60, 0 0 18px rgba(39,174,96,0.85); transform: scale(1.04); }
+            50%      { box-shadow: 0 0 0 7px #27ae60, 0 0 34px rgba(39,174,96,1);    transform: scale(1.08); }
+        }
         .group-card-header {
             padding: 10px 12px;
             display: flex;
@@ -6514,16 +6528,88 @@
         // Picks one group at random, then offers to award points to everyone in
         // it at once. Groups with no members are skipped; during a lesson,
         // absent students are excluded from the award (as with random picks).
+        var groupPickTimeout = null;
+
         function pickRandomGroup() {
             var groups = (liveState.groups || []).filter(function(g) { return g.members.length > 0; });
             if (!groups.length) {
                 alert('No groups with students yet.\n\nCreate a group, or use Auto-Sort to split the class.');
                 return;
             }
-            var g = groups[Math.floor(Math.random() * groups.length)];
+            var winner = groups[Math.floor(Math.random() * groups.length)];
+
+            // A single group can't "roll" — announce it without the theatre.
+            var cards = groups.map(function(g) {
+                return document.querySelector('.group-card[data-gid="' + g.id + '"]');
+            }).filter(Boolean);
+            if (cards.length < 2) {
+                finishGroupPick(winner);
+                return;
+            }
+
+            if (groupPickTimeout) { clearTimeout(groupPickTimeout); groupPickTimeout = null; }
+            clearGroupPickHighlights();
+
+            // Same easing shape as the student picker: fast at first, slowing to a stop.
+            var totalMs = 2600;
+            var frameCount = Math.max(18, Math.floor(totalMs / 80));
+            var frames = [];
+            for (var f = 0; f < frameCount; f++) {
+                var frac = f / frameCount;
+                var t = totalMs * (1 - Math.pow(1 - frac, 3));
+                frames.push({ time: t, el: cards[f % cards.length] });
+            }
+
+            playPickRoll(totalMs);
+
+            var lastLit = null;
+            frames.forEach(function(fr) {
+                setTimeout(function() {
+                    if (lastLit) lastLit.classList.remove('picking');
+                    fr.el.classList.add('picking');
+                    fr.el.scrollIntoView({ block: 'nearest' });
+                    lastLit = fr.el;
+                }, fr.time);
+            });
+
+            groupPickTimeout = setTimeout(function() {
+                if (lastLit) lastLit.classList.remove('picking');
+                clearGroupPickHighlights();
+                var winCard = document.querySelector('.group-card[data-gid="' + winner.id + '"]');
+                if (winCard) {
+                    winCard.classList.add('group-winner');
+                    winCard.scrollIntoView({ block: 'nearest' });
+                }
+                // Light up the winning group's desks too, so the class can see it
+                highlightGroupDesks(winner);
+                playFanfare();
+                // Let the winner pulse play before the panel covers the view
+                setTimeout(function() { finishGroupPick(winner); }, 900);
+            }, totalMs + 400);
+        }
+
+        function finishGroupPick(g) {
             logEvent('random_group_picked', { name: g.name, size: g.members.length });
             saveLiveState();
             showRandomGroupModal(g.id);
+        }
+
+        function clearGroupPickHighlights() {
+            document.querySelectorAll('.group-card').forEach(function(el) {
+                el.classList.remove('picking');
+                el.classList.remove('group-winner');
+            });
+        }
+
+        // Pulse the desks belonging to the chosen group, reusing the winner style
+        function highlightGroupDesks(g) {
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                el.classList.remove('winner');
+                el.classList.remove('picking');
+            });
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                if (g.members.indexOf(el.getAttribute('data-name')) !== -1) el.classList.add('winner');
+            });
         }
 
         function showRandomGroupModal(gid) {
@@ -6564,7 +6650,7 @@
 
             html += '<div class="modal-actions">';
             html += '<button class="export-btn" onclick="closeModal()">Close</button>';
-            html += '<button class="export-btn" onclick="pickRandomGroup()">🎲 Pick another</button>';
+            html += '<button class="export-btn" onclick="closeModal();pickRandomGroup();">🎲 Pick another</button>';
             html += '<button class="automation" onclick="pickFromGroup(\'' + g.id + '\')">Pick a student from this group</button>';
             html += '</div>';
             openModal(html);
