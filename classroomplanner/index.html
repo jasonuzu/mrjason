@@ -1309,6 +1309,12 @@
         }
         .ct-menu-item:hover { background: #f1f5f9; }
         .ct-divider { height: 1px; background: #e2e8f0; margin: 5px 8px; }
+        .ct-caret { margin-left: auto; color: #94a3b8; font-size: 0.8rem; transition: transform 0.15s; flex-shrink: 0; }
+        .ct-submenu-toggle.open .ct-caret { transform: rotate(180deg); }
+        .ct-submenu { display: none; }
+        .ct-submenu.open { display: block; }
+        .ct-sub-item { padding-left: 26px; background: #fafbfc; }
+        .ct-sub-item:hover { background: #eef2f7; }
         .ct-menu-item .ct-icon { font-size: 1.3rem; flex-shrink: 0; }
         .ct-menu-item .ct-title { font-weight: 700; font-size: 0.9rem; line-height: 1.2; }
         .ct-menu-item .ct-sub { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
@@ -2357,6 +2363,30 @@
                         <span class="ct-icon">🥚</span>
                         <div><div class="ct-title">Egg Hatching</div><div class="ct-sub">Work as a class to hatch the mystery egg</div></div>
                     </button>
+                    <div class="ct-divider"></div>
+                    <button class="ct-menu-item ct-submenu-toggle" onclick="toggleCtSubmenu(event)" title="Dice, spinner, coin flip and class polls.">
+                        <span class="ct-icon">🎯</span>
+                        <div><div class="ct-title">Randomisers &amp; Polls</div><div class="ct-sub">Spin, roll, flip, or poll the class</div></div>
+                        <span class="ct-caret">▾</span>
+                    </button>
+                    <div class="ct-submenu">
+                        <button class="ct-menu-item ct-sub-item" onclick="openClassGame('wheel')" title="A spinning wheel, pre-filled with this class's students.">
+                            <span class="ct-icon">🎡</span>
+                            <div><div class="ct-title">Wheel Spinner</div><div class="ct-sub">Pre-filled with your class list</div></div>
+                        </button>
+                        <button class="ct-menu-item ct-sub-item" onclick="openClassGame('dice')" title="Roll 3D dice with real physics.">
+                            <span class="ct-icon">🎲</span>
+                            <div><div class="ct-title">Roll Dice</div><div class="ct-sub">3D dice with physics</div></div>
+                        </button>
+                        <button class="ct-menu-item ct-sub-item" onclick="openClassGame('coin')" title="Flip a 3D coin.">
+                            <span class="ct-icon">🪙</span>
+                            <div><div class="ct-title">Coin Flip</div><div class="ct-sub">Settle it with heads or tails</div></div>
+                        </button>
+                        <button class="ct-menu-item ct-sub-item" onclick="openClassGame('survey')" title="Poll the class and graph the answers live.">
+                            <span class="ct-icon">📊</span>
+                            <div><div class="ct-title">Survey the Class</div><div class="ct-sub">Poll and graph the answers</div></div>
+                        </button>
+                    </div>
                     <div class="ct-divider"></div>
                     <button class="ct-menu-item" onclick="openClassGame('qr')" title="Turn a link or message into a QR code students can scan.">
                         <span class="ct-icon">⬛</span>
@@ -5793,9 +5823,15 @@
         var gameBlobUrl = null;
 
         var EMBEDDED_TOOLS = {
-            pointblast: { el: 'game-pointblast', title: '💥 Point Blast',      needsRoster: true  },
-            egg:        { el: 'game-egg',        title: '🥚 Egg Hatching',     needsRoster: true  },
-            qr:         { el: 'tool-qrcode',     title: '⬛ QR Code Generator',    needsRoster: false }
+            pointblast: { el: 'game-pointblast', title: '💥 Point Blast',        needsRoster: true  },
+            egg:        { el: 'game-egg',        title: '🥚 Egg Hatching',       needsRoster: true  },
+            qr:         { el: 'tool-qrcode',     title: '⬛ QR Code Generator',  needsRoster: false },
+            // Randomisers & polls. The wheel is seeded with the class list so it
+            // works as a student picker straight away; the rest need no roster.
+            wheel:      { el: 'tool-wheel',      title: '🎡 Wheel Spinner',      needsRoster: true, rosterAsLines: true },
+            dice:       { el: 'tool-dice',       title: '🎲 Roll Dice',          needsRoster: false },
+            coin:       { el: 'tool-coin',       title: '🪙 Coin Flip',          needsRoster: false },
+            survey:     { el: 'tool-survey',     title: '📊 Survey the Class',   needsRoster: false }
         };
 
         function liveRosterNames() {
@@ -5812,6 +5848,17 @@
                 names = names.filter(function(n) { return al.attendance[n] !== 'absent'; });
             }
             return names;
+        }
+
+        // The Randomisers & Polls group expands in place rather than opening a
+        // second floating menu, which would be fiddly on a projector.
+        function toggleCtSubmenu(e) {
+            e.stopPropagation();
+            var btn = e.currentTarget;
+            var menu = btn.nextElementSibling;
+            if (!menu) return;
+            var open = menu.classList.toggle('open');
+            btn.classList.toggle('open', open);
         }
 
         function openClassGame(which) {
@@ -5835,7 +5882,17 @@
             // Built by concatenation so this line cannot close our own block.
             var closeTag = '<' + '/script>';
             var html = srcEl.textContent.split('<' + '\\' + '/script>').join(closeTag);
-            if (tool.needsRoster) html = html.replace('__ROSTER__', JSON.stringify(names));
+            if (tool.needsRoster) {
+                if (tool.rosterAsLines) {
+                    // Seed a textarea: plain lines, escaped so names can't break the markup
+                    var lines = names.map(function(n) {
+                        return String(n).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    }).join('\n');
+                    html = html.replace('__ROSTER_LINES__', lines);
+                } else {
+                    html = html.replace('__ROSTER__', JSON.stringify(names));
+                }
+            }
 
             if (gameBlobUrl) { URL.revokeObjectURL(gameBlobUrl); gameBlobUrl = null; }
             gameBlobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
@@ -10543,6 +10600,3857 @@
         console.log(`👥 ${students.length} students · Hit Start or press Space/Enter!`);
     <\/script>
 
+</body>
+</html></script>
+<script type="text/plain" id="tool-survey"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Poll Graph</title>
+    <style>
+        /* ───────── reset & base ───────── */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #f0f4f8;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 20px;
+        }
+
+        /* ───────── main card ───────── */
+        .poll-card {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 32px 36px 40px;
+            max-width: 960px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 20, 40, 0.10);
+            transition: box-shadow 0.2s;
+        }
+        .poll-card:hover {
+            box-shadow: 0 24px 72px rgba(0, 20, 40, 0.14);
+        }
+
+        /* ───────── header / graph title ───────── */
+        .graph-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .graph-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 180px;
+        }
+        .graph-title-wrap .emoji {
+            font-size: 26px;
+            line-height: 1;
+        }
+        .graph-title-wrap input {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0b1e33;
+            background: transparent;
+            border: none;
+            border-bottom: 2px dashed #cdd9e6;
+            padding: 4px 0 6px;
+            width: 100%;
+            min-width: 120px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+        .graph-title-wrap input:focus {
+            border-bottom-color: #3b7cff;
+        }
+        .graph-title-wrap input::placeholder {
+            color: #b0c4db;
+            font-weight: 400;
+        }
+
+        .bar-count-badge {
+            font-size: 14px;
+            font-weight: 500;
+            color: #4a6a8b;
+            background: #eef3f9;
+            padding: 4px 14px;
+            border-radius: 40px;
+            white-space: nowrap;
+        }
+
+        /* ─── usage hint ─── */
+        .usage-hint {
+            color: #5f7d9c;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            padding: 8px 0 4px 0;
+            border-bottom: 1px solid #eef3f9;
+        }
+        .usage-hint strong {
+            color: #1a365d;
+        }
+
+        /* ───────── graph area ───────── */
+        .graph-area {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            position: relative;
+            padding-left: 42px;
+        }
+
+        /* ─── y-axis ─── */
+        .y-axis {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 0 10px 0 0;
+            width: 42px;
+            flex-shrink: 0;
+            margin-left: -42px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #4a6a8b;
+            text-align: right;
+            user-select: none;
+            height: 260px;
+        }
+        .y-axis span {
+            line-height: 1;
+            transform: translateY(4px);
+        }
+
+        /* ─── bars container ─── */
+        .bars-container {
+            display: flex;
+            gap: 14px;
+            flex: 1;
+            height: 260px;
+            padding-bottom: 0;
+            position: relative;
+            border-bottom: 2px solid #e2eaf2;
+            overflow: visible;
+        }
+
+        /* ─── baseline grid lines ─── */
+        .bars-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: repeating-linear-gradient(to top,
+                    rgba(200, 214, 229, 0.25) 0px,
+                    rgba(200, 214, 229, 0.25) 1px,
+                    transparent 1px,
+                    transparent calc(260px / 10));
+            pointer-events: none;
+        }
+
+        /* ─── each bar group ─── */
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            min-width: 0;
+            max-width: 120px;
+            transition: all 0.2s;
+            position: relative;
+            height: 100%;
+            min-height: 100%;
+            overflow: visible;
+        }
+
+        .bar-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+            justify-content: flex-end;
+            position: relative;
+            overflow: visible;
+        }
+
+        .bar {
+            width: 100%;
+            max-width: 72px;
+            min-height: 4px;
+            border-radius: 8px 8px 4px 4px;
+            background: linear-gradient(180deg, #3b7cff, #5b8ef5);
+            transition: height 0.25s cubic-bezier(0.34, 1.2, 0.64, 1), background 0.3s;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(59, 124, 255, 0.20);
+            margin: 0 auto;
+            flex-shrink: 0;
+        }
+        .bar-group:nth-child(2) .bar {
+            background: linear-gradient(180deg, #ff6b6b, #e85555);
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.22);
+        }
+        .bar-group:nth-child(3) .bar {
+            background: linear-gradient(180deg, #ffb347, #f59a2a);
+            box-shadow: 0 2px 8px rgba(255, 179, 71, 0.22);
+        }
+        .bar-group:nth-child(4) .bar {
+            background: linear-gradient(180deg, #20c997, #16a87a);
+            box-shadow: 0 2px 8px rgba(32, 201, 151, 0.22);
+        }
+        .bar-group:nth-child(5) .bar {
+            background: linear-gradient(180deg, #a855f7, #8b3fe0);
+            box-shadow: 0 2px 8px rgba(168, 85, 247, 0.22);
+        }
+        .bar-group:nth-child(6) .bar {
+            background: linear-gradient(180deg, #ec4899, #d43d87);
+            box-shadow: 0 2px 8px rgba(236, 72, 153, 0.22);
+        }
+        .bar-group:nth-child(7) .bar {
+            background: linear-gradient(180deg, #06b6d4, #0898b3);
+            box-shadow: 0 2px 8px rgba(6, 182, 212, 0.22);
+        }
+        .bar-group:nth-child(8) .bar {
+            background: linear-gradient(180deg, #84cc16, #6dac12);
+            box-shadow: 0 2px 8px rgba(132, 204, 22, 0.22);
+        }
+
+        .bar-value-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0b1e33;
+            margin-bottom: 4px;
+            min-height: 22px;
+            line-height: 1.2;
+        }
+
+        /* ─── bar title (editable, wraps) ─── */
+        .bar-title-input {
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a365d;
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px dashed #d0dcec;
+            padding: 4px 2px 5px;
+            margin-top: 6px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-family: inherit;
+            min-width: 0;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            line-height: 1.3;
+            flex-shrink: 0;
+        }
+        .bar-title-input:focus {
+            border-bottom-color: #3b7cff;
+        }
+        .bar-title-input:empty::before {
+            content: attr(data-placeholder);
+            color: #b6c9e0;
+            font-weight: 400;
+            font-size: 12px;
+        }
+        .bar-title-input:empty:focus::before {
+            content: '';
+        }
+
+        /* ─── controls row ─── */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            margin-top: 4px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: nowrap;
+            flex-shrink: 0;
+        }
+        .controls button {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            background: #eef3f9;
+            color: #1a365d;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, transform 0.1s;
+            flex-shrink: 0;
+            line-height: 1;
+            user-select: none;
+            padding: 0;
+        }
+        .controls button:hover {
+            background: #dce6f2;
+        }
+        .controls button:active {
+            transform: scale(0.90);
+            background: #c8d6e8;
+        }
+        .controls .down-btn {
+            color: #b91c1c;
+        }
+        .controls .up-btn {
+            color: #1a6b3b;
+        }
+
+        .controls input[type="number"] {
+            width: 44px;
+            height: 28px;
+            border: 1.5px solid #dce6f2;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #0b1e33;
+            background: #fafcff;
+            outline: none;
+            transition: border-color 0.2s;
+            padding: 0 2px;
+            font-family: inherit;
+            flex-shrink: 0;
+            -moz-appearance: textfield;
+        }
+        .controls input[type="number"]::-webkit-outer-spin-button,
+        .controls input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .controls input[type="number"]:focus {
+            border-color: #3b7cff;
+            box-shadow: 0 0 0 3px rgba(59, 124, 255, 0.12);
+        }
+
+        .delete-bar {
+            background: none;
+            border: none;
+            color: #b0c4db;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 2px 4px;
+            margin-top: 2px;
+            border-radius: 4px;
+            transition: all 0.15s;
+            line-height: 1;
+            opacity: 0.4;
+            flex-shrink: 0;
+        }
+        .delete-bar:hover {
+            color: #e53e3e;
+            background: #fee9e9;
+            opacity: 1;
+        }
+        .bar-group .delete-wrap {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-top: 1px;
+            flex-shrink: 0;
+        }
+
+        /* ─── add bar button (the "+") ─── */
+        .add-bar-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 56px;
+            height: 100%;
+            min-height: 200px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 16px;
+            background: transparent;
+            border: 2px dashed #d0dcec;
+            color: #4a6a8b;
+            padding: 12px 0;
+            font-size: 28px;
+            font-weight: 300;
+            user-select: none;
+            position: relative;
+        }
+        .add-bar-btn:hover {
+            border-color: #3b7cff;
+            background: #f5f9ff;
+            color: #3b7cff;
+            transform: scale(1.02);
+        }
+        .add-bar-btn:active {
+            transform: scale(0.96);
+        }
+        .add-bar-btn .label {
+            font-size: 11px;
+            font-weight: 500;
+            margin-top: 4px;
+            letter-spacing: 0.3px;
+            opacity: 0.7;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7a9abb;
+            font-size: 15px;
+        }
+        .empty-state .big {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .bars-scroll {
+            overflow-x: auto;
+            overflow-y: visible;
+            padding-bottom: 6px;
+            margin-bottom: 2px;
+            scrollbar-width: thin;
+            scrollbar-color: #cdd9e6 transparent;
+        }
+        .bars-scroll::-webkit-scrollbar {
+            height: 5px;
+        }
+        .bars-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .bars-scroll::-webkit-scrollbar-thumb {
+            background: #cdd9e6;
+            border-radius: 10px;
+        }
+        .bars-scroll::-webkit-scrollbar-thumb:hover {
+            background: #b0c4db;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 700px) {
+            .poll-card {
+                padding: 20px 16px 28px;
+                border-radius: 20px;
+            }
+            .graph-title-wrap input {
+                font-size: 20px;
+            }
+            .graph-area {
+                padding-left: 32px;
+            }
+            .y-axis {
+                width: 32px;
+                font-size: 10px;
+                margin-left: -32px;
+                height: 200px;
+            }
+            .bars-container {
+                height: 200px;
+                gap: 10px;
+            }
+            .bar {
+                max-width: 48px;
+                border-radius: 6px 6px 3px 3px;
+            }
+            .bar-value-label {
+                font-size: 12px;
+                min-height: 18px;
+            }
+            .bar-title-input {
+                font-size: 11px;
+                padding: 2px 0 4px;
+                margin-top: 4px;
+            }
+            .controls input[type="number"] {
+                width: 36px;
+                height: 26px;
+                font-size: 12px;
+            }
+            .controls button {
+                width: 24px;
+                height: 24px;
+                font-size: 14px;
+            }
+            .add-bar-btn {
+                flex: 0 0 44px;
+                min-height: 160px;
+                font-size: 22px;
+                padding: 8px 0 16px;
+            }
+            .add-bar-btn .label {
+                font-size: 9px;
+            }
+            .bar-count-badge {
+                font-size: 12px;
+                padding: 2px 10px;
+            }
+            .usage-hint {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .poll-card {
+                padding: 14px 10px 20px;
+            }
+            .graph-title-wrap input {
+                font-size: 17px;
+            }
+            .graph-area {
+                padding-left: 26px;
+            }
+            .y-axis {
+                width: 26px;
+                font-size: 9px;
+                margin-left: -26px;
+                height: 160px;
+            }
+            .bars-container {
+                height: 160px;
+                gap: 6px;
+            }
+            .bar {
+                max-width: 32px;
+                border-radius: 4px 4px 2px 2px;
+            }
+            .bar-value-label {
+                font-size: 10px;
+                min-height: 14px;
+            }
+            .bar-title-input {
+                font-size: 9px;
+                padding: 1px 0 3px;
+                margin-top: 3px;
+            }
+            .controls {
+                gap: 2px;
+                margin-top: 3px;
+            }
+            .controls input[type="number"] {
+                width: 30px;
+                height: 22px;
+                font-size: 10px;
+                border-radius: 4px;
+            }
+            .controls button {
+                width: 20px;
+                height: 20px;
+                font-size: 11px;
+                border-radius: 4px;
+            }
+            .add-bar-btn {
+                flex: 0 0 34px;
+                min-height: 130px;
+                font-size: 18px;
+                padding: 6px 0 12px;
+                border-radius: 10px;
+            }
+            .add-bar-btn .label {
+                font-size: 8px;
+            }
+            .bar-count-badge {
+                font-size: 10px;
+                padding: 2px 8px;
+            }
+            .delete-bar {
+                font-size: 11px;
+            }
+            .usage-hint {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="poll-card">
+        <!-- Header -->
+        <div class="graph-header">
+            <div class="graph-title-wrap">
+                <span class="emoji">📊</span>
+                <input type="text" id="graphTitle" value="Poll Title" placeholder="Poll Title" />
+            </div>
+            <span class="bar-count-badge" id="barCountBadge">3 bars</span>
+        </div>
+
+        <!-- Usage hint -->
+        <div class="usage-hint">
+            <strong>How to use:</strong> Type custom options and poll title by clicking on the text.
+            Adjust poll numbers by using the arrows or typing the number directly.
+        </div>
+
+        <!-- Graph -->
+        <div class="graph-area">
+            <div class="y-axis" id="yAxis"></div>
+            <div class="bars-scroll">
+                <div class="bars-container" id="barsContainer"></div>
+            </div>
+        </div>
+
+        <div class="empty-state hidden" id="emptyState">
+            <span class="big">📭</span>
+            No bars yet.<br />Click the <strong>+</strong> button to add your first decision.
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ─── state ────────────────────────────────────────────────
+            let bars = [
+                { id: 1, title: 'Option A', value: 7 },
+                { id: 2, title: 'Option B', value: 5 },
+                { id: 3, title: 'Option C', value: 9 },
+            ];
+            let nextId = 4;
+            const MIN_Y = 10;
+
+            // ─── DOM refs ─────────────────────────────────────────────
+            const container = document.getElementById('barsContainer');
+            const yAxis = document.getElementById('yAxis');
+            const emptyState = document.getElementById('emptyState');
+            const badge = document.getElementById('barCountBadge');
+            const graphTitleInput = document.getElementById('graphTitle');
+
+            // ─── helpers ──────────────────────────────────────────────
+            function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+            function getMaxValue() {
+                if (bars.length === 0) return MIN_Y;
+                const max = Math.max(...bars.map(b => b.value));
+                const headroom = Math.max(5, Math.ceil(max * 0.2));
+                return Math.max(MIN_Y, max + headroom);
+            }
+
+            // ─── render y-axis ────────────────────────────────────────
+            function renderYAxis() {
+                const maxVal = getMaxValue();
+                const steps = 10;
+                let html = '';
+                for (let i = steps; i >= 0; i--) {
+                    const val = Math.round((i / steps) * maxVal);
+                    html += `<span>${val}</span>`;
+                }
+                yAxis.innerHTML = html;
+            }
+
+            // ─── update a single bar's visuals (height + label) ──────
+            function updateBarVisuals(barId) {
+                const maxVal = getMaxValue();
+                const bar = bars.find(b => b.id === barId);
+                if (!bar) return;
+
+                const group = container.querySelector(`.bar-group[data-id="${barId}"]`);
+                if (!group) return;
+
+                const barEl = group.querySelector('.bar');
+                const labelEl = group.querySelector('.bar-value-label');
+
+                if (barEl) {
+                    const pct = maxVal > 0 ? (bar.value / maxVal) * 100 : 0;
+                    barEl.style.height = clamp(pct, 0, 100) + '%';
+                }
+                if (labelEl) {
+                    labelEl.textContent = bar.value;
+                }
+            }
+
+            // ─── update y-axis and all bars (lighter than full re-render) ──
+            function refreshGraph() {
+                renderYAxis();
+                for (const bar of bars) {
+                    updateBarVisuals(bar.id);
+                }
+                badge.textContent = `${bars.length} bar${bars.length !== 1 ? 's' : ''}`;
+                if (bars.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                }
+            }
+
+            // ─── full render (used for structural changes: add/delete/title updates) ──
+            function renderBars() {
+                const maxVal = getMaxValue();
+
+                if (bars.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    badge.textContent = '0 bars';
+                    renderYAxis();
+                    return;
+                }
+                emptyState.classList.add('hidden');
+
+                let html = '';
+                for (const bar of bars) {
+                    const pct = maxVal > 0 ? (bar.value / maxVal) * 100 : 0;
+                    const height = clamp(pct, 0, 100);
+
+                    html += `
+                        <div class="bar-group" data-id="${bar.id}">
+                            <div class="bar-wrapper">
+                                <span class="bar-value-label">${bar.value}</span>
+                                <div class="bar" style="height: ${height}%;"></div>
+                            </div>
+                            <div class="bar-title-input" contenteditable="true" data-id="${bar.id}" data-placeholder="Title…" role="textbox" aria-multiline="true">${escapeHtml(bar.title)}</div>
+                            <div class="controls">
+                                <button class="down-btn" data-id="${bar.id}" title="Decrease">▼</button>
+                                <input type="number" class="number-input" value="${bar.value}" min="0" step="1" data-id="${bar.id}" />
+                                <button class="up-btn" data-id="${bar.id}" title="Increase">▲</button>
+                            </div>
+                            <div class="delete-wrap">
+                                <button class="delete-bar" data-id="${bar.id}" title="Remove this bar">✕</button>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div class="add-bar-btn" id="addBarBtn" title="Add a new bar">
+                        +
+                        <span class="label">Add</span>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+
+                badge.textContent = `${bars.length} bar${bars.length !== 1 ? 's' : ''}`;
+                renderYAxis();
+                attachEvents();
+            }
+
+            // ─── attach events (called after full render) ──────────────
+            function attachEvents() {
+                // 1. title inputs (contenteditable)
+                container.querySelectorAll('.bar-title-input').forEach(el => {
+                    el.addEventListener('input', function() {
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            found.title = this.innerText.trim() || 'Untitled';
+                            if (found.title === '') found.title = 'Untitled';
+                        }
+                    });
+                    el.addEventListener('blur', function() {
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            let val = this.innerText.trim();
+                            if (val === '') val = 'Untitled';
+                            found.title = val;
+                            if (this.innerText.trim() === '') {
+                                this.innerText = 'Untitled';
+                            }
+                        }
+                    });
+                });
+
+                // 2. number inputs — NO re-render, just update visuals
+                container.querySelectorAll('.number-input').forEach(inp => {
+                    inp.addEventListener('input', function() {
+                        let val = parseInt(this.value, 10);
+                        if (isNaN(val) || val < 0) val = 0;
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            found.value = val;
+                            updateBarVisuals(id);
+                            renderYAxis();
+                        }
+                    });
+                    inp.addEventListener('blur', function() {
+                        let val = parseInt(this.value, 10);
+                        if (isNaN(val) || val < 0) val = 0;
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            found.value = val;
+                            refreshGraph();
+                        }
+                    });
+                });
+
+                // 3. up / down buttons
+                container.querySelectorAll('.up-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            found.value += 1;
+                            refreshGraph();
+                            const inp = container.querySelector(`.number-input[data-id="${id}"]`);
+                            if (inp) inp.value = found.value;
+                        }
+                    });
+                });
+                container.querySelectorAll('.down-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.dataset.id, 10);
+                        const found = bars.find(b => b.id === id);
+                        if (found) {
+                            found.value = Math.max(0, found.value - 1);
+                            refreshGraph();
+                            const inp = container.querySelector(`.number-input[data-id="${id}"]`);
+                            if (inp) inp.value = found.value;
+                        }
+                    });
+                });
+
+                // 4. delete buttons
+                container.querySelectorAll('.delete-bar').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.dataset.id, 10);
+                        bars = bars.filter(b => b.id !== id);
+                        renderBars();
+                    });
+                });
+
+                // 5. "+" add button
+                const addBtn = container.querySelector('#addBarBtn');
+                if (addBtn) {
+                    addBtn.addEventListener('click', function() {
+                        addBar();
+                    });
+                }
+            }
+
+            // ─── add a new bar ────────────────────────────────────────
+            function addBar() {
+                const newBar = {
+                    id: nextId++,
+                    title: `Option ${String.fromCharCode(65 + (bars.length % 26))}`,
+                    value: Math.floor(Math.random() * 5) + 3,
+                };
+                const used = bars.map(b => b.title);
+                let base = newBar.title;
+                let suffix = 1;
+                while (used.includes(base)) {
+                    base = `Option ${String.fromCharCode(65 + ((bars.length + suffix) % 26))}`;
+                    suffix++;
+                }
+                newBar.title = base;
+
+                bars.push(newBar);
+                renderBars();
+                const groups = container.querySelectorAll('.bar-group');
+                if (groups.length > 0) {
+                    const last = groups[groups.length - 1];
+                    last.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' });
+                }
+            }
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+
+            // ─── initial render ──────────────────────────────────────
+            renderBars();
+
+            // ─── keyboard shortcut: press "+" key ────────────────────
+            document.addEventListener('keydown', (e) => {
+                if (e.key === '+' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const target = e.target;
+                    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.hasAttribute('contenteditable'))
+                        return;
+                    e.preventDefault();
+                    addBar();
+                }
+            });
+
+            window.addPollBar = addBar;
+
+            graphTitleInput.addEventListener('focus', function() {
+                this.select();
+            });
+
+            console.log('📊 Poll Graph ready! Press the "+" key to add a bar.');
+        })();
+    <\/script>
+
+</body>
+</html></script>
+<script type="text/plain" id="tool-dice"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Dice – True Physics Roll</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            pointer-events: none;
+        }
+        #ui>* {
+            pointer-events: auto;
+        }
+
+        #result {
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 14px 36px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            text-align: center;
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            min-width: 200px;
+        }
+        #result.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        #result .dice-values {
+            font-size: 36px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 4px;
+        }
+        #result .dice-values span {
+            display: inline-block;
+            min-width: 40px;
+        }
+        #result .dice-values .val {
+            color: #ffd700;
+        }
+        #result .total-label {
+            font-size: 18px;
+            color: #aaa;
+            margin-top: 2px;
+        }
+        #result .total-number {
+            font-size: 42px;
+            font-weight: 800;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        #roll-btn {
+            padding: 14px 48px;
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffd700, #f0a500);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 30px rgba(255, 215, 0, 0.3);
+            letter-spacing: 1px;
+            pointer-events: auto;
+        }
+        #roll-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 40px rgba(255, 215, 0, 0.5);
+        }
+        #roll-btn:active {
+            transform: scale(0.95);
+        }
+        #roll-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @media (max-width: 500px) {
+            #result .dice-values {
+                font-size: 28px;
+            }
+            #result .total-number {
+                font-size: 32px;
+            }
+            #roll-btn {
+                padding: 12px 32px;
+                font-size: 17px;
+            }
+            #result {
+                padding: 12px 24px;
+                min-width: 160px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div id="result">
+            <div class="dice-values">
+                🎲 <span class="val" id="d1-val">?</span> &nbsp;+&nbsp; 🎲 <span class="val" id="d2-val">?</span>
+            </div>
+            <div class="total-label">Total</div>
+            <div class="total-number" id="total-val">?</div>
+        </div>
+        <button id="roll-btn">🎲 Roll Dice</button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    <\/script>
+
+    <script type="module">
+        // ─── imports ──────────────────────────────────────────────────────────────
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+        // ─── DOM refs ─────────────────────────────────────────────────────────────
+        const d1ValEl = document.getElementById('d1-val');
+        const d2ValEl = document.getElementById('d2-val');
+        const totalValEl = document.getElementById('total-val');
+        const resultEl = document.getElementById('result');
+        const rollBtn = document.getElementById('roll-btn');
+
+        // ─── scene setup ─────────────────────────────────────────────────────────
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+
+        const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(9, 7, 12);
+        camera.lookAt(0, 0.5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.prepend(renderer.domElement);
+
+        // ─── controls ─────────────────────────────────────────────────────────────
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.6, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 5;
+        controls.maxDistance = 30;
+        controls.maxPolarAngle = Math.PI / 2.1;
+        controls.update();
+
+        // ─── lights ──────────────────────────────────────────────────────────────
+        const ambientLight = new THREE.AmbientLight(0x404060, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffeedd, 2.2);
+        mainLight.position.set(6, 14, 6);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 30;
+        mainLight.shadow.camera.left = -10;
+        mainLight.shadow.camera.right = 10;
+        mainLight.shadow.camera.top = 10;
+        mainLight.shadow.camera.bottom = -10;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
+        fillLight.position.set(-5, 4, -6);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        rimLight.position.set(-4, 6, 7);
+        scene.add(rimLight);
+
+        const ambientFill = new THREE.HemisphereLight(0x4466aa, 0x222244, 0.6);
+        scene.add(ambientFill);
+
+        // ─── table ───────────────────────────────────────────────────────────────
+        const tableGeo = new THREE.PlaneGeometry(14, 14);
+        const tableMat = new THREE.MeshStandardMaterial({
+            color: 0x2a2a4a,
+            roughness: 0.75,
+            metalness: 0.05,
+            side: THREE.DoubleSide,
+        });
+        const table = new THREE.Mesh(tableGeo, tableMat);
+        table.rotation.x = -Math.PI / 2;
+        table.position.y = 0;
+        table.receiveShadow = true;
+        scene.add(table);
+
+        const gridHelper = new THREE.GridHelper(14, 24, 0x444477, 0x333366);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        // ─── die face textures ──────────────────────────────────────────────────
+        function createDieFace(dots, color = '#ffffff', dotColor = '#1a1a2e') {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const radius = 20;
+            ctx.fillStyle = color;
+            ctx.shadowColor = 'rgba(0,0,0,0.15)';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.stroke();
+
+            const dotRadius = size * 0.065;
+            const padding = size * 0.25;
+            const positions = getDotPositions(dots, padding, size);
+
+            ctx.fillStyle = dotColor;
+            ctx.shadowColor = 'rgba(0,0,0,0.25)';
+            ctx.shadowBlur = 6;
+            for (const [x, y] of positions) {
+                ctx.beginPath();
+                ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = 4;
+            return texture;
+        }
+
+        function getDotPositions(n, pad, size) {
+            const center = size / 2;
+            const offset = pad;
+            const positions = {
+                1: [
+                    [0, 0]
+                ],
+                2: [
+                    [-1, 1],
+                    [1, -1]
+                ],
+                3: [
+                    [-1, 1],
+                    [0, 0],
+                    [1, -1]
+                ],
+                4: [
+                    [-1, 1],
+                    [1, 1],
+                    [-1, -1],
+                    [1, -1]
+                ],
+                5: [
+                    [-1, 1],
+                    [1, 1],
+                    [0, 0],
+                    [-1, -1],
+                    [1, -1]
+                ],
+                6: [
+                    [-1, 1],
+                    [1, 1],
+                    [-1, 0],
+                    [1, 0],
+                    [-1, -1],
+                    [1, -1]
+                ],
+            };
+            const pts = positions[n] || [
+                [0, 0]
+            ];
+            return pts.map(([x, y]) => [center + x * offset, center + y * offset]);
+        }
+
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (r > w / 2) r = w / 2;
+                if (r > h / 2) r = h / 2;
+                this.moveTo(x + r, y);
+                this.lineTo(x + w - r, y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r);
+                this.lineTo(x + w, y + h - r);
+                this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                this.lineTo(x + r, y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r);
+                this.lineTo(x, y + r);
+                this.quadraticCurveTo(x, y, x + r, y);
+                return this;
+            };
+        }
+
+        // ─── create die ──────────────────────────────────────────────────────────
+        function createDie(size = 1.2) {
+            const faceValues = [2, 5, 1, 6, 3, 4];
+            const materials = faceValues.map((val) => {
+                const tex = createDieFace(val);
+                return new THREE.MeshStandardMaterial({
+                    map: tex,
+                    roughness: 0.2,
+                    metalness: 0.02,
+                    envMapIntensity: 0.3,
+                });
+            });
+
+            const geo = new RoundedBoxGeometry(size, size, size, 4, 0.12);
+            const mesh = new THREE.Mesh(geo, materials);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData.faceValues = faceValues;
+            mesh.userData.size = size;
+            return mesh;
+        }
+
+        // ─── physics constants ──────────────────────────────────────────────────
+        const GRAVITY = -24.0;
+        const RESTITUTION = 0.25;
+        const FRICTION = 0.96;
+        const ANGULAR_DAMP = 0.97;
+        const ROLL_COUPLING = 0.06;
+        const BLEND_FACTOR = 0.10;
+        const SETTLE_LIN = 0.008;
+        const SETTLE_ANG = 0.015;
+        const FORCE_SETTLE_TIME = 3.5;
+        const GROUND_Y = 0.6;
+
+        // ─── state ───────────────────────────────────────────────────────────────
+        const DICE_COUNT = 2;
+        const dice = [];
+        const diePhysics = [];
+        let isRolling = false;
+        let results = [null, null];
+        let physicsId = null;
+
+        // ─── snap die flat to table ────────────────────────────────────────────
+        function snapDieToTable(mesh) {
+            const halfSize = mesh.userData.size * 0.5;
+
+            // Local face normals (matching the order of faceValues: +X, -X, +Y, -Y, +Z, -Z)
+            const faceNormals = [
+                new THREE.Vector3(1, 0, 0),
+                new THREE.Vector3(-1, 0, 0),
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3(0, -1, 0),
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(0, 0, -1)
+            ];
+
+            const down = new THREE.Vector3(0, -1, 0);
+            let bestIdx = 0;
+            let bestDot = -Infinity;
+
+            // Find the face closest to pointing down in world space
+            for (let i = 0; i < faceNormals.length; i++) {
+                const worldNormal = faceNormals[i].clone().applyQuaternion(mesh.quaternion);
+                const dot = worldNormal.dot(down);
+                if (dot > bestDot) {
+                    bestDot = dot;
+                    bestIdx = i;
+                }
+            }
+
+            // Current direction of the chosen face in world space
+            const currentDir = faceNormals[bestIdx].clone().applyQuaternion(mesh.quaternion);
+            const targetDir = new THREE.Vector3(0, -1, 0);
+
+            // Compute the shortest rotation from currentDir to targetDir
+            const q = new THREE.Quaternion().setFromUnitVectors(currentDir, targetDir);
+
+            // Apply the rotation to the mesh
+            mesh.quaternion.premultiply(q);
+
+            // Snap the position to the ground (center of die at GROUND_Y)
+            mesh.position.y = GROUND_Y;
+        }
+
+        // ─── get top face ──────────────────────────────────────────────────────
+        function getTopFace(mesh) {
+            const up = new THREE.Vector3(0, 1, 0);
+            const localUp = up.clone().applyQuaternion(mesh.quaternion);
+            const normals = [
+                new THREE.Vector3(1, 0, 0),
+                new THREE.Vector3(-1, 0, 0),
+                new THREE.Vector3(0, 1, 0),
+                new THREE.Vector3(0, -1, 0),
+                new THREE.Vector3(0, 0, 1),
+                new THREE.Vector3(0, 0, -1),
+            ];
+            const worldNormals = normals.map(n => n.clone().applyQuaternion(mesh.quaternion));
+
+            let maxDot = -Infinity;
+            let bestIdx = 0;
+            for (let i = 0; i < worldNormals.length; i++) {
+                const d = worldNormals[i].dot(up);
+                if (d > maxDot) {
+                    maxDot = d;
+                    bestIdx = i;
+                }
+            }
+            const faceValues = mesh.userData.faceValues || [2, 5, 1, 6, 3, 4];
+            return faceValues[bestIdx];
+        }
+
+        function normalizeAngle(a) {
+            while (a > Math.PI) a -= Math.PI * 2;
+            while (a < -Math.PI) a += Math.PI * 2;
+            return a;
+        }
+
+        // ─── roll dice ──────────────────────────────────────────────────────────
+        function rollDice() {
+            if (isRolling) return;
+            isRolling = true;
+            rollBtn.disabled = true;
+            resultEl.classList.remove('show');
+
+            for (const d of dice) scene.remove(d);
+            dice.length = 0;
+            diePhysics.length = 0;
+
+            const spacing = 2.6;
+            const startX = -(DICE_COUNT - 1) * spacing / 2;
+
+            for (let i = 0; i < DICE_COUNT; i++) {
+                const die = createDie(1.2);
+                const x = startX + i * spacing + (Math.random() - 0.5) * 0.4;
+                const z = (i === 0 ? -0.3 : 0.3) + (Math.random() - 0.5) * 0.4;
+                const dropHeight = 4.5 + Math.random() * 1.5;
+
+                die.position.set(x, dropHeight, z);
+                die.rotation.set(
+                    Math.random() * Math.PI * 2,
+                    Math.random() * Math.PI * 2,
+                    Math.random() * Math.PI * 2
+                );
+                scene.add(die);
+                dice.push(die);
+
+                const hSpeed = 0.6 + Math.random() * 1.6;
+                const angle = Math.random() * Math.PI * 2;
+                const spread = (i === 0 ? -0.6 : 0.6) + (Math.random() - 0.5) * 0.3;
+
+                diePhysics.push({
+                    velocity: new THREE.Vector3(
+                        Math.cos(angle) * hSpeed + spread * 0.4,
+                        -(Math.random() * 1.8 + 2.2),
+                        Math.sin(angle) * hSpeed * 0.7 + (Math.random() - 0.5) * 0.6
+                    ),
+                    angularVel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 16,
+                        (Math.random() - 0.5) * 12,
+                        (Math.random() - 0.5) * 16
+                    ),
+                    onTable: false,
+                    settled: false,
+                    tableTime: 0,
+                    bounceCount: 0,
+                    snapped: false, // new flag to prevent re-snapping
+                });
+            }
+
+            if (physicsId) cancelAnimationFrame(physicsId);
+            animatePhysics();
+        }
+
+        // ─── physics update ─────────────────────────────────────────────────────
+        function animatePhysics() {
+            const dt = 1 / 60;
+            const steps = 2;
+            const subDt = dt / steps;
+            let allSettled = true;
+            const halfSize = 0.6;
+
+            for (let step = 0; step < steps; step++) {
+                for (let i = 0; i < dice.length; i++) {
+                    const mesh = dice[i];
+                    const phys = diePhysics[i];
+                    if (phys.settled) continue;
+                    allSettled = false;
+
+                    const pos = mesh.position;
+                    const vel = phys.velocity;
+                    const angVel = phys.angularVel;
+
+                    vel.y += GRAVITY * subDt;
+                    vel.multiplyScalar(1 - 0.001 * subDt);
+
+                    pos.x += vel.x * subDt;
+                    pos.y += vel.y * subDt;
+                    pos.z += vel.z * subDt;
+
+                    mesh.rotation.x += angVel.x * subDt;
+                    mesh.rotation.y += angVel.y * subDt;
+                    mesh.rotation.z += angVel.z * subDt;
+                    mesh.rotation.x = normalizeAngle(mesh.rotation.x);
+                    mesh.rotation.y = normalizeAngle(mesh.rotation.y);
+                    mesh.rotation.z = normalizeAngle(mesh.rotation.z);
+
+                    const groundY = GROUND_Y;
+
+                    if (pos.y < groundY) {
+                        pos.y = groundY;
+                        phys.onTable = true;
+                        phys.tableTime += subDt;
+
+                        if (vel.y < -0.4 && phys.bounceCount < 6) {
+                            vel.y = -vel.y * RESTITUTION;
+                            phys.bounceCount++;
+                            vel.x += (Math.random() - 0.5) * 0.5;
+                            vel.z += (Math.random() - 0.5) * 0.5;
+                            angVel.x += (Math.random() - 0.5) * 1.5;
+                            angVel.z += (Math.random() - 0.5) * 1.5;
+                            if (phys.bounceCount > 3) vel.y *= 0.6;
+                        } else {
+                            vel.y = 0;
+
+                            const targetVx = angVel.z * halfSize * ROLL_COUPLING;
+                            const targetVz = -angVel.x * halfSize * ROLL_COUPLING;
+                            vel.x += (targetVx - vel.x) * BLEND_FACTOR * subDt * 60;
+                            vel.z += (targetVz - vel.z) * BLEND_FACTOR * subDt * 60;
+
+                            const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+                            const frictionFactor = FRICTION + (1 - FRICTION) * 0.3 * Math.exp(-speed * 8);
+                            vel.x *= Math.pow(frictionFactor, subDt * 60);
+                            vel.z *= Math.pow(frictionFactor, subDt * 60);
+
+                            angVel.x *= Math.pow(ANGULAR_DAMP, subDt * 60);
+                            angVel.z *= Math.pow(ANGULAR_DAMP, subDt * 60);
+                            angVel.y *= Math.pow(ANGULAR_DAMP * 0.85, subDt * 60);
+
+                            if (phys.tableTime > 1.2) {
+                                const extra = 0.92;
+                                vel.x *= Math.pow(extra, subDt * 60);
+                                vel.z *= Math.pow(extra, subDt * 60);
+                                angVel.x *= Math.pow(extra, subDt * 60);
+                                angVel.z *= Math.pow(extra, subDt * 60);
+                                angVel.y *= Math.pow(extra, subDt * 60);
+                            }
+
+                            const linSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+                            const angSpeed = Math.sqrt(angVel.x * angVel.x + angVel.y * angVel.y + angVel.z * angVel.z);
+
+                            if (linSpeed < SETTLE_LIN && angSpeed < SETTLE_ANG) {
+                                vel.x = 0;
+                                vel.z = 0;
+                                angVel.x = 0;
+                                angVel.y = 0;
+                                angVel.z = 0;
+                                phys.settled = true;
+                                // Snap the die flat against the table
+                                if (!phys.snapped) {
+                                    snapDieToTable(mesh);
+                                    phys.snapped = true;
+                                }
+                            }
+
+                            if (phys.tableTime > FORCE_SETTLE_TIME) {
+                                vel.x = 0;
+                                vel.z = 0;
+                                angVel.x = 0;
+                                angVel.y = 0;
+                                angVel.z = 0;
+                                phys.settled = true;
+                                if (!phys.snapped) {
+                                    snapDieToTable(mesh);
+                                    phys.snapped = true;
+                                }
+                            }
+                        }
+                    } else {
+                        phys.onTable = false;
+                        phys.tableTime = 0;
+                    }
+
+                    const bound = 5.8;
+                    if (Math.abs(pos.x) > bound) {
+                        pos.x = Math.sign(pos.x) * bound;
+                        vel.x *= -0.2;
+                    }
+                    if (Math.abs(pos.z) > bound) {
+                        pos.z = Math.sign(pos.z) * bound;
+                        vel.z *= -0.2;
+                    }
+                }
+            }
+
+            const allDone = diePhysics.every(p => p.settled);
+            if (allDone) {
+                showResults();
+                isRolling = false;
+                rollBtn.disabled = false;
+                if (physicsId) {
+                    cancelAnimationFrame(physicsId);
+                    physicsId = null;
+                }
+                return;
+            }
+
+            physicsId = requestAnimationFrame(animatePhysics);
+        }
+
+        // ─── show results ──────────────────────────────────────────────────────
+        function showResults() {
+            for (let i = 0; i < dice.length && i < 2; i++) {
+                const val = getTopFace(dice[i]);
+                results[i] = val;
+            }
+            d1ValEl.textContent = results[0] || '?';
+            d2ValEl.textContent = results[1] || '?';
+            const total = (results[0] || 0) + (results[1] || 0);
+            totalValEl.textContent = total;
+            resultEl.classList.add('show');
+        }
+
+        // ─── resize ─────────────────────────────────────────────────────────────
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        });
+
+        // ─── button ─────────────────────────────────────────────────────────────
+        rollBtn.addEventListener('click', rollDice);
+
+        // ─── render loop ────────────────────────────────────────────────────────
+        function render() {
+            requestAnimationFrame(render);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ─── init and auto-roll ────────────────────────────────────────────────
+        initDice();
+        render();
+
+        setTimeout(() => {
+            rollDice();
+        }, 500);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                rollDice();
+            }
+        });
+
+        // ─── init helper ────────────────────────────────────────────────────────
+        function initDice() {
+            for (const d of dice) scene.remove(d);
+            dice.length = 0;
+            diePhysics.length = 0;
+        }
+
+        console.log('🎲 True physics dice roller – dice snap flat on settle!');
+    <\/script>
+</body>
+</html></script>
+<script type="text/plain" id="tool-wheel"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎡 Spinner · 10 Themes + Random FX</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+
+    <style>
+        /* ── Reset & Base ── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            margin: 0;
+            transition: background 0.6s ease;
+            background-color: #0b0d15;
+            background-image:
+                radial-gradient(ellipse at 20% 50%, rgba(88, 50, 255, 0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 50%, rgba(255, 50, 150, 0.08) 0%, transparent 60%);
+        }
+
+        /* ── Main Card ── */
+        .app {
+            max-width: 860px;
+            width: 100%;
+            background: rgba(18, 22, 36, 0.85);
+            backdrop-filter: blur(24px) saturate(1.4);
+            -webkit-backdrop-filter: blur(24px) saturate(1.4);
+            border-radius: 48px;
+            padding: 32px 36px 40px;
+            box-shadow:
+                0 30px 80px rgba(0, 0, 0, 0.7),
+                0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+                0 0 40px rgba(100, 60, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.3s ease;
+        }
+
+        /* ── Header ── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.5s ease;
+            background: linear-gradient(135deg, #b7a9ff, #f472b6, #ff9a56);
+        }
+
+        .header h1 span {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 12px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            -webkit-text-fill-color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .header-actions button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .header-actions button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: scale(1.02);
+        }
+
+        .header-actions button:active {
+            transform: scale(0.96);
+        }
+
+        /* ── Theme Selector ── */
+        .theme-selector {
+            margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .theme-selector label {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            margin-right: 6px;
+            letter-spacing: 0.01em;
+        }
+
+        .theme-btn {
+            padding: 6px 14px;
+            border-radius: 100px;
+            border: 2px solid transparent;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .theme-btn .swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .theme-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-1px);
+        }
+
+        .theme-btn.active {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .theme-btn .theme-name {
+            display: none;
+        }
+
+        @media (min-width: 600px) {
+            .theme-btn .theme-name {
+                display: inline;
+            }
+        }
+
+        /* ── Main Grid ── */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        /* ── Wheel Container ── */
+        .wheel-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1/1;
+            max-width: 380px;
+            margin: 0 auto;
+            transition: box-shadow 0.3s ease, transform 0.1s ease;
+            border-radius: 50%;
+        }
+
+        .wheel-container canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 50%;
+            box-shadow:
+                0 0 0 2px rgba(255, 255, 255, 0.06),
+                0 20px 60px rgba(0, 0, 0, 0.6),
+                0 0 80px rgba(100, 60, 255, 0.08);
+            transition: box-shadow 0.3s ease;
+            cursor: pointer;
+            touch-action: none;
+            position: relative;
+            z-index: 2;
+        }
+
+        .wheel-container canvas:hover {
+            box-shadow:
+                0 0 0 2px rgba(255, 255, 255, 0.08),
+                0 25px 70px rgba(0, 0, 0, 0.7),
+                0 0 100px rgba(100, 60, 255, 0.12);
+        }
+
+        /* ── Effect Overlay ── */
+        .effect-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 3;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .effect-overlay .ring {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            right: -8px;
+            bottom: -8px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            pointer-events: none;
+        }
+
+        .effect-overlay .sparkle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 12px #fff;
+        }
+
+        /* ── Pointer (above overlay) ── */
+        .pointer {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+        }
+
+        .pointer svg {
+            width: 42px;
+            height: 48px;
+            display: block;
+            filter: drop-shadow(0 0 12px rgba(255, 100, 200, 0.3));
+            transition: filter 0.5s ease;
+        }
+
+        /* ── Spin Button ── */
+        .spin-btn {
+            margin-top: 18px;
+            padding: 14px 44px;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            border: none;
+            border-radius: 100px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            letter-spacing: 0.01em;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            max-width: 280px;
+            background: linear-gradient(135deg, #7c5cfc, #b75cff);
+            box-shadow: 0 8px 30px rgba(124, 92, 252, 0.35);
+        }
+
+        .spin-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 100px;
+            padding: 2px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), transparent 60%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .spin-btn:hover:not(:disabled) {
+            transform: scale(1.04);
+        }
+
+        .spin-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .spin-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(0.98);
+        }
+
+        .spin-btn .btn-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .spin-btn .btn-shimmer {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+            animation: shimmer 2.8s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                left: -100%;
+            }
+            100% {
+                left: 200%;
+            }
+        }
+
+        /* ── Result Display ── */
+        .result-display {
+            margin-top: 16px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            padding: 8px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            width: 100%;
+            max-width: 280px;
+            transition: all 0.4s ease;
+        }
+
+        .result-display.highlight {
+            background: rgba(124, 92, 252, 0.15);
+            border-color: rgba(124, 92, 252, 0.25);
+            box-shadow: 0 0 40px rgba(124, 92, 252, 0.08);
+        }
+
+        .result-display .result-emoji {
+            font-size: 26px;
+        }
+
+        .result-display .result-text {
+            background: linear-gradient(135deg, #b7a9ff, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ── Input Panel ── */
+        .input-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .input-panel label {
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-panel label .badge {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 2px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .input-panel textarea {
+            width: 100%;
+            min-height: 130px;
+            padding: 16px 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.03);
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 15px;
+            font-family: 'Inter', sans-serif;
+            resize: vertical;
+            transition: all 0.3s ease;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        .input-panel textarea::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .input-panel textarea:focus {
+            border-color: rgba(124, 92, 252, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 30px rgba(124, 92, 252, 0.04);
+        }
+
+        .input-panel .input-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .input-panel .input-actions button {
+            flex: 1;
+            min-width: 70px;
+            padding: 10px 18px;
+            border-radius: 14px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .input-panel .input-actions button.primary {
+            background: linear-gradient(135deg, #7c5cfc, #b75cff);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 4px 20px rgba(124, 92, 252, 0.25);
+            transition: all 0.3s ease;
+        }
+
+        .input-panel .input-actions button.primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 28px rgba(124, 92, 252, 0.35);
+        }
+
+        .input-panel .input-actions button.primary:active {
+            transform: scale(0.96);
+        }
+
+        .input-panel .input-actions button.secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .input-panel .input-actions button.danger:hover {
+            background: rgba(255, 70, 70, 0.15);
+            color: #ff6b6b;
+            border-color: rgba(255, 70, 70, 0.15);
+        }
+
+        .input-panel .item-count {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.3);
+            text-align: right;
+            padding-right: 4px;
+            font-weight: 500;
+        }
+
+        .input-panel .item-count strong {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(20, 24, 44, 0.95);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 14px 28px;
+            border-radius: 100px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            font-size: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .toast .toast-icon {
+            font-size: 20px;
+        }
+
+        /* ── Confetti Canvas ── */
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 700px) {
+            .app {
+                padding: 20px 16px 26px;
+                border-radius: 32px;
+            }
+            .main-grid {
+                grid-template-columns: 1fr;
+                gap: 28px;
+            }
+            .wheel-container {
+                max-width: 280px;
+            }
+            .header h1 {
+                font-size: 20px;
+            }
+            .header h1 span {
+                font-size: 11px;
+                padding: 2px 10px;
+            }
+            .header-actions button {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            .spin-btn {
+                font-size: 16px;
+                padding: 12px 32px;
+                max-width: 200px;
+            }
+            .result-display {
+                font-size: 17px;
+                max-width: 200px;
+                min-height: 38px;
+            }
+            .pointer svg {
+                width: 32px;
+                height: 38px;
+            }
+            .pointer {
+                top: -4px;
+            }
+            .input-panel textarea {
+                min-height: 100px;
+                font-size: 14px;
+            }
+            .theme-selector {
+                padding: 10px 12px;
+                gap: 6px;
+            }
+            .theme-btn {
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+            .theme-btn .swatch {
+                width: 12px;
+                height: 12px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .app {
+                padding: 14px 12px 20px;
+                border-radius: 24px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .header-actions {
+                width: 100%;
+            }
+            .header-actions button {
+                flex: 1;
+                justify-content: center;
+                font-size: 11px;
+                padding: 6px 10px;
+            }
+            .wheel-container {
+                max-width: 220px;
+            }
+            .spin-btn {
+                font-size: 14px;
+                padding: 10px 20px;
+                max-width: 160px;
+            }
+            .result-display {
+                font-size: 15px;
+                max-width: 160px;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        @keyframes pulse-glow {
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(124, 92, 252, 0.1);
+            }
+            50% {
+                box-shadow: 0 0 60px rgba(124, 92, 252, 0.4);
+            }
+        }
+
+        .wheel-container.spinning canvas {
+            animation: pulse-glow 0.8s ease-in-out infinite;
+        }
+
+        /* ────────────────────────────────────────── */
+        /* ─── SPIN EFFECTS (10) ─── */
+        /* ────────────────────────────────────────── */
+
+        /* 1. Glow Pulse */
+        .spin-glow .effect-overlay {
+            animation: glowPulse 0.6s ease-in-out infinite alternate;
+        }
+        @keyframes glowPulse {
+            0% {
+                box-shadow: 0 0 20px rgba(255, 200, 0, 0.3), inset 0 0 20px rgba(255, 200, 0, 0.1);
+            }
+            100% {
+                box-shadow: 0 0 80px rgba(255, 200, 0, 0.7), inset 0 0 40px rgba(255, 200, 0, 0.3);
+            }
+        }
+
+        /* 2. Rotating Ring */
+        .spin-ring .effect-overlay .ring {
+            border-color: rgba(255, 255, 255, 0.5);
+            animation: spinRing 1.2s linear infinite;
+        }
+        @keyframes spinRing {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 3. Color Shift (rainbow overlay) */
+        .spin-rainbow .effect-overlay {
+            background: conic-gradient(from 0deg, #ff006e, #ffd700, #00d2ff, #ff006e);
+            mix-blend-mode: hue;
+            opacity: 0.4;
+            animation: rotateRainbow 1s linear infinite;
+        }
+        @keyframes rotateRainbow {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 4. Sparkle Trail */
+        .spin-sparkle .effect-overlay {
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3) 0%, transparent 60%),
+                radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.3) 0%, transparent 60%);
+            animation: sparkleMove 0.8s ease-in-out infinite alternate;
+        }
+        @keyframes sparkleMove {
+            0% {
+                background-position: 0% 0%;
+            }
+            100% {
+                background-position: 100% 100%;
+            }
+        }
+
+        /* 5. Shrink/Expand */
+        .spin-pulse .wheel-container {
+            animation: pulseScale 0.5s ease-in-out infinite alternate;
+        }
+        @keyframes pulseScale {
+            0% {
+                transform: scale(0.95);
+            }
+            100% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* 6. Shake */
+        .spin-shake .wheel-container {
+            animation: shake 0.2s ease-in-out infinite alternate;
+        }
+        @keyframes shake {
+            0% {
+                transform: rotate(-2deg);
+            }
+            100% {
+                transform: rotate(2deg);
+            }
+        }
+
+        /* 7. Border Flash */
+        .spin-flash .effect-overlay .ring {
+            border-color: #ff0;
+            animation: flashBorder 0.3s ease-in-out infinite alternate;
+        }
+        @keyframes flashBorder {
+            0% {
+                border-color: #ff0;
+                box-shadow: 0 0 20px #ff0;
+            }
+            100% {
+                border-color: #f0f;
+                box-shadow: 0 0 40px #f0f;
+            }
+        }
+
+        /* 8. Bounce */
+        .spin-bounce .wheel-container {
+            animation: bounceSpin 0.4s ease-in-out infinite alternate;
+        }
+        @keyframes bounceSpin {
+            0% {
+                transform: translateY(-6px);
+            }
+            100% {
+                transform: translateY(6px);
+            }
+        }
+
+        /* 9. Wobble (skew) */
+        .spin-wobble .wheel-container {
+            animation: wobble 0.3s ease-in-out infinite alternate;
+        }
+        @keyframes wobble {
+            0% {
+                transform: skewX(-3deg) skewY(2deg);
+            }
+            100% {
+                transform: skewX(3deg) skewY(-2deg);
+            }
+        }
+
+        /* 10. Rotating Arrows (using pseudo-elements on overlay) */
+        .spin-arrows .effect-overlay::before,
+        .spin-arrows .effect-overlay::after {
+            content: '➤';
+            position: absolute;
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.6);
+            animation: arrowRotate 1.2s linear infinite;
+        }
+        .spin-arrows .effect-overlay::before {
+            top: 10%;
+            left: 10%;
+        }
+        .spin-arrows .effect-overlay::after {
+            bottom: 10%;
+            right: 10%;
+            animation-direction: reverse;
+        }
+        @keyframes arrowRotate {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ────────────────────────────────────────── */
+        /* ─── STOP EFFECTS (5) ─── */
+        /* ────────────────────────────────────────── */
+
+        /* 1. Winner Glow */
+        .stop-glow .wheel-container {
+            animation: winnerGlow 0.8s ease-out 3;
+        }
+        @keyframes winnerGlow {
+            0% {
+                box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+            }
+            50% {
+                box-shadow: 0 0 100px rgba(255, 215, 0, 0.8), 0 0 200px rgba(255, 215, 0, 0.4);
+            }
+            100% {
+                box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+            }
+        }
+
+        /* 2. Screen Flash (overlay) */
+        .stop-flash .effect-overlay {
+            animation: flashScreen 0.6s ease-out 2;
+        }
+        @keyframes flashScreen {
+            0% {
+                background: rgba(255, 255, 255, 0);
+            }
+            30% {
+                background: rgba(255, 255, 255, 0.7);
+            }
+            70% {
+                background: rgba(255, 255, 255, 0.7);
+            }
+            100% {
+                background: rgba(255, 255, 255, 0);
+            }
+        }
+
+        /* 3. Bounce */
+        .stop-bounce .wheel-container {
+            animation: stopBounce 0.6s ease-out 3;
+        }
+        @keyframes stopBounce {
+            0% {
+                transform: scale(1);
+            }
+            30% {
+                transform: scale(1.15);
+            }
+            60% {
+                transform: scale(0.9);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* 4. Pop */
+        .stop-pop .wheel-container {
+            animation: pop 0.5s ease-out 3;
+        }
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+            40% {
+                transform: scale(1.2);
+            }
+            70% {
+                transform: scale(0.95);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        /* 5. Star Burst (using overlay with stars) */
+        .stop-stars .effect-overlay {
+            background: radial-gradient(circle at 30% 30%, rgba(255, 215, 0, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(255, 215, 0, 0.3) 0%, transparent 50%);
+            animation: starBurst 0.6s ease-out 2;
+        }
+        @keyframes starBurst {
+            0% {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+        }
+
+        /* ── Misc ── */
+        .empty-state {
+            color: rgba(255, 255, 255, 0.15);
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            padding: 20px 0;
+            letter-spacing: 0.02em;
+        }
+
+        /* Confetti (stop effect) is handled via JS, not CSS */
+    </style>
+</head>
+<body>
+
+    <div class="app" id="app">
+
+        <!-- Header -->
+        <div class="header">
+            <h1 id="mainTitle">
+                🎡 Spinner
+                <span>10 FX</span>
+            </h1>
+            <div class="header-actions">
+                <button id="saveBtn">💾 Save</button>
+                <button id="loadBtn">📂 Load</button>
+                <button id="clearBtn">🗑️ Clear</button>
+            </div>
+        </div>
+
+        <!-- Theme Selector -->
+        <div class="theme-selector" id="themeSelector">
+            <label>🎨 Theme</label>
+            <!-- Theme buttons injected by JS -->
+        </div>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+
+            <div class="wheel-wrapper">
+                <div class="wheel-container" id="wheelContainer">
+                    <canvas id="wheelCanvas" width="600" height="600"></canvas>
+
+                    <!-- Effect Overlay -->
+                    <div class="effect-overlay" id="effectOverlay">
+                        <div class="ring"></div>
+                        <!-- Additional dynamic elements can be added -->
+                    </div>
+
+                    <!-- Pointer -->
+                    <div class="pointer" id="pointerContainer">
+                        <svg viewBox="0 0 42 48" fill="none">
+                            <defs>
+                                <linearGradient id="pointerGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#b7a9ff" />
+                                    <stop offset="100%" stop-color="#f472b6" />
+                                </linearGradient>
+                                <filter id="pointerShadow">
+                                    <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.4" />
+                                </filter>
+                            </defs>
+                            <path d="M21 48L0.5 8L21 18L41.5 8L21 48Z"
+                            fill="url(#pointerGrad)"
+                            filter="url(#pointerShadow)"
+                            stroke="rgba(255,255,255,0.15)"
+                            stroke-width="1.5" />
+                            <circle cx="21" cy="13" r="5" fill="rgba(255,255,255,0.2)" />
+                        </svg>
+                    </div>
+                </div>
+
+                <button class="spin-btn" id="spinBtn">
+                    <span class="btn-shimmer"></span>
+                    <span class="btn-text">🎲 Spin</span>
+                </button>
+
+                <div class="result-display" id="resultDisplay">
+                    <span class="result-emoji">✨</span>
+                    <span class="result-text">Ready</span>
+                </div>
+            </div>
+
+            <div class="input-panel">
+                <label>
+                    📝 Items
+                    <span class="badge">one per line</span>
+                </label>
+                <textarea id="itemInput" placeholder="Paste your list here…&#10;e.g.&#10;Option 1&#10;Option 2&#10;Option 3&#10;Option 4">__ROSTER_LINES__</textarea>
+                <div class="input-actions">
+                    <button class="primary" id="generateBtn">⚡ Generate</button>
+                    <button class="secondary" id="exampleBtn">📋 Example</button>
+                </div>
+                <div class="item-count">
+                    <span id="itemCount">0</span> items
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <span class="toast-icon">✅</span>
+        <span class="toast-message">Saved!</span>
+    </div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ── DOM refs ──
+            const canvas = document.getElementById('wheelCanvas');
+            const ctx = canvas.getContext('2d');
+            const spinBtn = document.getElementById('spinBtn');
+            const resultDisplay = document.getElementById('resultDisplay');
+            const itemInput = document.getElementById('itemInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const exampleBtn = document.getElementById('exampleBtn');
+            const saveBtn = document.getElementById('saveBtn');
+            const loadBtn = document.getElementById('loadBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const itemCount = document.getElementById('itemCount');
+            const wheelContainer = document.getElementById('wheelContainer');
+            const effectOverlay = document.getElementById('effectOverlay');
+            const toast = document.getElementById('toast');
+            const toastMsg = toast.querySelector('.toast-message');
+            const toastIcon = toast.querySelector('.toast-icon');
+            const mainTitle = document.getElementById('mainTitle');
+            const pointerContainer = document.getElementById('pointerContainer');
+
+            // ── State ──
+            let items = [];
+            let currentRotation = 0;
+            let isSpinning = false;
+            let animationId = null;
+            let confettiPieces = [];
+            let confettiAnimId = null;
+            let currentThemeId = 'sunset';
+            let activeSpinEffects = [];
+            let activeStopEffects = [];
+
+            // ── THEMES ── (same as before)
+            const THEMES = {
+                sunset: {
+                    id: 'sunset',
+                    name: 'Sunset',
+                    colors: ['#FF6B6B', '#FF9F43', '#FECA57', '#FF9FF3', '#F368E0', '#FF4757', '#FF6348', '#F8A5C2',
+                        '#F19066', '#E15F41'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(255,107,107,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(254,202,87,0.25) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #FF4757, #FF9F43, #FECA57)',
+                    buttonGrad: 'linear-gradient(135deg, #FF6B6B, #FECA57)',
+                    buttonShadow: '0 8px 30px rgba(255,107,107,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #FF6B6B, #FECA57)',
+                    resultGrad: 'linear-gradient(135deg, #FF6B6B, #FECA57)',
+                },
+                ocean: {
+                    id: 'ocean',
+                    name: 'Ocean',
+                    colors: ['#0ABDE3', '#10AC84', '#01A3A4', '#00D2D3', '#54A0FF', '#2E86DE', '#1B9CFC', '#00A8FF',
+                        '#006266', '#0984E3'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(0,210,211,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(9,132,227,0.25) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #00D2D3, #0652DD, #1B9CFC)',
+                    buttonGrad: 'linear-gradient(135deg, #00D2D3, #0652DD)',
+                    buttonShadow: '0 8px 30px rgba(0,210,211,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #00D2D3, #0652DD)',
+                    resultGrad: 'linear-gradient(135deg, #00D2D3, #0652DD)',
+                },
+                forest: {
+                    id: 'forest',
+                    name: 'Forest',
+                    colors: ['#2ED573', '#7BED9F', '#F6B93B', '#4A8C5C', '#1E7A3A', '#A3CB38', '#6AB04C', '#BADB57',
+                        '#009432', '#C4E538'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(46,213,115,0.2) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(246,185,59,0.2) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #2ED573, #F6B93B, #6AB04C)',
+                    buttonGrad: 'linear-gradient(135deg, #2ED573, #F6B93B)',
+                    buttonShadow: '0 8px 30px rgba(46,213,115,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #2ED573, #F6B93B)',
+                    resultGrad: 'linear-gradient(135deg, #2ED573, #F6B93B)',
+                },
+                cyberpunk: {
+                    id: 'cyberpunk',
+                    name: 'Cyberpunk',
+                    colors: ['#FF006E', '#00D2FF', '#FFD700', '#9D4EDD', '#F72585', '#7209B7', '#3A0CA3', '#FF0055',
+                        '#00F5D4', '#FFC300'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(255,0,110,0.3) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(0,210,255,0.3) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #FF006E, #00D2FF, #9D4EDD)',
+                    buttonGrad: 'linear-gradient(135deg, #FF006E, #00D2FF)',
+                    buttonShadow: '0 8px 30px rgba(255,0,110,0.5)',
+                    pointerGrad: 'linear-gradient(135deg, #FF006E, #00D2FF)',
+                    resultGrad: 'linear-gradient(135deg, #FF006E, #00D2FF)',
+                },
+                pastel: {
+                    id: 'pastel',
+                    name: 'Pastel',
+                    colors: ['#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF', '#E8BAFF', '#FFB3E6', '#FFC8DD',
+                        '#BDE0FE', '#CDB4DB'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(255,179,186,0.3) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(186,225,255,0.3) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #FFB3BA, #BAFFC9, #BAE1FF)',
+                    buttonGrad: 'linear-gradient(135deg, #FFB3BA, #BAE1FF)',
+                    buttonShadow: '0 8px 30px rgba(255,179,186,0.3)',
+                    pointerGrad: 'linear-gradient(135deg, #FFB3BA, #BAE1FF)',
+                    resultGrad: 'linear-gradient(135deg, #FFB3BA, #BAE1FF)',
+                },
+                galaxy: {
+                    id: 'galaxy',
+                    name: 'Galaxy',
+                    colors: ['#4A00E0', '#8E2DE2', '#3A1C71', '#6A11CB', '#2575FC', '#6B4C9A', '#9D4EDD', '#0D47A1',
+                        '#4A148C', '#1A237E'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(74,0,224,0.3) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(142,45,226,0.3) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #8E2DE2, #2575FC, #4A00E0)',
+                    buttonGrad: 'linear-gradient(135deg, #8E2DE2, #2575FC)',
+                    buttonShadow: '0 8px 30px rgba(74,0,224,0.5)',
+                    pointerGrad: 'linear-gradient(135deg, #8E2DE2, #2575FC)',
+                    resultGrad: 'linear-gradient(135deg, #8E2DE2, #2575FC)',
+                },
+                candy: {
+                    id: 'candy',
+                    name: 'Candy',
+                    colors: ['#FF1493', '#FF4500', '#FFD700', '#32CD32', '#1E90FF', '#FF69B4', '#FF8C00', '#00FF7F',
+                        '#DC143C', '#FFA500'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(255,20,147,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(255,215,0,0.25) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #FF1493, #FFD700, #32CD32)',
+                    buttonGrad: 'linear-gradient(135deg, #FF1493, #FFD700)',
+                    buttonShadow: '0 8px 30px rgba(255,20,147,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #FF1493, #FFD700)',
+                    resultGrad: 'linear-gradient(135deg, #FF1493, #FFD700)',
+                },
+                mono: {
+                    id: 'mono',
+                    name: 'Mono',
+                    colors: ['#D1D5DB', '#9CA3AF', '#6B7280', '#4B5563', '#374151', '#1F2937', '#CBD5E1', '#94A3B8',
+                        '#64748B', '#334155'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(209,213,219,0.15) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(107,114,128,0.15) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #D1D5DB, #6B7280, #1F2937)',
+                    buttonGrad: 'linear-gradient(135deg, #9CA3AF, #374151)',
+                    buttonShadow: '0 8px 30px rgba(107,114,128,0.3)',
+                    pointerGrad: 'linear-gradient(135deg, #D1D5DB, #6B7280)',
+                    resultGrad: 'linear-gradient(135deg, #D1D5DB, #6B7280)',
+                },
+                desert: {
+                    id: 'desert',
+                    name: 'Desert',
+                    colors: ['#E07A5F', '#F4A261', '#E9C46A', '#81B29A', '#3D5A80', '#D4A373', '#CC8B65', '#B5835A',
+                        '#6C584C', '#A98467'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(224,122,95,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(233,196,106,0.25) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #E07A5F, #E9C46A, #3D5A80)',
+                    buttonGrad: 'linear-gradient(135deg, #E07A5F, #E9C46A)',
+                    buttonShadow: '0 8px 30px rgba(224,122,95,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #E07A5F, #E9C46A)',
+                    resultGrad: 'linear-gradient(135deg, #E07A5F, #E9C46A)',
+                },
+                tropical: {
+                    id: 'tropical',
+                    name: 'Tropical',
+                    colors: ['#00F260', '#0575E6', '#FF057C', '#FFD700', '#00C9FF', '#92FE9D', '#F53844', '#FF7EB3',
+                        '#36D1DC', '#FFB75E'
+                    ],
+                    bodyBg: 'radial-gradient(ellipse at 20% 50%, rgba(0,242,96,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 50%, rgba(255,5,124,0.25) 0%, transparent 60%)',
+                    headerGrad: 'linear-gradient(135deg, #00F260, #FF057C, #FFD700)',
+                    buttonGrad: 'linear-gradient(135deg, #00F260, #0575E6)',
+                    buttonShadow: '0 8px 30px rgba(0,242,96,0.4)',
+                    pointerGrad: 'linear-gradient(135deg, #00F260, #0575E6)',
+                    resultGrad: 'linear-gradient(135deg, #00F260, #0575E6)',
+                }
+            };
+
+            const THEME_IDS = Object.keys(THEMES);
+
+            // ── Helpers ──
+            function getColor(index) {
+                const theme = THEMES[currentThemeId];
+                return theme.colors[index % theme.colors.length];
+            }
+
+            function parseItems(text) {
+                return text
+                    .split(/\n|,|;/)
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+            }
+
+            function updateItemCount() {
+                itemCount.textContent = items.length;
+            }
+
+            function setResult(text, emoji = '🎯') {
+                const emojiEl = resultDisplay.querySelector('.result-emoji');
+                const textEl = resultDisplay.querySelector('.result-text');
+                emojiEl.textContent = emoji;
+                textEl.textContent = text;
+                resultDisplay.classList.add('highlight');
+                setTimeout(() => resultDisplay.classList.remove('highlight'), 600);
+            }
+
+            function resetResult() {
+                const emojiEl = resultDisplay.querySelector('.result-emoji');
+                const textEl = resultDisplay.querySelector('.result-text');
+                emojiEl.textContent = '✨';
+                textEl.textContent = items.length ? 'Ready' : 'Add items';
+                resultDisplay.classList.remove('highlight');
+            }
+
+            // ── Toast ──
+            let toastTimeout = null;
+
+            function showToast(message, icon = '✅') {
+                toastMsg.textContent = message;
+                toastIcon.textContent = icon;
+                toast.classList.add('show');
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2600);
+            }
+
+            // ── Draw Wheel ──
+            function drawWheel(rotation) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const radius = Math.min(w, h) / 2 - 16;
+
+                ctx.clearRect(0, 0, w, h);
+
+                if (items.length === 0) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.font = '18px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Add items →', cx, cy);
+                    return;
+                }
+
+                const n = items.length;
+                const slice = (Math.PI * 2) / n;
+
+                for (let i = 0; i < n; i++) {
+                    const start = i * slice + rotation;
+                    const end = start + slice;
+
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.arc(cx, cy, radius, start, end);
+                    ctx.closePath();
+
+                    ctx.fillStyle = getColor(i);
+                    ctx.fill();
+
+                    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    const mid = start + slice / 2;
+                    const labelRadius = radius * 0.68;
+                    const x = cx + Math.cos(mid) * labelRadius;
+                    const y = cy + Math.sin(mid) * labelRadius;
+
+                    const text = items[i];
+                    const fontSize = Math.min(
+                        18,
+                        radius / 12 + 4,
+                        (radius * 0.9) / Math.max(text.length, 2)
+                    );
+
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(mid + (mid > Math.PI / 2 ? Math.PI : 0));
+
+                    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+                    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                    ctx.shadowBlur = 8;
+
+                    const displayText = text.length > 18 ? text.slice(0, 16) + '…' : text;
+                    ctx.fillText(displayText, 0, 0);
+
+                    ctx.restore();
+                }
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius * 0.06, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                for (let i = 0; i < n * 2; i++) {
+                    const angle = (i / (n * 2)) * Math.PI * 2 + rotation;
+                    const dotR = radius - 6;
+                    const dx = cx + Math.cos(angle) * dotR;
+                    const dy = cy + Math.sin(angle) * dotR;
+                    ctx.beginPath();
+                    ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
+                    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)';
+                    ctx.fill();
+                }
+            }
+
+            // ── EFFECTS ENGINE ──
+            // Spin effects list (10)
+            const SPIN_EFFECTS = [
+                'spin-glow',
+                'spin-ring',
+                'spin-rainbow',
+                'spin-sparkle',
+                'spin-pulse',
+                'spin-shake',
+                'spin-flash',
+                'spin-bounce',
+                'spin-wobble',
+                'spin-arrows'
+            ];
+
+            // Stop effects list (5)
+            const STOP_EFFECTS = [
+                'stop-glow',
+                'stop-flash',
+                'stop-bounce',
+                'stop-pop',
+                'stop-stars'
+            ];
+
+            // Remove all effect classes from wheelContainer and overlay
+            function clearAllEffects() {
+                // Remove spin classes
+                SPIN_EFFECTS.forEach(cls => wheelContainer.classList.remove(cls));
+                // Remove stop classes
+                STOP_EFFECTS.forEach(cls => wheelContainer.classList.remove(cls));
+                // Also remove any inline styles added by effects (like background on overlay)
+                effectOverlay.style.background = '';
+                effectOverlay.style.boxShadow = '';
+                // Remove any pseudo-elements added by classes (they are removed with class)
+            }
+
+            // Apply spin effects randomly
+            function applySpinEffects() {
+                clearAllEffects();
+                const applied = [];
+                SPIN_EFFECTS.forEach(effect => {
+                    // 40% chance each
+                    if (Math.random() < 0.4) {
+                        wheelContainer.classList.add(effect);
+                        applied.push(effect);
+                    }
+                });
+                activeSpinEffects = applied;
+                if (applied.length > 0) {
+                    console.log(`🎡 Spin effects: ${applied.join(', ')}`);
+                }
+            }
+
+            // Apply stop effects randomly
+            function applyStopEffects() {
+                // Remove any leftover stop effects
+                STOP_EFFECTS.forEach(cls => wheelContainer.classList.remove(cls));
+                const applied = [];
+                STOP_EFFECTS.forEach(effect => {
+                    // 45% chance each
+                    if (Math.random() < 0.45) {
+                        wheelContainer.classList.add(effect);
+                        applied.push(effect);
+                    }
+                });
+                activeStopEffects = applied;
+                if (applied.length > 0) {
+                    console.log(`🎉 Stop effects: ${applied.join(', ')}`);
+                }
+                // Also decide if we want confetti (50% chance, but we already have a confetti function)
+                if (Math.random() < 0.5) {
+                    launchConfetti();
+                }
+                // If no effects at all, maybe add a simple glow as fallback? But we keep as is.
+                if (applied.length === 0 && Math.random() < 0.3) {
+                    // fallback: just a small glow
+                    wheelContainer.classList.add('stop-glow');
+                    setTimeout(() => wheelContainer.classList.remove('stop-glow'), 2000);
+                }
+            }
+
+            // ── Spin Logic ──
+            function spinWheel() {
+                if (isSpinning) return;
+                if (items.length < 2) {
+                    showToast('Add at least 2 items!', '⚠️');
+                    return;
+                }
+
+                isSpinning = true;
+                spinBtn.disabled = true;
+                spinBtn.querySelector('.btn-text').textContent = '🌀 Spinning…';
+                wheelContainer.classList.add('spinning');
+
+                // Clear any previous stop effects
+                STOP_EFFECTS.forEach(cls => wheelContainer.classList.remove(cls));
+                // Clear confetti if any (but we keep confetti canvas)
+
+                // Apply random spin effects
+                applySpinEffects();
+
+                const extraRotations = 5 + Math.random() * 6;
+                const targetRotation = currentRotation + extraRotations * Math.PI * 2 + (Math.random() * Math.PI * 2);
+
+                const startRotation = currentRotation;
+                const duration = 4000 + Math.random() * 1200;
+                const startTime = performance.now();
+
+                function getWinnerIndex(rot) {
+                    const n = items.length;
+                    const slice = (Math.PI * 2) / n;
+                    let pointerAngle = (-Math.PI / 2 - rot) % (Math.PI * 2);
+                    if (pointerAngle < 0) pointerAngle += Math.PI * 2;
+                    return Math.floor(pointerAngle / slice) % n;
+                }
+
+                function animateSpin(time) {
+                    const elapsed = time - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const current = startRotation + (targetRotation - startRotation) * eased;
+
+                    currentRotation = current;
+                    drawWheel(current);
+
+                    if (progress < 1) {
+                        animationId = requestAnimationFrame(animateSpin);
+                    } else {
+                        currentRotation = targetRotation;
+                        drawWheel(targetRotation);
+
+                        const winnerIdx = getWinnerIndex(targetRotation);
+                        const winner = items[winnerIdx] || '?';
+
+                        setResult(winner, '🎉');
+                        showToast(`🎉 ${winner} selected!`, '🎯');
+
+                        // ── Stop effects ──
+                        // Clear spin effects
+                        SPIN_EFFECTS.forEach(cls => wheelContainer.classList.remove(cls));
+                        wheelContainer.classList.remove('spinning');
+
+                        // Apply random stop effects (including optional confetti)
+                        applyStopEffects();
+
+                        // Also highlight result with a little extra
+                        resultDisplay.classList.add('highlight');
+                        setTimeout(() => resultDisplay.classList.remove('highlight'), 800);
+
+                        isSpinning = false;
+                        spinBtn.disabled = false;
+                        spinBtn.querySelector('.btn-text').textContent = '🎲 Spin';
+                    }
+                }
+
+                animationId = requestAnimationFrame(animateSpin);
+            }
+
+            // ── Confetti ── (kept as a separate function, called optionally from stop effects)
+            const confettiCanvas = document.getElementById('confetti-canvas');
+            const cctx = confettiCanvas.getContext('2d');
+
+            function resizeConfetti() {
+                confettiCanvas.width = window.innerWidth;
+                confettiCanvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resizeConfetti);
+            resizeConfetti();
+
+            class ConfettiPiece {
+                constructor() {
+                    this.x = Math.random() * confettiCanvas.width;
+                    this.y = Math.random() * confettiCanvas.height - confettiCanvas.height;
+                    this.w = 6 + Math.random() * 8;
+                    this.h = 4 + Math.random() * 6;
+                    const theme = THEMES[currentThemeId];
+                    this.color = theme.colors[Math.floor(Math.random() * theme.colors.length)];
+                    this.rotation = Math.random() * Math.PI * 2;
+                    this.rotSpeed = (Math.random() - 0.5) * 0.2;
+                    this.vy = 2 + Math.random() * 4;
+                    this.vx = (Math.random() - 0.5) * 3;
+                    this.gravity = 0.06 + Math.random() * 0.04;
+                    this.friction = 0.99;
+                    this.life = 1;
+                    this.decay = 0.003 + Math.random() * 0.004;
+                }
+
+                update() {
+                    this.vy += this.gravity;
+                    this.vx *= this.friction;
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.rotation += this.rotSpeed;
+                    this.life -= this.decay;
+                    return this.life > 0 && this.y < confettiCanvas.height + 50;
+                }
+
+                draw() {
+                    cctx.save();
+                    cctx.translate(this.x, this.y);
+                    cctx.rotate(this.rotation);
+                    cctx.globalAlpha = this.life * 0.85;
+                    cctx.fillStyle = this.color;
+                    cctx.shadowColor = 'rgba(0,0,0,0.1)';
+                    cctx.shadowBlur = 4;
+                    cctx.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+                    cctx.restore();
+                }
+            }
+
+            function launchConfetti() {
+                const count = 120 + Math.floor(Math.random() * 80);
+                for (let i = 0; i < count; i++) {
+                    confettiPieces.push(new ConfettiPiece());
+                }
+                if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
+                animateConfetti();
+            }
+
+            function animateConfetti() {
+                cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                let alive = false;
+                for (let i = confettiPieces.length - 1; i >= 0; i--) {
+                    const p = confettiPieces[i];
+                    if (p.update()) {
+                        p.draw();
+                        alive = true;
+                    } else {
+                        confettiPieces.splice(i, 1);
+                    }
+                }
+                if (alive || confettiPieces.length > 0) {
+                    confettiAnimId = requestAnimationFrame(animateConfetti);
+                } else {
+                    cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                    confettiAnimId = null;
+                }
+            }
+
+            // ── THEME APPLICATION ──
+            function applyTheme(themeId) {
+                const theme = THEMES[themeId];
+                if (!theme) return;
+
+                currentThemeId = themeId;
+
+                document.body.style.backgroundImage = theme.bodyBg;
+                document.body.style.backgroundColor = '#0b0d15';
+
+                mainTitle.style.background = theme.headerGrad;
+                mainTitle.style.webkitBackgroundClip = 'text';
+                mainTitle.style.webkitTextFillColor = 'transparent';
+                mainTitle.style.backgroundClip = 'text';
+
+                spinBtn.style.background = theme.buttonGrad;
+                spinBtn.style.boxShadow = theme.buttonShadow;
+
+                const resultText = resultDisplay.querySelector('.result-text');
+                resultText.style.background = theme.resultGrad;
+                resultText.style.webkitBackgroundClip = 'text';
+                resultText.style.webkitTextFillColor = 'transparent';
+                resultText.style.backgroundClip = 'text';
+
+                const gradEl = document.querySelector('#pointerGrad');
+                if (gradEl) {
+                    const stops = gradEl.querySelectorAll('stop');
+                    const colors = theme.pointerGrad.match(/#[0-9a-f]{6}/gi) || ['#b7a9ff', '#f472b6'];
+                    if (stops.length >= 2) {
+                        stops[0].setAttribute('stop-color', colors[0] || '#b7a9ff');
+                        stops[1].setAttribute('stop-color', colors[1] || '#f472b6');
+                    }
+                }
+
+                document.querySelectorAll('.theme-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.theme === themeId);
+                });
+
+                drawWheel(currentRotation);
+            }
+
+            // ── Build Theme Selector ──
+            function buildThemeSelector() {
+                themeSelector.innerHTML = '<label>🎨 Theme</label>';
+                THEME_IDS.forEach(id => {
+                    const theme = THEMES[id];
+                    const btn = document.createElement('button');
+                    btn.className = 'theme-btn';
+                    btn.dataset.theme = id;
+                    const swatch = document.createElement('span');
+                    swatch.className = 'swatch';
+                    swatch.style.background = theme.colors[0];
+                    btn.appendChild(swatch);
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'theme-name';
+                    nameSpan.textContent = theme.name;
+                    btn.appendChild(nameSpan);
+                    btn.addEventListener('click', () => {
+                        applyTheme(id);
+                        showToast(`🎨 Switched to ${theme.name}`, '🎨');
+                    });
+                    themeSelector.appendChild(btn);
+                });
+            }
+
+            // ── Generate Wheel from Items ──
+            function generateWheel() {
+                const text = itemInput.value;
+                const parsed = parseItems(text);
+                if (parsed.length === 0) {
+                    showToast('Please enter at least one item', '⚠️');
+                    return;
+                }
+                items = parsed;
+                updateItemCount();
+                currentRotation = 0;
+                drawWheel(0);
+                resetResult();
+                showToast(`✅ ${items.length} items loaded`, '📋');
+                saveToLocal();
+            }
+
+            // ── Local Storage ──
+            function saveToLocal() {
+                try {
+                    localStorage.setItem('spinner_items', JSON.stringify(items));
+                    localStorage.setItem('spinner_items_raw', itemInput.value);
+                    localStorage.setItem('spinner_theme', currentThemeId);
+                } catch (_) { /* ignore */ }
+            }
+
+            function loadFromLocal() {
+                try {
+                    const raw = localStorage.getItem('spinner_items_raw');
+                    const saved = localStorage.getItem('spinner_items');
+                    const theme = localStorage.getItem('spinner_theme');
+                    if (theme && THEMES[theme]) {
+                        applyTheme(theme);
+                    }
+                    if (raw) {
+                        itemInput.value = raw;
+                    }
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            items = parsed;
+                            updateItemCount();
+                            currentRotation = 0;
+                            drawWheel(0);
+                            resetResult();
+                            return true;
+                        }
+                    }
+                    return false;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            function clearAll() {
+                items = [];
+                itemInput.value = '';
+                updateItemCount();
+                currentRotation = 0;
+                drawWheel(0);
+                resetResult();
+                try {
+                    localStorage.removeItem('spinner_items');
+                    localStorage.removeItem('spinner_items_raw');
+                } catch (_) {}
+                showToast('🗑️ Cleared', '🗑️');
+            }
+
+            // ── Example Data ──
+            function loadExample() {
+                const example = [
+                    'Option 1', 'Option 2', 'Option 3', 'Option 4',
+                    'Option 5', 'Option 6', 'Option 7', 'Option 8',
+                    'Option 9', 'Option 10'
+                ];
+                itemInput.value = example.join('\n');
+                generateWheel();
+                showToast('📋 Example loaded', '📋');
+            }
+
+            // ── Init ──
+            function init() {
+                buildThemeSelector();
+
+                const loaded = loadFromLocal();
+
+                if (!loaded) {
+                    applyTheme('sunset');
+                    loadExample();
+                } else {
+                    const savedTheme = localStorage.getItem('spinner_theme');
+                    if (savedTheme && THEMES[savedTheme]) {
+                        applyTheme(savedTheme);
+                    } else {
+                        applyTheme('sunset');
+                    }
+                    drawWheel(0);
+                    resetResult();
+                }
+
+                // ── Event Listeners ──
+                spinBtn.addEventListener('click', spinWheel);
+                generateBtn.addEventListener('click', generateWheel);
+                exampleBtn.addEventListener('click', loadExample);
+
+                saveBtn.addEventListener('click', () => {
+                    const text = itemInput.value;
+                    const parsed = parseItems(text);
+                    if (parsed.length === 0) {
+                        showToast('Nothing to save', '⚠️');
+                        return;
+                    }
+                    items = parsed;
+                    updateItemCount();
+                    currentRotation = 0;
+                    drawWheel(0);
+                    resetResult();
+                    saveToLocal();
+                    showToast('💾 Saved to browser', '💾');
+                });
+
+                loadBtn.addEventListener('click', () => {
+                    const ok = loadFromLocal();
+                    if (ok) {
+                        drawWheel(0);
+                        resetResult();
+                        showToast('📂 Loaded saved data', '📂');
+                    } else {
+                        showToast('No saved data found', '📭');
+                    }
+                });
+
+                clearBtn.addEventListener('click', () => {
+                    if (items.length === 0 && !itemInput.value.trim()) {
+                        showToast('Already empty', '🧹');
+                        return;
+                    }
+                    if (confirm('Clear all items?')) {
+                        clearAll();
+                    }
+                });
+
+                let pasteTimeout = null;
+                itemInput.addEventListener('input', () => {
+                    clearTimeout(pasteTimeout);
+                    pasteTimeout = setTimeout(() => {
+                        const parsed = parseItems(itemInput.value);
+                        itemCount.textContent = parsed.length;
+                    }, 300);
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && !isSpinning) {
+                        spinWheel();
+                    }
+                });
+
+                canvas.addEventListener('click', () => {
+                    if (!isSpinning) spinWheel();
+                });
+
+                drawWheel(0);
+                updateItemCount();
+                if (items.length === 0) resetResult();
+
+                console.log('🎡 Spinner with 10 spin FX & 5 stop FX ready!');
+            }
+
+            // ── Start ──
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+        })();
+    <\/script>
+
+</body>
+</html></script>
+<script type="text/plain" id="tool-coin"><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Coin Flip – Reverse Call</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      overflow: hidden;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    #result {
+      position: absolute;
+      bottom: 40px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #fff;
+      font-size: 36px;
+      font-weight: 700;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.2);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(20px) scale(0.9);
+      transition: opacity 0.8s cubic-bezier(0.23, 1, 0.32, 1), transform 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+      letter-spacing: 2px;
+    }
+    #result.show {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    #restart-btn {
+      position: absolute;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 28px;
+      font-size: 16px;
+      background: rgba(255, 215, 0, 0.15);
+      color: #ffd700;
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      border-radius: 40px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      transition: all 0.3s ease;
+      letter-spacing: 1px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #restart-btn.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #restart-btn:hover {
+      background: rgba(255, 215, 0, 0.25);
+      border-color: #ffd700;
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="result">
+    🪙 <span id="side-text">HEADS</span>
+  </div>
+  <button id="restart-btn">↻ Flip again</button>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  <\/script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ─── Scene setup ───────────────────────────────────────────────
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    scene.fog = new THREE.Fog(0x1a1a2e, 8, 16);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 30);
+    camera.position.set(3.8, 2.8, 5.2);
+    camera.lookAt(0, 1.2, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    document.body.prepend(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.2, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 12;
+    controls.maxPolarAngle = Math.PI / 2.1;
+    controls.update();
+
+    // ─── Lights ────────────────────────────────────────────────────
+    const ambient = new THREE.AmbientLight(0x404060, 0.5);
+    scene.add(ambient);
+
+    const mainLight = new THREE.DirectionalLight(0xffeedd, 2.8);
+    mainLight.position.set(4, 8, 3);
+    mainLight.castShadow = true;
+    mainLight.shadow.mapSize.width = 1024;
+    mainLight.shadow.mapSize.height = 1024;
+    mainLight.shadow.camera.near = 0.5;
+    mainLight.shadow.camera.far = 20;
+    mainLight.shadow.camera.left = -6;
+    mainLight.shadow.camera.right = 6;
+    mainLight.shadow.camera.top = 6;
+    mainLight.shadow.camera.bottom = -6;
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0x88bbff, 0.6);
+    fillLight.position.set(-3, 2, 4);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffcc88, 0.5);
+    rimLight.position.set(-2, 1, -5);
+    scene.add(rimLight);
+
+    const pointLight = new THREE.PointLight(0xffd700, 0.4, 8);
+    pointLight.position.set(0, 5, 0);
+    scene.add(pointLight);
+
+    // ─── Table ─────────────────────────────────────────────────────
+    const tableMat = new THREE.MeshStandardMaterial({
+      color: 0x4a2f1b,
+      roughness: 0.7,
+      metalness: 0.05,
+    });
+    const table = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), tableMat);
+    table.rotation.x = -Math.PI / 2;
+    table.position.y = 0;
+    table.receiveShadow = true;
+    scene.add(table);
+
+    const ringGeo = new THREE.RingGeometry(2.2, 2.6, 64);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0x5a3f2a,
+      roughness: 0.8,
+      metalness: 0.1,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.3,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.001;
+    scene.add(ring);
+
+    // ─── Coin textures ────────────────────────────────────────────
+    function createHeadsTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+      grad.addColorStop(0, '#ffe87a');
+      grad.addColorStop(0.6, '#f5b81b');
+      grad.addColorStop(1, '#b8860b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#8b6508';
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.arc(256, 256, 210, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#a67c00';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(256, 256, 175, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#8b6508';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 12;
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const r = 145;
+        const x = 256 + Math.cos(angle) * r;
+        const y = 256 + Math.sin(angle) * r;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = '#4a2e00';
+      ctx.font = 'bold 102px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('HEADS', 256, 268);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#6b4400';
+      ctx.font = 'bold 100px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('HEADS', 256, 266);
+      ctx.fillStyle = '#8b6508';
+      ctx.font = '28px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('2026', 256, 370);
+      return c;
+    }
+
+    function createTailsTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+      grad.addColorStop(0, '#f0f0f0');
+      grad.addColorStop(0.5, '#c0c0c0');
+      grad.addColorStop(1, '#8a8a8a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#6a6a6a';
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.arc(256, 256, 210, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#9a9a9a';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(256, 256, 175, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#6a6a6a';
+      ctx.shadowColor = 'rgba(0,0,0,0.2)';
+      ctx.shadowBlur = 10;
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const r = 140;
+        const x = 256 + Math.cos(angle) * r;
+        const y = 256 + Math.sin(angle) * r;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 16, 8, angle, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#3a3a3a';
+      ctx.font = 'bold 102px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('TAILS', 256, 268);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#555';
+      ctx.font = 'bold 100px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('TAILS', 256, 266);
+      ctx.fillStyle = '#6a6a6a';
+      ctx.font = '28px "Segoe UI", Arial, sans-serif';
+      ctx.fillText('2026', 256, 370);
+      return c;
+    }
+
+    // ─── Build coin ───────────────────────────────────────────────
+    const coinRadius = 1.2;
+    const coinHeight = 0.2;
+
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0xbbaa88,
+      metalness: 0.85,
+      roughness: 0.35,
+    });
+    const topMat = new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(createHeadsTexture()),
+      metalness: 0.25,
+      roughness: 0.4,
+    });
+    const bottomMat = new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(createTailsTexture()),
+      metalness: 0.25,
+      roughness: 0.4,
+    });
+
+    const coinGeo = new THREE.CylinderGeometry(coinRadius, coinRadius, coinHeight, 80);
+    const coin = new THREE.Mesh(coinGeo, [sideMat, topMat, bottomMat]);
+    coin.castShadow = true;
+    coin.receiveShadow = true;
+    coin.position.set(0, 0.1, 0);
+    scene.add(coin);
+
+    const rimGeo = new THREE.TorusGeometry(coinRadius - 0.02, 0.04, 16, 80);
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0xffdd99,
+      metalness: 0.9,
+      roughness: 0.2,
+      emissive: 0x332211,
+      emissiveIntensity: 0.1,
+    });
+    const rimRing = new THREE.Mesh(rimGeo, rimMat);
+    rimRing.rotation.x = Math.PI / 2;
+    rimRing.position.y = 0;
+    coin.add(rimRing);
+
+    // ─── Animation state ──────────────────────────────────────────
+    const clock = new THREE.Clock();
+    let animState = 'flipping';
+    let flipStartTime = 0;
+    const FLIP_DURATION = 2.8;
+    const TOTAL_FLIPS_Z = 3.5;
+
+    // Random outcome (true = heads UP)
+    let isHeads = true;
+    let finalRotX = 0;
+
+    const resultEl = document.getElementById('result');
+    const sideText = document.getElementById('side-text');
+    const restartBtn = document.getElementById('restart-btn');
+
+    function resetFlip() {
+      // Randomly decide which side ends up facing UP
+      isHeads = Math.random() < 0.5;
+      // final rotation: 0 for heads up, PI for tails up
+      finalRotX = (isHeads ? 0 : Math.PI);
+
+      coin.position.set(0, 0.1, 0);
+      coin.rotation.set(0, 0, 0);
+      animState = 'flipping';
+      flipStartTime = clock.getElapsedTime();
+      resultEl.classList.remove('show');
+      restartBtn.classList.remove('show');
+    }
+
+    // ─── Animation loop ──────────────────────────────────────────
+    function animate() {
+      const elapsed = clock.getElapsedTime();
+      const delta = clock.getDelta();
+
+      if (animState === 'flipping') {
+        const t = (elapsed - flipStartTime) / FLIP_DURATION;
+        const p = Math.min(t, 1);
+        const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        const y = 0.1 + 4.2 * Math.sin(p * Math.PI);
+
+        // Spin: linearly interpolate to finalRotX
+        const currentRotX = p * finalRotX;
+        const rotZ = p * TOTAL_FLIPS_Z * 2 * Math.PI;
+        const rotY = p * 1.2 * Math.PI;
+
+        coin.position.set(0, y, 0);
+        coin.rotation.x = currentRotX;
+        coin.rotation.z = rotZ;
+        coin.rotation.y = rotY;
+
+        if (p >= 1) {
+          animState = 'wobbling';
+          // REVERSED: show the SIDE THAT IS DOWN
+          // If heads is up => tails is down, and vice versa
+          sideText.textContent = isHeads ? 'TAILS' : 'HEADS';
+          resultEl.classList.add('show');
+          setTimeout(() => restartBtn.classList.add('show'), 1200);
+        }
+      } else if (animState === 'wobbling') {
+        const wobbleStart = flipStartTime + FLIP_DURATION;
+        const wobbleT = elapsed - wobbleStart;
+        const decay = Math.exp(-wobbleT * 4.5);
+
+        const rotXOffset = Math.sin(wobbleT * 28 + 1.2) * 0.035 * decay;
+        const rotZOffset = Math.cos(wobbleT * 32 + 0.7) * 0.035 * decay;
+        const yOffset = Math.sin(wobbleT * 45) * 0.012 * decay;
+        const rotYOffset = Math.sin(wobbleT * 15) * 0.006 * decay;
+
+        coin.position.y = 0.1 + yOffset;
+        coin.rotation.x = finalRotX + rotXOffset;
+        coin.rotation.z = TOTAL_FLIPS_Z * 2 * Math.PI + rotZOffset;
+        coin.rotation.y += rotYOffset * 0.02;
+
+        if (decay < 0.002) {
+          animState = 'done';
+          coin.position.y = 0.1;
+          coin.rotation.x = finalRotX;
+          coin.rotation.z = TOTAL_FLIPS_Z * 2 * Math.PI;
+        }
+      } else {
+        // idle rotation
+        coin.rotation.y += delta * 0.04;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    // ─── Restart ──────────────────────────────────────────────────
+    restartBtn.addEventListener('click', resetFlip);
+
+    // ─── Resize ──────────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ─── Start ──────────────────────────────────────────────────
+    resetFlip();
+    animate();
+  <\/script>
 </body>
 </html></script>
 <script type="text/plain" id="tool-qrcode"><!DOCTYPE html>
