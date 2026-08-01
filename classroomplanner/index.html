@@ -1322,6 +1322,17 @@
         }
         .ct-menu-item:hover { background: #f1f5f9; }
         .ct-divider { height: 1px; background: #e2e8f0; margin: 5px 8px; }
+        .note-reveal-btn {
+            background: #f1f5f9; border: 1px solid #cbd5e0; color: #475569;
+            font-size: 0.72rem; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+            font-family: inherit; white-space: nowrap;
+        }
+        .note-reveal-btn:hover { background: #e2e8f0; border-color: #94a3b8; color: #2c3e50; }
+        .note-entry.note-older { opacity: 0.62; border-left: 2px solid #e2e8f0; }
+        .note-older-tag {
+            background: #f1f5f9; color: #94a3b8; font-size: 0.62rem; font-weight: 700;
+            padding: 1px 6px; border-radius: 999px; margin-left: 6px;
+        }
         .ct-caret { margin-left: auto; color: #94a3b8; font-size: 0.8rem; transition: transform 0.15s; flex-shrink: 0; }
         .ct-submenu-toggle.open .ct-caret { transform: rotate(180deg); }
         .ct-submenu { display: none; }
@@ -5457,6 +5468,9 @@
         }
         function closeModal() {
             document.getElementById('modal-backdrop').classList.remove('show');
+            // Never leave a student's full history revealed for the next time
+            // the modal opens — it has to be a deliberate act each time.
+            showAllNotesFor = null;
         }
         function closeModalIfBackdrop(e) {
             if (e.target.id === 'modal-backdrop') closeModal();
@@ -6079,6 +6093,14 @@
             openStudentModal(name);
         }
 
+        // Which student's full note history is currently revealed (null = none).
+        var showAllNotesFor = null;
+
+        function toggleAllNotes(name) {
+            showAllNotesFor = (showAllNotesFor === name) ? null : name;
+            openStudentModal(name);
+        }
+
         function openStudentModal(name) {
             if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
             var d = liveState.studentData[name];
@@ -6114,28 +6136,51 @@
                 }
             }
 
+            // The teacher can reveal the full history deliberately. It resets to
+            // hidden whenever a different student is opened, so it never stays
+            // revealed by accident with a student watching.
+            if (showAllNotesFor !== name) showAllNotesFor = null;
+            var showingAll = (showAllNotesFor === name) && hiddenCount > 0;
+            var listNotes = showingAll ? d.notes : visibleNotes;
+
             var notesHtml = '';
-            var scopeLabel = liveState.activeLesson
-                ? 'This lesson'
-                : ((liveState.completedLessons || []).length ? 'Last lesson' : 'Notes');
-            if (visibleNotes.length === 0) {
+            var scopeLabel = showingAll
+                ? 'All notes'
+                : (liveState.activeLesson
+                    ? 'This lesson'
+                    : ((liveState.completedLessons || []).length ? 'Last lesson' : 'Notes'));
+            if (listNotes.length === 0) {
                 notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">' +
                             (hiddenCount ? 'No notes this lesson.' : 'No notes yet.') + '</div>';
             } else {
-                visibleNotes.slice().reverse().forEach(function(n) {
+                var currentCutoff = liveState.activeLesson
+                    ? (liveState.activeLesson.startedAt || 0)
+                    : ((liveState.completedLessons || []).length
+                        ? liveState.completedLessons[liveState.completedLessons.length - 1].startedAt
+                        : 0);
+                listNotes.slice().reverse().forEach(function(n) {
                     var lpChip = '';
                     if (n.lpPosted) {
                         lpChip = ' <span style="background:#dcfce7;color:#065f46;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;" title="Auto-posted to Learner Profile System">✓ Posted to LP</span>';
                     } else if (n.lpPostError) {
                         lpChip = ' <span style="background:#fee2e2;color:#991b1b;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;" title="' + escapeAttr(n.lpPostError) + '">LP post failed</span>';
                     }
-                    notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + lpChip + '</span>' + escapeHtml(n.text) + '</div>';
+                    var isOlder = showingAll && (n.ts || 0) < currentCutoff;
+                    notesHtml += '<div class="note-entry' + (isOlder ? ' note-older' : '') + '">' +
+                                 '<span class="note-ts">' + formatTs(n.ts) + lpChip +
+                                 (isOlder ? ' <span class="note-older-tag">earlier</span>' : '') +
+                                 '</span>' + escapeHtml(n.text) + '</div>';
                 });
             }
             if (hiddenCount > 0) {
-                notesHtml += '<div style="color:#94a3b8;font-size:0.72rem;font-style:italic;margin-top:6px;">' +
-                             hiddenCount + ' earlier note' + (hiddenCount === 1 ? '' : 's') +
-                             ' kept in the Learner Profile, hidden here.</div>';
+                notesHtml += '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">' +
+                             '<button class="note-reveal-btn" onclick="toggleAllNotes(\'' + escapeAttr(name) + '\')">' +
+                                (showingAll ? '\u25B4 Hide earlier notes' : '\u25BE Show ' + hiddenCount + ' earlier note' + (hiddenCount === 1 ? '' : 's')) +
+                             '</button>' +
+                             '<span style="color:#94a3b8;font-size:0.7rem;font-style:italic;">' +
+                                (showingAll ? 'Careful \u2014 visible to the student' : 'kept in the Learner Profile') +
+                             '</span>' +
+                             '</div>';
             }
             // Attendance section — only shown when a lesson is active
             var attHtml = '';
@@ -6182,7 +6227,7 @@
                 '</div>' +
                 '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:10px;">' +
                     '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">' +
-                        'Notes \u00b7 ' + scopeLabel + ' (' + visibleNotes.length + ')</div>' +
+                        'Notes \u00b7 ' + scopeLabel + ' (' + listNotes.length + ')</div>' +
                     notesHtml +
                 '</div>';
             openModal(html);
