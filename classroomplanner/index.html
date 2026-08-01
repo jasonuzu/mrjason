@@ -6093,11 +6093,36 @@
             var lpChip = lpId
                 ? '<span style="display:inline-block;background:#eef4ff;color:#4a6fa5;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;" title="Linked to Learner Profile ' + escapeAttr(lpId) + '">🔗 LP: ' + escapeHtml(lpId) + '</span>'
                 : '';
-            var notesHtml = '';
-            if (d.notes.length === 0) {
-                notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">No notes yet.</div>';
+            // Notes shown here are limited to the lesson in progress. A student
+            // standing at the desk shouldn't be re-reading weeks of past remarks;
+            // the full history is still stored and visible in the Learner Profile.
+            var visibleNotes = d.notes;
+            var hiddenCount = 0;
+            if (liveState.activeLesson) {
+                var lessonStart = liveState.activeLesson.startedAt || 0;
+                visibleNotes = d.notes.filter(function(n) { return (n.ts || 0) >= lessonStart; });
+                hiddenCount = d.notes.length - visibleNotes.length;
             } else {
-                d.notes.slice().reverse().forEach(function(n) {
+                // Outside a lesson, show only notes from the most recent one so the
+                // modal never becomes a running tally of everything.
+                var lastLesson = (liveState.completedLessons || [])[(liveState.completedLessons || []).length - 1];
+                if (lastLesson) {
+                    visibleNotes = d.notes.filter(function(n) {
+                        return (n.ts || 0) >= lastLesson.startedAt && (n.ts || 0) <= lastLesson.endedAt;
+                    });
+                    hiddenCount = d.notes.length - visibleNotes.length;
+                }
+            }
+
+            var notesHtml = '';
+            var scopeLabel = liveState.activeLesson
+                ? 'This lesson'
+                : ((liveState.completedLessons || []).length ? 'Last lesson' : 'Notes');
+            if (visibleNotes.length === 0) {
+                notesHtml = '<div style="color:#94a3b8;font-size:0.85rem;font-style:italic;margin:8px 0;">' +
+                            (hiddenCount ? 'No notes this lesson.' : 'No notes yet.') + '</div>';
+            } else {
+                visibleNotes.slice().reverse().forEach(function(n) {
                     var lpChip = '';
                     if (n.lpPosted) {
                         lpChip = ' <span style="background:#dcfce7;color:#065f46;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;" title="Auto-posted to Learner Profile System">✓ Posted to LP</span>';
@@ -6106,6 +6131,11 @@
                     }
                     notesHtml += '<div class="note-entry"><span class="note-ts">' + formatTs(n.ts) + lpChip + '</span>' + escapeHtml(n.text) + '</div>';
                 });
+            }
+            if (hiddenCount > 0) {
+                notesHtml += '<div style="color:#94a3b8;font-size:0.72rem;font-style:italic;margin-top:6px;">' +
+                             hiddenCount + ' earlier note' + (hiddenCount === 1 ? '' : 's') +
+                             ' kept in the Learner Profile, hidden here.</div>';
             }
             // Attendance section — only shown when a lesson is active
             var attHtml = '';
@@ -6151,7 +6181,8 @@
                     '<button onclick="saveStudentNote(\'' + escapeAttr(name) + '\')">Save Note</button>' +
                 '</div>' +
                 '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:10px;">' +
-                    '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">Note history (' + d.notes.length + ')</div>' +
+                    '<div style="font-size:0.8rem;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:8px;">' +
+                        'Notes \u00b7 ' + scopeLabel + ' (' + visibleNotes.length + ')</div>' +
                     notesHtml +
                 '</div>';
             openModal(html);
