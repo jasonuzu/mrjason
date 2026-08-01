@@ -894,6 +894,19 @@
             border-color: #4a6fa5;
             background: #edf2f9;
         }
+        /* Group point award: the card pulses in the same colours as the desks */
+        .group-card.group-point-earned { animation: groupPointEarned 0.9s ease-out; }
+        .group-card.group-point-lost   { animation: groupPointLost 0.9s ease-out; }
+        @keyframes groupPointEarned {
+            0%   { box-shadow: 0 0 0 0 rgba(241,196,15,0.9); }
+            30%  { box-shadow: 0 0 0 6px rgba(241,196,15,0.55); background: #fffbeb; }
+            100% { box-shadow: 0 0 0 0 rgba(241,196,15,0); }
+        }
+        @keyframes groupPointLost {
+            0%   { box-shadow: 0 0 0 0 rgba(220,38,38,0.85); }
+            30%  { box-shadow: 0 0 0 6px rgba(220,38,38,0.5); background: #fef2f2; }
+            100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+        }
         /* Random-group roll: mirrors the desk picking/winner animation */
         .group-card.picking {
             border-color: #f1c40f;
@@ -4535,7 +4548,7 @@
                     el.onclick = (function(n) {
                         return function() {
                             if (isInAttendanceMode()) cycleAttendance(n);
-                            else checkLessonWarning(function() { openStudentModal(n); });
+                            else checkLessonWarning(function() { openStudentModalPlain(n); });
                         };
                     })(name);
                 } else if (item.type === 'line') {
@@ -6053,6 +6066,19 @@
             return html;
         }
 
+        function backToGroupPanel() {
+            var gid = lastGroupForStudentModal;
+            lastGroupForStudentModal = null;
+            closeModal();
+            if (gid) showRandomGroupModal(gid);
+        }
+
+        // Any entry point other than a group pick clears the breadcrumb.
+        function openStudentModalPlain(name) {
+            lastGroupForStudentModal = null;
+            openStudentModal(name);
+        }
+
         function openStudentModal(name) {
             if (!liveState.studentData[name]) liveState.studentData[name] = { points: 0, notes: [] };
             var d = liveState.studentData[name];
@@ -6117,6 +6143,11 @@
                 '<textarea class="modal-input" id="stu-note-input" placeholder="Observation, participation, behavior, etc."></textarea>' +
                 '<div class="modal-actions">' +
                     '<button class="export-btn" onclick="closeModal()">Close</button>' +
+                    // Only shown when this modal came from a group pick, so the
+                    // teacher can step back rather than losing the group.
+                    (lastGroupForStudentModal
+                        ? '<button class="export-btn" onclick="backToGroupPanel()">\u2039 Back to group</button>'
+                        : '') +
                     '<button onclick="saveStudentNote(\'' + escapeAttr(name) + '\')">Save Note</button>' +
                 '</div>' +
                 '<div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:10px;">' +
@@ -6708,7 +6739,7 @@
             html += '<div class="modal-actions">';
             html += '<button class="export-btn" onclick="closeModal()">Close</button>';
             html += '<button class="export-btn" onclick="closeModal();pickRandomGroup();">🎲 Pick another</button>';
-            html += '<button class="automation" onclick="pickFromGroup(\'' + g.id + '\')">Pick a student from this group</button>';
+            html += '<button class="automation" onclick="pickFromGroup(\'' + g.id + '\', true)">Pick a student from this group</button>';
             html += '</div>';
             openModal(html);
         }
@@ -6723,8 +6754,8 @@
                 return;
             }
             checkLessonWarning(function() {
-                // Mutate every member first, then render once — calling the
-                // single-student helper per member would re-render N times.
+                // Mutate every member first so the totals are correct, then update
+                // the desks surgically — a full re-render would wipe the animation.
                 eligible.forEach(function(m) {
                     if (!liveState.studentData[m]) liveState.studentData[m] = { points: 0, notes: [] };
                     liveState.studentData[m].points += delta;
@@ -6734,17 +6765,85 @@
                 });
                 logEvent('group_points', { group: g.name, delta: delta, count: eligible.length });
                 saveLiveState();
-                renderLiveView();
-                if (fromModal) showRandomGroupModal(gid);
+
+                // Ripple the award across the group's desks, one just after the
+                // next, so it reads as a group event rather than a single flash.
+                eligible.forEach(function(m, i) {
+                    setTimeout(function() {
+                        updateStudentPointBadgeDOM(m);
+                        animateGroupPointAdd(m, delta, i === 0);
+                    }, i * 110);
+                });
+
+                // Flash the group's own card in the panel to tie it together
+                flashGroupCard(gid, delta);
+                renderGroupsPanel();
+
+                if (fromModal) {
+                    // Let the ripple play before the panel redraws over it
+                    setTimeout(function() { showRandomGroupModal(gid); }, eligible.length * 110 + 500);
+                }
             });
         }
 
-        function pickFromGroup(gid) {
+        // Same desk feedback as an individual award, but the chime only plays on
+        // the first desk — one sound for the group, not one per student.
+        function animateGroupPointAdd(name, delta, withSound) {
+            var deskEl = null;
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                if (el.getAttribute('data-name') === name) deskEl = el;
+            });
+            if (!deskEl) { if (withSound) playPointSound(delta); return; }
+
+            var animClass = delta >= 0 ? 'point-earned' : 'point-lost';
+            deskEl.classList.remove(animClass);
+            void deskEl.offsetWidth;
+            deskEl.classList.add(animClass);
+            setTimeout(function() { deskEl.classList.remove(animClass); }, 800);
+
+            var canvas = document.getElementById('live-canvas');
+            if (canvas) {
+                var bubble = document.createElement('div');
+                bubble.className = 'point-float' + (delta < 0 ? ' neg' : '');
+                bubble.textContent = (delta > 0 ? '+' : '') + delta;
+                bubble.style.left = ((parseInt(deskEl.style.left) || 0) + (deskEl.offsetWidth / 2)) + 'px';
+                bubble.style.top  = ((parseInt(deskEl.style.top)  || 0) - 4) + 'px';
+                canvas.appendChild(bubble);
+                setTimeout(function() { if (bubble.parentNode) bubble.remove(); }, 1200);
+            }
+
+            if (withSound) playPointSound(delta);
+        }
+
+        function flashGroupCard(gid, delta) {
+            var card = document.querySelector('.group-card[data-gid="' + gid + '"]');
+            if (!card) return;
+            var cls = delta >= 0 ? 'group-point-earned' : 'group-point-lost';
+            card.classList.remove(cls);
+            void card.offsetWidth;
+            card.classList.add(cls);
+            setTimeout(function() { card.classList.remove(cls); }, 900);
+        }
+
+        function pickFromGroup(gid, showProfile) {
             var g = liveState.groups.find(x => x.id === gid);
             if (!g) return;
             if (g.members.length === 0) { alert("This group has no students yet."); return; }
-            pickRandomFromPool(g.members, 1);
+            // Close the group panel so the roll is visible on the canvas, then
+            // bring the chosen student's profile up once it lands.
+            if (showProfile) closeModal();
+            pickRandomFromPool(g.members, 1, showProfile ? function(names) {
+                if (!names.length) return;
+                setTimeout(function() {
+                    lastGroupForStudentModal = gid;
+                    openStudentModal(names[0]);
+                }, 700);
+            } : null);
         }
+
+        // Remembers which group a student modal was opened from, so the modal can
+        // offer a way back to the group panel instead of a dead end.
+        var lastGroupForStudentModal = null;
 
         // Anyone marked absent during an active lesson is excluded from random picks.
         // (Late students remain eligible — they're just late, not out.)
@@ -6753,7 +6852,7 @@
             return liveState.activeLesson.attendance[name] !== 'absent';
         }
 
-        function pickRandomFromPool(pool, count) {
+        function pickRandomFromPool(pool, count, onLanded) {
             var allDeskEls = Array.from(document.querySelectorAll('#live-canvas .live-student'));
             if (allDeskEls.length === 0) { alert("No students on the layout yet."); return; }
 
@@ -6814,9 +6913,11 @@
                 allDeskEls.forEach(el => el.classList.remove('picking'));
                 winners.forEach(el => el.classList.add('winner'));
                 playFanfare();
-                showWinnerBanner(winners.map(el => el.getAttribute('data-name')));
-                logEvent('random_pick', { count: count, winners: winners.map(el => el.getAttribute('data-name')), pool: pool ? 'group' : 'all' });
+                var winnerNames = winners.map(el => el.getAttribute('data-name'));
+                showWinnerBanner(winnerNames);
+                logEvent('random_pick', { count: count, winners: winnerNames, pool: pool ? 'group' : 'all' });
                 saveLiveState();
+                if (typeof onLanded === 'function') onLanded(winnerNames);
             }, totalMs + landHold);
         }
 
