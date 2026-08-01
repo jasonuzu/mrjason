@@ -1324,6 +1324,20 @@
         .ct-divider { height: 1px; background: #e2e8f0; margin: 5px 8px; }
         /* Bottom-bar popups reuse the Class Tools menu look, a touch narrower */
         .ab-menu { min-width: 240px; }
+        .ab-state-chip {
+            font-size: 0.62rem; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+            background: #e2e8f0; color: #64748b; margin-left: 6px; vertical-align: middle;
+        }
+        .ab-state-chip.on { background: #dcfce7; color: #065f46; }
+        .ct-menu-item.ab-active { background: #f0fdf4; }
+        /* A quiet reminder on the bar itself that totals are hidden */
+        #action-bar.no-points-on::before {
+            content: '\1F648 No Points Mode';
+            position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: #fff; font-size: 0.66rem; font-weight: 700;
+            padding: 2px 10px; border-radius: 999px 999px 0 0; letter-spacing: 0.4px;
+        }
+        #action-bar { position: relative; }
         .ab-menu-head {
             font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.6px;
             color: #94a3b8; font-weight: 700; padding: 6px 10px 4px;
@@ -2483,6 +2497,19 @@
                     <button class="ct-menu-item" onclick="closeAbMenus();exportJSON()" title="Structured data for import into other systems">
                         <span class="ct-icon">{ }</span>
                         <div><div class="ct-title">JSON data</div><div class="ct-sub">For import elsewhere</div></div>
+                    </button>
+                </div>
+            </div>
+            <div class="ab-group" style="position:relative;">
+                <button class="ab-btn" onclick="toggleAbMenu(event,'ab-settings-menu')" id="ab-settings-btn">🎛 Settings ▾</button>
+                <div id="ab-settings-menu" class="ct-menu ab-menu">
+                    <div class="ab-menu-head">Display</div>
+                    <button class="ct-menu-item" onclick="toggleNoPointsMode()" id="ct-nopoints-item">
+                        <span class="ct-icon" id="ct-nopoints-icon">👁</span>
+                        <div>
+                            <div class="ct-title">No Points Mode <span id="ct-nopoints-state" class="ab-state-chip">Off</span></div>
+                            <div class="ct-sub">Hide point totals from the class. Points are still recorded.</div>
+                        </div>
                     </button>
                 </div>
             </div>
@@ -4621,7 +4648,7 @@
                     el.innerHTML =
                         roleStripeHtml(itemRoles) +
                         '<span class="stu-name"' + nameStyle + '>' + escapeHtml(name) + '</span>' +
-                        '<span class="stu-points">' + pts + '</span>' +
+                        '<span class="stu-points">' + ptTotal(pts) + '</span>' +
                         attBadgeHtml +
                         roleDotsHtml(itemRoles) +
                         (noteCount > 0 ? '<span class="stu-note-badge">📝' + noteCount + '</span>' : '');
@@ -4702,6 +4729,8 @@
         }
         updateLiveClock();
         setInterval(updateLiveClock, 15000);
+        // Reflect a saved No Points Mode setting as soon as the page is ready
+        setTimeout(updateNoPointsUI, 0);
         // Also update on the second when the minute rolls over — small vanity, keeps clock crisp
         setTimeout(function initClockAlign() {
             updateLiveClock();
@@ -4913,9 +4942,9 @@
                 html += '<div class="group-card-header" style="background:' + g.color + ';">';
                 html += '<input type="color" value="' + g.color + '" onchange="recolorGroup(\'' + g.id + '\', this.value)" title="Group color">';
                 html += '<input type="text" class="grp-name" value="' + escapeHtml(g.name) + '" onchange="renameGroup(\'' + g.id + '\', this.value)">';
-                html += '<span class="grp-total" title="Group total points">' + total + ' pts</span>';
-                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', -1)" title="Give every member −1">−1</button>';
-                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', 1)" title="Give every member +1">+1</button>';
+                html += '<span class="grp-total" title="Group total points">' + ptTotal(total, ' pts') + '</span>';
+                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', -1)" title="Give every member −1">' + ptLabel(-1) + '</button>';
+                html += '<button class="icon-btn" onclick="awardGroupPoints(\'' + g.id + '\', 1)" title="Give every member +1">' + ptLabel(1) + '</button>';
                 html += '<button class="icon-btn" onclick="pickFromGroup(\'' + g.id + '\')" title="Pick random from this group">🎲</button>';
                 html += '<button class="icon-btn" onclick="deleteGroup(\'' + g.id + '\')" title="Delete group">✕</button>';
                 html += '</div>';
@@ -4927,7 +4956,7 @@
                         var pts = (liveState.studentData[m] && liveState.studentData[m].points) || 0;
                         html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
                         html += '<span class="m-name">' + escapeHtml(m) + '</span>';
-                        html += '<span class="m-pts">' + pts + '</span>';
+                        html += '<span class="m-pts">' + ptTotal(pts) + '</span>';
                         html += '<button class="m-pt-btn minus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
                         html += '<button class="m-pt-btn plus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
                         html += '</div>';
@@ -4943,7 +4972,7 @@
                     var pts = (liveState.studentData[m] && liveState.studentData[m].points) || 0;
                     html += '<div class="group-member" draggable="true" ondragstart="memberDragStart(event,\'' + escapeAttr(m) + '\')" ondragend="memberDragEnd(event)">';
                     html += '<span class="m-name">' + escapeHtml(m) + '</span>';
-                    html += '<span class="m-pts">' + pts + '</span>';
+                    html += '<span class="m-pts">' + ptTotal(pts) + '</span>';
                     html += '<button class="m-pt-btn minus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', -1)">−</button>';
                     html += '<button class="m-pt-btn plus" onclick="tryAddPoints(\'' + escapeAttr(m) + '\', 1)">+</button>';
                     html += '</div>';
@@ -5011,7 +5040,7 @@
             if (!deskEl) return;
             var pts = (liveState.studentData[name] && liveState.studentData[name].points) || 0;
             var badge = deskEl.querySelector('.stu-points');
-            if (badge) badge.textContent = pts;
+            if (badge) badge.textContent = ptTotal(pts);
         }
 
         // Visual + audio point-award feedback: desk pulses gold + "+N" bubble floats up + chime
@@ -5033,7 +5062,7 @@
             if (canvas) {
                 var bubble = document.createElement('div');
                 bubble.className = 'point-float' + (delta < 0 ? ' neg' : '');
-                bubble.textContent = (delta > 0 ? '+' : '') + delta;
+                bubble.textContent = ptLabel(delta);
                 var left = (parseInt(deskEl.style.left) || 0) + (deskEl.offsetWidth / 2);
                 var top  = (parseInt(deskEl.style.top)  || 0) - 4;
                 bubble.style.left = left + 'px';
@@ -5527,7 +5556,7 @@
             // Surgical update — every desk's badge, every group total, no full re-render
             document.querySelectorAll('#live-canvas .live-student').forEach(function(deskEl) {
                 var badge = deskEl.querySelector('.stu-points');
-                if (badge) badge.textContent = '0';
+                if (badge) badge.textContent = ptTotal(0);
             });
             renderGroupsPanel();
         }
@@ -6272,14 +6301,14 @@
             var html =
                 '<div class="modal-title">' + escapeHtml(name) + lpChip + '</div>' +
                 '<div style="color:#64748b;font-size:0.85rem;margin-bottom:14px;">' +
-                    'Points: <strong style="color:#2c3e50;font-size:1.1rem;">' + d.points + '</strong>' +
+                    'Points: <strong style="color:#2c3e50;font-size:1.1rem;">' + ptTotal(d.points) + '</strong>' +
                     (grp ? ' &nbsp;·&nbsp; Group: <strong style="color:' + grp.color + ';">' + escapeHtml(grp.name) + '</strong>' : ' &nbsp;·&nbsp; Unassigned') +
                 '</div>' +
                 attHtml +
                 '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">' +
-                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">+1 point</button>' +
-                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">+2 points</button>' +
-                    '<button class="warn" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">−1 point</button>' +
+                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',1);openStudentModal(\'' + escapeAttr(name) + '\')">' + ptLabel(1) + '</button>' +
+                    '<button class="automation" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',2);openStudentModal(\'' + escapeAttr(name) + '\')">' + ptLabel(2) + '</button>' +
+                    '<button class="warn" onclick="tryAddPoints(\'' + escapeAttr(name) + '\',-1);openStudentModal(\'' + escapeAttr(name) + '\')">' + ptLabel(-1) + '</button>' +
                     '<button class="danger" onclick="resetStudentPoints(\'' + escapeAttr(name) + '\');openStudentModal(\'' + escapeAttr(name) + '\')">Reset</button>' +
                 '</div>' +
                 quickFeedbackHtml(name) +
@@ -6866,7 +6895,7 @@
                         (out ? ';opacity:0.55' : '') + ';">';
                 html += '<span style="flex:1;font-size:0.9rem;font-weight:600;color:#2c3e50;">' + escapeHtml(m) +
                         (out ? ' <span style="font-weight:400;color:#94a3b8;font-size:0.78rem;">(absent)</span>' : '') + '</span>';
-                html += '<span style="font-size:0.85rem;color:#64748b;font-variant-numeric:tabular-nums;">' + pts + ' pts</span>';
+                html += '<span style="font-size:0.85rem;color:#64748b;font-variant-numeric:tabular-nums;">' + ptTotal(pts, ' pts') + '</span>';
                 html += '</div>';
             });
             html += '</div>';
@@ -6876,8 +6905,9 @@
             [-2, -1, 1, 2, 3].forEach(function(n) {
                 var isNeg = n < 0;
                 html += '<button class="' + (isNeg ? 'danger' : 'automation') + '" style="flex:1;min-width:56px;" ' +
-                        'onclick="awardGroupPoints(\'' + g.id + '\', ' + n + ', true)">' +
-                        (n > 0 ? '+' : '') + n + '</button>';
+                        'onclick="awardGroupPoints(\'' + g.id + '\', ' + n + ', true)" ' +
+                        'title="' + (n > 0 ? '+' : '') + n + ' each">' +
+                        ptLabel(n) + '</button>';
             });
             html += '</div>';
 
@@ -6950,7 +6980,7 @@
             if (canvas) {
                 var bubble = document.createElement('div');
                 bubble.className = 'point-float' + (delta < 0 ? ' neg' : '');
-                bubble.textContent = (delta > 0 ? '+' : '') + delta;
+                bubble.textContent = ptLabel(delta);
                 bubble.style.left = ((parseInt(deskEl.style.left) || 0) + (deskEl.offsetWidth / 2)) + 'px';
                 bubble.style.top  = ((parseInt(deskEl.style.top)  || 0) - 4) + 'px';
                 canvas.appendChild(bubble);
@@ -7131,9 +7161,54 @@
         // ============================================================
 
         // --- Popover menu toggle ---
+        // ── No Points Mode ──
+        // Hides every visible point total from the room while still recording
+        // points normally underneath. Point buttons keep their value but show a
+        // tick, so the teacher knows what they are awarding and the class doesn't.
+        var NO_POINTS_KEY = 'cd_no_points_mode';
+        var noPointsMode = (function() {
+            try { return localStorage.getItem(NO_POINTS_KEY) === '1'; } catch (e) { return false; }
+        })();
+
+        function isNoPoints() { return noPointsMode; }
+
+        // A point value as the class should see it: the number, or a tick.
+        function ptLabel(delta) {
+            if (!noPointsMode) return (delta > 0 ? '+' : '') + delta;
+            return (delta > 0 ? '+' : '\u2212') + '\u2713';
+        }
+
+        // A running total as the class should see it.
+        function ptTotal(value, suffix) {
+            if (!noPointsMode) return value + (suffix || '');
+            return '\u2022\u2022\u2022';
+        }
+
+        function toggleNoPointsMode() {
+            noPointsMode = !noPointsMode;
+            try { localStorage.setItem(NO_POINTS_KEY, noPointsMode ? '1' : '0'); } catch (e) {}
+            logEvent('no_points_mode', { on: noPointsMode });
+            saveLiveState();
+            updateNoPointsUI();
+            renderLiveView();
+            renderGroupsPanel();
+        }
+
+        function updateNoPointsUI() {
+            var chip = document.getElementById('ct-nopoints-state');
+            var icon = document.getElementById('ct-nopoints-icon');
+            var item = document.getElementById('ct-nopoints-item');
+            if (chip) chip.textContent = noPointsMode ? 'On' : 'Off';
+            if (chip) chip.classList.toggle('on', noPointsMode);
+            if (icon) icon.textContent = noPointsMode ? '\uD83D\uDE48' : '\uD83D\uDC41';
+            if (item) item.classList.toggle('ab-active', noPointsMode);
+            var bar = document.getElementById('action-bar');
+            if (bar) bar.classList.toggle('no-points-on', noPointsMode);
+        }
+
         // Bottom-bar popups (Pick / Timer / Export / Session). Only one can be
         // open at a time, and opening one closes Class Tools too.
-        var AB_MENU_IDS = ['ab-pick-menu', 'ab-timer-menu', 'ab-export-menu', 'ab-session-menu'];
+        var AB_MENU_IDS = ['ab-pick-menu', 'ab-timer-menu', 'ab-export-menu', 'ab-settings-menu', 'ab-session-menu'];
 
         function closeAbMenus(except) {
             AB_MENU_IDS.forEach(function(id) {
@@ -10618,7 +10693,7 @@
                 html += `
                     <div class="lb-entry">
                         <span class="lb-name"><span class="lb-rank">${medal}</span> ${s.name}</span>
-                        <span class="lb-pts">${s.points} pts</span>
+                        <span class="lb-pts">${ptTotal(s.points, ' pts')}</span>
                     </div>
                 `;
             });
