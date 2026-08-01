@@ -1322,6 +1322,14 @@
         }
         .ct-menu-item:hover { background: #f1f5f9; }
         .ct-divider { height: 1px; background: #e2e8f0; margin: 5px 8px; }
+        /* Bottom-bar popups reuse the Class Tools menu look, a touch narrower */
+        .ab-menu { min-width: 240px; }
+        .ab-menu-head {
+            font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.6px;
+            color: #94a3b8; font-weight: 700; padding: 6px 10px 4px;
+        }
+        .ct-menu-item.ab-danger .ct-title { color: #991b1b; }
+        .ct-menu-item.ab-danger:hover { background: #fef2f2; }
         .note-reveal-btn {
             background: #f1f5f9; border: 1px solid #cbd5e0; color: #475569;
             font-size: 0.72rem; padding: 4px 10px; border-radius: 5px; cursor: pointer;
@@ -2346,13 +2354,29 @@
         </div>
 
         <div id="action-bar">
-            <div class="ab-group">
-                <span class="ab-label">Pick</span>
+            <div class="ab-group" style="position:relative;">
+                <!-- Kept out of the popup: this is the single most-used control -->
                 <button class="ab-btn pick big" onclick="pickRandom(1)">🎲 Random Student</button>
-                <button class="ab-btn pick" onclick="pickRandom(2)">Pair</button>
-                <button class="ab-btn pick" onclick="pickRandom(3)">3</button>
-                <button class="ab-btn pick" onclick="pickRandom(4)">4</button>
-                <button class="ab-btn pick" onclick="pickRandom(5)">5</button>
+                <button class="ab-btn pick" onclick="toggleAbMenu(event,'ab-pick-menu')" id="ab-pick-btn">More ▾</button>
+                <div id="ab-pick-menu" class="ct-menu ab-menu">
+                    <div class="ab-menu-head">Pick several at once</div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();pickRandom(2)">
+                        <span class="ct-icon">👥</span>
+                        <div><div class="ct-title">Pick a pair</div><div class="ct-sub">Two students at random</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();pickRandom(3)">
+                        <span class="ct-icon">3️⃣</span>
+                        <div><div class="ct-title">Pick three</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();pickRandom(4)">
+                        <span class="ct-icon">4️⃣</span>
+                        <div><div class="ct-title">Pick four</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();pickRandom(5)">
+                        <span class="ct-icon">5️⃣</span>
+                        <div><div class="ct-title">Pick five</div></div>
+                    </button>
+                </div>
             </div>
             <div class="ab-group" style="position:relative;">
                 <button class="ab-btn tools" onclick="toggleClassToolsMenu(event)" id="class-tools-btn">🧰 Class Tools ▾</button>
@@ -2418,23 +2442,68 @@
                     </button>
                 </div>
             </div>
-            <div class="ab-group">
-                <span class="ab-label">Timer</span>
-                <button class="ab-btn timer" onclick="startTimer(2*60)">2m</button>
-                <button class="ab-btn timer" onclick="startTimer(3*60)">3m</button>
-                <button class="ab-btn timer" onclick="startTimer(5*60)">5m</button>
-                <button class="ab-btn timer" onclick="promptCustomTimer()">Custom</button>
+            <div class="ab-group" style="position:relative;">
+                <button class="ab-btn timer" onclick="toggleAbMenu(event,'ab-timer-menu')" id="ab-timer-btn">⏱ Timer ▾</button>
+                <div id="ab-timer-menu" class="ct-menu ab-menu">
+                    <div class="ab-menu-head">Start a countdown</div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();startTimer(1*60)">
+                        <span class="ct-icon">⏱</span><div><div class="ct-title">1 minute</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();startTimer(2*60)">
+                        <span class="ct-icon">⏱</span><div><div class="ct-title">2 minutes</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();startTimer(3*60)">
+                        <span class="ct-icon">⏱</span><div><div class="ct-title">3 minutes</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();startTimer(5*60)">
+                        <span class="ct-icon">⏱</span><div><div class="ct-title">5 minutes</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();startTimer(10*60)">
+                        <span class="ct-icon">⏱</span><div><div class="ct-title">10 minutes</div></div>
+                    </button>
+                    <div class="ct-divider"></div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();promptCustomTimer()">
+                        <span class="ct-icon">⚙️</span>
+                        <div><div class="ct-title">Custom…</div><div class="ct-sub">Set any length</div></div>
+                    </button>
+                </div>
             </div>
-            <div class="ab-group">
-                <span class="ab-label">Export</span>
-                <button class="ab-btn export" onclick="exportCSV()" title="Human-readable spreadsheet, opens in Excel or Sheets">📊 CSV</button>
-                <button class="ab-btn export" onclick="exportPDF()" title="Formatted printable report">📄 PDF</button>
-                <button class="ab-btn export" onclick="exportJSON()" title="Structured data for import into other systems">{ } JSON</button>
+            <div class="ab-group" style="position:relative;">
+                <button class="ab-btn export" onclick="toggleAbMenu(event,'ab-export-menu')" id="ab-export-btn">📤 Export ▾</button>
+                <div id="ab-export-menu" class="ct-menu ab-menu">
+                    <div class="ab-menu-head">Save this session</div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();exportCSV()" title="Human-readable spreadsheet, opens in Excel or Sheets">
+                        <span class="ct-icon">📊</span>
+                        <div><div class="ct-title">CSV spreadsheet</div><div class="ct-sub">Opens in Excel or Sheets</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();exportPDF()" title="Formatted printable report">
+                        <span class="ct-icon">📄</span>
+                        <div><div class="ct-title">PDF report</div><div class="ct-sub">Formatted for printing</div></div>
+                    </button>
+                    <button class="ct-menu-item" onclick="closeAbMenus();exportJSON()" title="Structured data for import into other systems">
+                        <span class="ct-icon">{ }</span>
+                        <div><div class="ct-title">JSON data</div><div class="ct-sub">For import elsewhere</div></div>
+                    </button>
+                </div>
             </div>
-            <div class="ab-group">
-                <button class="ab-btn" onclick="refreshLayoutFromDesigner()">🔄 Reload Layout</button>
-                <button class="ab-btn reset-pts" onclick="resetAllPoints()">⭐ Reset Points</button>
-                <button class="ab-btn reset" onclick="resetLiveSession()">Reset Session</button>
+            <div class="ab-group" style="position:relative;">
+                <button class="ab-btn" onclick="toggleAbMenu(event,'ab-session-menu')" id="ab-session-btn">⚙️ Session ▾</button>
+                <div id="ab-session-menu" class="ct-menu ab-menu">
+                    <div class="ab-menu-head">Layout &amp; session</div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();refreshLayoutFromDesigner()">
+                        <span class="ct-icon">🔄</span>
+                        <div><div class="ct-title">Reload layout</div><div class="ct-sub">Pull the latest seating from the Designer</div></div>
+                    </button>
+                    <div class="ct-divider"></div>
+                    <button class="ct-menu-item" onclick="closeAbMenus();resetAllPoints()">
+                        <span class="ct-icon">⭐</span>
+                        <div><div class="ct-title">Reset points</div><div class="ct-sub">Everyone back to zero</div></div>
+                    </button>
+                    <button class="ct-menu-item ab-danger" onclick="closeAbMenus();resetLiveSession()">
+                        <span class="ct-icon">♻️</span>
+                        <div><div class="ct-title">Reset session</div><div class="ct-sub">Clear points, notes, groups and lists</div></div>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -7062,9 +7131,48 @@
         // ============================================================
 
         // --- Popover menu toggle ---
+        // Bottom-bar popups (Pick / Timer / Export / Session). Only one can be
+        // open at a time, and opening one closes Class Tools too.
+        var AB_MENU_IDS = ['ab-pick-menu', 'ab-timer-menu', 'ab-export-menu', 'ab-session-menu'];
+
+        function closeAbMenus(except) {
+            AB_MENU_IDS.forEach(function(id) {
+                if (id === except) return;
+                var el = document.getElementById(id);
+                if (el) el.classList.remove('show');
+            });
+        }
+
+        function toggleAbMenu(e, menuId) {
+            if (e) e.stopPropagation();
+            var menu = document.getElementById(menuId);
+            if (!menu) return;
+            var willOpen = !menu.classList.contains('show');
+            closeAbMenus(menuId);
+            closeClassToolsMenu();
+            menu.classList.toggle('show', willOpen);
+        }
+
+        // Click anywhere else closes them
+        document.addEventListener('click', function(e) {
+            AB_MENU_IDS.forEach(function(id) {
+                var menu = document.getElementById(id);
+                if (!menu || !menu.classList.contains('show')) return;
+                var btn = document.getElementById(id.replace('-menu', '-btn'));
+                if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+                menu.classList.remove('show');
+            });
+        });
+
+        // Escape closes them
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') { closeAbMenus(); closeClassToolsMenu(); }
+        });
+
         function toggleClassToolsMenu(e) {
             if (e) e.stopPropagation();
             var menu = document.getElementById('class-tools-menu');
+            closeAbMenus();
             menu.classList.toggle('show');
             updateClassToolsMenuBadges();
         }
