@@ -7104,13 +7104,17 @@
             html += '<div class="wb-list">' + names.map(escapeHtml).join(' &nbsp;·&nbsp; ') + '</div>';
             html += '<div class="wb-actions">';
 
-            // "+1 All" — only makes sense when there is more than one winner
+            // "+1 All" — only makes sense when there is more than one winner.
+            // In No Points Mode the value becomes a tick, but the real award is
+            // unchanged; the tooltip still shows the teacher what it does.
             if (names.length > 1) {
-                html += '<button class="automation wb-all-btn" onclick="addPointToAllWinners()">⭐ +1 All</button>';
+                html += '<button class="automation wb-all-btn" onclick="addPointToAllWinners()" title="+1 to everyone selected">⭐ ' +
+                        ptLabel(1) + ' All</button>';
             }
-            // One +1 button per winner (individual — desk shakes + sound)
+            // One award button per winner (individual — desk shakes + sound)
             names.forEach(function(n, idx) {
-                html += '<button class="automation" onclick="addPointToWinner(' + idx + ')">+1 ' + escapeHtml(n) + '</button>';
+                html += '<button class="automation" onclick="addPointToWinner(' + idx + ')" title="+1 to ' + escapeAttr(n) + '">' +
+                        ptLabel(1) + ' ' + escapeHtml(n) + '</button>';
             });
             // Profile shortcut for the single-winner case
             if (names.length === 1) {
