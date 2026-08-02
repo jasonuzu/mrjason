@@ -805,19 +805,8 @@ const STORAGE_KEYS = {
 // ============================================================
 // SUPABASE CLIENT
 // ============================================================
-// ============================================================
-// >>> SUPABASE CONFIG - EDIT THESE TWO LINES <<<
-// Find them in your Supabase dashboard:
-//   Project Settings -> API -> "Project URL" and "anon public" key
-// ============================================================
 const SUPABASE_URL = "https://gppetukrcdtmebqxpotj.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwcGV0dWtyY2R0bWVicXhwb3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjI5NzEsImV4cCI6MjA5OTk5ODk3MX0.3zAfQlL8mGd5MRRJL5Rb-uv8Qj0l-8i7Ec--Z3FL8tU";
-
-// Fail loudly and clearly instead of silently breaking on every request.
-if (SUPABASE_URL.startsWith("PASTE_") || SUPABASE_ANON_KEY.startsWith("PASTE_")) {
-  document.body.innerHTML = '<div style="font-family:system-ui;max-width:640px;margin:80px auto;padding:24px;border:2px solid #3a1e0c;background:#fef6e4;color:#3a1e0c"><h2 style="margin-top:0">Setup needed</h2><p>Open this file in a text editor and replace <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> near the top of the script with the values from your Supabase project (Project Settings &rarr; API).</p></div>';
-  throw new Error("Supabase config not set.");
-}
 
 // Supabase client - loaded from CDN as window.supabase
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -921,17 +910,10 @@ function TeachersToolkit() {
     }
   }
   async function loadProfile(userId) {
-    // maybeSingle() returns null instead of throwing when the row is missing.
-    let {
+    const {
       data,
       error
-    } = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
-
-    // NOTE: profiles is a SHARED table across apps (plan, access flags,
-    // is_admin, suspended). We deliberately do NOT create rows here --
-    // provisioning is handled centrally. A missing row just means the
-    // app runs without profile extras rather than breaking.
-    if (error) console.error("Profile load error:", error.message);
+    } = await sb.from('profiles').select('*').eq('id', userId).single();
     if (data) setProfile(data);
     setAuthLoading(false);
   }
@@ -2342,9 +2324,7 @@ function MobileStepsCards({
   }, " -- "), BLOOMS_LEVELS.map(b => /*#__PURE__*/React.createElement("option", {
     key: b,
     value: b
-  }, b))))), /*#__PURE__*/React.createElement("div", {
-    className: "mb-3"
-  }, /*#__PURE__*/React.createElement("label", {
+  }, b))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block text-xs italic mb-1",
     style: {
       color: "#3a1e0c",
@@ -2355,38 +2335,16 @@ function MobileStepsCards({
   }, "Description"), /*#__PURE__*/React.createElement("textarea", {
     value: s.description,
     onChange: e => updateStep(s.id, "description", e.target.value),
-    placeholder: "What happens in this step?",
-    rows: allExpanded ? undefined : 3,
-    className: "w-full p-2 italic resize-none",
+    placeholder: "What happens in this step? Include timing, materials, key questions, and any teacher moves...",
+    rows: allExpanded ? undefined : 8,
+    className: "w-full p-3 italic resize-y",
     style: {
       fontFamily: "Georgia, serif",
-      fontSize: "0.95rem",
-      lineHeight: 1.5,
+      fontSize: "1rem",
+      lineHeight: 1.6,
       border: "1px solid rgba(58,30,12,0.3)",
       background: "#fef6e4",
-      minHeight: allExpanded ? "6em" : "4em"
-    }
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    className: "block text-xs italic mb-1",
-    style: {
-      color: "#3a1e0c",
-      opacity: 0.7,
-      fontVariant: "small-caps",
-      letterSpacing: "0.08em"
-    }
-  }, "Differentiation"), /*#__PURE__*/React.createElement("textarea", {
-    value: s.differentiation || "",
-    onChange: e => updateStep(s.id, "differentiation", e.target.value),
-    placeholder: "Adaptations for different learners...",
-    rows: allExpanded ? undefined : 2,
-    className: "w-full p-2 italic resize-none",
-    style: {
-      fontFamily: "Georgia, serif",
-      fontSize: "0.9rem",
-      lineHeight: 1.5,
-      border: "1px solid rgba(58,30,12,0.3)",
-      background: "#fef6e4",
-      minHeight: allExpanded ? "5em" : "3em"
+      minHeight: allExpanded ? "14em" : "10em"
     }
   })))));
 }
@@ -2417,7 +2375,7 @@ function DesktopStepsTable({
       background: "#3a1e0c",
       color: "#fef6e4"
     }
-  }, /*#__PURE__*/React.createElement(Th, null), /*#__PURE__*/React.createElement(Th, null, "#"), /*#__PURE__*/React.createElement(Th, null, "Step Name"), /*#__PURE__*/React.createElement(Th, null, "Interaction"), /*#__PURE__*/React.createElement(Th, null, "Description"), /*#__PURE__*/React.createElement(Th, null, "Differentiation"), /*#__PURE__*/React.createElement(Th, null, "Bloom's"), /*#__PURE__*/React.createElement(Th, null, "Min"), /*#__PURE__*/React.createElement(Th, null))), /*#__PURE__*/React.createElement("tbody", null, steps.map((s, i) => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement(Th, null), /*#__PURE__*/React.createElement(Th, null, "#"), /*#__PURE__*/React.createElement(Th, null, "Step Name"), /*#__PURE__*/React.createElement(Th, null, "Interaction"), /*#__PURE__*/React.createElement(Th, null, "Description"), /*#__PURE__*/React.createElement(Th, null, "Bloom's"), /*#__PURE__*/React.createElement(Th, null, "Min"), /*#__PURE__*/React.createElement(Th, null))), /*#__PURE__*/React.createElement("tbody", null, steps.map((s, i) => /*#__PURE__*/React.createElement("tr", {
     key: s.id,
     draggable: true,
     onDragStart: () => setDraggedId(s.id),
@@ -2476,12 +2434,6 @@ function DesktopStepsTable({
     onChange: v => updateStep(s.id, "description", v),
     placeholder: "What happens?",
     forceExpand: allExpanded
-  })), /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement(ExpandableField, {
-    value: s.differentiation || "",
-    onChange: v => updateStep(s.id, "differentiation", v),
-    placeholder: "Adaptations...",
-    forceExpand: allExpanded,
-    small: true
   })), /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("select", {
     value: s.bloom || "",
     onChange: e => updateStep(s.id, "bloom", e.target.value),
@@ -2579,12 +2531,9 @@ function ExpandableField({
   const ref = useRef(null);
   useEffect(() => {
     if (ref.current) {
-      if (forceExpand) {
-        ref.current.style.height = 'auto';
-        ref.current.style.height = ref.current.scrollHeight + 'px';
-      } else {
-        ref.current.style.height = '';
-      }
+      // Always auto-grow to fit content, with a comfortable minimum
+      ref.current.style.height = 'auto';
+      ref.current.style.height = Math.max(ref.current.scrollHeight, 72) + 'px';
     }
   }, [forceExpand, value]);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("textarea", {
@@ -2592,13 +2541,14 @@ function ExpandableField({
     value: value,
     onChange: e => onChange(e.target.value),
     placeholder: placeholder,
-    rows: forceExpand ? undefined : 1,
-    className: "w-full bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic resize-none",
+    rows: 3,
+    className: "w-full bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic resize-y",
     style: {
       fontFamily: "Georgia, serif",
-      minHeight: forceExpand ? undefined : "1.5em",
-      overflow: forceExpand ? "visible" : "hidden",
-      fontSize: small ? "0.8rem" : undefined
+      minHeight: "4.5em",
+      lineHeight: 1.5,
+      padding: "0.25rem 0",
+      fontSize: small ? "0.85rem" : "0.95rem"
     }
   }));
 }
