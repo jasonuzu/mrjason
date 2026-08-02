@@ -561,6 +561,90 @@
             white-space: nowrap;
         }
 
+        /* ── Classroom Rules ── */
+        #rules-overlay {
+            position: fixed; inset: 0; background: rgba(15,23,42,0.6);
+            z-index: 2600; display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        #rules-box {
+            background: #fdfcf8; border-radius: 14px; width: 100%; max-width: 780px;
+            max-height: 92vh; display: flex; flex-direction: column;
+            box-shadow: 0 28px 70px rgba(0,0,0,0.4);
+            border: 1px solid #e6e0d4;
+        }
+        #rules-head {
+            display: flex; align-items: center; gap: 12px; padding: 16px 22px;
+            border-bottom: 2px solid #2c3e50; background: #fdfcf8; border-radius: 14px 14px 0 0;
+        }
+        #rules-title-wrap { flex: 1; }
+        #rules-title {
+            font-size: 1.5rem; font-weight: 800; color: #2c3e50; letter-spacing: 0.5px;
+            font-family: Georgia, 'Times New Roman', serif; border: none; background: transparent;
+            width: 100%; padding: 2px 4px; border-radius: 5px;
+        }
+        #rules-title:focus { outline: none; background: #fff; box-shadow: 0 0 0 2px #cbd5e0; }
+        #rules-title[readonly] { cursor: default; }
+        #rules-sub { font-size: 0.75rem; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; padding-left: 4px; }
+        #rules-body { padding: 20px 26px 24px; overflow-y: auto; }
+        .rules-list { list-style: none; counter-reset: rule; }
+        .rules-list li {
+            counter-increment: rule; display: flex; align-items: flex-start; gap: 14px;
+            padding: 11px 12px; border-bottom: 1px solid #eee7da;
+        }
+        .rules-list li:last-child { border-bottom: none; }
+        .rules-list.numbered li::before {
+            content: counter(rule); flex-shrink: 0;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: #2c3e50; color: #fdfcf8; font-weight: 800; font-size: 0.9rem;
+            display: flex; align-items: center; justify-content: center;
+            font-family: Georgia, serif;
+        }
+        .rules-list.bulleted li::before {
+            content: '◆'; flex-shrink: 0; width: 30px; text-align: center;
+            color: #b8912f; font-size: 1.1rem; line-height: 30px;
+        }
+        .rules-list li .rule-text {
+            flex: 1; font-size: 1.05rem; color: #2c3e50; line-height: 1.5; padding-top: 3px;
+            font-family: Georgia, 'Times New Roman', serif;
+        }
+        .rules-list li .rule-del {
+            background: transparent; border: none; color: #cbd5e0; cursor: pointer;
+            font-size: 1rem; padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+        }
+        .rules-list li .rule-del:hover { background: #fee2e2; color: #991b1b; }
+        #rules-edit-area textarea {
+            width: 100%; min-height: 220px; padding: 14px 16px; border: 1px solid #d6cfc0;
+            border-radius: 8px; font-family: Georgia, serif; font-size: 1rem; line-height: 1.9;
+            background: #fff; color: #2c3e50; resize: vertical;
+        }
+        #rules-edit-area textarea:focus { outline: none; border-color: #2c3e50; box-shadow: 0 0 0 3px rgba(44,62,80,0.1); }
+        .rules-foot {
+            display: flex; align-items: center; gap: 10px; padding: 14px 22px;
+            border-top: 1px solid #e6e0d4; flex-wrap: wrap;
+        }
+        .rules-style-toggle { display: flex; gap: 4px; background: #efeade; border-radius: 7px; padding: 3px; }
+        .rules-style-toggle button {
+            border: none; background: transparent; padding: 5px 12px; border-radius: 5px;
+            cursor: pointer; font-size: 0.78rem; color: #64748b; font-family: inherit;
+        }
+        .rules-style-toggle button.on { background: #2c3e50; color: #fff; font-weight: 700; }
+        .rules-save-btn {
+            background: #1a7f4b; color: #fff; border: none; padding: 9px 22px; border-radius: 7px;
+            font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .rules-save-btn:hover { background: #14663c; }
+        .rules-ghost-btn {
+            background: #fff; color: #475569; border: 1px solid #cbd5e0; padding: 9px 16px;
+            border-radius: 7px; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+        }
+        .rules-ghost-btn:hover { background: #f1f5f9; }
+        #rules-saved-flash {
+            color: #1a7f4b; font-size: 0.82rem; font-weight: 700; opacity: 0;
+            transition: opacity 0.25s;
+        }
+        #rules-saved-flash.show { opacity: 1; }
+        .rules-empty { text-align: center; color: #94a3b8; font-style: italic; padding: 30px 10px; }
+
         /* ── Calendar ── */
         #cal-overlay {
             position: fixed; inset: 0; background: rgba(15,23,42,0.55);
@@ -2404,6 +2488,10 @@
                         <div><div class="ct-title">Create Class To-Do List</div><div class="ct-sub" id="ct-todo-count">Your own list of tasks or reminders</div></div>
                     </button>
                     <div class="ct-divider"></div>
+                    <button class="ct-menu-item" onclick="openClassRules()" title="Your classroom rules, displayed for the class.">
+                        <span class="ct-icon">📜</span>
+                        <div><div class="ct-title">Classroom Rules</div><div class="ct-sub">Set and display the rules of the room</div></div>
+                    </button>
                     <button class="ct-menu-item" onclick="openCalendar()" title="A full calendar. Add events with colours; today's events show as a banner.">
                         <span class="ct-icon">📅</span>
                         <div><div class="ct-title">Calendar</div><div class="ct-sub">Plan events; today's show as a banner</div></div>
@@ -5584,6 +5672,192 @@
         }
 
         // --- Student modal (notes + points) ---
+
+        // ══════════════════════════════════════════════════════
+        // CLASSROOM RULES — a display board for the room. Stored per teacher
+        // rather than per layout, so the same rules apply to every class.
+        // ══════════════════════════════════════════════════════
+        var RULES_KEY = 'cd_class_rules_v1';
+        var rulesEditing = false;
+
+        function loadRules() {
+            try {
+                var raw = localStorage.getItem(RULES_KEY);
+                var d = raw ? JSON.parse(raw) : null;
+                if (!d) return { title: 'Classroom Rules', style: 'numbered', items: [] };
+                return {
+                    title: d.title || 'Classroom Rules',
+                    style: d.style === 'bulleted' ? 'bulleted' : 'numbered',
+                    items: Array.isArray(d.items) ? d.items : [],
+                };
+            } catch (e) {
+                return { title: 'Classroom Rules', style: 'numbered', items: [] };
+            }
+        }
+
+        function saveRules(data) {
+            try { localStorage.setItem(RULES_KEY, JSON.stringify(data)); } catch (e) {}
+        }
+
+        function openClassRules() {
+            closeClassToolsMenu();
+            var existing = document.getElementById('rules-overlay');
+            if (existing) existing.remove();
+            rulesEditing = false;
+
+            var overlay = document.createElement('div');
+            overlay.id = 'rules-overlay';
+            overlay.onclick = function(e) { if (e.target === overlay) closeClassRules(); };
+            overlay.innerHTML =
+                '<div id="rules-box">' +
+                    '<div id="rules-head">' +
+                        '<span style="font-size:1.6rem;">\uD83D\uDCDC</span>' +
+                        '<div id="rules-title-wrap">' +
+                            '<input id="rules-title" readonly>' +
+                            '<div id="rules-sub">Our agreement together</div>' +
+                        '</div>' +
+                        '<button class="rules-ghost-btn" onclick="closeClassRules()">\u2715 Close</button>' +
+                    '</div>' +
+                    '<div id="rules-body"></div>' +
+                    '<div class="rules-foot" id="rules-foot"></div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            document.addEventListener('keydown', rulesEscHandler);
+            renderRules();
+        }
+
+        function closeClassRules() {
+            var el = document.getElementById('rules-overlay');
+            if (el) el.remove();
+            document.removeEventListener('keydown', rulesEscHandler);
+            rulesEditing = false;
+        }
+
+        function rulesEscHandler(e) { if (e.key === 'Escape') closeClassRules(); }
+
+        function renderRules() {
+            var data = loadRules();
+            var body = document.getElementById('rules-body');
+            var foot = document.getElementById('rules-foot');
+            var titleEl = document.getElementById('rules-title');
+            if (!body || !foot || !titleEl) return;
+
+            titleEl.value = data.title;
+            titleEl.readOnly = !rulesEditing;
+
+            if (rulesEditing) {
+                // One rule per line — quicker to reorder and retype than a form
+                body.innerHTML =
+                    '<div id="rules-edit-area">' +
+                        '<div style="font-size:0.8rem;color:#64748b;margin-bottom:8px;">One rule per line. Blank lines are ignored.</div>' +
+                        '<textarea id="rules-textarea" placeholder="Listen when someone else is speaking&#10;Put your hand up before answering&#10;Bring your book and a pen to every lesson">' +
+                            escapeHtml(data.items.join('\n')) +
+                        '</textarea>' +
+                    '</div>';
+                foot.innerHTML =
+                    '<div class="rules-style-toggle">' +
+                        '<button class="' + (data.style === 'numbered' ? 'on' : '') + '" onclick="setRulesStyle(\'numbered\')">1. Numbered</button>' +
+                        '<button class="' + (data.style === 'bulleted' ? 'on' : '') + '" onclick="setRulesStyle(\'bulleted\')">\u25C6 Bulleted</button>' +
+                    '</div>' +
+                    '<div style="flex:1;"></div>' +
+                    '<span id="rules-saved-flash">\u2713 Saved</span>' +
+                    '<button class="rules-ghost-btn" onclick="cancelRulesEdit()">Cancel</button>' +
+                    '<button class="rules-save-btn" onclick="saveRulesFromEditor()">\uD83D\uDCBE Save Rules</button>';
+                setTimeout(function() {
+                    var ta = document.getElementById('rules-textarea');
+                    if (ta) ta.focus();
+                }, 40);
+            } else {
+                if (!data.items.length) {
+                    body.innerHTML = '<div class="rules-empty">No rules set yet.<br>Click <strong>Edit</strong> to write the rules for your room.</div>';
+                } else {
+                    body.innerHTML = '<ol class="rules-list ' + data.style + '">' +
+                        data.items.map(function(r) {
+                            return '<li><span class="rule-text">' + escapeHtml(r) + '</span></li>';
+                        }).join('') + '</ol>';
+                }
+                foot.innerHTML =
+                    '<span style="font-size:0.78rem;color:#94a3b8;">' +
+                        (data.items.length ? data.items.length + ' rule' + (data.items.length === 1 ? '' : 's') : '') +
+                    '</span>' +
+                    '<div style="flex:1;"></div>' +
+                    '<button class="rules-ghost-btn" onclick="printRules()">\uD83D\uDDA8 Print</button>' +
+                    '<button class="rules-save-btn" onclick="startRulesEdit()">\u270F\uFE0F Edit</button>';
+            }
+        }
+
+        function startRulesEdit() { rulesEditing = true; renderRules(); }
+        function cancelRulesEdit() { rulesEditing = false; renderRules(); }
+
+        function setRulesStyle(style) {
+            // Keep whatever is typed but not yet saved
+            var ta = document.getElementById('rules-textarea');
+            var titleEl = document.getElementById('rules-title');
+            var data = loadRules();
+            data.style = style;
+            if (ta) data.items = parseRulesText(ta.value);
+            if (titleEl) data.title = (titleEl.value || '').trim() || 'Classroom Rules';
+            saveRules(data);
+            renderRules();
+        }
+
+        function parseRulesText(text) {
+            return String(text || '').split(/\r?\n/)
+                .map(function(x) { return x.trim(); })
+                .filter(function(x) { return x.length > 0; })
+                .map(function(x) {
+                    // Strip any numbering or bullet the teacher typed themselves,
+                    // since the list adds its own
+                    return x.replace(/^\s*(?:\d+[.)]\s*|[-*\u2022\u25C6]\s*)/, '');
+                });
+        }
+
+        function saveRulesFromEditor() {
+            var ta = document.getElementById('rules-textarea');
+            var titleEl = document.getElementById('rules-title');
+            var data = loadRules();
+            data.items = parseRulesText(ta ? ta.value : '');
+            data.title = (titleEl && titleEl.value.trim()) || 'Classroom Rules';
+            saveRules(data);
+            logEvent('rules_saved', { count: data.items.length });
+            saveLiveState();
+
+            var flash = document.getElementById('rules-saved-flash');
+            if (flash) {
+                flash.classList.add('show');
+                setTimeout(function() { flash.classList.remove('show'); }, 1400);
+            }
+            setTimeout(function() { rulesEditing = false; renderRules(); }, 450);
+        }
+
+        function printRules() {
+            var data = loadRules();
+            if (!data.items.length) { alert('There are no rules to print yet.'); return; }
+            var w = window.open('', '_blank');
+            if (!w) { alert('Your browser blocked the print window.'); return; }
+            var marker = data.style === 'numbered'
+                ? 'counter-increment:rule;'
+                : '';
+            w.document.write(
+                '<html><head><title>' + escapeHtml(data.title) + '</title><style>' +
+                'body{font-family:Georgia,serif;color:#2c3e50;margin:50px;}' +
+                'h1{font-size:2.2rem;border-bottom:3px solid #2c3e50;padding-bottom:12px;margin-bottom:6px;}' +
+                '.sub{color:#94a3b8;letter-spacing:2px;text-transform:uppercase;font-size:0.75rem;margin-bottom:28px;}' +
+                'ol,ul{padding-left:0;list-style:none;counter-reset:rule;}' +
+                'li{counter-increment:rule;display:flex;gap:16px;padding:14px 0;border-bottom:1px solid #eee;font-size:1.2rem;}' +
+                (data.style === 'numbered'
+                    ? 'li::before{content:counter(rule);background:#2c3e50;color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;flex-shrink:0;}'
+                    : 'li::before{content:"\\25C6";color:#b8912f;width:34px;text-align:center;flex-shrink:0;}') +
+                '</style></head><body>' +
+                '<h1>' + escapeHtml(data.title) + '</h1>' +
+                '<div class="sub">Our agreement together</div>' +
+                '<ol>' + data.items.map(function(r) { return '<li><span>' + escapeHtml(r) + '</span></li>'; }).join('') + '</ol>' +
+                '</body></html>'
+            );
+            w.document.close();
+            w.focus();
+            setTimeout(function() { w.print(); }, 250);
+        }
 
         // ══════════════════════════════════════════════════════
         // CALENDAR — events stored per teacher (not per layout), so the
