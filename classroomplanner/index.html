@@ -2511,6 +2511,15 @@
                             <div class="ct-sub">Hide point totals from the class. Points are still recorded.</div>
                         </div>
                     </button>
+                    <div class="ct-divider"></div>
+                    <div class="ab-menu-head">Sound</div>
+                    <button class="ct-menu-item" onclick="toggleNoSoundMode()" id="ct-nosound-item">
+                        <span class="ct-icon" id="ct-nosound-icon">🔊</span>
+                        <div>
+                            <div class="ct-title">No Sound Mode <span id="ct-nosound-state" class="ab-state-chip">Off</span></div>
+                            <div class="ct-sub">Mute chimes, drum rolls, timers and fanfares.</div>
+                        </div>
+                    </button>
                 </div>
             </div>
             <div class="ab-group" style="position:relative;">
@@ -4730,7 +4739,7 @@
         updateLiveClock();
         setInterval(updateLiveClock, 15000);
         // Reflect a saved No Points Mode setting as soon as the page is ready
-        setTimeout(updateNoPointsUI, 0);
+        setTimeout(function() { updateNoPointsUI(); updateNoSoundUI(); }, 0);
         // Also update on the second when the minute rolls over — small vanity, keeps clock crisp
         setTimeout(function initClockAlign() {
             updateLiveClock();
@@ -5986,6 +5995,50 @@
             btn.classList.toggle('open', open);
         }
 
+        // Builds a small script that silences a sandboxed tool: Web Audio output
+        // is routed to a muted gain node, and <audio>/Audio() playback is stubbed.
+        // Injected as the first thing in <head> so it runs before the tool's code.
+        function injectMuteIntoTool(html) {
+            var muteScript =
+                '<' + 'script>(function(){' +
+                'try{' +
+                  'var AC = window.AudioContext || window.webkitAudioContext;' +
+                  'if (AC) {' +
+                    'var origDest = Object.getOwnPropertyDescriptor(AC.prototype, "destination");' +
+                    'Object.defineProperty(AC.prototype, "destination", { get: function(){' +
+                      'if (!this.__muteNode) {' +
+                        'var real = origDest && origDest.get ? origDest.get.call(this) : null;' +
+                        'try { this.__muteNode = this.createGain(); this.__muteNode.gain.value = 0;' +
+                              'if (real) this.__muteNode.connect(real); } catch(e) { return real; }' +
+                      '}' +
+                      'return this.__muteNode;' +
+                    '} });' +
+                  '}' +
+                  'if (window.Audio) {' +
+                    'var OrigAudio = window.Audio;' +
+                    'window.Audio = function(){ var a = new OrigAudio(); a.muted = true;' +
+                      'a.play = function(){ return Promise.resolve(); }; return a; };' +
+                  '}' +
+                  'if (window.HTMLMediaElement) {' +
+                    'HTMLMediaElement.prototype.play = function(){ this.muted = true; return Promise.resolve(); };' +
+                  '}' +
+                  'if (window.speechSynthesis && window.speechSynthesis.speak) {' +
+                    'window.speechSynthesis.speak = function(){};' +
+                  '}' +
+                '}catch(e){}' +
+                '})();<' + '/script>';
+
+            // Prefer just after <head>; fall back to the top of the document.
+            var headIdx = html.search(/<head[^>]*>/i);
+            if (headIdx !== -1) {
+                var insertAt = html.indexOf('>', headIdx) + 1;
+                return html.slice(0, insertAt) + muteScript + html.slice(insertAt);
+            }
+            return muteScript + html;
+        }
+
+        var currentOpenTool = null;
+
         function openClassGame(which) {
             closeClassToolsMenu();
             var tool = EMBEDDED_TOOLS[which];
@@ -6019,6 +6072,11 @@
                 }
             }
 
+            // Carry No Sound Mode into the tool. Each embedded tool makes sound
+            // its own way, so rather than patching each one we neutralise the
+            // audio APIs inside its frame before any of its code runs.
+            if (noSoundMode) html = injectMuteIntoTool(html);
+
             if (gameBlobUrl) { URL.revokeObjectURL(gameBlobUrl); gameBlobUrl = null; }
             gameBlobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
 
@@ -6033,6 +6091,7 @@
                 '<iframe id="game-frame" src="' + gameBlobUrl + '" allow="autoplay"></iframe>';
             document.body.appendChild(overlay);
             document.addEventListener('keydown', gameEscHandler);
+            currentOpenTool = which;
         }
 
         function gameEscHandler(e) { if (e.key === 'Escape') closeClassGame(); }
@@ -6069,6 +6128,7 @@
         });
 
         function closeClassGame() {
+            currentOpenTool = null;
             var o = document.getElementById('game-overlay');
             if (o) o.remove();
             if (gameBlobUrl) { URL.revokeObjectURL(gameBlobUrl); gameBlobUrl = null; }
@@ -6590,6 +6650,9 @@
         // ============================================================
         var audioCtx = null;
         function getAudioCtx() {
+            // Single choke point for every sound in the app: when muted we hand
+            // back null, and each play* function already bails out on null.
+            if (noSoundMode) return null;
             if (!audioCtx) {
                 try {
                     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -7208,6 +7271,38 @@
             if (item) item.classList.toggle('ab-active', noPointsMode);
             var bar = document.getElementById('action-bar');
             if (bar) bar.classList.toggle('no-points-on', noPointsMode);
+        }
+
+        // ── No Sound Mode ──
+        var NO_SOUND_KEY = 'cd_no_sound_mode';
+        var noSoundMode = (function() {
+            try { return localStorage.getItem(NO_SOUND_KEY) === '1'; } catch (e) { return false; }
+        })();
+
+        function isNoSound() { return noSoundMode; }
+
+        function toggleNoSoundMode() {
+            noSoundMode = !noSoundMode;
+            try { localStorage.setItem(NO_SOUND_KEY, noSoundMode ? '1' : '0'); } catch (e) {}
+            logEvent('no_sound_mode', { on: noSoundMode });
+            saveLiveState();
+            updateNoSoundUI();
+            // A tool already on screen was built with the old setting, so rebuild
+            // it to match rather than leaving it out of step.
+            if (currentOpenTool && document.getElementById('game-overlay')) {
+                var again = currentOpenTool;
+                closeClassGame();
+                openClassGame(again);
+            }
+        }
+
+        function updateNoSoundUI() {
+            var chip = document.getElementById('ct-nosound-state');
+            var icon = document.getElementById('ct-nosound-icon');
+            var item = document.getElementById('ct-nosound-item');
+            if (chip) { chip.textContent = noSoundMode ? 'On' : 'Off'; chip.classList.toggle('on', noSoundMode); }
+            if (icon) icon.textContent = noSoundMode ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+            if (item) item.classList.toggle('ab-active', noSoundMode);
         }
 
         // Bottom-bar popups (Pick / Timer / Export / Session). Only one can be
