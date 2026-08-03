@@ -2097,7 +2097,31 @@ function StepsTable({
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [showBlooms, setShowBlooms] = useState(() => {
+    try {
+      return localStorage.getItem("tcanvas:showBlooms") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [showDifferentiation, setShowDifferentiation] = useState(() => {
+    try {
+      return localStorage.getItem("tcanvas:showDiff") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  useEffect(() => {
+    try {
+      localStorage.setItem("tcanvas:showBlooms", showBlooms);
+    } catch {}
+  }, [showBlooms]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("tcanvas:showDiff", showDifferentiation);
+    } catch {}
+  }, [showDifferentiation]);
 
   // Watch for viewport size changes
   useEffect(() => {
@@ -2115,11 +2139,45 @@ function StepsTable({
       boxShadow: "4px 4px 0 rgba(58, 30, 12, 0.2)"
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-end px-3 py-1 no-print",
+    className: "flex flex-wrap items-center justify-between px-3 py-2 gap-3 no-print",
     style: {
       borderBottom: "1px solid rgba(58,30,12,0.15)"
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-4"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-1.5 text-xs italic cursor-pointer select-none",
+    style: {
+      fontFamily: "Georgia, serif",
+      color: "#3a1e0c"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showBlooms,
+    onChange: e => setShowBlooms(e.target.checked),
+    style: {
+      accentColor: "#a0522d",
+      width: 14,
+      height: 14,
+      cursor: "pointer"
+    }
+  }), "Show Bloom's Taxonomy"), /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-1.5 text-xs italic cursor-pointer select-none",
+    style: {
+      fontFamily: "Georgia, serif",
+      color: "#3a1e0c"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: showDifferentiation,
+    onChange: e => setShowDifferentiation(e.target.checked),
+    style: {
+      accentColor: "#a0522d",
+      width: 14,
+      height: 14,
+      cursor: "pointer"
+    }
+  }), "Show Differentiation")), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAllExpanded(!allExpanded),
     className: "text-xs italic text-amber-900/70 hover:text-amber-900",
     style: {
@@ -2131,7 +2189,9 @@ function StepsTable({
     updateStep: updateStep,
     removeStep: removeStep,
     moveStep: moveStep,
-    allExpanded: allExpanded
+    allExpanded: allExpanded,
+    showBlooms: showBlooms,
+    showDifferentiation: showDifferentiation
   }), /*#__PURE__*/React.createElement("div", {
     className: "px-3 py-3 flex items-center justify-between",
     style: {
@@ -2163,6 +2223,8 @@ function StepsTable({
     reorderSteps: reorderSteps,
     totalTime: totalTime,
     allExpanded: allExpanded,
+    showBlooms: showBlooms,
+    showDifferentiation: showDifferentiation,
     draggedId: draggedId,
     setDraggedId: setDraggedId,
     dragOverId: dragOverId,
@@ -2178,7 +2240,9 @@ function MobileStepsCards({
   updateStep,
   removeStep,
   moveStep,
-  allExpanded
+  allExpanded,
+  showBlooms,
+  showDifferentiation
 }) {
   return /*#__PURE__*/React.createElement("div", {
     className: "p-2 space-y-3"
@@ -2259,7 +2323,7 @@ function MobileStepsCards({
       background: "#fef6e4"
     }
   })), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-3 gap-2 mb-3"
+    className: showBlooms ? "grid grid-cols-3 gap-2 mb-3" : "grid grid-cols-2 gap-2 mb-3"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block text-xs italic mb-1",
     style: {
@@ -2301,7 +2365,7 @@ function MobileStepsCards({
       border: "1px solid rgba(58,30,12,0.3)",
       background: "#fef6e4"
     }
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  })), showBlooms && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block text-xs italic mb-1",
     style: {
       color: "#3a1e0c",
@@ -2324,7 +2388,9 @@ function MobileStepsCards({
   }, " -- "), BLOOMS_LEVELS.map(b => /*#__PURE__*/React.createElement("option", {
     key: b,
     value: b
-  }, b))))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, b))))), /*#__PURE__*/React.createElement("div", {
+    className: showDifferentiation ? "mb-3" : ""
+  }, /*#__PURE__*/React.createElement("label", {
     className: "block text-xs italic mb-1",
     style: {
       color: "#3a1e0c",
@@ -2346,6 +2412,28 @@ function MobileStepsCards({
       background: "#fef6e4",
       minHeight: allExpanded ? "14em" : "10em"
     }
+  })), showDifferentiation && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs italic mb-1",
+    style: {
+      color: "#3a1e0c",
+      opacity: 0.7,
+      fontVariant: "small-caps",
+      letterSpacing: "0.08em"
+    }
+  }, "Differentiation"), /*#__PURE__*/React.createElement("textarea", {
+    value: s.differentiation || "",
+    onChange: e => updateStep(s.id, "differentiation", e.target.value),
+    placeholder: "Adaptations for different learners...",
+    rows: allExpanded ? undefined : 3,
+    className: "w-full p-3 italic resize-y",
+    style: {
+      fontFamily: "Georgia, serif",
+      fontSize: "0.95rem",
+      lineHeight: 1.5,
+      border: "1px solid rgba(58,30,12,0.3)",
+      background: "#fef6e4",
+      minHeight: allExpanded ? "6em" : "4em"
+    }
   })))));
 }
 
@@ -2360,6 +2448,8 @@ function DesktopStepsTable({
   reorderSteps,
   totalTime,
   allExpanded,
+  showBlooms,
+  showDifferentiation,
   draggedId,
   setDraggedId,
   dragOverId,
@@ -2375,7 +2465,7 @@ function DesktopStepsTable({
       background: "#3a1e0c",
       color: "#fef6e4"
     }
-  }, /*#__PURE__*/React.createElement(Th, null), /*#__PURE__*/React.createElement(Th, null, "#"), /*#__PURE__*/React.createElement(Th, null, "Step Name"), /*#__PURE__*/React.createElement(Th, null, "Interaction"), /*#__PURE__*/React.createElement(Th, null, "Description"), /*#__PURE__*/React.createElement(Th, null, "Bloom's"), /*#__PURE__*/React.createElement(Th, null, "Min"), /*#__PURE__*/React.createElement(Th, null))), /*#__PURE__*/React.createElement("tbody", null, steps.map((s, i) => /*#__PURE__*/React.createElement("tr", {
+  }, /*#__PURE__*/React.createElement(Th, null), /*#__PURE__*/React.createElement(Th, null, "#"), /*#__PURE__*/React.createElement(Th, null, "Step Name"), /*#__PURE__*/React.createElement(Th, null, "Interaction"), /*#__PURE__*/React.createElement(Th, null, "Description"), showDifferentiation && /*#__PURE__*/React.createElement(Th, null, "Differentiation"), showBlooms && /*#__PURE__*/React.createElement(Th, null, "Bloom's"), /*#__PURE__*/React.createElement(Th, null, "Min"), /*#__PURE__*/React.createElement(Th, null))), /*#__PURE__*/React.createElement("tbody", null, steps.map((s, i) => /*#__PURE__*/React.createElement("tr", {
     key: s.id,
     draggable: true,
     onDragStart: () => setDraggedId(s.id),
@@ -2434,7 +2524,13 @@ function DesktopStepsTable({
     onChange: v => updateStep(s.id, "description", v),
     placeholder: "What happens?",
     forceExpand: allExpanded
-  })), /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("select", {
+  })), showDifferentiation && /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement(ExpandableField, {
+    value: s.differentiation || "",
+    onChange: v => updateStep(s.id, "differentiation", v),
+    placeholder: "Adaptations...",
+    forceExpand: allExpanded,
+    small: true
+  })), showBlooms && /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("select", {
     value: s.bloom || "",
     onChange: e => updateStep(s.id, "bloom", e.target.value),
     className: "bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic cursor-pointer no-print-arrow",
@@ -2529,28 +2625,46 @@ function ExpandableField({
   small
 }) {
   const ref = useRef(null);
+
+  // Only resize on value change if there's actual content change (not on focus)
   useEffect(() => {
     if (ref.current) {
-      // Always auto-grow to fit content, with a comfortable minimum
-      ref.current.style.height = 'auto';
-      ref.current.style.height = Math.max(ref.current.scrollHeight, 72) + 'px';
+      const el = ref.current;
+      // Save cursor position
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      // Resize
+      el.style.height = 'auto';
+      el.style.height = Math.max(el.scrollHeight, 90) + 'px';
+      // Restore cursor position (in case any React re-render shifted it)
+      if (document.activeElement === el) {
+        el.setSelectionRange(start, end);
+      }
     }
-  }, [forceExpand, value]);
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("textarea", {
+  }, [value]);
+  return /*#__PURE__*/React.createElement("textarea", {
     ref: ref,
     value: value,
     onChange: e => onChange(e.target.value),
     placeholder: placeholder,
     rows: 3,
-    className: "w-full bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic resize-y",
+    className: "w-full italic resize-y",
     style: {
       fontFamily: "Georgia, serif",
-      minHeight: "4.5em",
+      fontSize: small ? "0.85rem" : "0.95rem",
       lineHeight: 1.5,
-      padding: "0.25rem 0",
-      fontSize: small ? "0.85rem" : "0.95rem"
-    }
-  }));
+      padding: "0.5rem 0.6rem",
+      background: "#fef6e4",
+      border: "1px solid rgba(58, 30, 12, 0.25)",
+      borderRadius: 0,
+      outline: "none",
+      minHeight: "5.5em",
+      boxSizing: "border-box",
+      display: "block"
+    },
+    onFocus: e => e.target.style.borderColor = "#a0522d",
+    onBlur: e => e.target.style.borderColor = "rgba(58, 30, 12, 0.25)"
+  });
 }
 function SummaryCard({
   totalTime,
