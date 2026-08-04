@@ -233,6 +233,10 @@
               <option value="loop">Always looping</option>
               <option value="click">On click</option>
             </select>
+            <label id="animHoldWrap" style="display:none;align-items:center;gap:5px;font-size:10px;color:#cdd5e0;opacity:0.85;margin-top:6px;cursor:pointer;">
+              <input id="animHold" type="checkbox" style="accent-color:#5a8fd6;">
+              Stop on final frame
+            </label>
           </div>
           <div style="text-align:center;">
             <div style="font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:4px;">Preview</div>
@@ -5412,6 +5416,7 @@
     interactions: {},
     selectedCell: null,   // {sx, sy} chosen with the Select tool
     pathTarget: null,     // index into `placed` of the sprite being given a path
+    selectedPlaced: null, // index into `placed` of the sprite selected for deletion
     showZones: true,      // draw markers over interaction zones while editing
     activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
@@ -5499,7 +5504,7 @@
   async function saveSpriteLib(){
     // Strip cached canvases before serializing; keep animation metadata
     const slim = spriteLib.map(s=> isAnim(s)
-      ? {id:s.id, name:s.name, type:'anim', frames:s.frames, fps:s.fps, trigger:s.trigger}
+      ? {id:s.id, name:s.name, type:'anim', frames:s.frames, fps:s.fps, trigger:s.trigger, holdLast:!!s.holdLast}
       : {id:s.id, name:s.name, data:s.data});
     await Store.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
   }
@@ -5587,12 +5592,18 @@
     if(frames.length === 0) return null;
     let idx = 0;
     if(entry.trigger === 'click'){
-      // Only advance while a triggered playback is still running
-      if(inst && inst.playUntil && nowSec < inst.playUntil){
+      const playing = inst && inst.playUntil && nowSec < inst.playUntil;
+      if(playing){
         const elapsed = nowSec - (inst.playFrom || 0);
-        idx = Math.floor(elapsed * (entry.fps || 4)) % frames.length;
+        const raw = Math.floor(elapsed * (entry.fps || 4));
+        // With holdLast the sequence clamps at the end instead of wrapping,
+        // so the final frame is guaranteed to be shown.
+        idx = entry.holdLast ? Math.min(raw, frames.length - 1)
+                             : raw % frames.length;
+      } else if(entry.holdLast && inst && inst.playFrom != null){
+        idx = frames.length - 1;   // finished — stay on the last frame
       } else {
-        idx = 0;   // resting pose is the first frame
+        idx = 0;                   // resting pose is the first frame
       }
     } else {
       idx = Math.floor(nowSec * (entry.fps || 4)) % frames.length;
@@ -6355,7 +6366,33 @@
       }
     }
 
-    // ---- 5c. Selected cell (Select tool) ----
+    // ---- 5c. Selected placed sprite (Select tool) ----
+    if(isLoggedIn && tileView.tool === 'select' && tileView.selectedPlaced !== null){
+      const inst = tileView.placed[tileView.selectedPlaced];
+      if(inst){
+        const pos = (inst.path && inst.path.length >= 2)
+          ? positionAlongPath(inst, tsec) : {x: inst.x, y: inst.y};
+        const bx = originX + pos.x*u, by = originY + pos.y*u, bs = inst.size*u;
+        const pulse = 0.6 + 0.35*Math.sin(tsec*4);
+        c.save();
+        c.strokeStyle = `rgba(255,120,140,${pulse.toFixed(3)})`;
+        c.lineWidth = Math.max(2, u*0.14);
+        c.strokeRect(bx, by, bs, bs);
+        c.strokeStyle = 'rgba(0,0,0,0.7)';
+        c.lineWidth = 1;
+        c.strokeRect(bx-1, by-1, bs+2, bs+2);
+        // corner grips so it reads as "selected object"
+        const g = Math.max(3, Math.min(u*0.5, bs*0.16));
+        c.fillStyle = `rgba(255,120,140,${pulse.toFixed(3)})`;
+        c.fillRect(bx-g/2, by-g/2, g, g);
+        c.fillRect(bx+bs-g/2, by-g/2, g, g);
+        c.fillRect(bx-g/2, by+bs-g/2, g, g);
+        c.fillRect(bx+bs-g/2, by+bs-g/2, g, g);
+        c.restore();
+      }
+    }
+
+    // ---- 5d. Selected cell (Select tool) ----
     if(isLoggedIn && tileView.tool === 'select' && tileView.selectedCell){
       const {sx, sy} = tileView.selectedCell;
       const pulse = 0.55 + 0.35*Math.sin(tsec*3);
@@ -6367,7 +6404,7 @@
       c.strokeRect(originX + sx*u - 1, originY + sy*u - 1, u+2, u+2);
     }
 
-    // ---- 5d. Brush hover preview ----
+    // ---- 5e. Brush hover preview ----
     if(isLoggedIn && tileView.hover && (tileView.tool === 'paint' || tileView.tool === 'erase')){
       const rad = tileView.brush - 1;
       c.save();
@@ -6495,6 +6532,7 @@
     tileView.interactions = {};
     tileView.selectedCell = null;
     tileView.pathTarget = null;
+    tileView.selectedPlaced = null;
     tileView.activeSprite = tileView.activeSprite || null;
     tileView.dirty = false;
     tileView.animT = 0;
@@ -6676,10 +6714,23 @@
           }
         }
 
-        // 3. In Select mode (editing), remember the cell so the panel can
-        //    attach or edit an interaction on it.
+        // 3. In Select mode (editing), remember what was clicked so the panel
+        //    can act on it — a placed sprite if one is under the cursor,
+        //    otherwise the bare cell for attaching an interaction.
         if(isLoggedIn && tileView.tool === 'select'){
           tileView.selectedCell = {sx: p.sx, sy: p.sy};
+          // Hit-test placed items topmost-first, honouring live path positions
+          tileView.selectedPlaced = null;
+          for(let i = tileView.placed.length - 1; i >= 0; i--){
+            const inst = tileView.placed[i];
+            const pos = (inst.path && inst.path.length >= 2)
+              ? positionAlongPath(inst, tileView.animT)
+              : {x: inst.x, y: inst.y};
+            if(p.sx < pos.x || p.sx >= pos.x + inst.size) continue;
+            if(p.sy < pos.y || p.sy >= pos.y + inst.size) continue;
+            tileView.selectedPlaced = i;
+            break;
+          }
           syncCellPanel();
         }
       }
@@ -6825,6 +6876,37 @@
     const el = document.getElementById('tileZoomLabel');
     if(el) el.textContent = `${tileView.zoom.toFixed(1)}×`;
   }
+
+  // Delete / Backspace removes the selected placed sprite.
+  // Only fires while the tile view is open, the user is logged in, and focus
+  // isn't in a text field — so Backspace still edits text normally.
+  window.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Delete' && e.key !== 'Backspace') return;
+    if(!tileView.open || !isLoggedIn) return;
+    if(isTypingTarget(e.target)) return;
+    // The Path tool deletes whatever it's currently targeting
+    let idx = null;
+    if(tileView.tool === 'path' && tileView.pathTarget !== null) idx = tileView.pathTarget;
+    else if(tileView.selectedPlaced !== null) idx = tileView.selectedPlaced;
+    if(idx === null || !tileView.placed[idx]) return;
+    e.preventDefault();
+    const entry = getSprite(tileView.placed[idx].sid);
+    tileView.placed.splice(idx, 1);
+    // Indices shift after a splice — clear anything pointing past the removal
+    tileView.selectedPlaced = null;
+    if(tileView.pathTarget !== null){
+      if(tileView.pathTarget === idx) tileView.pathTarget = null;
+      else if(tileView.pathTarget > idx) tileView.pathTarget--;
+    }
+    tileView.dirty = true;
+    syncPathPanel();
+    syncCellPanel();
+    const st = document.getElementById('spriteStatus');
+    if(st){
+      st.textContent = `Deleted "${entry ? entry.name : 'sprite'}" · ${tileView.placed.length} left on tile`;
+      st.style.color = '';
+    }
+  });
 
   // Space held = pan mode (like design tools).
   // Skipped entirely while a text field has focus, otherwise the shortcut
@@ -7031,6 +7113,7 @@
       // Leaving Select drops the cell highlight so it isn't stale later
       if(tileView.tool !== 'select'){
         tileView.selectedCell = null;
+        tileView.selectedPlaced = null;
         syncCellPanel();
       }
       if(tileView.tool !== 'path') tileView.pathTarget = null;
@@ -7400,7 +7483,7 @@
   };
 
   // ============ ANIMATION BUILDER ============
-  const animEd = { editingId: null, frames: [], fps: 4, trigger: 'loop', previewT: 0, rafId: null };
+  const animEd = { editingId: null, frames: [], fps: 4, trigger: 'loop', holdLast: false, previewT: 0, rafId: null };
 
   function openAnimEditor(id){
     const sprites = spriteLib.filter(s=>!isAnim(s));
@@ -7411,21 +7494,26 @@
     animEd.editingId = id;
     if(id){
       const a = getSprite(id);
-      animEd.frames  = (a.frames || []).slice();
-      animEd.fps     = a.fps || 4;
-      animEd.trigger = a.trigger || 'loop';
+      animEd.frames   = (a.frames || []).slice();
+      animEd.fps      = a.fps || 4;
+      animEd.trigger  = a.trigger || 'loop';
+      animEd.holdLast = !!a.holdLast;
       document.getElementById('animName').value = a.name || '';
       document.getElementById('animDelete').style.display = 'block';
     } else {
       animEd.frames = [];
       animEd.fps = 4;
       animEd.trigger = 'loop';
+      animEd.holdLast = false;
       document.getElementById('animName').value = '';
       document.getElementById('animDelete').style.display = 'none';
     }
     document.getElementById('animFps').value = animEd.fps;
     document.getElementById('animFpsLabel').textContent = animEd.fps + ' fps';
     document.getElementById('animTrigger').value = animEd.trigger;
+    document.getElementById('animHold').checked = animEd.holdLast;
+    document.getElementById('animHoldWrap').style.display =
+      animEd.trigger === 'click' ? 'flex' : 'none';
     document.getElementById('animEditor').style.display = 'flex';
     renderAnimFrames();
     renderAnimPicker();
@@ -7520,6 +7608,11 @@
   });
   document.getElementById('animTrigger').addEventListener('change', (e)=>{
     animEd.trigger = e.target.value;
+    document.getElementById('animHoldWrap').style.display =
+      animEd.trigger === 'click' ? 'flex' : 'none';
+  });
+  document.getElementById('animHold').addEventListener('change', (e)=>{
+    animEd.holdLast = e.target.checked;
   });
   document.getElementById('animDelete').onclick = async ()=>{
     if(!animEd.editingId) return;
@@ -7538,10 +7631,11 @@
     const name = (document.getElementById('animName').value || '').trim() || 'animation';
     if(animEd.editingId){
       const a = getSprite(animEd.editingId);
-      a.name = name; a.frames = animEd.frames.slice(); a.fps = animEd.fps; a.trigger = animEd.trigger;
+      a.name = name; a.frames = animEd.frames.slice(); a.fps = animEd.fps;
+      a.trigger = animEd.trigger; a.holdLast = animEd.holdLast;
     } else {
       const id = 'a' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
-      spriteLib.push({id, name, type:'anim', frames:animEd.frames.slice(), fps:animEd.fps, trigger:animEd.trigger});
+      spriteLib.push({id, name, type:'anim', frames:animEd.frames.slice(), fps:animEd.fps, trigger:animEd.trigger, holdLast:animEd.holdLast});
       tileView.activeSprite = id;
       tileView.tool = 'sprite';
       highlightTool();
@@ -7682,6 +7776,11 @@
     let note = `Cell (${sx}, ${sy})`;
     if(!existing && covering) note += ` — inside a zone anchored at (${covering.ax}, ${covering.ay})`;
     else if(existing) note += ' — has a message';
+    // Call out a selected sprite so the delete shortcut is discoverable
+    if(tileView.selectedPlaced !== null && tileView.placed[tileView.selectedPlaced]){
+      const sp = getSprite(tileView.placed[tileView.selectedPlaced].sid);
+      note += ` · sprite "${sp ? sp.name : '?'}" selected — press Delete to remove`;
+    }
     info.textContent = note;
     panel.style.display = 'block';
     document.getElementById('cellMsgInput').value = existing ? (existing.msg || '') : '';
