@@ -196,7 +196,7 @@ footer{text-align:center;font-size:6px;color:#4a4a6a;padding:12px;letter-spacing
   <aside id="editor" class="pbox">
     <div class="sec"><h2>BACKGROUND</h2><div id="bgGrid"></div>
       <div class="row"><button class="btn mini" id="bgUploadBtn" type="button">UPLOAD BG</button><label class="chk"><input type="checkbox" id="pixelChk" checked>PIXELATE</label><button class="btn mini" id="bgClearBtn" type="button" style="display:none">CLEAR</button></div>
-      <div class="note" id="bgNote">PICK A PRESET OR UPLOAD JPG/PNG/GIF</div></div>
+      <div class="note" id="bgNote">PICK A PRESET OR UPLOAD JPG/PNG/GIF/WEBP (ANIMATED OK)</div></div>
     <div class="sec"><h2>STORY LINES</h2><div id="lineList"></div>
       <div class="row"><button class="btn gold" id="addLine" type="button">+ LINE</button><button class="btn cyan" id="addTitle" type="button">+ TITLE</button><button class="btn green" id="addDialogue" type="button">+ DIALOGUE</button></div>
       <div class="note">EACH LINE HAS ITS OWN TRANSITION EFFECT</div></div>
@@ -266,11 +266,58 @@ bctx.imageSmoothingEnabled=false;
 var tmpCvs=document.createElement('canvas');tmpCvs.width=128;tmpCvs.height=72;var tctx=tmpCvs.getContext('2d');
 var pxlCtx=transPixelCanvas.getContext('2d');
 
+/* === ANIMATED GIF SUPPORT === */
+/* Hidden <img> element that browsers reliably advance frames for.
+   drawImage() reads the CURRENT frame each call, giving us animation. */
+var gifImg=document.createElement('img');
+gifImg.style.display='none';
+document.body.appendChild(gifImg);
+var gifReady=false;
+var gifSrc='';
+
+function syncGif(){
+ if(!customImg){gifReady=false;gifSrc='';return;}
+ var src=customImg.src||customImg.currentSrc||'';
+ if(src!==gifSrc){
+  gifSrc=src;gifReady=false;
+  gifImg.onload=function(){gifReady=true;};
+  gifImg.onerror=function(){gifReady=false;};
+  gifImg.src=src;
+ }
+}
+
 function toast(msg){var el=$('#toast');el.textContent=msg;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.style.display='none';},3000);}
 function fitStage(){stageEl.style.setProperty('--px',(stageEl.clientWidth/100)+'px');transPixelCanvas.width=stageEl.clientWidth;transPixelCanvas.height=stageEl.clientHeight;}
 window.addEventListener('resize',fitStage);
 
-function frame(ts){var t=ts/1000;try{if(customImg){if(state.pixelate){tctx.drawImage(customImg,0,0,128,72);bctx.imageSmoothingEnabled=false;bctx.drawImage(tmpCvs,0,0,W,H);}else{bctx.imageSmoothingEnabled=true;bctx.drawImage(customImg,0,0,W,H);}}else{bctx.imageSmoothingEnabled=false;BG[state.bg].draw(bctx,t);}}catch(e){}requestAnimationFrame(frame);}
+/* === RENDER LOOP WITH GIF ANIMATION === */
+function frame(ts){
+ var t=ts/1000;
+ try{
+  if(customImg){
+   syncGif();
+   /* Use gifImg (hidden <img>) when loaded — this is what makes
+      animated GIF/APNG/WebP work. The browser advances its internal
+      frame decoder, and drawImage reads the current frame each tick.
+      Falls back to customImg (canvas/Image) for static images or
+      before gifImg finishes loading. */
+   var drawSrc=(gifReady&&gifImg.complete&&gifImg.naturalWidth>0)?gifImg:customImg;
+   if(state.pixelate){
+    tctx.imageSmoothingEnabled=false;
+    tctx.drawImage(drawSrc,0,0,128,72);
+    bctx.imageSmoothingEnabled=false;
+    bctx.drawImage(tmpCvs,0,0,W,H);
+   }else{
+    bctx.imageSmoothingEnabled=true;
+    bctx.drawImage(drawSrc,0,0,W,H);
+   }
+  }else{
+   bctx.imageSmoothingEnabled=false;
+   BG[state.bg].draw(bctx,t);
+  }
+ }catch(e){}
+ requestAnimationFrame(frame);
+}
 requestAnimationFrame(frame);
 
 /* === TRANSITIONS === */
@@ -318,10 +365,10 @@ function runTrans(type,dir,midCb,doneCb){
 /* === UI === */
 var thumbJobs=[];
 (function(){for(var key in BG){(function(k){var b=document.createElement('button');b.className='bgCard';b.dataset.bg=k;b.type='button';var cv=document.createElement('canvas');cv.width=96;cv.height=54;var sp=document.createElement('span');sp.textContent=BG[k].name;b.appendChild(cv);b.appendChild(sp);bgGrid.appendChild(b);var tc=cv.getContext('2d');tc.imageSmoothingEnabled=false;tc.scale(96/W,54/H);thumbJobs.push({c:tc,key:k});b.addEventListener('click',function(){state.bg=k;customImg=null;updateBgUI();});})(key);}setInterval(function(){if(document.body.classList.contains('playing'))return;try{var t=performance.now()/1000;for(var i=0;i<thumbJobs.length;i++)BG[thumbJobs[i].key].draw(thumbJobs[i].c,t);}catch(e){}},180);})();
-function updateBgUI(){var cards=document.querySelectorAll('.bgCard');for(var i=0;i<cards.length;i++)cards[i].classList.toggle('sel',!customImg&&cards[i].dataset.bg===state.bg);$('#bgClearBtn').style.display=customImg?'inline-block':'none';$('#bgNote').textContent=customImg?('LOADED: '+customName.toUpperCase()):'PICK A PRESET OR UPLOAD JPG/PNG/GIF';refreshStatus();}
+function updateBgUI(){var cards=document.querySelectorAll('.bgCard');for(var i=0;i<cards.length;i++)cards[i].classList.toggle('sel',!customImg&&cards[i].dataset.bg===state.bg);$('#bgClearBtn').style.display=customImg?'inline-block':'none';$('#bgNote').textContent=customImg?('LOADED: '+customName.toUpperCase()):'PICK A PRESET OR UPLOAD JPG/PNG/GIF/WEBP (ANIMATED OK)';refreshStatus();}
 $('#bgUploadBtn').addEventListener('click',function(){$('#bgFileInput').click();});
 $('#bgFileInput').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;var im=new Image();im.onload=function(){customImg=im;customName=f.name;updateBgUI();};im.src=URL.createObjectURL(f);e.target.value='';});
-$('#bgClearBtn').addEventListener('click',function(){customImg=null;updateBgUI();});
+$('#bgClearBtn').addEventListener('click',function(){customImg=null;gifReady=false;gifSrc='';updateBgUI();});
 $('#pixelChk').addEventListener('change',function(e){state.pixelate=e.target.checked;});
 function refreshStatus(){statusBar.textContent='BG: '+(customImg?'CUSTOM':BG[state.bg].name)+' | FX: '+state.lighting.toUpperCase()+' | SPD '+state.speed+' | '+state.lines.length+' ITEMS';}
 function picOpts(sel){var o='<option value="">- NONE -</option>';for(var i=0;i<state.images.length;i++){var im=state.images[i];o+='<option value="'+im.id+'"'+(im.id===sel?' selected':'')+'>'+esc(im.name)+'</option>';}return o;}
@@ -409,7 +456,7 @@ document.addEventListener('keydown',function(e){if(!playing)return;if(e.code==='
 function imgToB64(url){return new Promise(function(res){var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/png'));};img.onerror=function(){res(null);};img.src=url;});}
 $('#saveBtn').addEventListener('click',async function(){toast('SAVING...');var im={};for(var i=0;i<state.images.length;i++){var b=await imgToB64(state.images[i].url);if(b)im[state.images[i].id]={name:state.images[i].name,data:b};}try{var j=JSON.stringify({v:4,bg:state.bg,px:state.pixelate,spd:state.speed,fx:state.lighting,scan:$('#scanChk').checked,auto:state.autoNext,lines:state.lines,images:im});var bl=new Blob([j],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='pixeltale-story.json';a.click();URL.revokeObjectURL(a.href);toast('SAVED!');}catch(e){toast('SAVE FAILED');}});
 $('#loadBtn').addEventListener('click',function(){$('#loadFileInput').click();});
-$('#loadFileInput').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){try{var d=JSON.parse(ev.target.result);if(!d.v){toast('INVALID FILE');return;}state.bg=d.bg||'starlight';state.pixelate=d.px!==false;state.speed=d.spd||5;state.lighting=d.fx||'none';state.autoNext=!!d.auto;$('#scanChk').checked=d.scan!==false;state.images=[];imgSeq=0;if(d.images)for(var id in d.images){imgSeq++;state.images.push({id:id,name:d.images[id].name,url:d.images[id].data});}state.lines=d.lines||[{type:'text',text:'',color:'#fff',img:null,trans:'none'}];customImg=null;customName='';renderLines();renderImages();updateBgUI();refreshStatus();lightFx.className=(state.lighting==='none')?'':('fx-'+state.lighting);scanFx.style.display=$('#scanChk').checked?'block':'none';toast('LOADED!');}catch(err){toast('LOAD FAILED');}};r.readAsText(f);e.target.value='';});
+$('#loadFileInput').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){try{var d=JSON.parse(ev.target.result);if(!d.v){toast('INVALID FILE');return;}state.bg=d.bg||'starlight';state.pixelate=d.px!==false;state.speed=d.spd||5;state.lighting=d.fx||'none';state.autoNext=!!d.auto;$('#scanChk').checked=d.scan!==false;state.images=[];imgSeq=0;if(d.images)for(var id in d.images){imgSeq++;state.images.push({id:id,name:d.images[id].name,url:d.images[id].data});}state.lines=d.lines||[{type:'text',text:'',color:'#fff',img:null,trans:'none'}];customImg=null;gifReady=false;gifSrc='';customName='';renderLines();renderImages();updateBgUI();refreshStatus();lightFx.className=(state.lighting==='none')?'':('fx-'+state.lighting);scanFx.style.display=$('#scanChk').checked?'block':'none';toast('LOADED!');}catch(err){toast('LOAD FAILED');}};r.readAsText(f);e.target.value='';});
 $('#shareBtn').addEventListener('click',function(){try{var d={v:4,bg:state.bg,px:state.pixelate,spd:state.speed,fx:state.lighting,scan:$('#scanChk').checked,auto:state.autoNext,lines:state.lines.filter(function(L){return L.type!=='dialogue';}).map(function(L){return L.type==='title'?{t:'title',tx:L.text,s:L.sub||'',c:L.color,tr:L.trans||'none'}:{t:'text',tx:L.text,c:L.color,tr:L.trans||'none'};})};var b=btoa(unescape(encodeURIComponent(JSON.stringify(d))));var u=location.origin+location.pathname+'#story='+b;if(u.length>8000)toast('LINK TOO LONG - USE SAVE/LOAD');else if(navigator.clipboard)navigator.clipboard.writeText(u).then(function(){toast('LINK COPIED!');});else prompt('COPY:',u);}catch(e){toast('SHARE FAILED');}});
 (function(){var h=location.hash;if(h.indexOf('#story=')===0){try{var d=JSON.parse(decodeURIComponent(escape(atob(h.substring(7)))));if(d.v){isReadOnly=true;state.bg=d.bg||'starlight';state.pixelate=d.px!==false;state.speed=d.spd||5;state.lighting=d.fx||'none';state.autoNext=!!d.auto;if(d.scan===false)$('#scanChk').checked=false;state.lines=(d.lines||[]).map(function(l){return l.t==='title'?{type:'title',text:l.tx||'',sub:l.s||'',color:l.c||'#ffcc33',trans:l.tr||'iris'}:{type:'text',text:l.tx||'',color:l.c||'#fff',img:null,trans:l.tr||'none'};});document.body.classList.add('playing');$('header').style.display='none';$('#editor').style.display='none';$('#statusBar').style.display='none';lightFx.className=(state.lighting==='none')?'':('fx-'+state.lighting);scanFx.style.display=$('#scanChk').checked?'block':'none';fitStage();setTimeout(startPlay,500);}}catch(e){}}})();
 
