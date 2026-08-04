@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PIXELTALE — Retro Story Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#ffcc33; --cyan:#6fe3ff; --pink:#ff5d7d; --green:#7dee6a;
+  --panel:#13131f; --panel2:#0e0e1a; --line:#30304e; --txt:#e8e8f2;
+}
+html,body{min-height:100%}
+body{
+  font-family:'Press Start 2P','Courier New',monospace; color:var(--txt);
+  background-color:#0a0a13;
+  background-image:
+    linear-gradient(45deg,#0e0e19 25%,transparent 25%,transparent 75%,#0e0e19 75%),
+    linear-gradient(45deg,#0e0e19 25%,transparent 25%,transparent 75%,#0e0e19 75%);
+  background-size:28px 28px; background-position:0 0,14px 14px;
+}
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:14px;padding:14px 18px;background:#101020;border-bottom:4px solid var(--line);flex-wrap:wrap}
+h1{font-size:17px;color:var(--gold);text-shadow:2px 2px 0 #7a4a00,4px 4px 0 #000;letter-spacing:2px}
+.tag{font-size:7px;color:#8a8ab0;letter-spacing:1px}
+.heart{display:inline-block;width:3px;height:3px;background:transparent;margin:8px 26px 0 6px;box-shadow:
+ 3px 0 var(--pink),6px 0 var(--pink),12px 0 var(--pink),15px 0 var(--pink),
+ 0 3px var(--pink),3px 3px var(--pink),6px 3px var(--pink),9px 3px var(--pink),12px 3px var(--pink),15px 3px var(--pink),18px 3px var(--pink),
+ 0 6px var(--pink),3px 6px var(--pink),6px 6px var(--pink),9px 6px var(--pink),12px 6px var(--pink),15px 6px var(--pink),18px 6px var(--pink),
+ 3px 9px var(--pink),6px 9px var(--pink),9px 9px var(--pink),12px 9px var(--pink),15px 9px var(--pink),
+ 6px 12px var(--pink),9px 12px var(--pink),12px 12px var(--pink), 9px 15px var(--pink)}
+.hspace{flex:1}
+/* ---------- buttons & controls ---------- */
+.btn{font-family:inherit;font-size:9px;padding:10px 12px;background:#24243c;color:#fff;border:0;cursor:pointer;
+ box-shadow:inset -3px -3px 0 #12121f,inset 3px 3px 0 #3c3c60,0 0 0 2px #05050c;letter-spacing:1px}
+.btn:hover{background:#2d2d4c}
+.btn:active{box-shadow:inset 3px 3px 0 #12121f,0 0 0 2px #05050c;transform:translateY(1px)}
+.btn.gold{background:#6e5510;box-shadow:inset -3px -3px 0 #3c2e06,inset 3px 3px 0 #a8862a,0 0 0 2px #05050c;color:#ffe9a0}
+.btn.gold:hover{background:#82661a}
+.btn.big{font-size:11px;padding:13px 18px}
+.btn.mini{font-size:8px;padding:8px 10px}
+input[type=range]{accent-color:var(--gold);background:transparent;cursor:pointer}
+.chk{font-size:8px;color:#aab;display:flex;align-items:center;gap:5px;cursor:pointer}
+.chk input{accent-color:var(--gold)}
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:1fr 400px;gap:18px;padding:18px;max-width:1560px;margin:0 auto;align-items:start}
+@media(max-width:1080px){main{grid-template-columns:1fr}}
+#stageCol{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pbox{background:var(--panel);border:3px solid var(--line);box-shadow:0 0 0 3px #05050c}
+#statusBar{font-size:8px;color:#9a9ac0;padding:9px 12px;letter-spacing:1px}
+/* ---------- stage ---------- */
+#stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;container-type:size;cursor:pointer}
+#bgCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+#lightFx{position:absolute;inset:0;pointer-events:none;z-index:3}
+#scanFx{position:absolute;inset:0;pointer-events:none;z-index:4;opacity:.5;
+ background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 4px)}
+#stage::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 70px rgba(0,0,0,.55)}
+.fx-night{background:rgba(16,26,120,.42)}
+.fx-dusk{background:rgba(255,110,30,.22)}
+.fx-candle{background:rgba(255,150,50,.16);animation:candle 2.1s steps(10) infinite}
+.fx-storm{background:rgba(6,10,30,.5);animation:storm 6.5s linear infinite}
+@keyframes candle{0%,100%{opacity:.7}22%{opacity:1}47%{opacity:.55}71%{opacity:.95}86%{opacity:.8}}
+@keyframes storm{0%,86%,93%,100%{background:rgba(6,10,30,.5)}88%{background:rgba(225,238,255,.55)}89.5%{background:rgba(6,10,30,.5)}91%{background:rgba(225,238,255,.4)}}
+#sceneUI{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:3%}
+/* picture window */
+#picWindow{display:none;background:#05050f;padding:3px;margin-bottom:14px;box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#picWindow.show{display:block;animation:pop .16s steps(3)}
+@keyframes pop{from{transform:scale(.5)}to{transform:scale(1)}}
+#picMid{background:#e8e8f4;padding:3px}
+#storyPic{display:block;height:30cqh;max-height:30cqh;max-width:66cqw;width:auto;image-rendering:pixelated;background:#111}
+/* dialog box */
+#dialogWrap{width:86%;background:#05050f;padding:3px;box-shadow:6px 6px 0 rgba(0,0,0,.45)}
+#dialogMid{background:#e8e8f4;padding:3px}
+#dialogInner{background:#10102c;padding:14px 16px;min-height:7.5em;
+ box-shadow:inset 3px 3px 0 rgba(255,255,255,.07),inset -3px -3px 0 rgba(0,0,0,.4);
+ font-size:14px;font-size:2.3cqw;line-height:2;text-shadow:2px 2px 0 rgba(0,0,0,.85);word-break:break-word}
+#cursor{margin-left:5px;animation:blink .85s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+#endCard{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;gap:20px;align-items:center;justify-content:center;
+ background:rgba(0,0,0,.6);color:var(--gold);font-size:30px;font-size:4.5cqw;text-shadow:3px 3px 0 #000;letter-spacing:4px}
+#endCard.show{display:flex}
+#endCard small{font-size:9px;font-size:1.3cqw;color:#cfcfe8;animation:blink 1s steps(1) infinite}
+#playHint{position:absolute;right:10px;bottom:8px;z-index:6;display:none;font-size:8px;font-size:1.1cqw;color:rgba(255,255,255,.55);letter-spacing:1px}
+body.playing #playHint{display:block}
+body.playing #editor{display:none}
+body.playing main{grid-template-columns:1fr}
+body.playing #stageCol{align-items:center}
+body.playing #stage{width:min(100%,calc((100vh - 170px)*16/9))}
+/* ---------- editor ---------- */
+#editor{padding:14px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 120px);overflow-y:auto;position:sticky;top:14px}
+#editor::-webkit-scrollbar{width:10px}
+#editor::-webkit-scrollbar-thumb{background:#30304e;border:2px solid #05050c}
+.sec{border:2px solid var(--line);background:var(--panel2);padding:12px}
+.sec h2{font-size:9px;color:var(--gold);letter-spacing:1px;margin-bottom:11px;text-shadow:2px 2px 0 #000}
+.row{display:flex;align-items:center;gap:10px;margin-top:9px;flex-wrap:wrap}
+.lbl{font-size:8px;color:#aab;white-space:nowrap}
+.val{font-size:9px;color:var(--cyan);min-width:16px}
+.note{font-size:7px;color:#66668c;line-height:1.8;margin-top:9px}
+#bgGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bgCard{border:3px solid var(--line);cursor:pointer;background:#000;padding:0;font-family:inherit;color:#aab}
+.bgCard canvas{display:block;width:100%;image-rendering:pixelated}
+.bgCard span{display:block;font-size:6px;padding:4px 1px;text-align:center;background:#101020;letter-spacing:0;font-family:inherit}
+.bgCard.sel{border-color:var(--gold);box-shadow:0 0 10px rgba(255,204,51,.35)}
+/* lines */
+#lineList{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.line{border:2px solid var(--line);background:#101020;padding:8px}
+.line-top{display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.lnum{font-size:9px;color:var(--gold);min-width:20px}
+.line input[type=color]{width:30px;height:24px;border:2px solid var(--line);background:#000;padding:1px;cursor:pointer}
+.line select{font-family:inherit;font-size:7px;background:#181830;color:#ddd;border:2px solid var(--line);padding:4px;max-width:130px}
+.spacer{flex:1}
+.ibtn{font-family:inherit;font-size:8px;width:24px;height:24px;background:#24243c;color:#fff;border:0;cursor:pointer;box-shadow:0 2px 0 #05050c}
+.ibtn:hover{background:#33335a}
+.ibtn.del:hover{background:#5e2434}
+.line textarea{width:100%;font-family:inherit;font-size:9px;line-height:1.9;background:#0b0b16;color:#fff;
+ border:2px solid var(--line);padding:8px;resize:vertical;min-height:52px}
+.line textarea:focus{outline:none;border-color:var(--cyan)}
+/* fx buttons */
+.fxbtn{font-family:inherit;font-size:7px;padding:8px 9px;background:#1c1c30;color:#bbc;border:2px solid var(--line);cursor:pointer}
+.fxbtn:hover{border-color:#55558a}
+.fxbtn.on{background:#41325e;border-color:var(--gold);color:#ffe9a0}
+/* images */
+#imgGrid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.thumb{border:3px solid var(--line);background:#000;width:88px}
+.thumb img{display:block;width:100%;height:56px;object-fit:cover;image-rendering:pixelated}
+.tname{font-size:6px;padding:4px 2px;text-align:center;color:#aab;white-space:nowrap;overflow:hidden}
+.tbtns{display:flex;gap:3px;padding:0 4px 4px}
+.tbtns button{flex:1;font-family:inherit;font-size:6px;padding:4px 0;background:#22223a;color:#fff;border:0;cursor:pointer;box-shadow:0 2px 0 #05050c}
+.tbtns button:hover{background:#31425e}
+.tbtns button.del:hover{background:#5e2434}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#000;border:3px solid var(--gold);
+ color:var(--gold);padding:11px 16px;font-size:9px;display:none;z-index:99;letter-spacing:1px}
+footer{text-align:center;font-size:7px;color:#4a4a6a;padding:14px;letter-spacing:1px}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="heart"></span>
+  <h1>PIXELTALE</h1>
+  <span class="tag">RETRO STORY STUDIO · 16-BIT</span>
+  <div class="hspace"></div>
+  <button class="btn mini" id="sfxBtn">SFX ON</button>
+  <button class="btn gold big" id="playBtn">▶ PLAY STORY</button>
+</header>
+
+<main>
+  <div id="stageCol">
+    <div id="stage" class="pbox">
+      <canvas id="bgCanvas" width="320" height="180"></canvas>
+      <div id="lightFx"></div>
+      <div id="scanFx"></div>
+      <div id="sceneUI">
+        <div id="picWindow"><div id="picMid"><img id="storyPic" alt=""></div></div>
+        <div id="dialogWrap"><div id="dialogMid"><div id="dialogInner"><span id="dialogText"></span><span id="cursor" style="visibility:hidden">▼</span></div></div></div>
+      </div>
+      <div id="endCard">✦ THE END ✦<small>CLICK OR PRESS ESC</small></div>
+      <div id="playHint">CLICK / SPACE ▸ NEXT</div>
+    </div>
+    <div id="statusBar" class="pbox">READY...</div>
+  </div>
+
+  <aside id="editor" class="pbox">
+    <div class="sec">
+      <h2>▚ BACKGROUND</h2>
+      <div id="bgGrid"></div>
+      <div class="row">
+        <button class="btn mini" id="bgUploadBtn">▲ UPLOAD BG</button>
+        <label class="chk"><input type="checkbox" id="pixelChk" checked>PIXELATE</label>
+        <button class="btn mini" id="bgClearBtn" style="display:none">✕ CLEAR</button>
+      </div>
+      <div class="note" id="bgNote">PICK A PRESET WORLD · UPLOADS SUPPORT JPG / PNG / GIF / WEBP (ANIMATED OK)</div>
+    </div>
+
+    <div class="sec">
+      <h2>▚ STORY LINES</h2>
+      <div id="lineList"></div>
+      <button class="btn gold" id="addLine">＋ ADD LINE</button>
+      <div class="note">ORDER = PLAYBACK ORDER · PICK A PICTURE PER LINE · PICK THE INK COLOR</div>
+    </div>
+
+    <div class="sec">
+      <h2>▚ REVEAL & LIGHTING</h2>
+      <div class="row"><span class="lbl">TEXT SPEED</span><input type="range" id="speed" min="1" max="10" value="5" style="flex:1"><span class="val" id="speedVal">5</span></div>
+      <div class="row" id="fxRow">
+        <button class="fxbtn on" data-fx="none">NONE</button>
+        <button class="fxbtn" data-fx="night">NIGHT</button>
+        <button class="fxbtn" data-fx="dusk">DUSK</button>
+        <button class="fxbtn" data-fx="candle">CANDLE</button>
+        <button class="fxbtn" data-fx="storm">STORM</button>
+      </div>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="scanChk" checked>CRT SCANLINES</label>
+        <label class="chk"><input type="checkbox" id="autoChk">AUTO-NEXT</label>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>▚ PICTURES</h2>
+      <button class="btn mini" id="imgUploadBtn">▲ UPLOAD PICTURES</button>
+      <div id="imgGrid"></div>
+      <div class="note">PICTURES APPEAR IN A FRAME ABOVE THE TEXT BOX DURING THEIR LINE</div>
+    </div>
+
+    <div class="sec">
+      <h2>▚ MUSIC</h2>
+      <div class="row">
+        <button class="btn mini" id="musicBtn">▲ UPLOAD MP3</button>
+        <span class="note" id="musicName" style="margin:0">NO TRACK LOADED</span>
+      </div>
+      <div class="row"><span class="lbl">VOL</span><input type="range" id="vol" min="0" max="100" value="70" style="flex:1"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>SPACE / ENTER / CLICK = ADVANCE · ESC = STOP · MADE OF PIXELS ✦</footer>
+
+<input type="file" id="bgFileInput" accept="image/*" hidden>
+<input type="file" id="imgFileInput" accept="image/*" multiple hidden>
+<input type="file" id="musicFileInput" accept="audio/*" hidden>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const W=320,H=180;
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function makeRand(seed){let s=seed>>>0;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
+function bands(c,cols,y0,y1){const n=cols.length,h=(y1-y0)/n;for(let i=0;i<n;i++){c.fillStyle=cols[i];c.fillRect(0,Math.floor(y0+i*h),W,Math.ceil(h)+1);}}
+function circle(c,x,y,r,col){c.fillStyle=col;for(let j=-r;j<=r;j++){const w=Math.floor(Math.sqrt(r*r-j*j));if(w>=0)c.fillRect(Math.round(x-w),Math.round(y+j),w*2+1,1);}}
+function diamond(c,x,y,s,col){c.fillStyle=col;for(let j=-s;j<=s;j++){const w=s-Math.abs(j);c.fillRect(Math.round(x-w),Math.round(y+j),w*2+1,1);}}
+function pine(c,x,base,h,w,col){c.fillStyle=col;for(let i=0;i<3;i++){const th=h/3+2,ty=base-h+i*(h/3),tw=w*(0.45+0.55*(i+1)/3);for(let yy=0;yy<th;yy++){const ww=Math.max(1,tw*(yy/th));c.fillRect(Math.round(x-ww/2),Math.round(ty+yy),Math.round(ww),1);}}}
+
+/* ==================== ANIMATED PIXEL BACKGROUNDS ==================== */
+const BG={};
+BG.starlight={name:'STARLIGHT RIDGE',
+ build(){const r=makeRand(99);
+  this.stars=Array.from({length:70},()=>({x:(r()*W)|0,y:(r()*105)|0,p:r()*6.28,b:r()<.25}));
+  const mk=(base,amp)=>{const a=[];let h=base;for(let x=0;x<W;x++){h+=(r()-.5)*amp;h=Math.max(base-16,Math.min(base+16,h));a.push(h);}return a;};
+  this.far=mk(104,5);this.near=mk(126,7);this.lights=[[46,'#ffb54d'],[152,'#ffb54d'],[268,'#ff8a5a']];},
+ draw(c,t){
+  bands(c,['#050514','#0a0a26','#12103c','#1c1650'],0,112);
+  circle(c,246,36,15,'rgba(226,226,198,.08)');circle(c,246,36,10,'#e9e6cf');
+  c.fillStyle='#cfcbb2';c.fillRect(242,33,3,3);c.fillRect(248,38,2,2);c.fillRect(250,31,2,2);
+  for(const s of this.stars){const a=(.3+.7*Math.abs(Math.sin(t*1.5+s.p))).toFixed(2);
+   c.fillStyle=s.b?`rgba(150,190,255,${a})`:`rgba(255,255,255,${a})`;c.fillRect(s.x,s.y,s.b?2:1,s.b?2:1);}
+  const ph=t%9;
+  if(ph<.8){const sx=330-ph*300,sy=14+ph*62;
+   for(let k=0;k<8;k++){c.fillStyle=`rgba(255,255,255,${(1-k/8)*.9})`;c.fillRect(sx+k*3,sy-k,2,1);}}
+  c.fillStyle='#181646';for(let x=0;x<W;x++){const y=this.far[x]|0;c.fillRect(x,y,1,H-y);}
+  c.fillStyle='#0a0922';for(let x=0;x<W;x++){const y=this.near[x]|0;c.fillRect(x,y,1,H-y);}
+  for(const [lx,col] of this.lights){const ly=(this.near[lx]|0)-3,a=.55+.45*Math.sin(t*3+lx);
+   c.fillStyle=`rgba(255,180,80,${(.25*a).toFixed(2)})`;c.fillRect(lx-2,ly-2,5,5);
+   c.globalAlpha=a;c.fillStyle=col;c.fillRect(lx,ly,1,2);c.globalAlpha=1;}
+ }};
+BG.forest={name:'WHISPER WOODS',
+ build(){const r=makeRand(5);
+  this.farT=Array.from({length:15},()=>({x:r()*W,h:18+r()*14,w:9+r()*6}));
+  this.nearT=Array.from({length:9},()=>({x:r()*W,h:36+r()*26,w:16+r()*9}));
+  this.flies=Array.from({length:16},()=>({x:r()*W,y:70+r()*86,ph:r()*6.28,sp:.5+r()*1.2}));},
+ draw(c,t){
+  bands(c,['#03140d','#072718','#0b3a22'],0,H-24);
+  c.fillStyle='#04120b';c.fillRect(0,H-24,W,24);
+  for(const tr of this.farT)pine(c,tr.x,H-24,tr.h,tr.w,'#0b2a19');
+  for(const tr of this.nearT)pine(c,tr.x,H+3,tr.h,tr.w,'#071a0f');
+  c.fillStyle='rgba(2,10,6,.5)';c.fillRect(0,0,W,10);
+  for(const f of this.flies){
+   const x=f.x+Math.sin(t*f.sp+f.ph)*11,y=f.y+Math
