@@ -31,7 +31,8 @@
       <div style="font-weight:500;margin-bottom:8px;opacity:0.85;">Paint tools</div>
 
       <div style="display:flex;gap:4px;margin-bottom:8px;">
-        <button class="ttool" data-ttool="paint" style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Paint</button>
+        <button class="ttool" data-ttool="select" style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;" title="Look around and test interactions without drawing">Select</button>
+        <button class="ttool" data-ttool="paint" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Paint</button>
         <button class="ttool" data-ttool="erase" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Erase</button>
         <button class="ttool" data-ttool="sprite" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Sprite</button>
       </div>
@@ -5314,7 +5315,7 @@
     scatter: [],         // [{kind, sx, sy, seedVal}]
     paint: {},           // sparse: "idx" -> materialId
     placed: [],          // [{sid, x, y, size}] sprite instances on this tile
-    tool: 'paint',
+    tool: 'select',    // select | paint | erase | sprite
     material: 'stone',
     brush: 1,
     spriteSize: 1,       // placement size in sub-cells (1 = one cell)
@@ -6148,7 +6149,7 @@
     }
 
     // ---- 5b. Brush hover preview ----
-    if(isLoggedIn && tileView.hover && tileView.tool !== 'sprite'){
+    if(isLoggedIn && tileView.hover && (tileView.tool === 'paint' || tileView.tool === 'erase')){
       const rad = tileView.brush - 1;
       c.save();
       c.strokeStyle = tileView.tool === 'erase' ? 'rgba(255,140,140,0.95)' : 'rgba(255,232,90,0.95)';
@@ -6307,6 +6308,7 @@
     document.getElementById('enterTileBtn').style.display = 'none';
     buildMaterialGrid();
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
+    highlightTool();
     document.getElementById('tileMsgInput').value = tileView.message || '';
     document.getElementById('tileClickAnim').checked = !!tileView.clickAnimAnywhere;
     document.getElementById('tileMessage').style.display = 'none';
@@ -6373,6 +6375,15 @@
       b.style.background = on ? 'rgba(60,90,140,0.8)' : 'rgba(40,55,80,0.6)';
       b.style.borderColor = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
     });
+    // Cursor reflects the active mode so it's obvious when drawing is off
+    tileCv.style.cursor = tileView.spaceHeld ? 'grab'
+                        : tileView.tool === 'select' ? 'default'
+                        : 'crosshair';
+    const st = document.getElementById('spriteStatus');
+    if(st && tileView.tool === 'select'){
+      st.textContent = 'Select mode — clicks test interactions, nothing is drawn.';
+      st.style.color = '';
+    }
   }
 
   // ---- Painting interaction ----
@@ -6415,7 +6426,8 @@
     // a message shows the message popup.
     {
       const p = tileCanvasToSub(e.clientX, e.clientY);
-      if(p && !(isLoggedIn && (tileView.tool === 'paint' || tileView.tool === 'erase' || tileView.tool === 'sprite'))){
+      const editingTool = isLoggedIn && (tileView.tool === 'paint' || tileView.tool === 'erase' || tileView.tool === 'sprite');
+      if(p && !editingTool){
         const nowSec = tileView.animT;
         let triggered = false;
         // Hit-test topmost-first so overlapping items behave sensibly
@@ -6466,6 +6478,8 @@
       }
       return;
     }
+    // The select tool is a pure cursor — it never modifies the tile.
+    if(tileView.tool === 'select') return;
     const p = tileCanvasToSub(e.clientX, e.clientY);
     if(!p) return;
     tileView.painting = true;
@@ -6556,12 +6570,27 @@
     if(el) el.textContent = `${tileView.zoom.toFixed(1)}×`;
   }
 
-  // Space held = pan mode (like design tools)
+  // Space held = pan mode (like design tools).
+  // Skipped entirely while a text field has focus, otherwise the shortcut
+  // swallows the space bar and you can't type spaces into the message box.
+  function isTypingTarget(el){
+    if(!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
   window.addEventListener('keydown', (e)=>{
-    if(tileView.open && e.code === 'Space'){ tileView.spaceHeld = true; tileCv.style.cursor='grab'; e.preventDefault(); }
+    if(isTypingTarget(e.target)) return;
+    if(tileView.open && e.code === 'Space'){
+      tileView.spaceHeld = true;
+      tileCv.style.cursor = 'grab';
+      e.preventDefault();
+    }
   });
   window.addEventListener('keyup', (e)=>{
-    if(e.code === 'Space'){ tileView.spaceHeld = false; tileCv.style.cursor='crosshair'; }
+    if(e.code === 'Space'){
+      tileView.spaceHeld = false;
+      tileCv.style.cursor = tileView.tool === 'select' ? 'default' : 'crosshair';
+    }
   });
 
   // ---- Save / clear ----
