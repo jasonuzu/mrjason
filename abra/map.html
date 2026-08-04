@@ -5,6 +5,55 @@
        so it doesn't intercept clicks intended for the canvas underneath. -->
   <div id="selectionOverlay" style="position:absolute;display:none;border:3px solid #ffe85a;outline:2px solid rgba(0,0,0,0.85);box-shadow:0 0 0 1px rgba(0,0,0,0.5) inset, 0 0 12px 2px rgba(255,232,90,0.6);pointer-events:none;z-index:9;box-sizing:border-box;transition:none;"></div>
 
+  <!-- "Enter tile" button — appears on the selected tile at high zoom.
+       Clicking opens the full-screen procedural tile view. -->
+  <button id="enterTileBtn" style="position:absolute;display:none;z-index:11;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);border:1px solid rgba(255,232,90,0.6);color:#ffe85a;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;box-shadow:0 2px 12px rgba(0,0,0,0.5);">⤢ Enter tile</button>
+
+  <!-- ============ FULL-SCREEN TILE DETAIL VIEW ============ -->
+  <div id="tileDetail" style="position:absolute;inset:0;display:none;z-index:50;background:#0b1220;">
+    <canvas id="tileCanvas" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;cursor:crosshair;"></canvas>
+
+    <!-- Header bar -->
+    <div style="position:absolute;top:0;left:0;right:0;height:44px;background:linear-gradient(to bottom, rgba(11,18,32,0.95), rgba(11,18,32,0.0));display:flex;align-items:center;padding:0 12px;gap:10px;z-index:2;pointer-events:none;">
+      <button id="tileBack" style="pointer-events:auto;background:rgba(20,30,50,0.9);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 12px;border-radius:7px;font-size:12px;cursor:pointer;">← Back to map</button>
+      <div id="tileTitle" style="font-size:13px;font-weight:500;color:#e8eef7;"></div>
+      <div id="tileSubtitle" style="font-size:11px;opacity:0.7;color:#cdd5e0;"></div>
+    </div>
+
+    <!-- Paint toolbar (logged in only) -->
+    <div id="tileTools" style="position:absolute;top:54px;left:10px;width:186px;background:rgba(15,23,42,0.94);backdrop-filter:blur(10px);border:1px solid rgba(120,160,220,0.3);border-radius:10px;padding:10px;display:none;z-index:3;font-size:11px;max-height:calc(100% - 70px);overflow-y:auto;">
+      <div style="font-weight:500;margin-bottom:8px;opacity:0.85;">Paint tools</div>
+
+      <div style="display:flex;gap:4px;margin-bottom:8px;">
+        <button class="ttool" data-ttool="paint" style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Paint</button>
+        <button class="ttool" data-ttool="erase" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Erase</button>
+      </div>
+
+      <div style="margin-bottom:6px;opacity:0.7;">Brush size</div>
+      <input id="brushSize" type="range" min="1" max="8" value="2" style="width:100%;margin-bottom:10px;accent-color:#5a8fd6;">
+
+      <div style="margin-bottom:6px;opacity:0.7;">Material</div>
+      <div id="materialGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px;"></div>
+
+      <div style="margin-bottom:6px;opacity:0.7;">Place image</div>
+      <input id="decalUpload" type="file" accept="image/png,image/jpeg,image/webp" style="width:100%;font-size:10px;color:#cdd5e0;margin-bottom:6px;">
+      <div id="decalStatus" style="font-size:10px;opacity:0.6;margin-bottom:6px;"></div>
+      <button id="decalPlaceBtn" style="width:100%;background:rgba(80,110,160,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:4px;display:none;">Click map to place</button>
+      <div style="display:flex;gap:4px;margin-bottom:10px;">
+        <button id="decalUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Remove last image</button>
+      </div>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;gap:4px;">
+        <button id="tileSave" style="flex:1;background:#3b6db8;border:none;color:#fff;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Save</button>
+        <button id="tileClear" style="background:rgba(140,50,50,0.5);border:1px solid rgba(255,120,120,0.25);color:#ffd0d0;padding:6px 8px;border-radius:6px;font-size:11px;cursor:pointer;">Clear</button>
+      </div>
+      <div id="tileSaveStatus" style="font-size:10px;opacity:0.6;margin-top:5px;min-height:12px;"></div>
+    </div>
+
+    <!-- Footer info -->
+    <div id="tileFooter" style="position:absolute;bottom:10px;right:10px;background:rgba(15,23,42,0.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;font-size:11px;color:#cdd5e0;z-index:3;line-height:1.5;"></div>
+  </div>
+
   <!-- Top bar -->
   <div style="position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;pointer-events:none;z-index:5;">
     <div id="clock" style="background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);padding:8px 12px;border-radius:8px;font-size:13px;border:1px solid rgba(255,255,255,0.08);pointer-events:auto;">
@@ -4870,6 +4919,857 @@
     if(view.selected) deselectTile();
   });
 
+  // ============================================================
+  // ============ FULL-SCREEN TILE DETAIL VIEW ==================
+  // ============================================================
+  // Each world tile can be "entered" at high zoom, opening a full-screen
+  // top-down pixel-art scene. The scene is a SUB_GRID x SUB_GRID grid of
+  // sub-cells, procedurally generated from the parent tile's terrain, biome,
+  // elevation, moisture, weather and season — so every tile looks unique but
+  // is stable (same tile always regenerates identically).
+  //
+  // Layers, painted bottom to top:
+  //   1. Procedural ground   — base material per sub-cell
+  //   2. Procedural scatter  — sprites (rocks, plants, trees, etc.)
+  //   3. User paint layer    — sparse map of "subIdx -> materialId"
+  //   4. User decals         — uploaded images placed at positions
+  //   5. Weather animation   — rain/snow/fog particles over everything
+  // ============================================================
+
+  const SUB_GRID = 32;               // sub-cells per side (32x32 = 1024 cells)
+  const ENTER_TILE_MIN_ZOOM = 60;    // "Enter tile" button appears at/above this zoom
+
+  // ---- Material library ----
+  // Each material has: id, label, base color, and an optional texture style
+  // that controls how individual sub-cells are shaded.
+  // Texture styles: 'flat', 'grain' (speckled), 'brick', 'plank', 'rough', 'gloss'
+  const MATERIALS = [
+    {id:'grass',     label:'Grass',      color:[104,152,72],  tex:'grain'},
+    {id:'darkgrass', label:'Dk grass',   color:[66,112,58],   tex:'grain'},
+    {id:'dirt',      label:'Dirt',       color:[124,96,64],   tex:'grain'},
+    {id:'mud',       label:'Mud',        color:[86,68,48],    tex:'rough'},
+    {id:'sand',      label:'Sand',       color:[222,200,150], tex:'grain'},
+    {id:'clay',      label:'Clay',       color:[178,110,78],  tex:'rough'},
+    {id:'stone',     label:'Stone',      color:[132,130,126], tex:'rough'},
+    {id:'cobble',    label:'Cobble',     color:[112,110,108], tex:'brick'},
+    {id:'brick',     label:'Brick',      color:[152,72,56],   tex:'brick'},
+    {id:'plank',     label:'Wood',       color:[142,102,62],  tex:'plank'},
+    {id:'snow',      label:'Snow',       color:[238,242,248], tex:'grain'},
+    {id:'ice',       label:'Ice',        color:[176,214,232], tex:'gloss'},
+    {id:'water',     label:'Water',      color:[72,124,172],  tex:'gloss'},
+    {id:'moss',      label:'Moss',       color:[78,124,68],   tex:'rough'},
+    {id:'ash',       label:'Ash',        color:[92,88,86],    tex:'grain'},
+    {id:'gravel',    label:'Gravel',     color:[146,140,132], tex:'rough'},
+    {id:'black',     label:'Black',      color:[26,26,30],    tex:'flat'},
+    {id:'brown',     label:'Brown',      color:[102,72,46],   tex:'flat'},
+    {id:'green',     label:'Green',      color:[62,142,72],   tex:'flat'},
+    {id:'yellow',    label:'Yellow',     color:[226,196,74],  tex:'flat'},
+    {id:'white',     label:'White',      color:[240,240,238], tex:'flat'},
+    {id:'red',       label:'Red',        color:[186,60,54],   tex:'flat'},
+    {id:'blue',      label:'Blue',       color:[62,102,180],  tex:'flat'},
+    {id:'purple',    label:'Purple',     color:[124,76,164],  tex:'flat'},
+  ];
+  const MATERIAL_BY_ID = {};
+  for(const m of MATERIALS) MATERIAL_BY_ID[m.id] = m;
+
+  // ---- Per-terrain ground recipes ----
+  // Each terrain maps to a weighted list of base materials plus a scatter
+  // recipe describing what sprites appear and how densely.
+  // scatter kinds: 'tree','pine','palm','bush','rock','boulder','reed','flower',
+  //                'cactus','stump','crystal','ripple','driftwood','bone','snowdrift'
+  const TERRAIN_RECIPES = {
+    0:  {ground:[['water',1]],                            scatter:[['ripple',0.05]], liquid:true},
+    1:  {ground:[['water',1]],                            scatter:[['ripple',0.06]], liquid:true},
+    2:  {ground:[['water',0.8],['sand',0.2]],             scatter:[['ripple',0.08],['rock',0.01]], liquid:true},
+    3:  {ground:[['sand',0.92],['gravel',0.08]],          scatter:[['driftwood',0.008],['rock',0.012],['shell',0.02]]},
+    4:  {ground:[['grass',0.86],['darkgrass',0.1],['dirt',0.04]], scatter:[['flower',0.03],['bush',0.02],['rock',0.006]]},
+    5:  {ground:[['grass',0.6],['darkgrass',0.3],['dirt',0.1]],   scatter:[['tree',0.11],['bush',0.05],['stump',0.006],['flower',0.01]]},
+    6:  {ground:[['darkgrass',0.55],['moss',0.3],['dirt',0.15]],  scatter:[['pine',0.16],['bush',0.04],['rock',0.01],['stump',0.008]]},
+    7:  {ground:[['sand',0.95],['clay',0.05]],            scatter:[['cactus',0.012],['rock',0.01],['bone',0.004]]},
+    8:  {ground:[['grass',0.5],['sand',0.35],['dirt',0.15]],      scatter:[['tree',0.02],['bush',0.05],['rock',0.008]]},
+    9:  {ground:[['grass',0.55],['dirt',0.25],['stone',0.2]],     scatter:[['rock',0.04],['boulder',0.012],['bush',0.03]]},
+    10: {ground:[['stone',0.7],['gravel',0.25],['dirt',0.05]],    scatter:[['boulder',0.05],['rock',0.06],['pine',0.01]]},
+    11: {ground:[['snow',0.75],['ice',0.12],['stone',0.13]],      scatter:[['snowdrift',0.05],['rock',0.02],['crystal',0.004]]},
+    12: {ground:[['snow',0.45],['darkgrass',0.3],['gravel',0.25]],scatter:[['rock',0.025],['bush',0.02],['snowdrift',0.03]]},
+    13: {ground:[['mud',0.5],['water',0.3],['moss',0.2]],         scatter:[['reed',0.09],['tree',0.02],['lily',0.03]]},
+    14: {ground:[['moss',0.45],['darkgrass',0.4],['mud',0.15]],   scatter:[['palm',0.13],['bush',0.09],['flower',0.04],['reed',0.02]]},
+    15: {ground:[['water',0.94],['mud',0.06]],            scatter:[['ripple',0.05],['lily',0.015]], liquid:true},
+  };
+
+  // Tile detail state
+  const tileView = {
+    open: false,
+    tx: 0, ty: 0,
+    ground: null,        // Uint8Array of material indices, SUB_GRID^2
+    scatter: [],         // [{kind, sx, sy, seedVal}]
+    paint: {},           // sparse: "idx" -> materialId
+    decals: [],          // [{dataUrl, x, y, w, h, img}]
+    tool: 'paint',
+    material: 'stone',
+    brush: 2,
+    pendingDecal: null,  // {dataUrl, img} awaiting placement
+    dirty: false,
+    animT: 0,
+    rafId: null,
+    painting: false,
+  };
+  const tileCv  = document.getElementById('tileCanvas');
+  const tileCtx = tileCv.getContext('2d');
+  tileCtx.imageSmoothingEnabled = false;
+
+  function pickWeightedMat(list, r){
+    let total = 0; for(const [,w] of list) total += w;
+    let acc = 0;
+    for(const [id, w] of list){ acc += w/total; if(r < acc) return id; }
+    return list[list.length-1][0];
+  }
+
+  // Generate the procedural ground + scatter for a tile.
+  // Deterministic from (tx, ty, SEED) plus tile data, so it's always identical.
+  function generateTileDetail(tx, ty){
+    const t     = tiles[ty*WORLD_W+tx];
+    const e     = elev[ty*WORLD_W+tx];
+    const m     = moist[ty*WORLD_W+tx];
+    const recipe = TERRAIN_RECIPES[t] || TERRAIN_RECIPES[4];
+    const rng = mulberry32((tx*2654435761) ^ (ty*40503) ^ SEED ^ 0xABCD);
+    // Sub-scale noise for coherent patches rather than pure salt-and-pepper
+    const noiseA = makeNoise((tx*7919 ^ ty*31 ^ SEED)>>>0, 16, 16);
+    const noiseB = makeNoise((tx*104729 ^ ty*7919 ^ SEED)>>>0, 8, 8);
+
+    const ground = new Uint8Array(SUB_GRID*SUB_GRID);
+    const matIdxById = {};
+    MATERIALS.forEach((mm,i)=>{ matIdxById[mm.id]=i; });
+
+    for(let sy=0; sy<SUB_GRID; sy++){
+      for(let sx=0; sx<SUB_GRID; sx++){
+        const nA = noiseA(sx*0.9, sy*0.9);
+        const nB = noiseB(sx*2.1, sy*2.1);
+        // Combine noise into a 0..1 selector, biased by moisture/elevation
+        let sel = nA*0.65 + nB*0.35;
+        sel = Math.max(0, Math.min(0.999, sel*0.85 + (m-0.5)*0.12 + (e-0.5)*0.08 + 0.075));
+        const id = pickWeightedMat(recipe.ground, sel);
+        ground[sy*SUB_GRID+sx] = matIdxById[id] ?? 0;
+      }
+    }
+
+    // Scatter sprites — placed on sub-cell centers with jitter
+    const scatter = [];
+    for(const [kind, density] of (recipe.scatter||[])){
+      const count = Math.round(density * SUB_GRID * SUB_GRID);
+      for(let i=0;i<count;i++){
+        const sx = rng()*SUB_GRID;
+        const sy = rng()*SUB_GRID;
+        // Don't scatter land sprites onto water cells
+        const gi = ground[(Math.floor(sy)*SUB_GRID + Math.floor(sx))];
+        const gm = MATERIALS[gi];
+        const onWater = gm && gm.id === 'water';
+        if(onWater && !['ripple','lily','reed','driftwood'].includes(kind)) continue;
+        if(!onWater && ['ripple','lily'].includes(kind)) continue;
+        scatter.push({kind, sx, sy, v: rng()});
+      }
+    }
+    // Sort by y so nearer sprites draw over farther ones (top-down depth)
+    scatter.sort((a,b)=>a.sy-b.sy);
+    return {ground, scatter};
+  }
+
+  // ---- Sprite drawing (hand-drawn pixel-art style) ----
+  // Each sprite is drawn at a sub-cell scale `u` (pixels per sub-cell).
+  function drawSprite(c, kind, px, py, u, v, lighting){
+    const L = (col)=>rgbStr(applyLighting(col));
+    switch(kind){
+      case 'tree': {
+        const h = u*(1.5 + v*0.6);
+        c.fillStyle = 'rgba(0,0,0,0.22)';
+        c.beginPath(); c.ellipse(px, py+u*0.15, u*0.75, u*0.32, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([84,58,34]);
+        c.fillRect(px-u*0.13, py-h*0.30, u*0.26, h*0.42);
+        c.fillStyle = L([38,84,44]);
+        c.beginPath(); c.arc(px, py-h*0.45, u*0.80, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([56,116,58]);
+        c.beginPath(); c.arc(px-u*0.20, py-h*0.55, u*0.58, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(px+u*0.26, py-h*0.42, u*0.50, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([80,148,72]);
+        c.beginPath(); c.arc(px-u*0.26, py-h*0.66, u*0.24, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'pine': {
+        const h = u*(1.9 + v*0.8);
+        c.fillStyle = 'rgba(0,0,0,0.22)';
+        c.beginPath(); c.ellipse(px, py+u*0.12, u*0.55, u*0.24, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([66,46,28]);
+        c.fillRect(px-u*0.10, py-h*0.18, u*0.20, h*0.28);
+        for(let k=0;k<3;k++){
+          const yy = py - h*(0.20 + k*0.26);
+          const w  = u*(0.85 - k*0.20);
+          c.fillStyle = L(k===2?[46,102,58]:[32,78,46]);
+          c.beginPath();
+          c.moveTo(px, yy - h*0.34);
+          c.lineTo(px - w, yy);
+          c.lineTo(px + w, yy);
+          c.closePath(); c.fill();
+        }
+        break;
+      }
+      case 'palm': {
+        const h = u*(2.0 + v*0.7);
+        c.fillStyle = 'rgba(0,0,0,0.20)';
+        c.beginPath(); c.ellipse(px, py+u*0.12, u*0.5, u*0.22, 0, 0, Math.PI*2); c.fill();
+        c.strokeStyle = L([120,88,52]); c.lineWidth = Math.max(1,u*0.16); c.lineCap='round';
+        c.beginPath(); c.moveTo(px, py); c.quadraticCurveTo(px+u*0.2, py-h*0.5, px+u*0.1, py-h*0.85); c.stroke();
+        const top = {x:px+u*0.1, y:py-h*0.85};
+        c.strokeStyle = L([40,124,64]); c.lineWidth = Math.max(1,u*0.13);
+        for(let k=0;k<6;k++){
+          const a = (k/6)*Math.PI*2 + v*2;
+          c.beginPath(); c.moveTo(top.x, top.y);
+          c.quadraticCurveTo(top.x+Math.cos(a)*u*0.6, top.y+Math.sin(a)*u*0.4 - u*0.3,
+                             top.x+Math.cos(a)*u*1.0, top.y+Math.sin(a)*u*0.75);
+          c.stroke();
+        }
+        break;
+      }
+      case 'bush': {
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.beginPath(); c.ellipse(px, py+u*0.10, u*0.44, u*0.18, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([44,96,50]);
+        c.beginPath(); c.arc(px, py-u*0.12, u*0.42, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([64,128,62]);
+        c.beginPath(); c.arc(px-u*0.14, py-u*0.24, u*0.28, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(px+u*0.18, py-u*0.16, u*0.24, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'rock': {
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.beginPath(); c.ellipse(px, py+u*0.08, u*0.34, u*0.14, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([96,92,88]);
+        c.beginPath(); c.ellipse(px, py-u*0.04, u*0.32, u*0.22, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([146,140,132]);
+        c.beginPath(); c.ellipse(px-u*0.06, py-u*0.10, u*0.22, u*0.14, 0, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'boulder': {
+        c.fillStyle = 'rgba(0,0,0,0.24)';
+        c.beginPath(); c.ellipse(px, py+u*0.16, u*0.70, u*0.26, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([84,80,76]);
+        c.beginPath(); c.ellipse(px, py-u*0.10, u*0.66, u*0.50, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([134,128,120]);
+        c.beginPath(); c.ellipse(px-u*0.14, py-u*0.24, u*0.44, u*0.30, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([166,160,150]);
+        c.beginPath(); c.ellipse(px-u*0.22, py-u*0.32, u*0.18, u*0.11, 0, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'reed': {
+        c.strokeStyle = L([64,102,54]); c.lineWidth = Math.max(1,u*0.11); c.lineCap='round';
+        for(let k=0;k<4;k++){
+          const off = (k-1.5)*u*0.16;
+          const hh = u*(0.9 + ((k*7+v*11)%5)/5*0.6);
+          c.beginPath(); c.moveTo(px+off, py);
+          c.quadraticCurveTo(px+off+u*0.10, py-hh*0.6, px+off+u*0.18, py-hh);
+          c.stroke();
+        }
+        break;
+      }
+      case 'flower': {
+        const cols = [[240,208,72],[226,102,140],[178,132,222],[240,136,72],[236,240,244]];
+        const col = cols[Math.floor(v*cols.length)%cols.length];
+        c.strokeStyle = L([70,120,60]); c.lineWidth = Math.max(1,u*0.08);
+        c.beginPath(); c.moveTo(px, py); c.lineTo(px, py-u*0.38); c.stroke();
+        c.fillStyle = L(col);
+        for(let k=0;k<5;k++){
+          const a = (k/5)*Math.PI*2;
+          c.beginPath();
+          c.arc(px+Math.cos(a)*u*0.13, py-u*0.40+Math.sin(a)*u*0.13, u*0.11, 0, Math.PI*2);
+          c.fill();
+        }
+        c.fillStyle = L([250,232,140]);
+        c.beginPath(); c.arc(px, py-u*0.40, u*0.08, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'cactus': {
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.beginPath(); c.ellipse(px, py+u*0.10, u*0.32, u*0.13, 0, 0, Math.PI*2); c.fill();
+        const h = u*(1.3+v*0.5);
+        c.fillStyle = L([54,96,48]);
+        c.fillRect(px-u*0.20, py-h, u*0.40, h);
+        c.fillStyle = L([76,128,60]);
+        c.fillRect(px-u*0.16, py-h, u*0.16, h);
+        c.fillStyle = L([54,96,48]);
+        c.fillRect(px-u*0.52, py-h*0.62, u*0.30, u*0.20);
+        c.fillRect(px-u*0.52, py-h*0.62, u*0.16, u*0.48);
+        c.fillRect(px+u*0.22, py-h*0.78, u*0.30, u*0.20);
+        c.fillRect(px+u*0.38, py-h*0.78, u*0.16, u*0.55);
+        break;
+      }
+      case 'stump': {
+        c.fillStyle = L([72,52,32]);
+        c.beginPath(); c.ellipse(px, py, u*0.36, u*0.20, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([116,86,52]);
+        c.beginPath(); c.ellipse(px, py-u*0.06, u*0.30, u*0.16, 0, 0, Math.PI*2); c.fill();
+        c.strokeStyle = L([86,62,38]); c.lineWidth = 1;
+        c.beginPath(); c.ellipse(px, py-u*0.06, u*0.16, u*0.09, 0, 0, Math.PI*2); c.stroke();
+        break;
+      }
+      case 'crystal': {
+        c.fillStyle = 'rgba(180,220,255,0.25)';
+        c.beginPath(); c.ellipse(px, py+u*0.10, u*0.40, u*0.16, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([150,200,232]);
+        c.beginPath(); c.moveTo(px, py-u*1.0); c.lineTo(px-u*0.28, py); c.lineTo(px+u*0.28, py); c.closePath(); c.fill();
+        c.fillStyle = L([206,238,255]);
+        c.beginPath(); c.moveTo(px, py-u*1.0); c.lineTo(px-u*0.05, py); c.lineTo(px+u*0.12, py); c.closePath(); c.fill();
+        break;
+      }
+      case 'snowdrift': {
+        c.fillStyle = L([248,250,255]);
+        c.beginPath(); c.ellipse(px, py, u*0.68, u*0.30, 0, 0, Math.PI*2); c.fill();
+        c.fillStyle = L([224,232,244]);
+        c.beginPath(); c.ellipse(px+u*0.14, py+u*0.08, u*0.44, u*0.18, 0, 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'driftwood': {
+        c.save(); c.translate(px, py); c.rotate((v-0.5)*2);
+        c.fillStyle = L([158,142,118]);
+        c.fillRect(-u*0.60, -u*0.10, u*1.20, u*0.20);
+        c.fillStyle = L([120,104,84]);
+        c.fillRect(-u*0.60, u*0.02, u*1.20, u*0.08);
+        c.restore();
+        break;
+      }
+      case 'bone': {
+        c.fillStyle = L([230,226,212]);
+        c.save(); c.translate(px, py); c.rotate((v-0.5)*3);
+        c.fillRect(-u*0.40, -u*0.06, u*0.80, u*0.12);
+        c.beginPath(); c.arc(-u*0.42, -u*0.08, u*0.10, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(-u*0.42, u*0.08, u*0.10, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc( u*0.42, -u*0.08, u*0.10, 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc( u*0.42, u*0.08, u*0.10, 0, Math.PI*2); c.fill();
+        c.restore();
+        break;
+      }
+      case 'shell': {
+        c.fillStyle = L([246,232,214]);
+        c.beginPath(); c.ellipse(px, py, u*0.20, u*0.14, v*3, 0, Math.PI*2); c.fill();
+        c.strokeStyle = L([214,190,166]); c.lineWidth = 1;
+        c.beginPath(); c.ellipse(px, py, u*0.13, u*0.09, v*3, 0, Math.PI*2); c.stroke();
+        break;
+      }
+      case 'lily': {
+        c.fillStyle = L([54,116,64]);
+        c.beginPath(); c.ellipse(px, py, u*0.38, u*0.30, 0, 0.4, Math.PI*2); c.fill();
+        c.fillStyle = L([78,148,78]);
+        c.beginPath(); c.ellipse(px-u*0.05, py-u*0.04, u*0.24, u*0.18, 0, 0.4, Math.PI*2); c.fill();
+        if(v > 0.7){
+          c.fillStyle = L([248,224,238]);
+          c.beginPath(); c.arc(px+u*0.10, py-u*0.10, u*0.13, 0, Math.PI*2); c.fill();
+        }
+        break;
+      }
+      case 'ripple': {
+        // handled by animated water layer; skip static draw
+        break;
+      }
+    }
+  }
+
+  // ---- Texture shading for a painted/ground sub-cell ----
+  function shadeCell(c, mat, x, y, u, cellSeed){
+    const base = applyLighting(mat.color);
+    c.fillStyle = rgbStr(base);
+    c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+    const r = ((cellSeed * 2654435761) >>> 0) / 4294967296;
+    switch(mat.tex){
+      case 'grain': {
+        const n = 4;
+        for(let i=0;i<n;i++){
+          const rr = (((cellSeed*(i+13)*2654435761)>>>0)/4294967296);
+          const gx = x + rr*u, gy = y + ((rr*7)%1)*u;
+          const f = rr > 0.5 ? 1.12 : 0.9;
+          c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, f)));
+          c.fillRect(gx|0, gy|0, Math.max(1,u*0.2)|0, Math.max(1,u*0.2)|0);
+        }
+        break;
+      }
+      case 'rough': {
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, r>0.5?1.14:0.86)));
+        c.fillRect(x, y, Math.ceil(u*0.55), Math.ceil(u*0.55));
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, r>0.5?0.88:1.10)));
+        c.fillRect(x+u*0.5, y+u*0.45, Math.ceil(u*0.5), Math.ceil(u*0.5));
+        break;
+      }
+      case 'brick': {
+        const row = Math.floor(y/u);
+        const off = (row % 2) ? u*0.5 : 0;
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.7)));
+        c.lineWidth = Math.max(1, u*0.08);
+        c.beginPath();
+        c.moveTo(x, y+u); c.lineTo(x+u, y+u);
+        c.moveTo(x+off, y); c.lineTo(x+off, y+u);
+        c.stroke();
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.10)));
+        c.fillRect(x+off*0.2, y+u*0.12, u*0.5, Math.max(1,u*0.12));
+        break;
+      }
+      case 'plank': {
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.72)));
+        c.lineWidth = Math.max(1, u*0.07);
+        c.beginPath(); c.moveTo(x, y+u*0.5); c.lineTo(x+u, y+u*0.5); c.stroke();
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.12)));
+        c.beginPath(); c.moveTo(x, y+u*0.18); c.lineTo(x+u, y+u*0.18); c.stroke();
+        break;
+      }
+      case 'gloss': {
+        const g = c.createLinearGradient(x, y, x+u, y+u);
+        g.addColorStop(0, rgbStr(applyLighting(rgbAdj(mat.color, 1.16))));
+        g.addColorStop(1, rgbStr(applyLighting(rgbAdj(mat.color, 0.88))));
+        c.fillStyle = g;
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        break;
+      }
+    }
+  }
+
+  // ---- Main tile-detail render ----
+  function drawTileDetail(){
+    if(!tileView.open) return;
+    const r = root.getBoundingClientRect();
+    const W = r.width, H = r.height;
+    if(tileCv.width !== Math.floor(W*devicePixelRatio) || tileCv.height !== Math.floor(H*devicePixelRatio)){
+      tileCv.width  = Math.floor(W*devicePixelRatio);
+      tileCv.height = Math.floor(H*devicePixelRatio);
+      tileCv.style.width = W+'px';
+      tileCv.style.height = H+'px';
+      tileCtx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+      tileCtx.imageSmoothingEnabled = false;
+    }
+    const c = tileCtx;
+    const u = Math.min(W, H) / SUB_GRID;      // pixels per sub-cell (square, fits screen)
+    const originX = (W - u*SUB_GRID)/2;
+    const originY = (H - u*SUB_GRID)/2;
+    tileView.originX = originX; tileView.originY = originY; tileView.u = u;
+
+    const t  = tiles[tileView.ty*WORLD_W + tileView.tx];
+    const recipe = TERRAIN_RECIPES[t] || TERRAIN_RECIPES[4];
+
+    c.clearRect(0,0,W,H);
+    // letterbox background
+    c.fillStyle = '#070c16';
+    c.fillRect(0,0,W,H);
+
+    // ---- 1. Ground layer ----
+    for(let sy=0; sy<SUB_GRID; sy++){
+      for(let sx=0; sx<SUB_GRID; sx++){
+        const idx = sy*SUB_GRID+sx;
+        const painted = tileView.paint[idx];
+        const mat = painted ? MATERIAL_BY_ID[painted] : MATERIALS[tileView.ground[idx]];
+        if(!mat) continue;
+        shadeCell(c, mat, originX + sx*u, originY + sy*u, u, (idx*73856093 ^ tileView.tx*19349663 ^ tileView.ty)>>>0);
+      }
+    }
+
+    // ---- 1b. Animated water shimmer over water cells ----
+    const tsec = tileView.animT;
+    c.save();
+    for(let sy=0; sy<SUB_GRID; sy++){
+      for(let sx=0; sx<SUB_GRID; sx++){
+        const idx = sy*SUB_GRID+sx;
+        const painted = tileView.paint[idx];
+        const mat = painted ? MATERIAL_BY_ID[painted] : MATERIALS[tileView.ground[idx]];
+        if(!mat || (mat.id !== 'water' && mat.id !== 'ice')) continue;
+        const ph = Math.sin(tsec*1.6 + sx*0.55 + sy*0.42);
+        if(ph > 0.55){
+          c.fillStyle = 'rgba(220,240,255,' + ((ph-0.55)*0.42).toFixed(3) + ')';
+          c.fillRect(originX + sx*u + u*0.15, originY + sy*u + u*0.35, u*0.7, Math.max(1, u*0.14));
+        }
+      }
+    }
+    c.restore();
+
+    // ---- 2. Scatter sprites ----
+    for(const s of tileView.scatter){
+      const idx = Math.floor(s.sy)*SUB_GRID + Math.floor(s.sx);
+      if(tileView.paint[idx]) continue;   // painted-over cells hide their scatter
+      const px = originX + s.sx*u;
+      const py = originY + s.sy*u;
+      // subtle sway for vegetation
+      let swayX = 0;
+      if(['tree','pine','palm','bush','reed','flower','cactus'].includes(s.kind)){
+        swayX = Math.sin(tsec*0.9 + s.sx*0.4 + s.sy*0.2) * u*0.06;
+      }
+      drawSprite(c, s.kind, px+swayX, py, u, s.v);
+    }
+
+    // ---- 3. User decals ----
+    for(const d of tileView.decals){
+      if(!d.img || !d.img.complete) continue;
+      c.drawImage(d.img, originX + d.x*u, originY + d.y*u, d.w*u, d.h*u);
+    }
+
+    // ---- 4. Weather + season overlay ----
+    drawTileWeather(c, W, H, originX, originY, u);
+
+    // ---- 5. Frame border ----
+    c.strokeStyle = 'rgba(255,232,90,0.35)';
+    c.lineWidth = 2;
+    c.strokeRect(originX-1, originY-1, u*SUB_GRID+2, u*SUB_GRID+2);
+  }
+
+  // Weather / season particle overlay inside the tile scene
+  function drawTileWeather(c, W, H, ox, oy, u){
+    const ms = getWorldMs();
+    const localHere = localTimeAtTile(tileView.tx, ms);
+    const wp = currentWeatherPeriod(localHere.day, localHere.hour);
+    const w  = weatherAtTile(tileView.tx, tileView.ty, wp.day, wp.period);
+    const cellX = Math.min(WEATHER_CELLS_X-1, Math.max(0, Math.floor(tileView.tx / WEATHER_CELL_SIZE)));
+    const cellY = Math.min(WEATHER_CELLS_Y-1, Math.max(0, Math.floor(tileView.ty / WEATHER_CELL_SIZE)));
+    const wind = windAtCell(cellX, cellY, localHere.day);
+    const wx = Math.cos(wind.angle) * wind.speed;
+    const t = tileView.animT;
+    const side = u*SUB_GRID;
+
+    c.save();
+    c.beginPath(); c.rect(ox, oy, side, side); c.clip();
+
+    if(w === 'rain' || w === 'storm'){
+      const n = w === 'storm' ? 220 : 130;
+      c.strokeStyle = w === 'storm' ? 'rgba(180,205,235,0.55)' : 'rgba(170,200,230,0.42)';
+      c.lineWidth = Math.max(1, u*0.05);
+      for(let i=0;i<n;i++){
+        const seed = i*0.618;
+        const x = ox + ((seed*side + t*u*wx*9) % side + side) % side;
+        const y = oy + ((seed*7919 % side) + t*u*22) % side;
+        c.beginPath(); c.moveTo(x, y); c.lineTo(x + wx*u*0.5, y + u*0.7); c.stroke();
+      }
+      if(w === 'storm' && Math.sin(t*0.7)>0.985){
+        c.fillStyle = 'rgba(255,255,255,0.30)';
+        c.fillRect(ox, oy, side, side);
+      }
+    } else if(w === 'snow' || w === 'blizzard'){
+      const n = w === 'blizzard' ? 260 : 120;
+      c.fillStyle = 'rgba(245,250,255,0.85)';
+      for(let i=0;i<n;i++){
+        const seed = i*0.618;
+        const drift = Math.sin(t*0.8 + i)*u*0.4;
+        const x = ox + ((seed*side + t*u*wx*4 + drift) % side + side) % side;
+        const y = oy + ((seed*7919 % side) + t*u*(w==='blizzard'?11:5)) % side;
+        const rr = u*(0.06 + (i%3)*0.03);
+        c.beginPath(); c.arc(x, y, rr, 0, Math.PI*2); c.fill();
+      }
+    } else if(w === 'sandstorm'){
+      c.fillStyle = 'rgba(214,182,120,0.20)';
+      c.fillRect(ox, oy, side, side);
+      c.strokeStyle = 'rgba(226,200,146,0.35)';
+      c.lineWidth = Math.max(1, u*0.06);
+      for(let i=0;i<160;i++){
+        const seed = i*0.618;
+        const y = oy + (seed*7919 % side);
+        const x = ox + ((seed*side + t*u*26) % side + side) % side;
+        c.beginPath(); c.moveTo(x, y); c.lineTo(x + u*1.1, y + u*0.1); c.stroke();
+      }
+    } else if(w === 'fog'){
+      for(let i=0;i<5;i++){
+        const y = oy + (i/5)*side + Math.sin(t*0.25 + i)*u*0.8;
+        const g = c.createLinearGradient(ox, y, ox, y + side*0.3);
+        g.addColorStop(0, 'rgba(210,220,232,0)');
+        g.addColorStop(0.5, 'rgba(210,220,232,0.22)');
+        g.addColorStop(1, 'rgba(210,220,232,0)');
+        c.fillStyle = g;
+        c.fillRect(ox, y, side, side*0.3);
+      }
+    } else if(w === 'cloudy'){
+      c.fillStyle = 'rgba(80,92,112,0.14)';
+      c.fillRect(ox, oy, side, side);
+    }
+
+    // Night tint from the world lighting model
+    const lig = getLighting();
+    if(lig.amb < 0.75){
+      const darkness = (0.75 - lig.amb) * 0.9;
+      c.fillStyle = `rgba(10,18,42,${Math.min(0.62, darkness).toFixed(3)})`;
+      c.fillRect(ox, oy, side, side);
+      // fireflies on warm vegetated tiles at night
+      const tt = tiles[tileView.ty*WORLD_W + tileView.tx];
+      if([4,5,6,8,13,14].includes(tt)){
+        c.fillStyle = 'rgba(230,255,150,0.85)';
+        for(let i=0;i<18;i++){
+          const seed = i*0.618;
+          const x = ox + (seed*side + Math.sin(t*0.5+i*2)*u*2) % side;
+          const y = oy + ((seed*4409 % side) + Math.cos(t*0.42+i)*u*2);
+          const a = 0.4 + 0.6*Math.sin(t*2 + i*1.7);
+          if(a > 0.55){
+            c.globalAlpha = (a-0.55)/0.45;
+            c.beginPath(); c.arc(x, y, u*0.09, 0, Math.PI*2); c.fill();
+            c.globalAlpha = 1;
+          }
+        }
+      }
+    }
+    c.restore();
+  }
+
+  // ---- Open / close ----
+  async function openTileDetail(tx, ty){
+    tileView.open = true;
+    tileView.tx = tx; tileView.ty = ty;
+    const gen = generateTileDetail(tx, ty);
+    tileView.ground = gen.ground;
+    tileView.scatter = gen.scatter;
+    tileView.paint = {};
+    tileView.decals = [];
+    tileView.pendingDecal = null;
+    tileView.dirty = false;
+    tileView.animT = 0;
+
+    // Load any saved paint/decals for this tile
+    try{
+      const res = await window.storage.get(`pixelworld:tile:${tx},${ty}`, true);
+      if(res && res.value){
+        const saved = JSON.parse(res.value);
+        tileView.paint = saved.paint || {};
+        tileView.decals = (saved.decals || []).map(d=>{
+          const img = new Image();
+          img.src = d.dataUrl;
+          return {...d, img};
+        });
+      }
+    }catch(e){ /* nothing saved yet */ }
+
+    // Header text
+    const t = tiles[ty*WORLD_W+tx];
+    const e = elev[ty*WORLD_W+tx];
+    const ms = getWorldMs();
+    const localHere = localTimeAtTile(tx, ms);
+    const wp = currentWeatherPeriod(localHere.day, localHere.hour);
+    const w  = weatherAtTile(tx, ty, wp.day, wp.period);
+    const season = seasonAt(localHere.day, ty / WORLD_H);
+    const elevLabel = e<0.05 ? `${Math.round((0.05-e)*-4000)}m` : `${Math.round((e-0.05)*4000)}m`;
+    document.getElementById('tileTitle').textContent = `Tile (${tx}, ${ty}) · ${TERRAIN_NAMES[t]}`;
+    document.getElementById('tileSubtitle').textContent = `${BIOME_NAMES[t]} · ${elevLabel}`;
+    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️' };
+    const weatherIcons = { clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️', snow:'❄️', fog:'🌫️', sandstorm:'🌪️', blizzard:'🌨️' };
+    document.getElementById('tileFooter').innerHTML =
+      `<div>${weatherIcons[w]||''} ${w} · ${seasonIcons[season]} ${season}</div>` +
+      `<div style="opacity:0.65;">${SUB_GRID}×${SUB_GRID} sub-grid · ${Math.round(KM_PER_TILE*1000/SUB_GRID)} m per cell</div>`;
+
+    document.getElementById('tileDetail').style.display = 'block';
+    document.getElementById('tileTools').style.display = isLoggedIn ? 'block' : 'none';
+    document.getElementById('enterTileBtn').style.display = 'none';
+    buildMaterialGrid();
+    startTileLoop();
+  }
+
+  function closeTileDetail(){
+    tileView.open = false;
+    document.getElementById('tileDetail').style.display = 'none';
+    if(tileView.rafId){ cancelAnimationFrame(tileView.rafId); tileView.rafId = null; }
+    updateEnterTileButton();
+  }
+
+  function startTileLoop(){
+    if(tileView.rafId) cancelAnimationFrame(tileView.rafId);
+    let last = performance.now();
+    function step(now){
+      if(!tileView.open) return;
+      const dt = Math.min(0.1, (now - last)/1000);
+      last = now;
+      tileView.animT += dt;
+      try{ drawTileDetail(); }catch(err){ console.error('Tile render error:', err); }
+      tileView.rafId = requestAnimationFrame(step);
+    }
+    tileView.rafId = requestAnimationFrame(step);
+  }
+
+  // ---- Material palette UI ----
+  function buildMaterialGrid(){
+    const grid = document.getElementById('materialGrid');
+    if(grid.childElementCount) { highlightMaterial(); return; }
+    for(const m of MATERIALS){
+      const b = document.createElement('button');
+      b.className = 'matbtn';
+      b.dataset.mat = m.id;
+      b.title = m.label;
+      b.style.cssText = `height:26px;border-radius:4px;cursor:pointer;border:2px solid transparent;background:rgb(${m.color[0]},${m.color[1]},${m.color[2]});`;
+      b.onclick = ()=>{ tileView.material = m.id; tileView.tool = 'paint'; highlightMaterial(); highlightTool(); };
+      grid.appendChild(b);
+    }
+    highlightMaterial();
+  }
+  function highlightMaterial(){
+    document.querySelectorAll('.matbtn').forEach(b=>{
+      b.style.borderColor = b.dataset.mat === tileView.material ? '#ffe85a' : 'transparent';
+    });
+  }
+  function highlightTool(){
+    document.querySelectorAll('.ttool').forEach(b=>{
+      const on = b.dataset.ttool === tileView.tool;
+      b.style.background = on ? 'rgba(60,90,140,0.8)' : 'rgba(40,55,80,0.6)';
+      b.style.borderColor = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    });
+  }
+
+  // ---- Painting interaction ----
+  function tileCanvasToSub(clientX, clientY){
+    const r = tileCv.getBoundingClientRect();
+    const px = clientX - r.left, py = clientY - r.top;
+    const sx = Math.floor((px - tileView.originX) / tileView.u);
+    const sy = Math.floor((py - tileView.originY) / tileView.u);
+    if(sx < 0 || sx >= SUB_GRID || sy < 0 || sy >= SUB_GRID) return null;
+    return {sx, sy};
+  }
+
+  function applyBrush(sx, sy){
+    const rad = tileView.brush - 1;
+    for(let dy=-rad; dy<=rad; dy++){
+      for(let dx=-rad; dx<=rad; dx++){
+        if(dx*dx + dy*dy > rad*rad + rad) continue;   // roundish brush
+        const nx = sx+dx, ny = sy+dy;
+        if(nx<0||nx>=SUB_GRID||ny<0||ny>=SUB_GRID) continue;
+        const idx = ny*SUB_GRID+nx;
+        if(tileView.tool === 'erase') delete tileView.paint[idx];
+        else tileView.paint[idx] = tileView.material;
+      }
+    }
+    tileView.dirty = true;
+  }
+
+  tileCv.addEventListener('pointerdown', (e)=>{
+    if(!tileView.open || !isLoggedIn) return;
+    // Placing a decal takes priority
+    if(tileView.pendingDecal){
+      const p = tileCanvasToSub(e.clientX, e.clientY);
+      if(p){
+        const img = tileView.pendingDecal.img;
+        const maxSide = 8;   // decal spans at most 8 sub-cells
+        const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
+        const w = ar >= 1 ? maxSide : maxSide*ar;
+        const h = ar >= 1 ? maxSide/ar : maxSide;
+        tileView.decals.push({
+          dataUrl: tileView.pendingDecal.dataUrl,
+          x: p.sx - w/2, y: p.sy - h/2, w, h, img
+        });
+        tileView.pendingDecal = null;
+        tileView.dirty = true;
+        document.getElementById('decalPlaceBtn').style.display = 'none';
+        document.getElementById('decalStatus').textContent = 'Image placed.';
+      }
+      return;
+    }
+    const p = tileCanvasToSub(e.clientX, e.clientY);
+    if(!p) return;
+    tileView.painting = true;
+    tileCv.setPointerCapture(e.pointerId);
+    applyBrush(p.sx, p.sy);
+  });
+  tileCv.addEventListener('pointermove', (e)=>{
+    if(!tileView.open || !tileView.painting) return;
+    const p = tileCanvasToSub(e.clientX, e.clientY);
+    if(p) applyBrush(p.sx, p.sy);
+  });
+  function endTilePaint(e){
+    tileView.painting = false;
+    try{ tileCv.releasePointerCapture(e.pointerId); }catch(_){}
+  }
+  tileCv.addEventListener('pointerup', endTilePaint);
+  tileCv.addEventListener('pointercancel', endTilePaint);
+
+  // ---- Save / clear ----
+  async function saveTileDetail(){
+    const status = document.getElementById('tileSaveStatus');
+    try{
+      const payload = {
+        paint: tileView.paint,
+        decals: tileView.decals.map(d=>({dataUrl:d.dataUrl, x:d.x, y:d.y, w:d.w, h:d.h}))
+      };
+      await window.storage.set(`pixelworld:tile:${tileView.tx},${tileView.ty}`, JSON.stringify(payload), true);
+      tileView.dirty = false;
+      status.textContent = 'Saved.';
+      status.style.color = '#9fe0a8';
+      setTimeout(()=>{ status.textContent=''; }, 2000);
+    }catch(err){
+      status.textContent = 'Save failed (too large?)';
+      status.style.color = '#ffb0b0';
+    }
+  }
+
+  // ---- Enter-tile button positioning ----
+  function updateEnterTileButton(){
+    const btn = document.getElementById('enterTileBtn');
+    if(tileView.open || !view.selected || view.scale < ENTER_TILE_MIN_ZOOM){
+      btn.style.display = 'none';
+      return;
+    }
+    const [sx, sy] = worldToScreen(view.selected.x + 0.5, view.selected.y);
+    const r = root.getBoundingClientRect();
+    // Place just above the tile, clamped into the viewport
+    const bw = btn.offsetWidth || 96, bh = btn.offsetHeight || 28;
+    let left = sx - bw/2;
+    let top  = sy - bh - 8;
+    if(top < 50) top = sy + view.scale + 8;          // flip below if it'd overlap the top bar
+    left = Math.max(6, Math.min(r.width - bw - 6, left));
+    top  = Math.max(50, Math.min(r.height - bh - 6, top));
+    btn.style.display = 'block';
+    btn.style.left = `${left}px`;
+    btn.style.top  = `${top}px`;
+  }
+
+  // ---- Tile detail UI wiring ----
+  document.getElementById('enterTileBtn').onclick = ()=>{
+    if(view.selected) openTileDetail(view.selected.x, view.selected.y);
+  };
+  document.getElementById('tileBack').onclick = ()=>{
+    if(tileView.dirty && isLoggedIn){
+      if(!confirm('You have unsaved changes to this tile. Leave anyway?')) return;
+    }
+    closeTileDetail();
+  };
+  document.querySelectorAll('.ttool').forEach(b=>{
+    b.onclick = ()=>{ tileView.tool = b.dataset.ttool; highlightTool(); };
+  });
+  document.getElementById('brushSize').addEventListener('input', (e)=>{
+    tileView.brush = parseInt(e.target.value, 10);
+  });
+  document.getElementById('tileSave').onclick = saveTileDetail;
+  document.getElementById('tileClear').onclick = ()=>{
+    if(!confirm('Clear all paint and images from this tile?')) return;
+    tileView.paint = {};
+    tileView.decals = [];
+    tileView.dirty = true;
+  };
+  document.getElementById('decalUndo').onclick = ()=>{
+    tileView.decals.pop();
+    tileView.dirty = true;
+  };
+  document.getElementById('decalUpload').addEventListener('change', (e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const status = document.getElementById('decalStatus');
+    if(file.size > 900000){
+      status.textContent = 'Image too large (max ~900 KB).';
+      status.style.color = '#ffb0b0';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        tileView.pendingDecal = {dataUrl: reader.result, img};
+        document.getElementById('decalPlaceBtn').style.display = 'block';
+        status.textContent = `Ready: ${img.naturalWidth}×${img.naturalHeight}`;
+        status.style.color = '#cdd5e0';
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Escape closes the tile view
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && tileView.open){
+      const tag = e.target && e.target.tagName;
+      if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      closeTileDetail();
+      e.stopPropagation();
+    }
+  }, true);
+
   // ============ UI WIRING ============
   document.getElementById('gridBtn').onclick = ()=>{
     view.showGrid = !view.showGrid;
@@ -4918,6 +5818,7 @@
       editor.tool = 'select';
       editor.drawing = null;
       editor.hoverTile = null;
+      document.getElementById('tileTools').style.display='none';
       draw();
     } else {
       document.getElementById('loginModal').style.display='flex';
@@ -4938,6 +5839,11 @@
       document.getElementById('timeBtn').style.display='inline-block';
       setTool('select');
       if(view.selected) showInfo(view.selected.x, view.selected.y);
+      // If the full-screen tile view is open, reveal its paint tools too
+      if(tileView.open){
+        document.getElementById('tileTools').style.display='block';
+        buildMaterialGrid();
+      }
     } else {
       const inp = document.getElementById('pwInput');
       inp.style.borderColor='#e85a5a';
@@ -5080,6 +5986,8 @@
       // every animation frame regardless of whether draw() runs, so the outline
       // always tracks view.selected through pans, zooms, and clicks.
       updateSelectionOverlay();
+      // Keep the "Enter tile" button pinned to the selected tile.
+      updateEnterTileButton();
       // Update clock display only when the displayed minute changes — cheap.
       const curMin = Math.floor(world.hour*60);
       const minChanged = (curMin !== lastClockMin);
