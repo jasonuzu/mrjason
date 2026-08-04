@@ -61,7 +61,18 @@
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;opacity:0.7;">
         <span>Brush size</span><span id="brushLabel" style="opacity:0.9;">1 cell</span>
       </div>
-      <input id="brushSize" type="range" min="1" max="8" value="1" style="width:100%;margin-bottom:10px;accent-color:#5a8fd6;">
+      <input id="brushSize" type="range" min="1" max="8" value="1" style="width:100%;margin-bottom:8px;accent-color:#5a8fd6;">
+
+      <div style="margin-bottom:4px;opacity:0.7;">Shape</div>
+      <div id="shapeRow" style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;margin-bottom:4px;">
+        <button class="tshape" data-shape="free"        title="Freehand"        style="height:24px;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">✎</button>
+        <button class="tshape" data-shape="line"        title="Line"            style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">╱</button>
+        <button class="tshape" data-shape="rect"        title="Rectangle"       style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">▭</button>
+        <button class="tshape" data-shape="rectFill"    title="Filled rectangle" style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">▬</button>
+        <button class="tshape" data-shape="ellipse"     title="Ellipse"         style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">◯</button>
+        <button class="tshape" data-shape="ellipseFill" title="Filled ellipse"  style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">⬤</button>
+      </div>
+      <div style="font-size:9px;opacity:0.5;margin-bottom:10px;line-height:1.35;">Hold <b>Shift</b> to draw a straight line from your last dab.</div>
 
       <div style="margin-bottom:6px;opacity:0.7;">Material</div>
       <div id="materialGrid" style="margin-bottom:10px;"></div>
@@ -179,13 +190,30 @@
             </select>
           </div>
           <canvas id="spriteCanvas" width="512" height="512" style="width:420px;height:420px;image-rendering:pixelated;border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:crosshair;background:#0a0f1a;"></canvas>
-          <div style="display:flex;gap:6px;align-items:center;">
+          <div style="display:flex;gap:5px;align-items:center;">
             <button class="sptool" data-sptool="pen"    style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Pen</button>
             <button class="sptool" data-sptool="erase"  style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Erase</button>
             <button class="sptool" data-sptool="fill"   style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Fill</button>
             <button class="sptool" data-sptool="picker" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Pick</button>
+            <button class="sptool" data-sptool="marquee" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;" title="Select an area — Ctrl+C / Ctrl+V / Delete">Select</button>
             <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#cdd5e0;cursor:pointer;"><input id="spriteMirror" type="checkbox" style="accent-color:#5a8fd6;">Mirror</label>
           </div>
+          <div style="display:flex;gap:5px;align-items:center;">
+            <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;flex:1;">
+              <button class="spshape" data-spshape="free"        title="Freehand"         style="height:24px;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">✎</button>
+              <button class="spshape" data-spshape="line"        title="Line"             style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">╱</button>
+              <button class="spshape" data-spshape="rect"        title="Rectangle"        style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">▭</button>
+              <button class="spshape" data-spshape="rectFill"    title="Filled rectangle" style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">▬</button>
+              <button class="spshape" data-spshape="ellipse"     title="Ellipse"          style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">◯</button>
+              <button class="spshape" data-spshape="ellipseFill" title="Filled ellipse"   style="height:24px;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;border-radius:4px;font-size:12px;cursor:pointer;padding:0;">⬤</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;min-width:132px;">
+              <span style="font-size:10px;color:#cdd5e0;opacity:0.7;">Size</span>
+              <input id="spBrushSize" type="range" min="1" max="8" value="1" style="flex:1;accent-color:#5a8fd6;">
+              <span id="spBrushLabel" style="font-size:10px;color:#cdd5e0;opacity:0.9;min-width:14px;">1</span>
+            </div>
+          </div>
+          <div style="font-size:9px;opacity:0.5;color:#cdd5e0;">Shift-click draws a straight line · right-click erases · Ctrl+C/V copy &amp; paste a selection · Delete clears it</div>
         </div>
         <!-- Palette + actions -->
         <div style="width:196px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">
@@ -5417,6 +5445,10 @@
     selectedCell: null,   // {sx, sy} chosen with the Select tool
     pathTarget: null,     // index into `placed` of the sprite being given a path
     selectedPlaced: null, // index into `placed` of the sprite selected for deletion
+    shape: 'free',        // free | line | rect | rectFill | ellipse | ellipseFill
+    shapeStart: null,     // anchor cell while dragging a shape
+    shapeEnd: null,
+    lastDab: null,        // last painted cell, anchor for shift-line strokes
     showZones: true,      // draw markers over interaction zones while editing
     activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
@@ -6404,7 +6436,29 @@
       c.strokeRect(originX + sx*u - 1, originY + sy*u - 1, u+2, u+2);
     }
 
-    // ---- 5e. Brush hover preview ----
+    // ---- 5e. Shape preview while dragging ----
+    if(isLoggedIn && tileView.shapeStart && tileView.shapeEnd){
+      const a = tileView.shapeStart, b = tileView.shapeEnd;
+      const mat = MATERIAL_BY_ID[tileView.material];
+      const col = tileView.tool === 'erase' ? [255,120,120] : (mat ? mat.color : [255,232,90]);
+      c.save();
+      c.globalAlpha = 0.55;
+      c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      rasterShape(tileView.shape, a.sx, a.sy, b.sx, b.sy, (x,y)=>{
+        if(x<0||x>=SUB_GRID||y<0||y>=SUB_GRID) return;
+        c.fillRect(originX + x*u, originY + y*u, Math.ceil(u), Math.ceil(u));
+      });
+      c.restore();
+      c.strokeStyle = 'rgba(255,232,90,0.85)';
+      c.lineWidth = 1;
+      const ax = Math.min(a.sx,b.sx), ay = Math.min(a.sy,b.sy);
+      const bw = Math.abs(b.sx-a.sx)+1, bh = Math.abs(b.sy-a.sy)+1;
+      c.setLineDash([4,3]);
+      c.strokeRect(originX + ax*u, originY + ay*u, bw*u, bh*u);
+      c.setLineDash([]);
+    }
+
+    // ---- 5f. Brush hover preview ----
     if(isLoggedIn && tileView.hover && (tileView.tool === 'paint' || tileView.tool === 'erase')){
       const rad = tileView.brush - 1;
       c.save();
@@ -6567,6 +6621,7 @@
     buildMaterialGrid();
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
     highlightTool();
+    highlightShape();
     syncCellPanel();
     syncPathPanel();
     document.getElementById('showZones').checked = tileView.showZones !== false;
@@ -6653,6 +6708,77 @@
     const sy = Math.floor((py - tileView.originY) / tileView.u);
     if(sx < 0 || sx >= SUB_GRID || sy < 0 || sy >= SUB_GRID) return null;
     return {sx, sy};
+  }
+
+  // ============ SHAPE RASTERIZERS ============
+  // Shared by the tile painter and the sprite editor. Each walks the cells a
+  // shape covers and hands them to `plot(x, y)`; the caller decides what to
+  // write there. Working in grid space keeps both editors pixel-exact.
+  function rasterLine(x0, y0, x1, y1, plot){
+    // Bresenham
+    let dx = Math.abs(x1-x0), dy = Math.abs(y1-y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    for(;;){
+      plot(x0, y0);
+      if(x0 === x1 && y0 === y1) break;
+      const e2 = 2*err;
+      if(e2 > -dy){ err -= dy; x0 += sx; }
+      if(e2 <  dx){ err += dx; y0 += sy; }
+    }
+  }
+  function rasterRect(x0, y0, x1, y1, filled, plot){
+    const ax = Math.min(x0,x1), bx = Math.max(x0,x1);
+    const ay = Math.min(y0,y1), by = Math.max(y0,y1);
+    for(let y=ay; y<=by; y++){
+      for(let x=ax; x<=bx; x++){
+        if(filled || x===ax || x===bx || y===ay || y===by) plot(x, y);
+      }
+    }
+  }
+  function rasterEllipse(x0, y0, x1, y1, filled, plot){
+    const ax = Math.min(x0,x1), bx = Math.max(x0,x1);
+    const ay = Math.min(y0,y1), by = Math.max(y0,y1);
+    const cx = (ax+bx)/2, cy = (ay+by)/2;
+    const rx = Math.max(0.5, (bx-ax)/2), ry = Math.max(0.5, (by-ay)/2);
+    for(let y=ay; y<=by; y++){
+      for(let x=ax; x<=bx; x++){
+        const nx = (x-cx)/rx, ny = (y-cy)/ry;
+        const d = nx*nx + ny*ny;
+        if(filled){
+          if(d <= 1.05) plot(x, y);
+        } else {
+          // Outline: inside the ellipse but with a neighbour outside it
+          if(d > 1.05) continue;
+          const edge =
+            ((x+1-cx)/rx)**2 + ny*ny > 1.05 ||
+            ((x-1-cx)/rx)**2 + ny*ny > 1.05 ||
+            nx*nx + ((y+1-cy)/ry)**2 > 1.05 ||
+            nx*nx + ((y-1-cy)/ry)**2 > 1.05;
+          if(edge) plot(x, y);
+        }
+      }
+    }
+  }
+  // Dispatch by shape name. Returns the set of cells as "x,y" keys too, so
+  // callers can preview without committing.
+  function rasterShape(kind, x0, y0, x1, y1, plot){
+    switch(kind){
+      case 'line':        rasterLine(x0,y0,x1,y1, plot); break;
+      case 'rect':        rasterRect(x0,y0,x1,y1,false, plot); break;
+      case 'rectFill':    rasterRect(x0,y0,x1,y1,true,  plot); break;
+      case 'ellipse':     rasterEllipse(x0,y0,x1,y1,false, plot); break;
+      case 'ellipseFill': rasterEllipse(x0,y0,x1,y1,true,  plot); break;
+    }
+  }
+  // Snap an endpoint to horizontal / vertical / 45° from an anchor.
+  function snapAngle(x0, y0, x1, y1){
+    const dx = x1-x0, dy = y1-y0;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    if(adx > ady*2)      return [x1, y0];                       // horizontal
+    if(ady > adx*2)      return [x0, y1];                       // vertical
+    const m = Math.max(adx, ady);                               // diagonal
+    return [x0 + Math.sign(dx)*m, y0 + Math.sign(dy)*m];
   }
 
   function applyBrush(sx, sy){
@@ -6789,9 +6915,28 @@
     if(tileView.tool === 'select') return;
     const p = tileCanvasToSub(e.clientX, e.clientY);
     if(!p) return;
+    tileCv.setPointerCapture(e.pointerId);
+
+    // Shift + click in freehand mode strokes a straight line from the last
+    // dab to here — the classic "click one tile, shift-click another" fill.
+    if(tileView.shape === 'free' && e.shiftKey && tileView.lastDab){
+      const a = tileView.lastDab;
+      rasterLine(a.sx, a.sy, p.sx, p.sy, (x,y)=>applyBrush(x,y));
+      tileView.lastDab = p;
+      return;
+    }
+
+    if(tileView.shape !== 'free'){
+      // Shapes are dragged out: remember the anchor and preview until release
+      tileView.shapeStart = p;
+      tileView.shapeEnd = p;
+      tileView.painting = false;
+      return;
+    }
+
     tileView.painting = true;
     tileView.lastPaint = p;
-    tileCv.setPointerCapture(e.pointerId);
+    tileView.lastDab = p;
     applyBrush(p.sx, p.sy);
   });
 
@@ -6806,6 +6951,14 @@
     }
     const p = tileCanvasToSub(e.clientX, e.clientY);
     tileView.hover = p;   // drives the brush preview outline
+    // Live shape preview while dragging out a shape
+    if(tileView.shapeStart && p){
+      tileView.shapeEnd = e.shiftKey
+        ? (()=>{ const [qx,qy] = snapAngle(tileView.shapeStart.sx, tileView.shapeStart.sy, p.sx, p.sy);
+                 return {sx:qx, sy:qy}; })()
+        : p;
+      return;
+    }
     if(!tileView.painting || !p) return;
     // Interpolate between the previous and current cell so fast drags don't
     // leave gaps in the painted stroke.
@@ -6826,6 +6979,14 @@
   tileCv.addEventListener('pointerleave', ()=>{ tileView.hover = null; });
 
   function endTilePaint(e){
+    // Commit a dragged shape on release
+    if(tileView.shapeStart && tileView.shapeEnd){
+      const a = tileView.shapeStart, b = tileView.shapeEnd;
+      rasterShape(tileView.shape, a.sx, a.sy, b.sx, b.sy, (x,y)=>applyBrush(x,y));
+      tileView.lastDab = b;
+    }
+    tileView.shapeStart = null;
+    tileView.shapeEnd = null;
     tileView.painting = false;
     tileView.panning = false;
     tileView.lastPaint = null;
@@ -7121,6 +7282,26 @@
       highlightTool();
     };
   });
+  // Shape picker for the tile painter
+  function highlightShape(){
+    document.querySelectorAll('.tshape').forEach(b=>{
+      const on = b.dataset.shape === tileView.shape;
+      b.style.background = on ? 'rgba(60,90,140,0.8)' : 'rgba(40,55,80,0.6)';
+      b.style.borderColor = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    });
+  }
+  document.querySelectorAll('.tshape').forEach(b=>{
+    b.onclick = ()=>{
+      tileView.shape = b.dataset.shape;
+      // Choosing a shape implies you want to paint with it
+      if(tileView.tool !== 'paint' && tileView.tool !== 'erase'){
+        tileView.tool = 'paint';
+        highlightTool();
+      }
+      highlightShape();
+    };
+  });
+
   document.getElementById('brushSize').addEventListener('input', (e)=>{
     tileView.brush = parseInt(e.target.value, 10);
     const n = tileView.brush === 1 ? '1 cell' : `${tileView.brush*2-1} cells`;
@@ -7185,6 +7366,14 @@
     editingId: null,
     drawing: false,
     mirror: false,
+    brush: 1,             // pen / eraser radius in pixels
+    shape: 'free',        // free | line | rect | rectFill | ellipse | ellipseFill
+    shapeStart: null,     // anchor while dragging a shape
+    shapeEnd: null,
+    lastDab: null,        // anchor for shift-line strokes
+    sel: null,            // {x0,y0,x1,y1} marquee selection
+    selDrag: null,        // anchor while dragging a marquee
+    clipboard: null,      // {w, h, cells:[], colors:[]}
   };
   const spCv  = document.getElementById('spriteCanvas');
   const spCtx = spCv.getContext('2d');
@@ -7216,8 +7405,16 @@
       document.getElementById('spriteDelete').style.display = 'none';
       document.getElementById('spriteSaveNew').style.display = 'none';
     }
+    spriteEd.sel = null;
+    spriteEd.selDrag = null;
+    spriteEd.shapeStart = null;
+    spriteEd.shapeEnd = null;
+    spriteEd.lastDab = null;
     document.getElementById('spriteEditor').style.display = 'flex';
+    document.getElementById('spBrushSize').value = spriteEd.brush;
+    document.getElementById('spBrushLabel').textContent = spriteEd.brush;
     buildSpritePalette();
+    highlightSpriteShape();
     updateSpriteCurrentSwatch();
     highlightSpriteTool();
     drawSpriteEditor();
@@ -7270,6 +7467,20 @@
         spCtx.fillRect(x*u, y*u, Math.ceil(u), Math.ceil(u));
       }
     }
+    // shape preview while dragging
+    if(spriteEd.shapeStart && spriteEd.shapeEnd){
+      const a = spriteEd.shapeStart, b = spriteEd.shapeEnd;
+      const erasing = spriteEd.erasing || spriteEd.tool === 'erase';
+      spCtx.save();
+      spCtx.globalAlpha = 0.6;
+      spCtx.fillStyle = erasing ? '#ff6b6b' : '#' + spriteEd.current;
+      rasterShape(spriteEd.shape, a.x, a.y, b.x, b.y, (x,y)=>{
+        if(x<0||x>=res||y<0||y>=res) return;
+        spCtx.fillRect(x*u, y*u, Math.ceil(u), Math.ceil(u));
+      });
+      spCtx.restore();
+    }
+
     // grid
     if(u >= 8){
       spCtx.strokeStyle = 'rgba(255,255,255,0.07)';
@@ -7280,6 +7491,26 @@
         spCtx.moveTo(0, i*u); spCtx.lineTo(size, i*u);
       }
       spCtx.stroke();
+    }
+
+    // marquee selection
+    const sel = normSel(spriteEd.selDrag || spriteEd.sel);
+    if(sel){
+      const sx = sel.x0*u, sy = sel.y0*u;
+      const sw = (sel.x1-sel.x0+1)*u, sh = (sel.y1-sel.y0+1)*u;
+      spCtx.save();
+      spCtx.fillStyle = 'rgba(120,200,255,0.12)';
+      spCtx.fillRect(sx, sy, sw, sh);
+      spCtx.strokeStyle = 'rgba(255,255,255,0.95)';
+      spCtx.lineWidth = 2;
+      spCtx.setLineDash([6,4]);
+      spCtx.strokeRect(sx, sy, sw, sh);
+      spCtx.strokeStyle = 'rgba(0,0,0,0.7)';
+      spCtx.lineDashOffset = 5;
+      spCtx.strokeRect(sx, sy, sw, sh);
+      spCtx.setLineDash([]);
+      spCtx.lineDashOffset = 0;
+      spCtx.restore();
     }
   }
 
@@ -7315,6 +7546,19 @@
       stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
     }
   }
+  // Stamp the pen at a point, honouring the brush size (round-ish nib)
+  function spriteStamp(x, y, code){
+    const rad = spriteEd.brush - 1;
+    if(rad === 0){ spriteSet(x, y, code); return; }
+    for(let dy=-rad; dy<=rad; dy++){
+      for(let dx=-rad; dx<=rad; dx++){
+        if(dx*dx + dy*dy > rad*rad + rad) continue;
+        const nx = x+dx, ny = y+dy;
+        if(nx<0||nx>=spriteEd.res||ny<0||ny>=spriteEd.res) continue;
+        spriteSet(nx, ny, code);
+      }
+    }
+  }
   function spriteApply(p, erasing){
     if(spriteEd.tool === 'picker'){
       const code = spriteEd.cells[p.y*spriteEd.res+p.x];
@@ -7328,26 +7572,147 @@
     }
     const code = (erasing || spriteEd.tool === 'erase') ? 0 : spriteColorIndex(spriteEd.current);
     if(spriteEd.tool === 'fill') spriteFloodFill(p.x, p.y, code);
-    else spriteSet(p.x, p.y, code);
+    else spriteStamp(p.x, p.y, code);
     drawSpriteEditor();
+  }
+
+  // ---- Selection: copy / paste / clear ----
+  function normSel(sel){
+    if(!sel) return null;
+    return {
+      x0: Math.max(0, Math.min(sel.x0, sel.x1)),
+      y0: Math.max(0, Math.min(sel.y0, sel.y1)),
+      x1: Math.min(spriteEd.res-1, Math.max(sel.x0, sel.x1)),
+      y1: Math.min(spriteEd.res-1, Math.max(sel.y0, sel.y1))
+    };
+  }
+  function spriteCopySelection(){
+    const sel = normSel(spriteEd.sel);
+    if(!sel) return false;
+    const w = sel.x1-sel.x0+1, h = sel.y1-sel.y0+1;
+    const cells = [];
+    // Store hex colours directly so a paste survives palette renumbering
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const code = spriteEd.cells[(sel.y0+y)*spriteEd.res + (sel.x0+x)];
+        cells.push(code === 0 ? null : spriteEd.colors[code-1]);
+      }
+    }
+    spriteEd.clipboard = {w, h, cells};
+    return true;
+  }
+  function spritePasteClipboard(){
+    const cb = spriteEd.clipboard;
+    if(!cb) return false;
+    // Paste anchored at the current selection, else at the top-left
+    const sel = normSel(spriteEd.sel);
+    const ax = sel ? sel.x0 : 0, ay = sel ? sel.y0 : 0;
+    for(let y=0;y<cb.h;y++){
+      for(let x=0;x<cb.w;x++){
+        const hex = cb.cells[y*cb.w + x];
+        if(hex === null) continue;          // keep transparency transparent
+        const nx = ax+x, ny = ay+y;
+        if(nx<0||nx>=spriteEd.res||ny<0||ny>=spriteEd.res) continue;
+        spriteEd.cells[ny*spriteEd.res + nx] = spriteColorIndex(hex);
+      }
+    }
+    spriteEd.sel = {x0:ax, y0:ay, x1:ax+cb.w-1, y1:ay+cb.h-1};
+    drawSpriteEditor();
+    return true;
+  }
+  function spriteClearSelection(){
+    const sel = normSel(spriteEd.sel);
+    if(!sel) return false;
+    for(let y=sel.y0; y<=sel.y1; y++){
+      for(let x=sel.x0; x<=sel.x1; x++) spriteEd.cells[y*spriteEd.res+x] = 0;
+    }
+    drawSpriteEditor();
+    return true;
   }
 
   spCv.addEventListener('pointerdown', (e)=>{
     const p = spriteCanvasToCell(e.clientX, e.clientY);
     if(!p) return;
-    spriteEd.drawing = true;
-    spriteEd.erasing = (e.button === 2);
     spCv.setPointerCapture(e.pointerId);
-    spriteApply(p, spriteEd.erasing);
     e.preventDefault();
+    spriteEd.erasing = (e.button === 2);
+
+    // Marquee selection
+    if(spriteEd.tool === 'marquee'){
+      spriteEd.selDrag = {x0:p.x, y0:p.y, x1:p.x, y1:p.y};
+      spriteEd.sel = spriteEd.selDrag;
+      drawSpriteEditor();
+      return;
+    }
+    // Shift+click strokes a line from the last dab
+    if(spriteEd.shape === 'free' && e.shiftKey && spriteEd.lastDab &&
+       spriteEd.tool !== 'fill' && spriteEd.tool !== 'picker'){
+      const code = (spriteEd.erasing || spriteEd.tool === 'erase') ? 0 : spriteColorIndex(spriteEd.current);
+      const a = spriteEd.lastDab;
+      rasterLine(a.x, a.y, p.x, p.y, (x,y)=>spriteStamp(x,y,code));
+      spriteEd.lastDab = p;
+      drawSpriteEditor();
+      return;
+    }
+    // Dragged shapes
+    if(spriteEd.shape !== 'free' && spriteEd.tool !== 'fill' && spriteEd.tool !== 'picker'){
+      spriteEd.shapeStart = p;
+      spriteEd.shapeEnd = p;
+      drawSpriteEditor();
+      return;
+    }
+    spriteEd.drawing = true;
+    spriteEd.lastDab = p;
+    spriteApply(p, spriteEd.erasing);
   });
+
   spCv.addEventListener('pointermove', (e)=>{
+    const p = spriteCanvasToCell(e.clientX, e.clientY);
+    if(!p) return;
+    if(spriteEd.selDrag){
+      spriteEd.selDrag.x1 = p.x; spriteEd.selDrag.y1 = p.y;
+      spriteEd.sel = spriteEd.selDrag;
+      drawSpriteEditor();
+      return;
+    }
+    if(spriteEd.shapeStart){
+      spriteEd.shapeEnd = e.shiftKey
+        ? (()=>{ const [qx,qy] = snapAngle(spriteEd.shapeStart.x, spriteEd.shapeStart.y, p.x, p.y);
+                 return {x:qx, y:qy}; })()
+        : p;
+      drawSpriteEditor();
+      return;
+    }
     if(!spriteEd.drawing) return;
     if(spriteEd.tool === 'fill' || spriteEd.tool === 'picker') return;
-    const p = spriteCanvasToCell(e.clientX, e.clientY);
-    if(p) spriteApply(p, spriteEd.erasing);
+    // Interpolate so fast drags don't leave gaps
+    const code = (spriteEd.erasing || spriteEd.tool === 'erase') ? 0 : spriteColorIndex(spriteEd.current);
+    const prev = spriteEd.lastDab;
+    if(prev && (Math.abs(p.x-prev.x) > 1 || Math.abs(p.y-prev.y) > 1)){
+      rasterLine(prev.x, prev.y, p.x, p.y, (x,y)=>spriteStamp(x,y,code));
+      drawSpriteEditor();
+    } else {
+      spriteApply(p, spriteEd.erasing);
+    }
+    spriteEd.lastDab = p;
   });
+
   function endSpriteDraw(e){
+    // Commit a dragged shape
+    if(spriteEd.shapeStart && spriteEd.shapeEnd){
+      const code = (spriteEd.erasing || spriteEd.tool === 'erase') ? 0 : spriteColorIndex(spriteEd.current);
+      const a = spriteEd.shapeStart, b = spriteEd.shapeEnd;
+      rasterShape(spriteEd.shape, a.x, a.y, b.x, b.y, (x,y)=>spriteStamp(x,y,code));
+      spriteEd.lastDab = b;
+      drawSpriteEditor();
+    }
+    spriteEd.shapeStart = null;
+    spriteEd.shapeEnd = null;
+    if(spriteEd.selDrag){
+      spriteEd.sel = normSel(spriteEd.selDrag);
+      spriteEd.selDrag = null;
+      drawSpriteEditor();
+    }
     spriteEd.drawing = false;
     try{ spCv.releasePointerCapture(e.pointerId); }catch(_){}
   }
@@ -7356,8 +7721,55 @@
   spCv.addEventListener('contextmenu', (e)=>e.preventDefault());
 
   document.querySelectorAll('.sptool').forEach(b=>{
-    b.onclick = ()=>{ spriteEd.tool = b.dataset.sptool; highlightSpriteTool(); };
+    b.onclick = ()=>{
+      spriteEd.tool = b.dataset.sptool;
+      // Leaving the marquee drops the selection so it can't be pasted into by surprise
+      if(spriteEd.tool !== 'marquee'){ spriteEd.sel = null; spriteEd.selDrag = null; }
+      highlightSpriteTool();
+      drawSpriteEditor();
+    };
   });
+  // Shape picker
+  function highlightSpriteShape(){
+    document.querySelectorAll('.spshape').forEach(b=>{
+      const on = b.dataset.spshape === spriteEd.shape;
+      b.style.background = on ? 'rgba(60,90,140,0.8)' : 'rgba(40,55,80,0.6)';
+      b.style.borderColor = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    });
+  }
+  document.querySelectorAll('.spshape').forEach(b=>{
+    b.onclick = ()=>{
+      spriteEd.shape = b.dataset.spshape;
+      if(spriteEd.tool === 'fill' || spriteEd.tool === 'picker' || spriteEd.tool === 'marquee'){
+        spriteEd.tool = 'pen';
+        highlightSpriteTool();
+      }
+      highlightSpriteShape();
+    };
+  });
+  document.getElementById('spBrushSize').addEventListener('input', (e)=>{
+    spriteEd.brush = parseInt(e.target.value, 10);
+    document.getElementById('spBrushLabel').textContent = spriteEd.brush;
+  });
+
+  // Clipboard + delete shortcuts, active only while the sprite editor is open
+  window.addEventListener('keydown', (e)=>{
+    const open = document.getElementById('spriteEditor').style.display !== 'none';
+    if(!open) return;
+    if(isTypingTarget(e.target)) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if(mod && (e.key === 'c' || e.key === 'C')){
+      if(spriteCopySelection()) e.preventDefault();
+    } else if(mod && (e.key === 'v' || e.key === 'V')){
+      if(spritePasteClipboard()) e.preventDefault();
+    } else if(mod && (e.key === 'x' || e.key === 'X')){
+      if(spriteCopySelection()){ spriteClearSelection(); e.preventDefault(); }
+    } else if(e.key === 'Delete' || e.key === 'Backspace'){
+      if(spriteClearSelection()) e.preventDefault();
+    } else if(e.key === 'Escape'){
+      if(spriteEd.sel){ spriteEd.sel = null; drawSpriteEditor(); e.preventDefault(); e.stopPropagation(); }
+    }
+  }, true);
   document.getElementById('spriteMirror').addEventListener('change', (e)=>{
     spriteEd.mirror = e.target.checked;
   });
