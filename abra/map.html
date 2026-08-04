@@ -63,11 +63,22 @@
         <button id="spriteUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Undo place</button>
       </div>
 
-      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;opacity:0.7;">Tile interaction</div>
-      <textarea id="tileMsgInput" placeholder="Message shown when this tile is clicked (leave empty for none)…" style="width:100%;height:46px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
+      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;opacity:0.7;">Cell interaction</div>
+      <div id="cellSelInfo" style="font-size:10px;opacity:0.6;margin-bottom:6px;line-height:1.4;">Use <b>Select</b>, then click a cell to attach a message to it.</div>
+      <div id="cellIxPanel" style="display:none;">
+        <textarea id="cellMsgInput" placeholder="Message shown when this cell is clicked…" style="width:100%;height:46px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
+          <span>Click area</span><span id="cellZoneLabel" style="opacity:0.9;">1 cell</span>
+        </div>
+        <input id="cellZoneSize" type="range" min="1" max="16" value="1" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
+        <div style="display:flex;gap:4px;margin-bottom:6px;">
+          <button id="cellIxApply" style="flex:1;background:rgba(60,110,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Attach</button>
+          <button id="cellIxRemove" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Remove</button>
+        </div>
+      </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:10px;opacity:0.8;margin-bottom:10px;cursor:pointer;">
-        <input id="tileClickAnim" type="checkbox" style="accent-color:#5a8fd6;">
-        Play click-triggered sprites anywhere on tile
+        <input id="showZones" type="checkbox" checked style="accent-color:#5a8fd6;">
+        Show interaction markers
       </label>
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;gap:4px;">
@@ -5319,8 +5330,12 @@
     material: 'stone',
     brush: 1,
     spriteSize: 1,       // placement size in sub-cells (1 = one cell)
-    message: '',         // shown in a popup when the tile scene is clicked
-    clickAnimAnywhere: false,  // clicking anywhere fires all click-trigger anims
+    // Per-cell interactions: "cellIdx" -> {msg, size}
+    // `size` makes the clickable zone a square anchored at that cell, so a
+    // marker can cover a multi-cell sprite rather than a single pixel.
+    interactions: {},
+    selectedCell: null,   // {sx, sy} chosen with the Select tool
+    showZones: true,      // draw markers over interaction zones while editing
     activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
     animT: 0,
@@ -6148,7 +6163,43 @@
       c.stroke();
     }
 
-    // ---- 5b. Brush hover preview ----
+    // ---- 5b. Interaction zone markers (editing only) ----
+    if(isLoggedIn && tileView.showZones){
+      for(const key in tileView.interactions){
+        const ix = tileView.interactions[key];
+        const idx = key|0;
+        const ax = idx % SUB_GRID, ay = Math.floor(idx / SUB_GRID);
+        const size = ix.size || 1;
+        const zx = originX + ax*u, zy = originY + ay*u, zs = size*u;
+        c.save();
+        c.fillStyle = 'rgba(120,200,255,0.10)';
+        c.fillRect(zx, zy, zs, zs);
+        c.strokeStyle = 'rgba(120,200,255,0.75)';
+        c.lineWidth = Math.max(1, u*0.07);
+        c.setLineDash([Math.max(3,u*0.35), Math.max(2,u*0.25)]);
+        c.strokeRect(zx, zy, zs, zs);
+        c.setLineDash([]);
+        // speech-bubble dot in the corner
+        const r = Math.max(2, Math.min(u*0.22, zs*0.18));
+        c.fillStyle = 'rgba(120,200,255,0.95)';
+        c.beginPath(); c.arc(zx + r*1.2, zy + r*1.2, r, 0, Math.PI*2); c.fill();
+        c.restore();
+      }
+    }
+
+    // ---- 5c. Selected cell (Select tool) ----
+    if(isLoggedIn && tileView.tool === 'select' && tileView.selectedCell){
+      const {sx, sy} = tileView.selectedCell;
+      const pulse = 0.55 + 0.35*Math.sin(tsec*3);
+      c.strokeStyle = `rgba(120,230,255,${pulse.toFixed(3)})`;
+      c.lineWidth = Math.max(2, u*0.12);
+      c.strokeRect(originX + sx*u, originY + sy*u, u, u);
+      c.strokeStyle = 'rgba(0,0,0,0.65)';
+      c.lineWidth = 1;
+      c.strokeRect(originX + sx*u - 1, originY + sy*u - 1, u+2, u+2);
+    }
+
+    // ---- 5d. Brush hover preview ----
     if(isLoggedIn && tileView.hover && (tileView.tool === 'paint' || tileView.tool === 'erase')){
       const rad = tileView.brush - 1;
       c.save();
@@ -6273,8 +6324,8 @@
     tileView.scatter = gen.scatter;
     tileView.paint = {};
     tileView.placed = [];
-    tileView.message = '';
-    tileView.clickAnimAnywhere = false;
+    tileView.interactions = {};
+    tileView.selectedCell = null;
     tileView.activeSprite = tileView.activeSprite || null;
     tileView.dirty = false;
     tileView.animT = 0;
@@ -6309,8 +6360,8 @@
     buildMaterialGrid();
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
     highlightTool();
-    document.getElementById('tileMsgInput').value = tileView.message || '';
-    document.getElementById('tileClickAnim').checked = !!tileView.clickAnimAnywhere;
+    syncCellPanel();
+    document.getElementById('showZones').checked = tileView.showZones !== false;
     document.getElementById('tileMessage').style.display = 'none';
     updateStorageReadout();
     updateTileZoomLabel();
@@ -6422,15 +6473,16 @@
       return;
     }
     // Interaction pass — runs for everyone, logged in or not.
-    // Clicking a click-triggered animation plays it; clicking a tile that has
-    // a message shows the message popup.
+    // Everything here is scoped to the exact cell that was clicked: a
+    // click-triggered animation only plays if the click landed inside its
+    // footprint, and a message only appears if the click landed inside the
+    // zone it was attached to.
     {
       const p = tileCanvasToSub(e.clientX, e.clientY);
       const editingTool = isLoggedIn && (tileView.tool === 'paint' || tileView.tool === 'erase' || tileView.tool === 'sprite');
       if(p && !editingTool){
         const nowSec = tileView.animT;
-        let triggered = false;
-        // Hit-test topmost-first so overlapping items behave sensibly
+        // 1. Click-triggered animation directly under the cursor (topmost wins)
         for(let i = tileView.placed.length - 1; i >= 0; i--){
           const inst = tileView.placed[i];
           if(p.sx < inst.x || p.sx >= inst.x + inst.size) continue;
@@ -6440,23 +6492,19 @@
             const cycle = (entry.frames.length) / (entry.fps || 4);
             inst.playFrom  = nowSec;
             inst.playUntil = nowSec + cycle;
-            triggered = true;
           }
           break;
         }
-        // "Play anywhere" mode fires every click-triggered item on the tile
-        if(!triggered && tileView.clickAnimAnywhere){
-          for(const inst of tileView.placed){
-            const entry = getSprite(inst.sid);
-            if(isAnim(entry) && entry.trigger === 'click'){
-              const cycle = (entry.frames.length) / (entry.fps || 4);
-              inst.playFrom  = nowSec;
-              inst.playUntil = nowSec + cycle;
-              triggered = true;
-            }
-          }
+        // 2. Message attached to a zone containing this cell
+        const hit = interactionAt(p.sx, p.sy);
+        if(hit && hit.msg) showTileMessage(hit.msg);
+
+        // 3. In Select mode (editing), remember the cell so the panel can
+        //    attach or edit an interaction on it.
+        if(isLoggedIn && tileView.tool === 'select'){
+          tileView.selectedCell = {sx: p.sx, sy: p.sy};
+          syncCellPanel();
         }
-        if(tileView.message) showTileMessage(tileView.message);
       }
     }
     if(!isLoggedIn) return;
@@ -6654,9 +6702,9 @@
       await Store.set(base + ':paint',  encoded,   true);
       await Store.set(base + ':placed', placedStr, true);
       // Interaction settings ride along as a tiny JSON blob
+      // Per-cell interactions ride along as a compact JSON blob
       await Store.set(base + ':meta', JSON.stringify({
-        message: tileView.message || '',
-        clickAnimAnywhere: !!tileView.clickAnimAnywhere
+        interactions: tileView.interactions || {}
       }), true);
       tileView.dirty = false;
       const total = encoded.length + placedStr.length;
@@ -6691,8 +6739,11 @@
       const res = await Store.get(base + ':meta', true);
       if(res && res.value){
         const meta = JSON.parse(res.value);
-        tileView.message = meta.message || '';
-        tileView.clickAnimAnywhere = !!meta.clickAnimAnywhere;
+        tileView.interactions = meta.interactions || {};
+        // Migrate the old tile-wide message into a zone covering the tile
+        if(meta.message){
+          tileView.interactions[0] = {msg: meta.message, size: SUB_GRID};
+        }
       }
     }catch(e){ /* nothing saved */ }
     try{
@@ -6745,7 +6796,15 @@
     closeTileDetail();
   };
   document.querySelectorAll('.ttool').forEach(b=>{
-    b.onclick = ()=>{ tileView.tool = b.dataset.ttool; highlightTool(); };
+    b.onclick = ()=>{
+      tileView.tool = b.dataset.ttool;
+      // Leaving Select drops the cell highlight so it isn't stale later
+      if(tileView.tool !== 'select'){
+        tileView.selectedCell = null;
+        syncCellPanel();
+      }
+      highlightTool();
+    };
   });
   document.getElementById('brushSize').addEventListener('input', (e)=>{
     tileView.brush = parseInt(e.target.value, 10);
@@ -7273,13 +7332,83 @@
     document.getElementById('tileMessage').style.display = 'none';
     if(tileMsgTimer) clearTimeout(tileMsgTimer);
   };
-  document.getElementById('tileMsgInput').addEventListener('input', (e)=>{
-    tileView.message = e.target.value;
-    tileView.dirty = true;
+  // ---- Per-cell interactions ----
+  // Find the interaction whose zone contains this cell, if any. Smaller zones
+  // win over larger ones so a precise marker placed on top of a broad one is
+  // still reachable.
+  function interactionAt(sx, sy){
+    let best = null;
+    for(const key in tileView.interactions){
+      const ix = tileView.interactions[key];
+      const idx = key|0;
+      const ax = idx % SUB_GRID, ay = Math.floor(idx / SUB_GRID);
+      const size = ix.size || 1;
+      if(sx < ax || sx >= ax + size) continue;
+      if(sy < ay || sy >= ay + size) continue;
+      if(!best || size < best.size) best = {...ix, size, ax, ay, key};
+    }
+    return best;
+  }
+
+  // Refresh the interaction panel to match the currently selected cell
+  function syncCellPanel(){
+    const info  = document.getElementById('cellSelInfo');
+    const panel = document.getElementById('cellIxPanel');
+    if(!tileView.selectedCell){
+      info.innerHTML = 'Use <b>Select</b>, then click a cell to attach a message to it.';
+      panel.style.display = 'none';
+      return;
+    }
+    const {sx, sy} = tileView.selectedCell;
+    const idx = sy*SUB_GRID + sx;
+    const existing = tileView.interactions[idx];
+    // Also report if this cell merely falls inside someone else's zone
+    const covering = interactionAt(sx, sy);
+    let note = `Cell (${sx}, ${sy})`;
+    if(!existing && covering) note += ` — inside a zone anchored at (${covering.ax}, ${covering.ay})`;
+    else if(existing) note += ' — has a message';
+    info.textContent = note;
+    panel.style.display = 'block';
+    document.getElementById('cellMsgInput').value = existing ? existing.msg : '';
+    const size = existing ? (existing.size || 1) : 1;
+    document.getElementById('cellZoneSize').value = size;
+    document.getElementById('cellZoneLabel').textContent = size === 1 ? '1 cell' : `${size}×${size} cells`;
+  }
+
+  document.getElementById('cellZoneSize').addEventListener('input', (e)=>{
+    const n = parseInt(e.target.value, 10);
+    document.getElementById('cellZoneLabel').textContent = n === 1 ? '1 cell' : `${n}×${n} cells`;
   });
-  document.getElementById('tileClickAnim').addEventListener('change', (e)=>{
-    tileView.clickAnimAnywhere = e.target.checked;
+  document.getElementById('cellIxApply').onclick = ()=>{
+    if(!tileView.selectedCell) return;
+    const {sx, sy} = tileView.selectedCell;
+    const idx = sy*SUB_GRID + sx;
+    const msg = document.getElementById('cellMsgInput').value.trim();
+    const size = parseInt(document.getElementById('cellZoneSize').value, 10) || 1;
+    if(msg){
+      tileView.interactions[idx] = {msg, size};
+    } else {
+      delete tileView.interactions[idx];
+    }
     tileView.dirty = true;
+    syncCellPanel();
+  };
+  document.getElementById('cellIxRemove').onclick = ()=>{
+    if(!tileView.selectedCell) return;
+    const {sx, sy} = tileView.selectedCell;
+    // Remove an interaction anchored here, or the zone covering this cell
+    const idx = sy*SUB_GRID + sx;
+    if(tileView.interactions[idx]) delete tileView.interactions[idx];
+    else {
+      const covering = interactionAt(sx, sy);
+      if(covering) delete tileView.interactions[covering.key];
+    }
+    tileView.dirty = true;
+    document.getElementById('cellMsgInput').value = '';
+    syncCellPanel();
+  };
+  document.getElementById('showZones').addEventListener('change', (e)=>{
+    tileView.showZones = e.target.checked;
   });
 
   // Escape closes the tile view
