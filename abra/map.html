@@ -46,7 +46,10 @@
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
         <span style="opacity:0.7;">Sprites</span>
-        <button id="spriteNew" style="background:rgba(70,120,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:3px 8px;border-radius:5px;font-size:10px;cursor:pointer;">+ New</button>
+        <span style="display:flex;gap:4px;">
+          <button id="spriteNew" style="background:rgba(70,120,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:3px 7px;border-radius:5px;font-size:10px;cursor:pointer;">+ Sprite</button>
+          <button id="animNew" style="background:rgba(90,80,140,0.6);border:1px solid rgba(170,160,230,0.3);color:#e2ddf7;padding:3px 7px;border-radius:5px;font-size:10px;cursor:pointer;">+ Anim</button>
+        </span>
       </div>
       <div id="spriteLibrary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px;"></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
@@ -58,6 +61,13 @@
         <button id="spriteEdit" style="flex:1;background:rgba(60,90,140,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Edit</button>
         <button id="spriteUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Undo place</button>
       </div>
+
+      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;opacity:0.7;">Tile interaction</div>
+      <textarea id="tileMsgInput" placeholder="Message shown when this tile is clicked (leave empty for none)…" style="width:100%;height:46px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
+      <label style="display:flex;align-items:center;gap:6px;font-size:10px;opacity:0.8;margin-bottom:10px;cursor:pointer;">
+        <input id="tileClickAnim" type="checkbox" style="accent-color:#5a8fd6;">
+        Play click-triggered sprites anywhere on tile
+      </label>
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;gap:4px;">
         <button id="tileSave" style="flex:1;background:#3b6db8;border:none;color:#fff;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Save</button>
@@ -105,12 +115,60 @@
           <div style="font-size:10px;opacity:0.6;color:#cdd5e0;line-height:1.4;">Right-click erases. Transparent cells show the ground beneath.</div>
           <div style="margin-top:auto;display:flex;flex-direction:column;gap:5px;">
             <button id="spriteSave"   style="background:#3b6db8;border:none;color:#fff;padding:7px;border-radius:6px;font-size:12px;cursor:pointer;">Save sprite</button>
+            <button id="spriteSaveNew" style="background:rgba(60,110,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;display:none;">Save as new copy</button>
             <button id="spriteClearBtn" style="background:rgba(90,70,50,0.5);border:1px solid rgba(255,200,140,0.2);color:#ffe8c8;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Clear canvas</button>
             <button id="spriteDelete" style="background:rgba(140,50,50,0.45);border:1px solid rgba(255,120,120,0.25);color:#ffd0d0;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;display:none;">Delete sprite</button>
             <button id="spriteCancel" style="background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Close</button>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ============ ANIMATION BUILDER ============ -->
+    <div id="animEditor" style="position:absolute;inset:0;display:none;z-index:60;background:rgba(6,10,20,0.94);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+      <div style="background:#111a2c;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:16px;width:520px;max-height:92%;overflow-y:auto;">
+        <div style="font-size:13px;font-weight:500;color:#e8eef7;margin-bottom:10px;">Animation</div>
+        <input id="animName" placeholder="Animation name" style="width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:7px 9px;border-radius:6px;font-size:12px;margin-bottom:10px;box-sizing:border-box;">
+
+        <div style="font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:5px;">Frames — click sprites below to append</div>
+        <div id="animFrames" style="display:flex;gap:5px;flex-wrap:wrap;min-height:48px;background:rgba(0,0,0,0.25);border:1px dashed rgba(255,255,255,0.12);border-radius:7px;padding:6px;margin-bottom:10px;"></div>
+
+        <div style="font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:5px;">Sprite library</div>
+        <div id="animPicker" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:12px;max-height:150px;overflow-y:auto;"></div>
+
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:4px;">
+              <span>Speed</span><span id="animFpsLabel" style="opacity:0.9;">4 fps</span>
+            </div>
+            <input id="animFps" type="range" min="1" max="24" value="4" style="width:100%;accent-color:#5a8fd6;">
+          </div>
+          <div>
+            <div style="font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:4px;">Trigger</div>
+            <select id="animTrigger" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;">
+              <option value="loop">Always looping</option>
+              <option value="click">On click</option>
+            </select>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:11px;opacity:0.7;color:#cdd5e0;margin-bottom:4px;">Preview</div>
+            <canvas id="animPreview" width="48" height="48" style="width:48px;height:48px;image-rendering:pixelated;background:#0a0f1a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;"></canvas>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:6px;">
+          <button id="animSave" style="flex:1;background:#3b6db8;border:none;color:#fff;padding:8px;border-radius:6px;font-size:12px;cursor:pointer;">Save animation</button>
+          <button id="animClearFrames" style="background:rgba(90,70,50,0.5);border:1px solid rgba(255,200,140,0.2);color:#ffe8c8;padding:8px 10px;border-radius:6px;font-size:11px;cursor:pointer;">Clear frames</button>
+          <button id="animDelete" style="background:rgba(140,50,50,0.45);border:1px solid rgba(255,120,120,0.25);color:#ffd0d0;padding:8px 10px;border-radius:6px;font-size:11px;cursor:pointer;display:none;">Delete</button>
+          <button id="animCancel" style="background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:8px 10px;border-radius:6px;font-size:11px;cursor:pointer;">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message popup shown when a tile with a message is clicked -->
+    <div id="tileMessage" style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);display:none;z-index:40;max-width:520px;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border:1px solid rgba(255,232,90,0.35);border-radius:10px;padding:12px 16px;color:#e8eef7;font-size:13px;line-height:1.5;box-shadow:0 6px 28px rgba(0,0,0,0.6);">
+      <button id="tileMessageClose" style="position:absolute;top:5px;right:6px;width:20px;height:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cdd5e0;border-radius:5px;font-size:12px;line-height:1;cursor:pointer;padding:0;">×</button>
+      <div id="tileMessageText" style="padding-right:18px;"></div>
     </div>
   </div>
 
@@ -5260,6 +5318,8 @@
     material: 'stone',
     brush: 1,
     spriteSize: 1,       // placement size in sub-cells (1 = one cell)
+    message: '',         // shown in a popup when the tile scene is clicked
+    clickAnimAnywhere: false,  // clicking anywhere fires all click-trigger anims
     activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
     animT: 0,
@@ -5337,14 +5397,17 @@
       const res = await Store.get(SPRITE_LIB_KEY, true);
       if(res && res.value){
         spriteLib = JSON.parse(res.value);
-        for(const s of spriteLib) buildSpriteCanvas(s);
+        // Only plain sprites carry pixel data that needs a cached canvas
+        for(const s of spriteLib) if(!isAnim(s) && s.data) buildSpriteCanvas(s);
       }
     }catch(e){ spriteLib = []; }
     renderSpriteLibrary();
   }
   async function saveSpriteLib(){
-    // Strip the cached canvas before serializing
-    const slim = spriteLib.map(s=>({id:s.id, name:s.name, data:s.data}));
+    // Strip cached canvases before serializing; keep animation metadata
+    const slim = spriteLib.map(s=> isAnim(s)
+      ? {id:s.id, name:s.name, type:'anim', frames:s.frames, fps:s.fps, trigger:s.trigger}
+      : {id:s.id, name:s.name, data:s.data});
     await Store.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
   }
 
@@ -5353,21 +5416,27 @@
     if(!grid) return;
     grid.innerHTML = '';
     if(spriteLib.length === 0){
-      grid.innerHTML = '<div style="grid-column:1/-1;font-size:10px;opacity:0.5;text-align:center;padding:8px 0;">No sprites yet — click "+ New"</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;font-size:10px;opacity:0.5;text-align:center;padding:8px 0;">Nothing yet — use + Sprite</div>';
       return;
     }
     for(const s of spriteLib){
+      const anim = isAnim(s);
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;';
 
       const b = document.createElement('button');
-      b.title = s.name || 'sprite';
-      b.style.cssText = `width:100%;height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:2px solid ${tileView.activeSprite===s.id?'#ffe85a':'rgba(255,255,255,0.12)'};display:flex;align-items:center;justify-content:center;`;
-      if(!s.canvas) buildSpriteCanvas(s);
-      const im = document.createElement('img');
-      im.src = s.canvas.toDataURL();
-      im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated;';
-      b.appendChild(im);
+      b.title = (s.name || 'sprite') + (anim ? ` (animation, ${s.trigger === 'click' ? 'on click' : s.fps + ' fps'})` : '');
+      b.style.cssText = `width:100%;height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:2px solid ${tileView.activeSprite===s.id?'#ffe85a':(anim?'rgba(170,160,230,0.4)':'rgba(255,255,255,0.12)')};display:flex;align-items:center;justify-content:center;`;
+      const thumb = entryThumbCanvas(s);
+      if(thumb){
+        const im = document.createElement('img');
+        im.src = thumb.toDataURL();
+        im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated;';
+        b.appendChild(im);
+      } else {
+        b.textContent = '?';
+        b.style.color = '#8a8a96';
+      }
       b.onclick = ()=>{
         tileView.activeSprite = s.id;
         tileView.tool = 'sprite';
@@ -5377,14 +5446,23 @@
       };
       wrap.appendChild(b);
 
+      // Animation badge
+      if(anim){
+        const badge = document.createElement('div');
+        badge.textContent = s.trigger === 'click' ? '☞' : '▶';
+        badge.title = s.trigger === 'click' ? 'Plays on click' : 'Loops';
+        badge.style.cssText = 'position:absolute;bottom:-3px;left:-3px;width:14px;height:14px;border-radius:4px;background:rgba(90,80,140,0.95);border:1px solid rgba(180,170,240,0.5);color:#e2ddf7;font-size:8px;line-height:1;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+        wrap.appendChild(badge);
+      }
+
       // Small delete affordance in the corner of each thumbnail
       const del = document.createElement('button');
       del.textContent = '×';
-      del.title = 'Delete sprite';
+      del.title = anim ? 'Delete animation' : 'Delete sprite';
       del.style.cssText = 'position:absolute;top:-4px;right:-4px;width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,140,140,0.5);background:rgba(60,20,20,0.95);color:#ffd0d0;font-size:10px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;';
       del.onclick = async (ev)=>{
         ev.stopPropagation();
-        if(!confirm(`Delete sprite "${s.name}"? Existing placements of it will disappear.`)) return;
+        if(!confirm(`Delete "${s.name}"? Existing placements of it will disappear.`)) return;
         spriteLib = spriteLib.filter(x=>x.id !== s.id);
         if(tileView.activeSprite === s.id) tileView.activeSprite = null;
         try{ await saveSpriteLib(); }catch(e){ console.warn('persist after delete failed', e); }
@@ -5396,6 +5474,54 @@
     }
   }
   function getSprite(id){ return spriteLib.find(s=>s.id===id); }
+
+  // ---- Animation entries ----
+  // An animation is a library entry of type 'anim' that references two or more
+  // sprite ids as frames. It either loops continuously at a set speed, or waits
+  // for a click and then plays through once.
+  //   {id, name, type:'anim', frames:[spriteId,...], fps, trigger:'loop'|'click'}
+  function isAnim(entry){ return entry && entry.type === 'anim'; }
+
+  // Resolve what should be drawn for a library entry right now.
+  // `inst` is the placement record, used to track click-triggered playback.
+  function resolveFrameCanvas(entry, inst, nowSec){
+    if(!entry) return null;
+    if(!isAnim(entry)){
+      if(!entry.canvas) buildSpriteCanvas(entry);
+      return entry.canvas;
+    }
+    const frames = entry.frames || [];
+    if(frames.length === 0) return null;
+    let idx = 0;
+    if(entry.trigger === 'click'){
+      // Only advance while a triggered playback is still running
+      if(inst && inst.playUntil && nowSec < inst.playUntil){
+        const elapsed = nowSec - (inst.playFrom || 0);
+        idx = Math.floor(elapsed * (entry.fps || 4)) % frames.length;
+      } else {
+        idx = 0;   // resting pose is the first frame
+      }
+    } else {
+      idx = Math.floor(nowSec * (entry.fps || 4)) % frames.length;
+    }
+    const fr = getSprite(frames[idx]);
+    if(!fr) return null;
+    if(!fr.canvas) buildSpriteCanvas(fr);
+    return fr.canvas;
+  }
+
+  // A thumbnail for library UI — animations show their first frame.
+  function entryThumbCanvas(entry){
+    if(!entry) return null;
+    if(isAnim(entry)){
+      const first = getSprite((entry.frames||[])[0]);
+      if(!first) return null;
+      if(!first.canvas) buildSpriteCanvas(first);
+      return first.canvas;
+    }
+    if(!entry.canvas) buildSpriteCanvas(entry);
+    return entry.canvas;
+  }
 
   const tileCv  = document.getElementById('tileCanvas');
   const tileCtx = tileCv.getContext('2d');
@@ -5964,28 +6090,38 @@
       drawSprite(c, s.kind, px+swayX, py, u, s.v);
     }
 
-    // ---- 3. Placed sprites ----
-    // Sorted by y so sprites lower on the tile overlap those above them.
+    // ---- 3. Placed sprites & animations ----
+    // Sorted by y so items lower on the tile overlap those above them.
     const sorted = tileView.placed.slice().sort((a,b)=>(a.y+a.size)-(b.y+b.size));
     for(const p of sorted){
-      const sp = getSprite(p.sid);
-      if(!sp) continue;
-      if(!sp.canvas) buildSpriteCanvas(sp);
-      c.drawImage(sp.canvas, originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+      const entry = getSprite(p.sid);
+      if(!entry) continue;
+      const frame = resolveFrameCanvas(entry, p, tsec);
+      if(!frame) continue;
+      c.drawImage(frame, originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+      // Subtle hint ring on click-triggered animations so they're discoverable
+      if(isAnim(entry) && entry.trigger === 'click'){
+        const pulse = 0.25 + 0.2*Math.sin(tsec*2.2 + p.x*0.5 + p.y*0.3);
+        c.strokeStyle = `rgba(190,180,255,${pulse.toFixed(3)})`;
+        c.lineWidth = Math.max(1, u*0.06);
+        c.strokeRect(originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+      }
     }
 
     // ---- 3b. Sprite placement ghost ----
     if(isLoggedIn && tileView.tool === 'sprite' && tileView.activeSprite && tileView.hover){
-      const sp = getSprite(tileView.activeSprite);
-      if(sp){
-        if(!sp.canvas) buildSpriteCanvas(sp);
+      const entry = getSprite(tileView.activeSprite);
+      if(entry){
+        const frame = resolveFrameCanvas(entry, null, tsec);
         const sz = tileView.spriteSize;
         const gx = tileView.hover.sx - Math.floor(sz/2);
         const gy = tileView.hover.sy - Math.floor(sz/2);
-        c.save();
-        c.globalAlpha = 0.6;
-        c.drawImage(sp.canvas, originX + gx*u, originY + gy*u, sz*u, sz*u);
-        c.restore();
+        if(frame){
+          c.save();
+          c.globalAlpha = 0.6;
+          c.drawImage(frame, originX + gx*u, originY + gy*u, sz*u, sz*u);
+          c.restore();
+        }
         c.strokeStyle = 'rgba(255,232,90,0.9)';
         c.lineWidth = Math.max(1, u*0.08);
         c.strokeRect(originX + gx*u, originY + gy*u, sz*u, sz*u);
@@ -6136,6 +6272,8 @@
     tileView.scatter = gen.scatter;
     tileView.paint = {};
     tileView.placed = [];
+    tileView.message = '';
+    tileView.clickAnimAnywhere = false;
     tileView.activeSprite = tileView.activeSprite || null;
     tileView.dirty = false;
     tileView.animT = 0;
@@ -6169,6 +6307,9 @@
     document.getElementById('enterTileBtn').style.display = 'none';
     buildMaterialGrid();
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
+    document.getElementById('tileMsgInput').value = tileView.message || '';
+    document.getElementById('tileClickAnim').checked = !!tileView.clickAnimAnywhere;
+    document.getElementById('tileMessage').style.display = 'none';
     updateStorageReadout();
     updateTileZoomLabel();
     startTileLoop();
@@ -6268,6 +6409,43 @@
       tileCv.setPointerCapture(e.pointerId);
       e.preventDefault();
       return;
+    }
+    // Interaction pass — runs for everyone, logged in or not.
+    // Clicking a click-triggered animation plays it; clicking a tile that has
+    // a message shows the message popup.
+    {
+      const p = tileCanvasToSub(e.clientX, e.clientY);
+      if(p && !(isLoggedIn && (tileView.tool === 'paint' || tileView.tool === 'erase' || tileView.tool === 'sprite'))){
+        const nowSec = tileView.animT;
+        let triggered = false;
+        // Hit-test topmost-first so overlapping items behave sensibly
+        for(let i = tileView.placed.length - 1; i >= 0; i--){
+          const inst = tileView.placed[i];
+          if(p.sx < inst.x || p.sx >= inst.x + inst.size) continue;
+          if(p.sy < inst.y || p.sy >= inst.y + inst.size) continue;
+          const entry = getSprite(inst.sid);
+          if(isAnim(entry) && entry.trigger === 'click'){
+            const cycle = (entry.frames.length) / (entry.fps || 4);
+            inst.playFrom  = nowSec;
+            inst.playUntil = nowSec + cycle;
+            triggered = true;
+          }
+          break;
+        }
+        // "Play anywhere" mode fires every click-triggered item on the tile
+        if(!triggered && tileView.clickAnimAnywhere){
+          for(const inst of tileView.placed){
+            const entry = getSprite(inst.sid);
+            if(isAnim(entry) && entry.trigger === 'click'){
+              const cycle = (entry.frames.length) / (entry.fps || 4);
+              inst.playFrom  = nowSec;
+              inst.playUntil = nowSec + cycle;
+              triggered = true;
+            }
+          }
+        }
+        if(tileView.message) showTileMessage(tileView.message);
+      }
     }
     if(!isLoggedIn) return;
     // Placing a sprite takes priority over painting
@@ -6446,6 +6624,11 @@
         .join(',');
       await Store.set(base + ':paint',  encoded,   true);
       await Store.set(base + ':placed', placedStr, true);
+      // Interaction settings ride along as a tiny JSON blob
+      await Store.set(base + ':meta', JSON.stringify({
+        message: tileView.message || '',
+        clickAnimAnywhere: !!tileView.clickAnimAnywhere
+      }), true);
       tileView.dirty = false;
       const total = encoded.length + placedStr.length;
       const painted = Object.keys(tileView.paint).length;
@@ -6474,6 +6657,14 @@
     try{
       const res = await Store.get(base + ':paint', true);
       if(res && res.value) tileView.paint = decodePaint(res.value);
+    }catch(e){ /* nothing saved */ }
+    try{
+      const res = await Store.get(base + ':meta', true);
+      if(res && res.value){
+        const meta = JSON.parse(res.value);
+        tileView.message = meta.message || '';
+        tileView.clickAnimAnywhere = !!meta.clickAnimAnywhere;
+      }
     }catch(e){ /* nothing saved */ }
     try{
       const res = await Store.get(base + ':placed', true);
@@ -6560,8 +6751,13 @@
   };
   document.getElementById('spriteNew').onclick  = ()=> openSpriteEditor(null);
   document.getElementById('spriteEdit').onclick = ()=>{
-    if(tileView.activeSprite) openSpriteEditor(tileView.activeSprite);
-    else document.getElementById('spriteStatus').textContent = 'Select a sprite first.';
+    if(!tileView.activeSprite){
+      document.getElementById('spriteStatus').textContent = 'Select something first.';
+      return;
+    }
+    const entry = getSprite(tileView.activeSprite);
+    if(isAnim(entry)) openAnimEditor(tileView.activeSprite);
+    else openSpriteEditor(tileView.activeSprite);
   };
 
   // ============ SPRITE EDITOR ============
@@ -6608,12 +6804,14 @@
       document.getElementById('spriteName').value = s.name || '';
       document.getElementById('spriteRes').value = String(dec.res);
       document.getElementById('spriteDelete').style.display = 'block';
+      document.getElementById('spriteSaveNew').style.display = 'block';
     } else {
       spriteEd.res = parseInt(document.getElementById('spriteRes').value, 10) || 32;
       spriteEd.colors = [];
       spriteEd.cells = new Int16Array(spriteEd.res * spriteEd.res);
       document.getElementById('spriteName').value = '';
       document.getElementById('spriteDelete').style.display = 'none';
+      document.getElementById('spriteSaveNew').style.display = 'none';
     }
     document.getElementById('spriteEditor').style.display = 'flex';
     buildSpritePalette();
@@ -6796,8 +6994,8 @@
     renderSpriteLibrary();
     closeSpriteEditor();
   };
-  document.getElementById('spriteSave').onclick = async ()=>{
-    // Compact the palette to only the colours actually used
+  // Serialize the current editor canvas into a compact library entry payload
+  function buildSpritePayload(){
     const used = new Map();
     const compact = new Int16Array(spriteEd.cells.length);
     const newColors = [];
@@ -6808,7 +7006,35 @@
       if(!used.has(hex)){ newColors.push(hex); used.set(hex, newColors.length); }
       compact[i] = used.get(hex);
     }
-    const data = encodeSprite(spriteEd.res, Array.from(compact), newColors);
+    return encodeSprite(spriteEd.res, Array.from(compact), newColors);
+  }
+
+  async function persistSpriteLib(statusMsg){
+    try{
+      await saveSpriteLib();
+      renderSpriteLibrary();
+      closeSpriteEditor();
+      if(Store.backend === 'memory'){
+        document.getElementById('spriteStatus').textContent =
+          'Saved for this session only (no persistent storage available).';
+      } else if(statusMsg){
+        document.getElementById('spriteStatus').textContent = statusMsg;
+      }
+    }catch(err){
+      // The sprite already lives in the in-memory library, so it stays usable
+      renderSpriteLibrary();
+      closeSpriteEditor();
+      const st = document.getElementById('spriteStatus');
+      st.textContent = 'Kept for this session — could not persist: ' +
+        (err && err.message ? err.message : 'unknown error');
+      st.style.color = '#ffcf8a';
+      console.warn('sprite library persist failed', err);
+    }
+  }
+
+  // Save — overwrites the sprite being edited, or creates one if new
+  document.getElementById('spriteSave').onclick = async ()=>{
+    const data = buildSpritePayload();
     const name = (document.getElementById('spriteName').value || '').trim() || 'sprite';
     if(spriteEd.editingId){
       const s = getSprite(spriteEd.editingId);
@@ -6823,26 +7049,209 @@
       tileView.tool = 'sprite';
       highlightTool();
     }
-    try{
-      await saveSpriteLib();
-      renderSpriteLibrary();
-      closeSpriteEditor();
-      if(Store.backend === 'memory'){
-        document.getElementById('spriteStatus').textContent =
-          'Saved for this session only (no persistent storage available).';
-      }
-    }catch(err){
-      // The sprite is already in the in-memory library, so it stays usable
-      // for this session even if persisting it failed.
-      renderSpriteLibrary();
-      closeSpriteEditor();
-      const st = document.getElementById('spriteStatus');
-      st.textContent = 'Sprite kept for this session — could not persist: ' +
-        (err && err.message ? err.message : 'unknown error');
-      st.style.color = '#ffcf8a';
-      console.warn('sprite library persist failed', err);
-    }
+    await persistSpriteLib();
   };
+
+  // Save as new copy — always creates a fresh entry, leaving the original
+  // untouched. Handy for making animation frames: open a sprite, tweak it,
+  // then save the variation alongside it.
+  document.getElementById('spriteSaveNew').onclick = async ()=>{
+    const data = buildSpritePayload();
+    let name = (document.getElementById('spriteName').value || '').trim() || 'sprite';
+    // Auto-number the copy so frames read as "walk 2", "walk 3", ...
+    const m = name.match(/^(.*?)(\d+)$/);
+    if(m){
+      let base = m[1], n = parseInt(m[2], 10) + 1;
+      while(spriteLib.some(s=>s.name === base + n)) n++;
+      name = base + n;
+    } else {
+      let n = 2;
+      while(spriteLib.some(s=>s.name === name + ' ' + n)) n++;
+      name = name + ' ' + n;
+    }
+    const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
+    const s = {id, name, data};
+    buildSpriteCanvas(s);
+    spriteLib.push(s);
+    tileView.activeSprite = id;
+    tileView.tool = 'sprite';
+    highlightTool();
+    await persistSpriteLib(`Saved as new sprite "${name}"`);
+  };
+
+  // ============ ANIMATION BUILDER ============
+  const animEd = { editingId: null, frames: [], fps: 4, trigger: 'loop', previewT: 0, rafId: null };
+
+  function openAnimEditor(id){
+    const sprites = spriteLib.filter(s=>!isAnim(s));
+    if(sprites.length < 2 && !id){
+      document.getElementById('spriteStatus').textContent = 'Draw at least 2 sprites first.';
+      return;
+    }
+    animEd.editingId = id;
+    if(id){
+      const a = getSprite(id);
+      animEd.frames  = (a.frames || []).slice();
+      animEd.fps     = a.fps || 4;
+      animEd.trigger = a.trigger || 'loop';
+      document.getElementById('animName').value = a.name || '';
+      document.getElementById('animDelete').style.display = 'block';
+    } else {
+      animEd.frames = [];
+      animEd.fps = 4;
+      animEd.trigger = 'loop';
+      document.getElementById('animName').value = '';
+      document.getElementById('animDelete').style.display = 'none';
+    }
+    document.getElementById('animFps').value = animEd.fps;
+    document.getElementById('animFpsLabel').textContent = animEd.fps + ' fps';
+    document.getElementById('animTrigger').value = animEd.trigger;
+    document.getElementById('animEditor').style.display = 'flex';
+    renderAnimFrames();
+    renderAnimPicker();
+    startAnimPreview();
+  }
+  function closeAnimEditor(){
+    document.getElementById('animEditor').style.display = 'none';
+    if(animEd.rafId){ cancelAnimationFrame(animEd.rafId); animEd.rafId = null; }
+  }
+
+  function renderAnimFrames(){
+    const box = document.getElementById('animFrames');
+    box.innerHTML = '';
+    if(animEd.frames.length === 0){
+      box.innerHTML = '<div style="font-size:10px;opacity:0.45;color:#cdd5e0;align-self:center;padding:10px;">Pick two or more sprites below</div>';
+      return;
+    }
+    animEd.frames.forEach((sid, i)=>{
+      const sp = getSprite(sid);
+      const w = document.createElement('div');
+      w.style.cssText = 'position:relative;width:40px;height:40px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);border-radius:5px;display:flex;align-items:center;justify-content:center;';
+      if(sp){
+        const th = entryThumbCanvas(sp);
+        if(th){
+          const im = document.createElement('img');
+          im.src = th.toDataURL();
+          im.style.cssText = 'max-width:92%;max-height:92%;image-rendering:pixelated;';
+          w.appendChild(im);
+        }
+      }
+      const num = document.createElement('div');
+      num.textContent = i+1;
+      num.style.cssText = 'position:absolute;bottom:1px;left:2px;font-size:8px;color:#cdd5e0;opacity:0.7;';
+      w.appendChild(num);
+      const x = document.createElement('button');
+      x.textContent = '×';
+      x.style.cssText = 'position:absolute;top:-5px;right:-5px;width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,140,140,0.5);background:rgba(60,20,20,0.95);color:#ffd0d0;font-size:9px;line-height:1;cursor:pointer;padding:0;';
+      x.onclick = ()=>{ animEd.frames.splice(i,1); renderAnimFrames(); };
+      w.appendChild(x);
+      box.appendChild(w);
+    });
+  }
+
+  function renderAnimPicker(){
+    const box = document.getElementById('animPicker');
+    box.innerHTML = '';
+    for(const s of spriteLib){
+      if(isAnim(s)) continue;    // animations can't nest
+      const b = document.createElement('button');
+      b.title = s.name;
+      b.style.cssText = 'height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;';
+      const th = entryThumbCanvas(s);
+      if(th){
+        const im = document.createElement('img');
+        im.src = th.toDataURL();
+        im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated;';
+        b.appendChild(im);
+      }
+      b.onclick = ()=>{ animEd.frames.push(s.id); renderAnimFrames(); };
+      box.appendChild(b);
+    }
+  }
+
+  function startAnimPreview(){
+    const pv = document.getElementById('animPreview');
+    const pctx = pv.getContext('2d');
+    pctx.imageSmoothingEnabled = false;
+    if(animEd.rafId) cancelAnimationFrame(animEd.rafId);
+    let last = performance.now();
+    function step(now){
+      if(document.getElementById('animEditor').style.display === 'none') return;
+      animEd.previewT += Math.min(0.1, (now-last)/1000);
+      last = now;
+      pctx.clearRect(0,0,pv.width,pv.height);
+      if(animEd.frames.length){
+        const idx = Math.floor(animEd.previewT * animEd.fps) % animEd.frames.length;
+        const sp = getSprite(animEd.frames[idx]);
+        const th = sp ? entryThumbCanvas(sp) : null;
+        if(th) pctx.drawImage(th, 0, 0, pv.width, pv.height);
+      }
+      animEd.rafId = requestAnimationFrame(step);
+    }
+    animEd.rafId = requestAnimationFrame(step);
+  }
+
+  document.getElementById('animNew').onclick = ()=> openAnimEditor(null);
+  document.getElementById('animCancel').onclick = closeAnimEditor;
+  document.getElementById('animClearFrames').onclick = ()=>{ animEd.frames = []; renderAnimFrames(); };
+  document.getElementById('animFps').addEventListener('input', (e)=>{
+    animEd.fps = parseInt(e.target.value, 10);
+    document.getElementById('animFpsLabel').textContent = animEd.fps + ' fps';
+  });
+  document.getElementById('animTrigger').addEventListener('change', (e)=>{
+    animEd.trigger = e.target.value;
+  });
+  document.getElementById('animDelete').onclick = async ()=>{
+    if(!animEd.editingId) return;
+    if(!confirm('Delete this animation? Existing placements will disappear.')) return;
+    spriteLib = spriteLib.filter(s=>s.id !== animEd.editingId);
+    if(tileView.activeSprite === animEd.editingId) tileView.activeSprite = null;
+    try{ await saveSpriteLib(); }catch(e){ console.warn(e); }
+    renderSpriteLibrary();
+    closeAnimEditor();
+  };
+  document.getElementById('animSave').onclick = async ()=>{
+    if(animEd.frames.length < 2){
+      alert('An animation needs at least 2 frames.');
+      return;
+    }
+    const name = (document.getElementById('animName').value || '').trim() || 'animation';
+    if(animEd.editingId){
+      const a = getSprite(animEd.editingId);
+      a.name = name; a.frames = animEd.frames.slice(); a.fps = animEd.fps; a.trigger = animEd.trigger;
+    } else {
+      const id = 'a' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
+      spriteLib.push({id, name, type:'anim', frames:animEd.frames.slice(), fps:animEd.fps, trigger:animEd.trigger});
+      tileView.activeSprite = id;
+      tileView.tool = 'sprite';
+      highlightTool();
+    }
+    try{ await saveSpriteLib(); }catch(e){ console.warn('anim persist failed', e); }
+    renderSpriteLibrary();
+    closeAnimEditor();
+  };
+
+  // ---- Tile message popup ----
+  let tileMsgTimer = null;
+  function showTileMessage(text){
+    const box = document.getElementById('tileMessage');
+    document.getElementById('tileMessageText').textContent = text;
+    box.style.display = 'block';
+    if(tileMsgTimer) clearTimeout(tileMsgTimer);
+    tileMsgTimer = setTimeout(()=>{ box.style.display = 'none'; }, 9000);
+  }
+  document.getElementById('tileMessageClose').onclick = ()=>{
+    document.getElementById('tileMessage').style.display = 'none';
+    if(tileMsgTimer) clearTimeout(tileMsgTimer);
+  };
+  document.getElementById('tileMsgInput').addEventListener('input', (e)=>{
+    tileView.message = e.target.value;
+    tileView.dirty = true;
+  });
+  document.getElementById('tileClickAnim').addEventListener('change', (e)=>{
+    tileView.clickAnimAnywhere = e.target.checked;
+    tileView.dirty = true;
+  });
 
   // Escape closes the tile view
   window.addEventListener('keydown', (e)=>{
