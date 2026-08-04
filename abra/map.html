@@ -35,6 +35,27 @@
         <button class="ttool" data-ttool="paint" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Paint</button>
         <button class="ttool" data-ttool="erase" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Erase</button>
         <button class="ttool" data-ttool="sprite" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Sprite</button>
+        <button class="ttool" data-ttool="path" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;" title="Give a placed sprite a movement path">Path</button>
+      </div>
+
+      <!-- Movement path editor -->
+      <div id="pathPanel" style="display:none;border:1px solid rgba(160,200,255,0.25);background:rgba(30,50,80,0.35);border-radius:7px;padding:8px;margin-bottom:8px;">
+        <div id="pathInfo" style="font-size:10px;opacity:0.75;margin-bottom:6px;line-height:1.4;">Click a placed sprite to give it a path.</div>
+        <div id="pathControls" style="display:none;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;opacity:0.7;font-size:10px;">
+            <span>Speed</span><span id="pathSpeedLabel" style="opacity:0.9;">4 cells/s</span>
+          </div>
+          <input id="pathSpeed" type="range" min="1" max="40" value="4" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
+          <select id="pathMode" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;margin-bottom:6px;">
+            <option value="loop">Loop — restart at the beginning</option>
+            <option value="pingpong">Back and forth</option>
+            <option value="once">Play once, then stop</option>
+          </select>
+          <div style="display:flex;gap:4px;">
+            <button id="pathDone"  style="flex:1;background:rgba(60,110,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Done</button>
+            <button id="pathClear" style="background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px 8px;border-radius:5px;font-size:10px;cursor:pointer;">Clear</button>
+          </div>
+        </div>
       </div>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;opacity:0.7;">
@@ -66,14 +87,65 @@
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;opacity:0.7;">Cell interaction</div>
       <div id="cellSelInfo" style="font-size:10px;opacity:0.6;margin-bottom:6px;line-height:1.4;">Use <b>Select</b>, then click a cell to attach a message to it.</div>
       <div id="cellIxPanel" style="display:none;">
-        <textarea id="cellMsgInput" placeholder="Message shown when this cell is clicked…" style="width:100%;height:46px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
+        <textarea id="cellMsgInput" placeholder="Message… each new line becomes a separate page" style="width:100%;height:52px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
         <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
           <span>Click area</span><span id="cellZoneLabel" style="opacity:0.9;">1 cell</span>
         </div>
-        <input id="cellZoneSize" type="range" min="1" max="16" value="1" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
+        <input id="cellZoneSize" type="range" min="1" max="16" value="1" style="width:100%;margin-bottom:8px;accent-color:#5a8fd6;">
+
+        <!-- Link -->
+        <div style="opacity:0.7;font-size:10px;margin-bottom:4px;">Hyperlink (optional)</div>
+        <input id="cellLink" type="text" placeholder="https://…" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px 7px;border-radius:5px;font-size:10px;margin-bottom:4px;box-sizing:border-box;">
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <select id="cellLinkTarget" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;">
+            <option value="_blank">New window</option>
+            <option value="_self">Same window</option>
+          </select>
+          <input id="cellLinkLabel" type="text" placeholder="Button text" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px 6px;border-radius:5px;font-size:10px;box-sizing:border-box;">
+        </div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:9px;opacity:0.75;margin-bottom:8px;cursor:pointer;">
+          <input id="cellLinkAuto" type="checkbox" style="accent-color:#5a8fd6;">
+          Open immediately on click (skip the box)
+        </label>
+
+        <!-- Style -->
+        <details style="margin-bottom:8px;">
+          <summary style="font-size:10px;opacity:0.7;cursor:pointer;outline:none;">Box style</summary>
+          <div style="padding-top:6px;">
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 6px;align-items:center;font-size:9px;opacity:0.8;margin-bottom:6px;">
+              <span>Box</span><input id="ixBg"     type="color" value="#0f1729" style="width:100%;height:20px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;background:none;cursor:pointer;padding:0;">
+              <span>Edge</span><input id="ixBorder" type="color" value="#ffe85a" style="width:100%;height:20px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;background:none;cursor:pointer;padding:0;">
+              <span>Text</span><input id="ixText"   type="color" value="#e8eef7" style="width:100%;height:20px;border:1px solid rgba(255,255,255,0.15);border-radius:4px;background:none;cursor:pointer;padding:0;">
+            </div>
+            <select id="ixFont" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;margin-bottom:4px;">
+              <option value="system">Sans (default)</option>
+              <option value="serif">Serif</option>
+              <option value="mono">Monospace</option>
+              <option value="pixel">Pixel / retro</option>
+            </select>
+            <div style="display:flex;gap:4px;margin-bottom:4px;">
+              <select id="ixSize" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;">
+                <option value="12">Small</option>
+                <option value="14" selected>Medium</option>
+                <option value="18">Large</option>
+                <option value="24">Huge</option>
+              </select>
+              <select id="ixAlign" style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:9px;opacity:0.75;cursor:pointer;">
+              <input id="ixItalic" type="checkbox" style="accent-color:#5a8fd6;">Italic
+            </label>
+          </div>
+        </details>
+
         <div style="display:flex;gap:4px;margin-bottom:6px;">
           <button id="cellIxApply" style="flex:1;background:rgba(60,110,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Attach</button>
-          <button id="cellIxRemove" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Remove</button>
+          <button id="cellIxTest" style="background:rgba(60,90,140,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:10px;cursor:pointer;">Test</button>
+          <button id="cellIxRemove" style="background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px 8px;border-radius:5px;font-size:10px;cursor:pointer;">Remove</button>
         </div>
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:10px;opacity:0.8;margin-bottom:10px;cursor:pointer;">
@@ -178,9 +250,13 @@
     </div>
 
     <!-- Message popup shown when a tile with a message is clicked -->
-    <div id="tileMessage" style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);display:none;z-index:40;max-width:520px;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border:1px solid rgba(255,232,90,0.35);border-radius:10px;padding:12px 16px;color:#e8eef7;font-size:13px;line-height:1.5;box-shadow:0 6px 28px rgba(0,0,0,0.6);">
-      <button id="tileMessageClose" style="position:absolute;top:5px;right:6px;width:20px;height:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cdd5e0;border-radius:5px;font-size:12px;line-height:1;cursor:pointer;padding:0;">×</button>
-      <div id="tileMessageText" style="padding-right:18px;"></div>
+    <div id="tileMessage" style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);display:none;z-index:40;min-width:280px;max-width:560px;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border:2px solid rgba(255,232,90,0.55);border-radius:10px;padding:14px 18px;color:#e8eef7;font-size:14px;line-height:1.55;box-shadow:0 6px 28px rgba(0,0,0,0.6);cursor:pointer;">
+      <button id="tileMessageClose" style="position:absolute;top:5px;right:6px;width:20px;height:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cdd5e0;border-radius:5px;font-size:12px;line-height:1;cursor:pointer;padding:0;z-index:2;">×</button>
+      <div id="tileMessageText" style="padding-right:18px;min-height:20px;"></div>
+      <div id="tileMessageFooter" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;">
+        <a id="tileMessageLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;font-size:12px;padding:5px 11px;border-radius:6px;text-decoration:none;border:1px solid currentColor;opacity:0.9;"></a>
+        <div id="tileMessageMore" style="display:none;font-size:11px;opacity:0.6;margin-left:auto;">[continue…]</div>
+      </div>
     </div>
   </div>
 
@@ -5335,6 +5411,7 @@
     // marker can cover a multi-cell sprite rather than a single pixel.
     interactions: {},
     selectedCell: null,   // {sx, sy} chosen with the Select tool
+    pathTarget: null,     // index into `placed` of the sprite being given a path
     showZones: true,      // draw markers over interaction zones while editing
     activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
@@ -5527,6 +5604,48 @@
   }
 
   // A thumbnail for library UI — animations show their first frame.
+  // ---- Movement paths ----
+  // A placed item can carry `path` (a list of [x,y] waypoints in sub-cells),
+  // `speed` in cells per second, and `pathMode` (loop | pingpong | once).
+  // This returns the interpolated position for the current time.
+  function positionAlongPath(inst, nowSec){
+    const pts = inst.path;
+    if(!pts || pts.length < 2) return {x: inst.x, y: inst.y};
+    // Cumulative segment lengths
+    let total = 0;
+    const segs = [];
+    for(let i=1;i<pts.length;i++){
+      const dx = pts[i][0]-pts[i-1][0], dy = pts[i][1]-pts[i-1][1];
+      const len = Math.sqrt(dx*dx + dy*dy);
+      segs.push(len);
+      total += len;
+    }
+    if(total === 0) return {x: pts[0][0], y: pts[0][1]};
+    const speed = inst.speed || 4;
+    let dist = nowSec * speed;
+    const mode = inst.pathMode || 'loop';
+    if(mode === 'loop'){
+      dist = dist % total;
+    } else if(mode === 'pingpong'){
+      const cycle = total * 2;
+      let d = dist % cycle;
+      dist = d <= total ? d : cycle - d;
+    } else {   // once — park at the end
+      dist = Math.min(dist, total);
+    }
+    // Walk the segments to find where we are
+    let acc = 0;
+    for(let i=0;i<segs.length;i++){
+      if(acc + segs[i] >= dist || i === segs.length-1){
+        const t = segs[i] === 0 ? 0 : (dist - acc) / segs[i];
+        const a = pts[i], b = pts[i+1];
+        return {x: a[0] + (b[0]-a[0])*t, y: a[1] + (b[1]-a[1])*t};
+      }
+      acc += segs[i];
+    }
+    return {x: pts[pts.length-1][0], y: pts[pts.length-1][1]};
+  }
+
   function entryThumbCanvas(entry){
     if(!entry) return null;
     if(isAnim(entry)){
@@ -6107,21 +6226,70 @@
     }
 
     // ---- 3. Placed sprites & animations ----
-    // Sorted by y so items lower on the tile overlap those above them.
-    const sorted = tileView.placed.slice().sort((a,b)=>(a.y+a.size)-(b.y+b.size));
-    for(const p of sorted){
+    // Resolve live positions first (items on a path move), then sort by y so
+    // items lower on the tile overlap those above them.
+    const live = tileView.placed.map(p=>{
+      const pos = p.path && p.path.length >= 2 ? positionAlongPath(p, tsec) : {x:p.x, y:p.y};
+      return {inst:p, dx:pos.x, dy:pos.y};
+    });
+    live.sort((a,b)=>(a.dy + a.inst.size) - (b.dy + b.inst.size));
+    for(const L of live){
+      const p = L.inst;
       const entry = getSprite(p.sid);
       if(!entry) continue;
       const frame = resolveFrameCanvas(entry, p, tsec);
       if(!frame) continue;
-      c.drawImage(frame, originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+      c.drawImage(frame, originX + L.dx*u, originY + L.dy*u, p.size*u, p.size*u);
       // Subtle hint ring on click-triggered animations so they're discoverable
       if(isAnim(entry) && entry.trigger === 'click'){
         const pulse = 0.25 + 0.2*Math.sin(tsec*2.2 + p.x*0.5 + p.y*0.3);
         c.strokeStyle = `rgba(190,180,255,${pulse.toFixed(3)})`;
         c.lineWidth = Math.max(1, u*0.06);
-        c.strokeRect(originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+        c.strokeRect(originX + L.dx*u, originY + L.dy*u, p.size*u, p.size*u);
       }
+    }
+
+    // ---- 3c. Movement paths (editing only) ----
+    if(isLoggedIn && tileView.tool === 'path'){
+      tileView.placed.forEach((p, i)=>{
+        if(!p.path || p.path.length < 2){
+          if(i !== tileView.pathTarget) return;
+        }
+        const isTarget = (i === tileView.pathTarget);
+        const pts = p.path || [];
+        if(pts.length){
+          c.save();
+          c.strokeStyle = isTarget ? 'rgba(255,200,90,0.95)' : 'rgba(160,200,255,0.45)';
+          c.lineWidth = Math.max(1.5, u*0.10);
+          c.setLineDash([Math.max(4,u*0.4), Math.max(3,u*0.3)]);
+          c.beginPath();
+          pts.forEach((pt, k)=>{
+            const px = originX + (pt[0] + p.size/2)*u;
+            const py = originY + (pt[1] + p.size/2)*u;
+            if(k===0) c.moveTo(px, py); else c.lineTo(px, py);
+          });
+          c.stroke();
+          c.setLineDash([]);
+          // Waypoint dots, numbered at the start
+          pts.forEach((pt, k)=>{
+            const px = originX + (pt[0] + p.size/2)*u;
+            const py = originY + (pt[1] + p.size/2)*u;
+            c.fillStyle = isTarget ? 'rgba(255,200,90,0.95)' : 'rgba(160,200,255,0.6)';
+            c.beginPath(); c.arc(px, py, Math.max(2.5, u*0.18), 0, Math.PI*2); c.fill();
+            if(k === 0){
+              c.fillStyle = 'rgba(20,25,35,0.9)';
+              c.beginPath(); c.arc(px, py, Math.max(1.2, u*0.08), 0, Math.PI*2); c.fill();
+            }
+          });
+          c.restore();
+        }
+        // Outline the sprite that's currently being edited
+        if(isTarget){
+          c.strokeStyle = 'rgba(255,200,90,0.9)';
+          c.lineWidth = Math.max(2, u*0.12);
+          c.strokeRect(originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+        }
+      });
     }
 
     // ---- 3b. Sprite placement ghost ----
@@ -6326,6 +6494,7 @@
     tileView.placed = [];
     tileView.interactions = {};
     tileView.selectedCell = null;
+    tileView.pathTarget = null;
     tileView.activeSprite = tileView.activeSprite || null;
     tileView.dirty = false;
     tileView.animT = 0;
@@ -6361,6 +6530,7 @@
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
     highlightTool();
     syncCellPanel();
+    syncPathPanel();
     document.getElementById('showZones').checked = tileView.showZones !== false;
     document.getElementById('tileMessage').style.display = 'none';
     updateStorageReadout();
@@ -6495,9 +6665,16 @@
           }
           break;
         }
-        // 2. Message attached to a zone containing this cell
+        // 2. Interaction attached to a zone containing this cell
         const hit = interactionAt(p.sx, p.sy);
-        if(hit && hit.msg) showTileMessage(hit.msg);
+        if(hit){
+          if(hit.linkAuto && hit.link){
+            // Skip the box entirely and follow the link straight away
+            window.open(hit.link, hit.linkTarget || '_blank', 'noopener,noreferrer');
+          } else if(hit.msg || hit.link){
+            showTileMessage(hit);
+          }
+        }
 
         // 3. In Select mode (editing), remember the cell so the panel can
         //    attach or edit an interaction on it.
@@ -6523,6 +6700,37 @@
         const sp = getSprite(tileView.activeSprite);
         document.getElementById('spriteStatus').textContent =
           `Placed "${sp?sp.name:''}" (${tileView.placed.length} on this tile)`;
+      }
+      return;
+    }
+    // Path tool — first click picks a placed sprite, subsequent clicks add
+    // waypoints to its movement path.
+    if(tileView.tool === 'path'){
+      const p = tileCanvasToSub(e.clientX, e.clientY);
+      if(!p) return;
+      if(tileView.pathTarget === null){
+        // Pick the topmost sprite under the cursor
+        for(let i = tileView.placed.length - 1; i >= 0; i--){
+          const inst = tileView.placed[i];
+          if(p.sx < inst.x || p.sx >= inst.x + inst.size) continue;
+          if(p.sy < inst.y || p.sy >= inst.y + inst.size) continue;
+          tileView.pathTarget = i;
+          // A path always starts where the sprite was placed
+          if(!inst.path || inst.path.length === 0) inst.path = [[inst.x, inst.y]];
+          syncPathPanel();
+          return;
+        }
+        document.getElementById('pathInfo').textContent = 'No sprite there — click one to give it a path.';
+      } else {
+        const inst = tileView.placed[tileView.pathTarget];
+        if(inst){
+          inst.path = inst.path || [[inst.x, inst.y]];
+          inst.path.push([p.sx, p.sy]);
+          inst.speed    = inst.speed    || parseInt(document.getElementById('pathSpeed').value, 10) || 4;
+          inst.pathMode = inst.pathMode || document.getElementById('pathMode').value;
+          tileView.dirty = true;
+          syncPathPanel();
+        }
       }
       return;
     }
@@ -6696,9 +6904,17 @@
     const base = `pixelworld:tile:${tileView.tx},${tileView.ty}`;
     try{
       const encoded = encodePaint(tileView.paint);
-      const placedStr = tileView.placed
-        .map(p=>`${p.sid}.${Math.round(p.x)}.${Math.round(p.y)}.${p.size}`)
-        .join(',');
+      // Placements are JSON now that they can carry paths; still tiny because
+      // only the fields that are actually set get written.
+      const placedStr = JSON.stringify(tileView.placed.map(p=>{
+        const rec = {s:p.sid, x:Math.round(p.x), y:Math.round(p.y), z:p.size};
+        if(p.path && p.path.length >= 2){
+          rec.p = p.path.map(pt=>[Math.round(pt[0]), Math.round(pt[1])]);
+          rec.v = p.speed || 4;
+          rec.m = p.pathMode || 'loop';
+        }
+        return rec;
+      }));
       await Store.set(base + ':paint',  encoded,   true);
       await Store.set(base + ':placed', placedStr, true);
       // Interaction settings ride along as a tiny JSON blob
@@ -6749,16 +6965,30 @@
     try{
       const res = await Store.get(base + ':placed', true);
       if(res && res.value){
-        for(const rec of res.value.split(',')){
-          if(!rec) continue;
-          const parts = rec.split('.');
-          if(parts.length < 4) continue;
-          tileView.placed.push({
-            sid:  parts[0],
-            x:    parseInt(parts[1], 10),
-            y:    parseInt(parts[2], 10),
-            size: parseInt(parts[3], 10)
-          });
+        const raw = res.value.trim();
+        if(raw.startsWith('[')){
+          for(const rec of JSON.parse(raw)){
+            const inst = {sid: rec.s, x: rec.x, y: rec.y, size: rec.z};
+            if(rec.p && rec.p.length >= 2){
+              inst.path = rec.p;
+              inst.speed = rec.v || 4;
+              inst.pathMode = rec.m || 'loop';
+            }
+            tileView.placed.push(inst);
+          }
+        } else {
+          // Legacy "sid.x.y.size,..." format from before paths existed
+          for(const rec of raw.split(',')){
+            if(!rec) continue;
+            const parts = rec.split('.');
+            if(parts.length < 4) continue;
+            tileView.placed.push({
+              sid: parts[0],
+              x: parseInt(parts[1], 10),
+              y: parseInt(parts[2], 10),
+              size: parseInt(parts[3], 10)
+            });
+          }
         }
       }
     }catch(e){ /* nothing saved */ }
@@ -6803,6 +7033,8 @@
         tileView.selectedCell = null;
         syncCellPanel();
       }
+      if(tileView.tool !== 'path') tileView.pathTarget = null;
+      syncPathPanel();
       highlightTool();
     };
   });
@@ -7320,17 +7552,100 @@
   };
 
   // ---- Tile message popup ----
-  let tileMsgTimer = null;
-  function showTileMessage(text){
-    const box = document.getElementById('tileMessage');
-    document.getElementById('tileMessageText').textContent = text;
-    box.style.display = 'block';
-    if(tileMsgTimer) clearTimeout(tileMsgTimer);
-    tileMsgTimer = setTimeout(()=>{ box.style.display = 'none'; }, 9000);
+  // Messages are paginated: every newline in the text starts a new page, shown
+  // one at a time with a [continue…] prompt. Clicking the box advances.
+  const msgState = { pages: [], idx: 0, ix: null };
+
+  const FONT_STACKS = {
+    system: 'system-ui, -apple-system, sans-serif',
+    serif:  'Georgia, "Times New Roman", serif',
+    mono:   '"SF Mono", Menlo, Consolas, monospace',
+    pixel:  '"Courier New", monospace'
+  };
+
+  function defaultIxStyle(){
+    return {bg:'#0f1729', border:'#ffe85a', text:'#e8eef7', font:'system', size:14, align:'left', italic:false};
   }
-  document.getElementById('tileMessageClose').onclick = ()=>{
+
+  function hexToRgba(hex, a){
+    const h = (hex || '#000000').replace('#','');
+    const r = parseInt(h.slice(0,2),16) || 0;
+    const g = parseInt(h.slice(2,4),16) || 0;
+    const b = parseInt(h.slice(4,6),16) || 0;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function applyMessageStyle(st){
+    const box = document.getElementById('tileMessage');
+    const txt = document.getElementById('tileMessageText');
+    box.style.background   = hexToRgba(st.bg, 0.96);
+    box.style.borderColor  = st.border;
+    box.style.color        = st.text;
+    txt.style.fontFamily   = FONT_STACKS[st.font] || FONT_STACKS.system;
+    txt.style.fontSize     = (st.size || 14) + 'px';
+    txt.style.textAlign    = st.align || 'left';
+    txt.style.fontStyle    = st.italic ? 'italic' : 'normal';
+    txt.style.color        = st.text;
+    document.getElementById('tileMessageMore').style.color = st.text;
+    const link = document.getElementById('tileMessageLink');
+    link.style.color = st.border;
+  }
+
+  function renderMessagePage(){
+    const txt   = document.getElementById('tileMessageText');
+    const more  = document.getElementById('tileMessageMore');
+    const link  = document.getElementById('tileMessageLink');
+    const foot  = document.getElementById('tileMessageFooter');
+    txt.textContent = msgState.pages[msgState.idx] || '';
+    const isLast = msgState.idx >= msgState.pages.length - 1;
+    more.style.display = isLast ? 'none' : 'block';
+    // The link button only appears on the final page
+    const ix = msgState.ix;
+    if(ix && ix.link && isLast){
+      link.style.display = 'inline-block';
+      link.textContent   = ix.linkLabel || 'Open link →';
+      link.href          = ix.link;
+      link.target        = ix.linkTarget || '_blank';
+    } else {
+      link.style.display = 'none';
+    }
+    foot.style.display = (more.style.display === 'none' && link.style.display === 'none') ? 'none' : 'flex';
+  }
+
+  function showTileMessage(ix){
+    // Accept either a raw string or a full interaction record
+    const rec = (typeof ix === 'string') ? {msg: ix} : (ix || {});
+    const pages = String(rec.msg || '')
+      .split(/\r?\n/)
+      .map(l=>l.trim())
+      .filter(l=>l.length);
+    msgState.pages = pages.length ? pages : [''];
+    msgState.idx = 0;
+    msgState.ix = rec;
+    applyMessageStyle(Object.assign(defaultIxStyle(), rec.style || {}));
+    renderMessagePage();
+    document.getElementById('tileMessage').style.display = 'block';
+  }
+
+  function hideTileMessage(){
     document.getElementById('tileMessage').style.display = 'none';
-    if(tileMsgTimer) clearTimeout(tileMsgTimer);
+    msgState.pages = []; msgState.idx = 0; msgState.ix = null;
+  }
+
+  // Clicking the box advances to the next page, or closes on the last one
+  document.getElementById('tileMessage').addEventListener('click', (e)=>{
+    if(e.target.id === 'tileMessageClose') return;
+    if(e.target.id === 'tileMessageLink')  return;   // let the anchor do its job
+    if(msgState.idx < msgState.pages.length - 1){
+      msgState.idx++;
+      renderMessagePage();
+    } else {
+      hideTileMessage();
+    }
+  });
+  document.getElementById('tileMessageClose').onclick = (e)=>{
+    e.stopPropagation();
+    hideTileMessage();
   };
   // ---- Per-cell interactions ----
   // Find the interaction whose zone contains this cell, if any. Smaller zones
@@ -7369,10 +7684,45 @@
     else if(existing) note += ' — has a message';
     info.textContent = note;
     panel.style.display = 'block';
-    document.getElementById('cellMsgInput').value = existing ? existing.msg : '';
+    document.getElementById('cellMsgInput').value = existing ? (existing.msg || '') : '';
     const size = existing ? (existing.size || 1) : 1;
     document.getElementById('cellZoneSize').value = size;
     document.getElementById('cellZoneLabel').textContent = size === 1 ? '1 cell' : `${size}×${size} cells`;
+    // Link fields
+    document.getElementById('cellLink').value       = existing ? (existing.link || '') : '';
+    document.getElementById('cellLinkTarget').value = existing ? (existing.linkTarget || '_blank') : '_blank';
+    document.getElementById('cellLinkLabel').value  = existing ? (existing.linkLabel || '') : '';
+    document.getElementById('cellLinkAuto').checked = existing ? !!existing.linkAuto : false;
+    // Style fields
+    const st = Object.assign(defaultIxStyle(), (existing && existing.style) || {});
+    document.getElementById('ixBg').value     = st.bg;
+    document.getElementById('ixBorder').value = st.border;
+    document.getElementById('ixText').value   = st.text;
+    document.getElementById('ixFont').value   = st.font;
+    document.getElementById('ixSize').value   = String(st.size);
+    document.getElementById('ixAlign').value  = st.align;
+    document.getElementById('ixItalic').checked = !!st.italic;
+  }
+
+  // Read the current panel values into an interaction record
+  function readIxPanel(){
+    return {
+      msg:  document.getElementById('cellMsgInput').value.trim(),
+      size: parseInt(document.getElementById('cellZoneSize').value, 10) || 1,
+      link: document.getElementById('cellLink').value.trim(),
+      linkTarget: document.getElementById('cellLinkTarget').value,
+      linkLabel:  document.getElementById('cellLinkLabel').value.trim(),
+      linkAuto:   document.getElementById('cellLinkAuto').checked,
+      style: {
+        bg:     document.getElementById('ixBg').value,
+        border: document.getElementById('ixBorder').value,
+        text:   document.getElementById('ixText').value,
+        font:   document.getElementById('ixFont').value,
+        size:   parseInt(document.getElementById('ixSize').value, 10) || 14,
+        align:  document.getElementById('ixAlign').value,
+        italic: document.getElementById('ixItalic').checked
+      }
+    };
   }
 
   document.getElementById('cellZoneSize').addEventListener('input', (e)=>{
@@ -7383,15 +7733,19 @@
     if(!tileView.selectedCell) return;
     const {sx, sy} = tileView.selectedCell;
     const idx = sy*SUB_GRID + sx;
-    const msg = document.getElementById('cellMsgInput').value.trim();
-    const size = parseInt(document.getElementById('cellZoneSize').value, 10) || 1;
-    if(msg){
-      tileView.interactions[idx] = {msg, size};
+    const rec = readIxPanel();
+    // An interaction needs either a message or a link to be worth keeping
+    if(rec.msg || rec.link){
+      tileView.interactions[idx] = rec;
     } else {
       delete tileView.interactions[idx];
     }
     tileView.dirty = true;
     syncCellPanel();
+  };
+  document.getElementById('cellIxTest').onclick = ()=>{
+    const rec = readIxPanel();
+    if(rec.msg || rec.link) showTileMessage(rec);
   };
   document.getElementById('cellIxRemove').onclick = ()=>{
     if(!tileView.selectedCell) return;
@@ -7407,6 +7761,53 @@
     document.getElementById('cellMsgInput').value = '';
     syncCellPanel();
   };
+  // ---- Movement path panel ----
+  function syncPathPanel(){
+    const panel    = document.getElementById('pathPanel');
+    const info     = document.getElementById('pathInfo');
+    const controls = document.getElementById('pathControls');
+    panel.style.display = (tileView.tool === 'path') ? 'block' : 'none';
+    if(tileView.tool !== 'path') return;
+    if(tileView.pathTarget === null || !tileView.placed[tileView.pathTarget]){
+      info.textContent = 'Click a placed sprite to give it a path.';
+      controls.style.display = 'none';
+      return;
+    }
+    const inst = tileView.placed[tileView.pathTarget];
+    const entry = getSprite(inst.sid);
+    const n = (inst.path || []).length;
+    info.textContent = `"${entry ? entry.name : 'sprite'}" — ${n} waypoint${n===1?'':'s'}. Click cells to extend the path.`;
+    controls.style.display = 'block';
+    const sp = inst.speed || 4;
+    document.getElementById('pathSpeed').value = sp;
+    document.getElementById('pathSpeedLabel').textContent = sp + ' cells/s';
+    document.getElementById('pathMode').value = inst.pathMode || 'loop';
+  }
+
+  document.getElementById('pathSpeed').addEventListener('input', (e)=>{
+    const v = parseInt(e.target.value, 10);
+    document.getElementById('pathSpeedLabel').textContent = v + ' cells/s';
+    const inst = tileView.placed[tileView.pathTarget];
+    if(inst){ inst.speed = v; tileView.dirty = true; }
+  });
+  document.getElementById('pathMode').addEventListener('change', (e)=>{
+    const inst = tileView.placed[tileView.pathTarget];
+    if(inst){ inst.pathMode = e.target.value; tileView.dirty = true; }
+  });
+  document.getElementById('pathClear').onclick = ()=>{
+    const inst = tileView.placed[tileView.pathTarget];
+    if(inst){
+      delete inst.path; delete inst.speed; delete inst.pathMode;
+      tileView.dirty = true;
+    }
+    tileView.pathTarget = null;
+    syncPathPanel();
+  };
+  document.getElementById('pathDone').onclick = ()=>{
+    tileView.pathTarget = null;
+    syncPathPanel();
+  };
+
   document.getElementById('showZones').addEventListener('change', (e)=>{
     tileView.showZones = e.target.checked;
   });
