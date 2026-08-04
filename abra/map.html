@@ -64,6 +64,7 @@
         <button id="tileClear" style="background:rgba(140,50,50,0.5);border:1px solid rgba(255,120,120,0.25);color:#ffd0d0;padding:6px 8px;border-radius:6px;font-size:11px;cursor:pointer;">Clear</button>
       </div>
       <div id="tileSaveStatus" style="font-size:10px;opacity:0.6;margin-top:5px;min-height:12px;"></div>
+      <div id="storageMode" style="font-size:9px;opacity:0.45;margin-top:5px;line-height:1.35;"></div>
     </div>
 
     <!-- Footer info -->
@@ -313,6 +314,123 @@
 (async function(){
   'use strict';
   const root = document.getElementById('root');
+
+  // ============ STORAGE LAYER ============
+  // The artifact host injects `window.storage`, but when this file is opened
+  // directly from disk (file://) that API doesn't exist and every save fails
+  // silently. This shim picks the best available backend at startup:
+  //   1. window.storage  — shared persistence in the artifact viewer
+  //   2. localStorage    — per-browser persistence for a downloaded copy
+  //   3. in-memory       — last resort, lasts only for the session
+  // All methods keep the same async signature as the host API.
+  const Store = (function(){
+    let backend = 'memory';
+    const mem = new Map();
+    const PREFIX = 'pw:';   // namespace for localStorage keys
+
+    const hasHostApi = (typeof window !== 'undefined')
+      && window.storage
+      && typeof window.storage.set === 'function'
+      && typeof window.storage.get === 'function';
+
+    if(hasHostApi){
+      backend = 'host';
+    } else {
+      try{
+        const probe = '__pw_probe__';
+        window.localStorage.setItem(probe, '1');
+        window.localStorage.removeItem(probe);
+        backend = 'local';
+      }catch(e){
+        backend = 'memory';
+      }
+    }
+
+    async function get(key, shared){
+      if(backend === 'host'){
+        // The host API throws for missing keys; normalise that to null.
+        try{ return await window.storage.get(key, shared); }
+        catch(e){ return null; }
+      }
+      if(backend === 'local'){
+        const v = window.localStorage.getItem(PREFIX + key);
+        return v === null ? null : {key, value: v, shared: !!shared};
+      }
+      const v = mem.get(key);
+      return v === undefined ? null : {key, value: v, shared: !!shared};
+    }
+
+    async function set(key, value, shared){
+      const str = typeof value === 'string' ? value : JSON.stringify(value);
+      if(backend === 'host') return await window.storage.set(key, str, shared);
+      if(backend === 'local'){
+        try{
+          window.localStorage.setItem(PREFIX + key, str);
+        }catch(e){
+          // Quota exceeded — surface a clear, actionable message
+          throw new Error('Browser storage is full (' + (str.length/1024).toFixed(0) + ' KB write). Try clearing older tiles.');
+        }
+        return {key, value: str, shared: !!shared};
+      }
+      mem.set(key, str);
+      return {key, value: str, shared: !!shared};
+    }
+
+    async function del(key, shared){
+      if(backend === 'host'){
+        try{ return await window.storage.delete(key, shared); }catch(e){ return null; }
+      }
+      if(backend === 'local'){ window.localStorage.removeItem(PREFIX + key); return {key, deleted:true}; }
+      mem.delete(key);
+      return {key, deleted:true};
+    }
+
+    async function list(prefix, shared){
+      if(backend === 'host'){
+        try{ return await window.storage.list(prefix, shared); }catch(e){ return {keys:[]}; }
+      }
+      const keys = [];
+      if(backend === 'local'){
+        for(let i=0;i<window.localStorage.length;i++){
+          const k = window.localStorage.key(i);
+          if(k && k.startsWith(PREFIX)){
+            const bare = k.slice(PREFIX.length);
+            if(!prefix || bare.startsWith(prefix)) keys.push(bare);
+          }
+        }
+      } else {
+        for(const k of mem.keys()) if(!prefix || k.startsWith(prefix)) keys.push(k);
+      }
+      return {keys, prefix, shared: !!shared};
+    }
+
+    // Approximate bytes used, for the storage readout in the UI
+    function usage(){
+      if(backend === 'local'){
+        let total = 0;
+        for(let i=0;i<window.localStorage.length;i++){
+          const k = window.localStorage.key(i);
+          if(k && k.startsWith(PREFIX)) total += k.length + (window.localStorage.getItem(k)||'').length;
+        }
+        return total;
+      }
+      if(backend === 'memory'){
+        let total = 0;
+        for(const [k,v] of mem) total += k.length + v.length;
+        return total;
+      }
+      return -1;   // unknown for the host API
+    }
+
+    return {get, set, delete: del, list, usage, get backend(){ return backend; }};
+  })();
+
+  function storageLabel(){
+    return Store.backend === 'host'   ? 'shared cloud storage'
+         : Store.backend === 'local'  ? 'this browser (local file mode)'
+         :                              'memory only — will be lost on reload';
+  }
+
   const cv = document.getElementById('map');
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
@@ -2203,7 +2321,7 @@
     timeOffsetMs: 0          // applied to live Date.now() when frozenWorldMs is null
   };
   try{
-    const r = await window.storage.get(STORAGE_KEY, true);
+    const r = await Store.get(STORAGE_KEY, true);
     if(r && r.value){
       const loaded = JSON.parse(r.value);
       // merge in any missing arrays from older saves
@@ -2219,7 +2337,7 @@
     }
   }catch(e){ /* first time, no data */ }
   async function saveUserData(){
-    try{ await window.storage.set(STORAGE_KEY, JSON.stringify(userData), true); }catch(e){ console.warn('save failed',e); }
+    try{ await Store.set(STORAGE_KEY, JSON.stringify(userData), true); }catch(e){ console.warn('save failed',e); }
   }
 
   // ============ AUTH ============
@@ -5216,7 +5334,7 @@
   }
   async function loadSpriteLib(){
     try{
-      const res = await window.storage.get(SPRITE_LIB_KEY, true);
+      const res = await Store.get(SPRITE_LIB_KEY, true);
       if(res && res.value){
         spriteLib = JSON.parse(res.value);
         for(const s of spriteLib) buildSpriteCanvas(s);
@@ -5227,7 +5345,7 @@
   async function saveSpriteLib(){
     // Strip the cached canvas before serializing
     const slim = spriteLib.map(s=>({id:s.id, name:s.name, data:s.data}));
-    await window.storage.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
+    await Store.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
   }
 
   function renderSpriteLibrary(){
@@ -5239,9 +5357,12 @@
       return;
     }
     for(const s of spriteLib){
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;';
+
       const b = document.createElement('button');
       b.title = s.name || 'sprite';
-      b.style.cssText = `height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:2px solid ${tileView.activeSprite===s.id?'#ffe85a':'rgba(255,255,255,0.12)'};display:flex;align-items:center;justify-content:center;`;
+      b.style.cssText = `width:100%;height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:2px solid ${tileView.activeSprite===s.id?'#ffe85a':'rgba(255,255,255,0.12)'};display:flex;align-items:center;justify-content:center;`;
       if(!s.canvas) buildSpriteCanvas(s);
       const im = document.createElement('img');
       im.src = s.canvas.toDataURL();
@@ -5254,7 +5375,24 @@
         renderSpriteLibrary();
         document.getElementById('spriteStatus').textContent = `"${s.name}" — click the tile to place`;
       };
-      grid.appendChild(b);
+      wrap.appendChild(b);
+
+      // Small delete affordance in the corner of each thumbnail
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.title = 'Delete sprite';
+      del.style.cssText = 'position:absolute;top:-4px;right:-4px;width:15px;height:15px;border-radius:50%;border:1px solid rgba(255,140,140,0.5);background:rgba(60,20,20,0.95);color:#ffd0d0;font-size:10px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;';
+      del.onclick = async (ev)=>{
+        ev.stopPropagation();
+        if(!confirm(`Delete sprite "${s.name}"? Existing placements of it will disappear.`)) return;
+        spriteLib = spriteLib.filter(x=>x.id !== s.id);
+        if(tileView.activeSprite === s.id) tileView.activeSprite = null;
+        try{ await saveSpriteLib(); }catch(e){ console.warn('persist after delete failed', e); }
+        renderSpriteLibrary();
+      };
+      wrap.appendChild(del);
+
+      grid.appendChild(wrap);
     }
   }
   function getSprite(id){ return spriteLib.find(s=>s.id===id); }
@@ -6031,6 +6169,7 @@
     document.getElementById('enterTileBtn').style.display = 'none';
     buildMaterialGrid();
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
+    updateStorageReadout();
     updateTileZoomLabel();
     startTileLoop();
   }
@@ -6305,13 +6444,14 @@
       const placedStr = tileView.placed
         .map(p=>`${p.sid}.${Math.round(p.x)}.${Math.round(p.y)}.${p.size}`)
         .join(',');
-      await window.storage.set(base + ':paint',  encoded,   true);
-      await window.storage.set(base + ':placed', placedStr, true);
+      await Store.set(base + ':paint',  encoded,   true);
+      await Store.set(base + ':placed', placedStr, true);
       tileView.dirty = false;
       const total = encoded.length + placedStr.length;
       const painted = Object.keys(tileView.paint).length;
       status.textContent = `Saved · ${painted} cells, ${tileView.placed.length} sprites · ${humanBytes(total)}`;
       status.style.color = '#9fe0a8';
+      updateStorageReadout();
       setTimeout(()=>{ status.textContent=''; }, 3500);
     }catch(err){
       console.error('tile save failed', err);
@@ -6320,14 +6460,23 @@
     }
   }
 
+  function updateStorageReadout(){
+    const el = document.getElementById('storageMode');
+    if(!el) return;
+    const used = Store.usage();
+    const usedTxt = used >= 0 ? ` · ${(used/1024).toFixed(0)} KB used` : '';
+    el.textContent = `Saving to ${storageLabel()}${usedTxt}`;
+    el.style.color = Store.backend === 'memory' ? '#ffcf8a' : '';
+  }
+
   async function loadTileDetail(tx, ty){
     const base = `pixelworld:tile:${tx},${ty}`;
     try{
-      const res = await window.storage.get(base + ':paint', true);
+      const res = await Store.get(base + ':paint', true);
       if(res && res.value) tileView.paint = decodePaint(res.value);
     }catch(e){ /* nothing saved */ }
     try{
-      const res = await window.storage.get(base + ':placed', true);
+      const res = await Store.get(base + ':placed', true);
       if(res && res.value){
         for(const rec of res.value.split(',')){
           if(!rec) continue;
@@ -6678,8 +6827,20 @@
       await saveSpriteLib();
       renderSpriteLibrary();
       closeSpriteEditor();
+      if(Store.backend === 'memory'){
+        document.getElementById('spriteStatus').textContent =
+          'Saved for this session only (no persistent storage available).';
+      }
     }catch(err){
-      alert('Could not save sprite library: ' + (err && err.message ? err.message : 'unknown error'));
+      // The sprite is already in the in-memory library, so it stays usable
+      // for this session even if persisting it failed.
+      renderSpriteLibrary();
+      closeSpriteEditor();
+      const st = document.getElementById('spriteStatus');
+      st.textContent = 'Sprite kept for this session — could not persist: ' +
+        (err && err.message ? err.message : 'unknown error');
+      st.style.color = '#ffcf8a';
+      console.warn('sprite library persist failed', err);
     }
   };
 
