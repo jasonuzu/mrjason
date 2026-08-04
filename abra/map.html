@@ -33,6 +33,7 @@
       <div style="display:flex;gap:4px;margin-bottom:8px;">
         <button class="ttool" data-ttool="paint" style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Paint</button>
         <button class="ttool" data-ttool="erase" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Erase</button>
+        <button class="ttool" data-ttool="sprite" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Sprite</button>
       </div>
 
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;opacity:0.7;">
@@ -41,18 +42,21 @@
       <input id="brushSize" type="range" min="1" max="8" value="1" style="width:100%;margin-bottom:10px;accent-color:#5a8fd6;">
 
       <div style="margin-bottom:6px;opacity:0.7;">Material</div>
-      <div id="materialGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px;"></div>
+      <div id="materialGrid" style="margin-bottom:10px;"></div>
 
-      <div style="margin-bottom:6px;opacity:0.7;">Place image</div>
-      <input id="decalUpload" type="file" accept="image/png,image/jpeg,image/webp" style="width:100%;font-size:10px;color:#cdd5e0;margin-bottom:6px;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
-        <span>Image size</span><span id="decalSizeLabel" style="opacity:0.9;">12 cells</span>
+      <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="opacity:0.7;">Sprites</span>
+        <button id="spriteNew" style="background:rgba(70,120,90,0.6);border:1px solid rgba(140,220,170,0.3);color:#dff5e6;padding:3px 8px;border-radius:5px;font-size:10px;cursor:pointer;">+ New</button>
       </div>
-      <input id="decalSize" type="range" min="2" max="48" value="12" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
-      <div id="decalStatus" style="font-size:10px;opacity:0.6;margin-bottom:6px;"></div>
-      <button id="decalPlaceBtn" style="width:100%;background:rgba(80,110,160,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:4px;display:none;">Click map to place</button>
+      <div id="spriteLibrary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px;"></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
+        <span>Place size</span><span id="spriteSizeLabel" style="opacity:0.9;">1 cell</span>
+      </div>
+      <input id="spriteSize" type="range" min="1" max="32" value="1" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
+      <div id="spriteStatus" style="font-size:10px;opacity:0.6;margin-bottom:6px;min-height:12px;"></div>
       <div style="display:flex;gap:4px;margin-bottom:10px;">
-        <button id="decalUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Remove last image</button>
+        <button id="spriteEdit" style="flex:1;background:rgba(60,90,140,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Edit</button>
+        <button id="spriteUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Undo place</button>
       </div>
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;display:flex;gap:4px;">
@@ -64,6 +68,49 @@
 
     <!-- Footer info -->
     <div id="tileFooter" style="position:absolute;bottom:10px;right:10px;background:rgba(15,23,42,0.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 12px;font-size:11px;color:#cdd5e0;z-index:3;line-height:1.5;"></div>
+
+    <!-- ============ SPRITE EDITOR ============ -->
+    <div id="spriteEditor" style="position:absolute;inset:0;display:none;z-index:60;background:rgba(6,10,20,0.94);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+      <div style="background:#111a2c;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:14px;display:flex;gap:14px;max-height:94%;">
+        <!-- Canvas + controls -->
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input id="spriteName" placeholder="Sprite name" style="flex:1;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;box-sizing:border-box;">
+            <select id="spriteRes" style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;">
+              <option value="16">16×16</option>
+              <option value="24">24×24</option>
+              <option value="32" selected>32×32</option>
+              <option value="48">48×48</option>
+            </select>
+          </div>
+          <canvas id="spriteCanvas" width="512" height="512" style="width:420px;height:420px;image-rendering:pixelated;border:1px solid rgba(255,255,255,0.15);border-radius:8px;cursor:crosshair;background:#0a0f1a;"></canvas>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="sptool" data-sptool="pen"    style="flex:1;background:rgba(60,90,140,0.8);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Pen</button>
+            <button class="sptool" data-sptool="erase"  style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Erase</button>
+            <button class="sptool" data-sptool="fill"   style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Fill</button>
+            <button class="sptool" data-sptool="picker" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Pick</button>
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:#cdd5e0;cursor:pointer;"><input id="spriteMirror" type="checkbox" style="accent-color:#5a8fd6;">Mirror</label>
+          </div>
+        </div>
+        <!-- Palette + actions -->
+        <div style="width:196px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">
+          <div style="font-size:11px;opacity:0.75;color:#cdd5e0;">Colour</div>
+          <div id="spritePalette" style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;"></div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input id="spriteCustomColor" type="color" value="#88cc66" style="width:36px;height:26px;border:1px solid rgba(255,255,255,0.15);border-radius:5px;background:none;cursor:pointer;padding:0;">
+            <span style="font-size:10px;opacity:0.6;color:#cdd5e0;">custom</span>
+          </div>
+          <div id="spriteCurrent" style="height:22px;border-radius:5px;border:1px solid rgba(255,255,255,0.2);"></div>
+          <div style="font-size:10px;opacity:0.6;color:#cdd5e0;line-height:1.4;">Right-click erases. Transparent cells show the ground beneath.</div>
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:5px;">
+            <button id="spriteSave"   style="background:#3b6db8;border:none;color:#fff;padding:7px;border-radius:6px;font-size:12px;cursor:pointer;">Save sprite</button>
+            <button id="spriteClearBtn" style="background:rgba(90,70,50,0.5);border:1px solid rgba(255,200,140,0.2);color:#ffe8c8;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Clear canvas</button>
+            <button id="spriteDelete" style="background:rgba(140,50,50,0.45);border:1px solid rgba(255,120,120,0.25);color:#ffd0d0;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;display:none;">Delete sprite</button>
+            <button id="spriteCancel" style="background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:6px;border-radius:6px;font-size:11px;cursor:pointer;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Top bar -->
@@ -4944,7 +4991,7 @@
   //   1. Procedural ground   — base material per sub-cell
   //   2. Procedural scatter  — sprites (rocks, plants, trees, etc.)
   //   3. User paint layer    — sparse map of "subIdx -> materialId"
-  //   4. User decals         — uploaded images placed at positions
+  //   4. Placed sprites      — pixel art drawn in the built-in editor
   //   5. Weather animation   — rain/snow/fog particles over everything
   // ============================================================
 
@@ -4955,34 +5002,109 @@
   // Each material has: id, label, base color, and an optional texture style
   // that controls how individual sub-cells are shaded.
   // Texture styles: 'flat', 'grain' (speckled), 'brick', 'plank', 'rough', 'gloss'
+  // Materials are grouped so the palette UI can show category headings.
+  // tex styles: flat, grain, rough, brick, plank, gloss, tile, thatch,
+  //             shingle, scale, weave, marble, metal, crack, herring, log
   const MATERIALS = [
-    {id:'grass',     label:'Grass',      color:[104,152,72],  tex:'grain'},
-    {id:'darkgrass', label:'Dk grass',   color:[66,112,58],   tex:'grain'},
-    {id:'dirt',      label:'Dirt',       color:[124,96,64],   tex:'grain'},
-    {id:'mud',       label:'Mud',        color:[86,68,48],    tex:'rough'},
-    {id:'sand',      label:'Sand',       color:[222,200,150], tex:'grain'},
-    {id:'clay',      label:'Clay',       color:[178,110,78],  tex:'rough'},
-    {id:'stone',     label:'Stone',      color:[132,130,126], tex:'rough'},
-    {id:'cobble',    label:'Cobble',     color:[112,110,108], tex:'brick'},
-    {id:'brick',     label:'Brick',      color:[152,72,56],   tex:'brick'},
-    {id:'plank',     label:'Wood',       color:[142,102,62],  tex:'plank'},
-    {id:'snow',      label:'Snow',       color:[238,242,248], tex:'grain'},
-    {id:'ice',       label:'Ice',        color:[176,214,232], tex:'gloss'},
-    {id:'water',     label:'Water',      color:[72,124,172],  tex:'gloss'},
-    {id:'moss',      label:'Moss',       color:[78,124,68],   tex:'rough'},
-    {id:'ash',       label:'Ash',        color:[92,88,86],    tex:'grain'},
-    {id:'gravel',    label:'Gravel',     color:[146,140,132], tex:'rough'},
-    {id:'black',     label:'Black',      color:[26,26,30],    tex:'flat'},
-    {id:'brown',     label:'Brown',      color:[102,72,46],   tex:'flat'},
-    {id:'green',     label:'Green',      color:[62,142,72],   tex:'flat'},
-    {id:'yellow',    label:'Yellow',     color:[226,196,74],  tex:'flat'},
-    {id:'white',     label:'White',      color:[240,240,238], tex:'flat'},
-    {id:'red',       label:'Red',        color:[186,60,54],   tex:'flat'},
-    {id:'blue',      label:'Blue',       color:[62,102,180],  tex:'flat'},
-    {id:'purple',    label:'Purple',     color:[124,76,164],  tex:'flat'},
+    // --- Natural ground ---
+    {id:'grass',     label:'Grass',       color:[104,152,72],  tex:'grain',  cat:'Ground'},
+    {id:'darkgrass', label:'Dk grass',    color:[66,112,58],   tex:'grain',  cat:'Ground'},
+    {id:'drygrass',  label:'Dry grass',   color:[176,166,96],  tex:'grain',  cat:'Ground'},
+    {id:'moss',      label:'Moss',        color:[78,124,68],   tex:'rough',  cat:'Ground'},
+    {id:'dirt',      label:'Dirt',        color:[124,96,64],   tex:'grain',  cat:'Ground'},
+    {id:'darkdirt',  label:'Dk dirt',     color:[86,66,44],    tex:'grain',  cat:'Ground'},
+    {id:'mud',       label:'Mud',         color:[86,68,48],    tex:'rough',  cat:'Ground'},
+    {id:'sand',      label:'Sand',        color:[222,200,150], tex:'grain',  cat:'Ground'},
+    {id:'redsand',   label:'Red sand',    color:[198,132,88],  tex:'grain',  cat:'Ground'},
+    {id:'gravel',    label:'Gravel',      color:[146,140,132], tex:'rough',  cat:'Ground'},
+    {id:'ash',       label:'Ash',         color:[92,88,86],    tex:'grain',  cat:'Ground'},
+    {id:'peat',      label:'Peat',        color:[62,50,40],    tex:'rough',  cat:'Ground'},
+    {id:'snow',      label:'Snow',        color:[238,242,248], tex:'grain',  cat:'Ground'},
+    {id:'ice',       label:'Ice',         color:[176,214,232], tex:'gloss',  cat:'Ground'},
+    {id:'water',     label:'Water',       color:[72,124,172],  tex:'gloss',  cat:'Ground'},
+    {id:'deepwater', label:'Deep water',  color:[42,78,124],   tex:'gloss',  cat:'Ground'},
+    {id:'lava',      label:'Lava',        color:[214,88,32],   tex:'crack',  cat:'Ground'},
+
+    // --- Stone & masonry ---
+    {id:'stone',     label:'Stone',       color:[132,130,126], tex:'rough',  cat:'Stone'},
+    {id:'darkstone', label:'Dk stone',    color:[86,84,82],    tex:'rough',  cat:'Stone'},
+    {id:'granite',   label:'Granite',     color:[150,142,138], tex:'grain',  cat:'Stone'},
+    {id:'slate',     label:'Slate',       color:[78,86,96],    tex:'plank',  cat:'Stone'},
+    {id:'sandstone', label:'Sandstone',   color:[206,178,128], tex:'brick',  cat:'Stone'},
+    {id:'limestone', label:'Limestone',   color:[224,216,196], tex:'brick',  cat:'Stone'},
+    {id:'marble',    label:'Marble',      color:[232,230,226], tex:'marble', cat:'Stone'},
+    {id:'blackmarb', label:'Blk marble',  color:[46,44,50],    tex:'marble', cat:'Stone'},
+    {id:'cobble',    label:'Cobble',      color:[112,110,108], tex:'cobble', cat:'Stone'},
+    {id:'flagstone', label:'Flagstone',   color:[158,152,142], tex:'tile',   cat:'Stone'},
+    {id:'brick',     label:'Brick',       color:[152,72,56],   tex:'brick',  cat:'Stone'},
+    {id:'palebrick', label:'Pale brick',  color:[198,158,124], tex:'brick',  cat:'Stone'},
+    {id:'greybrick', label:'Grey brick',  color:[126,124,120], tex:'brick',  cat:'Stone'},
+    {id:'concrete',  label:'Concrete',    color:[168,166,160], tex:'rough',  cat:'Stone'},
+    {id:'obsidian',  label:'Obsidian',    color:[32,28,44],    tex:'gloss',  cat:'Stone'},
+    {id:'crackstone',label:'Cracked',     color:[118,114,108], tex:'crack',  cat:'Stone'},
+    {id:'rubble',    label:'Rubble',      color:[136,126,116], tex:'cobble', cat:'Stone'},
+
+    // --- Wood & organic build ---
+    {id:'plank',     label:'Plank',       color:[152,112,68],  tex:'plank',  cat:'Wood'},
+    {id:'darkplank', label:'Dk plank',    color:[104,74,44],   tex:'plank',  cat:'Wood'},
+    {id:'paleplank', label:'Pale plank',  color:[196,164,116], tex:'plank',  cat:'Wood'},
+    {id:'log',       label:'Logs',        color:[128,94,58],   tex:'log',    cat:'Wood'},
+    {id:'bark',      label:'Bark',        color:[86,64,42],    tex:'log',    cat:'Wood'},
+    {id:'parquet',   label:'Parquet',     color:[164,116,66],  tex:'herring',cat:'Wood'},
+    {id:'thatch',    label:'Thatch',      color:[198,168,96],  tex:'thatch', cat:'Wood'},
+    {id:'straw',     label:'Straw',       color:[220,196,128], tex:'thatch', cat:'Wood'},
+    {id:'shingle',   label:'Shingle',     color:[124,88,64],   tex:'shingle',cat:'Wood'},
+    {id:'redroof',   label:'Red tile',    color:[168,78,54],   tex:'shingle',cat:'Wood'},
+    {id:'blueroof',  label:'Blue tile',   color:[74,98,142],   tex:'shingle',cat:'Wood'},
+    {id:'greenroof', label:'Green tile',  color:[76,110,78],   tex:'shingle',cat:'Wood'},
+
+    // --- Metal & crafted ---
+    {id:'iron',      label:'Iron',        color:[112,114,120], tex:'metal',  cat:'Crafted'},
+    {id:'rustiron',  label:'Rust iron',   color:[140,86,54],   tex:'rough',  cat:'Crafted'},
+    {id:'steel',     label:'Steel',       color:[166,172,182], tex:'metal',  cat:'Crafted'},
+    {id:'copper',    label:'Copper',      color:[188,110,62],  tex:'metal',  cat:'Crafted'},
+    {id:'verdigris', label:'Verdigris',   color:[92,158,138],  tex:'rough',  cat:'Crafted'},
+    {id:'gold',      label:'Gold',        color:[214,174,64],  tex:'metal',  cat:'Crafted'},
+    {id:'silver',    label:'Silver',      color:[198,202,208], tex:'metal',  cat:'Crafted'},
+    {id:'bronze',    label:'Bronze',      color:[168,124,60],  tex:'metal',  cat:'Crafted'},
+    {id:'clay',      label:'Clay',        color:[178,110,78],  tex:'rough',  cat:'Crafted'},
+    {id:'terracotta',label:'Terracotta',  color:[192,104,72],  tex:'tile',   cat:'Crafted'},
+    {id:'ceramic',   label:'Ceramic',     color:[228,220,208], tex:'tile',   cat:'Crafted'},
+    {id:'mosaic',    label:'Mosaic',      color:[92,132,170],  tex:'tile',   cat:'Crafted'},
+    {id:'glass',     label:'Glass',       color:[168,206,214], tex:'gloss',  cat:'Crafted'},
+    {id:'cloth',     label:'Cloth',       color:[196,178,152], tex:'weave',  cat:'Crafted'},
+    {id:'carpet',    label:'Carpet',      color:[142,58,62],   tex:'weave',  cat:'Crafted'},
+    {id:'canvas',    label:'Canvas',      color:[214,202,174], tex:'weave',  cat:'Crafted'},
+    {id:'leather',   label:'Leather',     color:[124,84,52],   tex:'rough',  cat:'Crafted'},
+    {id:'scale',     label:'Scales',      color:[86,124,96],   tex:'scale',  cat:'Crafted'},
+    {id:'bone',      label:'Bone',        color:[226,220,202], tex:'grain',  cat:'Crafted'},
+    {id:'crystal',   label:'Crystal',     color:[168,206,238], tex:'gloss',  cat:'Crafted'},
+
+    // --- Flat colours ---
+    {id:'black',     label:'Black',       color:[26,26,30],    tex:'flat',   cat:'Colour'},
+    {id:'charcoal',  label:'Charcoal',    color:[58,58,64],    tex:'flat',   cat:'Colour'},
+    {id:'grey',      label:'Grey',        color:[130,130,134], tex:'flat',   cat:'Colour'},
+    {id:'white',     label:'White',       color:[240,240,238], tex:'flat',   cat:'Colour'},
+    {id:'brown',     label:'Brown',       color:[102,72,46],   tex:'flat',   cat:'Colour'},
+    {id:'tan',       label:'Tan',         color:[196,164,120], tex:'flat',   cat:'Colour'},
+    {id:'red',       label:'Red',         color:[186,60,54],   tex:'flat',   cat:'Colour'},
+    {id:'orange',    label:'Orange',      color:[220,124,52],  tex:'flat',   cat:'Colour'},
+    {id:'yellow',    label:'Yellow',      color:[226,196,74],  tex:'flat',   cat:'Colour'},
+    {id:'lime',      label:'Lime',        color:[146,196,72],  tex:'flat',   cat:'Colour'},
+    {id:'green',     label:'Green',       color:[62,142,72],   tex:'flat',   cat:'Colour'},
+    {id:'teal',      label:'Teal',        color:[54,146,140],  tex:'flat',   cat:'Colour'},
+    {id:'cyan',      label:'Cyan',        color:[86,186,206],  tex:'flat',   cat:'Colour'},
+    {id:'blue',      label:'Blue',        color:[62,102,180],  tex:'flat',   cat:'Colour'},
+    {id:'navy',      label:'Navy',        color:[40,54,102],   tex:'flat',   cat:'Colour'},
+    {id:'purple',    label:'Purple',      color:[124,76,164],  tex:'flat',   cat:'Colour'},
+    {id:'magenta',   label:'Magenta',     color:[190,74,148],  tex:'flat',   cat:'Colour'},
+    {id:'pink',      label:'Pink',        color:[232,150,168], tex:'flat',   cat:'Colour'},
   ];
   const MATERIAL_BY_ID = {};
   for(const m of MATERIALS) MATERIAL_BY_ID[m.id] = m;
+  const MATERIAL_CATS = [];
+  for(const m of MATERIALS) if(!MATERIAL_CATS.includes(m.cat)) MATERIAL_CATS.push(m.cat);
+
 
   // ---- Per-terrain ground recipes ----
   // Each terrain maps to a weighted list of base materials plus a scatter
@@ -5015,12 +5137,12 @@
     ground: null,        // Uint8Array of material indices, SUB_GRID^2
     scatter: [],         // [{kind, sx, sy, seedVal}]
     paint: {},           // sparse: "idx" -> materialId
-    decals: [],          // [{dataUrl, x, y, w, h, img}]
+    placed: [],          // [{sid, x, y, size}] sprite instances on this tile
     tool: 'paint',
     material: 'stone',
     brush: 1,
-    decalSize: 12,
-    pendingDecal: null,  // {dataUrl, img} awaiting placement
+    spriteSize: 1,       // placement size in sub-cells (1 = one cell)
+    activeSprite: null,  // sprite id currently selected for placing
     dirty: false,
     animT: 0,
     rafId: null,
@@ -5031,6 +5153,112 @@
     panning: false,
     panStart: null,
   };
+  // ============ SPRITE LIBRARY ============
+  // Sprites are small pixel grids drawn in the built-in editor. They're stored
+  // as a compact RLE string of palette indices — a 32x32 sprite typically
+  // compresses to a few hundred bytes, versus tens of KB for a base64 PNG.
+  // The library is shared across all tiles; each tile stores only lightweight
+  // placement records {spriteId, x, y, size}.
+  //
+  // Encoding: "res|hexcolor,hexcolor,...|runs" where runs are "count.index"
+  // and index 0 means transparent.
+  const SPRITE_LIB_KEY = 'pixelworld:sprites';
+  let spriteLib = [];        // [{id, name, res, colors:[hex], data:'runs', canvas}]
+
+  function encodeSprite(res, cells, colors){
+    // cells: Int array length res*res of palette index (0 = transparent)
+    const runs = [];
+    let cur = cells[0], len = 1;
+    for(let i=1;i<cells.length;i++){
+      if(cells[i] === cur) len++;
+      else { runs.push(len + '.' + cur); cur = cells[i]; len = 1; }
+    }
+    runs.push(len + '.' + cur);
+    return `${res}|${colors.join(',')}|${runs.join(',')}`;
+  }
+  function decodeSprite(str){
+    const [resStr, colStr, runStr] = str.split('|');
+    const res = parseInt(resStr, 10);
+    const colors = colStr ? colStr.split(',') : [];
+    const cells = new Int16Array(res*res);
+    let idx = 0;
+    if(runStr){
+      for(const run of runStr.split(',')){
+        const dot = run.indexOf('.');
+        const len = parseInt(run.slice(0, dot), 10);
+        const code = parseInt(run.slice(dot+1), 10);
+        for(let i=0;i<len && idx<cells.length;i++) cells[idx++] = code;
+      }
+    }
+    return {res, colors, cells};
+  }
+  // Render a sprite to an offscreen canvas once, then reuse it every frame.
+  function buildSpriteCanvas(sprite){
+    const {res, colors, cells} = decodeSprite(sprite.data);
+    const oc = document.createElement('canvas');
+    oc.width = res; oc.height = res;
+    const octx = oc.getContext('2d');
+    const img = octx.createImageData(res, res);
+    for(let i=0;i<cells.length;i++){
+      const code = cells[i];
+      const o = i*4;
+      if(code === 0){ img.data[o+3] = 0; continue; }
+      const hex = colors[code-1] || '888888';
+      img.data[o]   = parseInt(hex.slice(0,2), 16);
+      img.data[o+1] = parseInt(hex.slice(2,4), 16);
+      img.data[o+2] = parseInt(hex.slice(4,6), 16);
+      img.data[o+3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    sprite.canvas = oc;
+    sprite.res = res;
+    return oc;
+  }
+  async function loadSpriteLib(){
+    try{
+      const res = await window.storage.get(SPRITE_LIB_KEY, true);
+      if(res && res.value){
+        spriteLib = JSON.parse(res.value);
+        for(const s of spriteLib) buildSpriteCanvas(s);
+      }
+    }catch(e){ spriteLib = []; }
+    renderSpriteLibrary();
+  }
+  async function saveSpriteLib(){
+    // Strip the cached canvas before serializing
+    const slim = spriteLib.map(s=>({id:s.id, name:s.name, data:s.data}));
+    await window.storage.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
+  }
+
+  function renderSpriteLibrary(){
+    const grid = document.getElementById('spriteLibrary');
+    if(!grid) return;
+    grid.innerHTML = '';
+    if(spriteLib.length === 0){
+      grid.innerHTML = '<div style="grid-column:1/-1;font-size:10px;opacity:0.5;text-align:center;padding:8px 0;">No sprites yet — click "+ New"</div>';
+      return;
+    }
+    for(const s of spriteLib){
+      const b = document.createElement('button');
+      b.title = s.name || 'sprite';
+      b.style.cssText = `height:38px;border-radius:5px;cursor:pointer;padding:2px;background:rgba(0,0,0,0.35);border:2px solid ${tileView.activeSprite===s.id?'#ffe85a':'rgba(255,255,255,0.12)'};display:flex;align-items:center;justify-content:center;`;
+      if(!s.canvas) buildSpriteCanvas(s);
+      const im = document.createElement('img');
+      im.src = s.canvas.toDataURL();
+      im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated;';
+      b.appendChild(im);
+      b.onclick = ()=>{
+        tileView.activeSprite = s.id;
+        tileView.tool = 'sprite';
+        highlightTool();
+        renderSpriteLibrary();
+        document.getElementById('spriteStatus').textContent = `"${s.name}" — click the tile to place`;
+      };
+      grid.appendChild(b);
+    }
+  }
+  function getSprite(id){ return spriteLib.find(s=>s.id===id); }
+
   const tileCv  = document.getElementById('tileCanvas');
   const tileCtx = tileCv.getContext('2d');
   tileCtx.imageSmoothingEnabled = false;
@@ -5342,6 +5570,179 @@
         c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
         break;
       }
+      case 'cobble': {
+        // irregular rounded stones with dark mortar
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.62)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        const cells = [[0.02,0.02,0.46,0.46],[0.52,0.05,0.44,0.40],[0.05,0.54,0.40,0.42],[0.50,0.52,0.46,0.44]];
+        for(let i=0;i<cells.length;i++){
+          const rr = (((cellSeed*(i+7)*2654435761)>>>0)/4294967296);
+          const [ax,ay,aw,ah] = cells[i];
+          c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.92 + rr*0.30)));
+          c.beginPath();
+          c.ellipse(x+(ax+aw/2)*u, y+(ay+ah/2)*u, aw*u*0.48, ah*u*0.46, rr*2, 0, Math.PI*2);
+          c.fill();
+        }
+        break;
+      }
+      case 'tile': {
+        // square tiles with grout lines and a subtle per-tile tone shift
+        const rr = ((cellSeed*2654435761)>>>0)/4294967296;
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.94 + rr*0.16)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.66)));
+        c.lineWidth = Math.max(1, u*0.07);
+        c.strokeRect(x+u*0.04, y+u*0.04, u*0.92, u*0.92);
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.14)));
+        c.fillRect(x+u*0.12, y+u*0.12, u*0.34, Math.max(1,u*0.09));
+        break;
+      }
+      case 'thatch': {
+        // bundled straw — angled strokes in rows
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.74)));
+        c.lineWidth = Math.max(1, u*0.07);
+        for(let k=0;k<4;k++){
+          const yy = y + u*(0.14 + k*0.24);
+          c.beginPath();
+          for(let s=0;s<3;s++){
+            const xx = x + u*(0.1 + s*0.33);
+            c.moveTo(xx, yy);
+            c.lineTo(xx + u*0.22, yy - u*0.10);
+          }
+          c.stroke();
+        }
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.14)));
+        c.fillRect(x, y+u*0.02, Math.ceil(u)+1, Math.max(1, u*0.06));
+        break;
+      }
+      case 'shingle': {
+        // overlapping roof tiles, offset per row
+        const row = Math.floor(y/Math.max(1,u));
+        const off = (row % 2) ? u*0.5 : 0;
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.80)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        c.fillStyle = rgbStr(applyLighting(mat.color));
+        for(let s=-1;s<2;s++){
+          const cx0 = x + off + s*u*0.5;
+          c.beginPath();
+          c.moveTo(cx0, y+u);
+          c.lineTo(cx0, y+u*0.35);
+          c.quadraticCurveTo(cx0+u*0.25, y+u*0.05, cx0+u*0.5, y+u*0.35);
+          c.lineTo(cx0+u*0.5, y+u);
+          c.closePath(); c.fill();
+        }
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.18)));
+        c.lineWidth = 1;
+        c.beginPath(); c.moveTo(x, y+u*0.36); c.lineTo(x+u, y+u*0.36); c.stroke();
+        break;
+      }
+      case 'scale': {
+        // fish-scale / dragon-hide arcs
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.78)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        c.fillStyle = rgbStr(applyLighting(mat.color));
+        for(let ry=0; ry<2; ry++){
+          const off = ry % 2 ? u*0.25 : 0;
+          for(let rx=0; rx<2; rx++){
+            c.beginPath();
+            c.arc(x + off + rx*u*0.5 + u*0.25, y + ry*u*0.5 + u*0.12, u*0.26, 0, Math.PI);
+            c.fill();
+          }
+        }
+        break;
+      }
+      case 'weave': {
+        // basket-weave cloth threads
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.88)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.12)));
+        const tw = Math.max(1, u*0.22);
+        c.fillRect(x, y, tw, Math.ceil(u)+1);
+        c.fillRect(x+u*0.5, y, tw, Math.ceil(u)+1);
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.02)));
+        c.fillRect(x, y+u*0.25, Math.ceil(u)+1, tw);
+        c.fillRect(x, y+u*0.75, Math.ceil(u)+1, tw);
+        break;
+      }
+      case 'marble': {
+        c.fillStyle = rgbStr(applyLighting(mat.color));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        const rr = ((cellSeed*2654435761)>>>0)/4294967296;
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.72)));
+        c.lineWidth = Math.max(1, u*0.05);
+        c.beginPath();
+        c.moveTo(x, y + u*rr);
+        c.bezierCurveTo(x+u*0.3, y+u*(rr-0.25), x+u*0.6, y+u*(rr+0.3), x+u, y+u*((rr+0.5)%1));
+        c.stroke();
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.10)));
+        c.lineWidth = Math.max(1, u*0.03);
+        c.beginPath();
+        c.moveTo(x, y + u*((rr+0.35)%1));
+        c.bezierCurveTo(x+u*0.4, y+u*((rr+0.1)%1), x+u*0.7, y+u*((rr+0.6)%1), x+u, y+u*((rr+0.2)%1));
+        c.stroke();
+        break;
+      }
+      case 'metal': {
+        const g = c.createLinearGradient(x, y, x, y+u);
+        g.addColorStop(0,   rgbStr(applyLighting(rgbAdj(mat.color, 1.24))));
+        g.addColorStop(0.45,rgbStr(applyLighting(rgbAdj(mat.color, 0.98))));
+        g.addColorStop(0.55,rgbStr(applyLighting(rgbAdj(mat.color, 1.12))));
+        g.addColorStop(1,   rgbStr(applyLighting(rgbAdj(mat.color, 0.78))));
+        c.fillStyle = g;
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        // rivets
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.66)));
+        c.beginPath(); c.arc(x+u*0.16, y+u*0.16, Math.max(0.6,u*0.055), 0, Math.PI*2); c.fill();
+        c.beginPath(); c.arc(x+u*0.84, y+u*0.84, Math.max(0.6,u*0.055), 0, Math.PI*2); c.fill();
+        break;
+      }
+      case 'crack': {
+        c.fillStyle = rgbStr(applyLighting(mat.color));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        const rr = ((cellSeed*2654435761)>>>0)/4294967296;
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.50)));
+        c.lineWidth = Math.max(1, u*0.06);
+        c.beginPath();
+        c.moveTo(x+u*rr, y);
+        c.lineTo(x+u*((rr+0.3)%1), y+u*0.45);
+        c.lineTo(x+u*((rr+0.15)%1), y+u);
+        c.moveTo(x+u*((rr+0.3)%1), y+u*0.45);
+        c.lineTo(x+u, y+u*0.62);
+        c.stroke();
+        break;
+      }
+      case 'herring': {
+        // herringbone parquet
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.86)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 1.16)));
+        c.lineWidth = Math.max(1, u*0.11);
+        c.beginPath();
+        c.moveTo(x, y+u*0.5); c.lineTo(x+u*0.5, y);
+        c.moveTo(x+u*0.5, y+u); c.lineTo(x+u, y+u*0.5);
+        c.stroke();
+        c.strokeStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.62)));
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(x, y+u); c.lineTo(x+u, y);
+        c.stroke();
+        break;
+      }
+      case 'log': {
+        // stacked round logs
+        c.fillStyle = rgbStr(applyLighting(rgbAdj(mat.color, 0.66)));
+        c.fillRect(x, y, Math.ceil(u)+1, Math.ceil(u)+1);
+        for(let k=0;k<2;k++){
+          const yy = y + k*u*0.5;
+          const g = c.createLinearGradient(x, yy, x, yy+u*0.5);
+          g.addColorStop(0,   rgbStr(applyLighting(rgbAdj(mat.color, 1.18))));
+          g.addColorStop(0.6, rgbStr(applyLighting(mat.color)));
+          g.addColorStop(1,   rgbStr(applyLighting(rgbAdj(mat.color, 0.70))));
+          c.fillStyle = g;
+          c.fillRect(x, yy+u*0.03, Math.ceil(u)+1, u*0.44);
+        }
+        break;
+      }
     }
   }
 
@@ -5425,10 +5826,32 @@
       drawSprite(c, s.kind, px+swayX, py, u, s.v);
     }
 
-    // ---- 3. User decals ----
-    for(const d of tileView.decals){
-      if(!d.img || !d.img.complete) continue;
-      c.drawImage(d.img, originX + d.x*u, originY + d.y*u, d.w*u, d.h*u);
+    // ---- 3. Placed sprites ----
+    // Sorted by y so sprites lower on the tile overlap those above them.
+    const sorted = tileView.placed.slice().sort((a,b)=>(a.y+a.size)-(b.y+b.size));
+    for(const p of sorted){
+      const sp = getSprite(p.sid);
+      if(!sp) continue;
+      if(!sp.canvas) buildSpriteCanvas(sp);
+      c.drawImage(sp.canvas, originX + p.x*u, originY + p.y*u, p.size*u, p.size*u);
+    }
+
+    // ---- 3b. Sprite placement ghost ----
+    if(isLoggedIn && tileView.tool === 'sprite' && tileView.activeSprite && tileView.hover){
+      const sp = getSprite(tileView.activeSprite);
+      if(sp){
+        if(!sp.canvas) buildSpriteCanvas(sp);
+        const sz = tileView.spriteSize;
+        const gx = tileView.hover.sx - Math.floor(sz/2);
+        const gy = tileView.hover.sy - Math.floor(sz/2);
+        c.save();
+        c.globalAlpha = 0.6;
+        c.drawImage(sp.canvas, originX + gx*u, originY + gy*u, sz*u, sz*u);
+        c.restore();
+        c.strokeStyle = 'rgba(255,232,90,0.9)';
+        c.lineWidth = Math.max(1, u*0.08);
+        c.strokeRect(originX + gx*u, originY + gy*u, sz*u, sz*u);
+      }
     }
 
     // ---- 4. Weather + season overlay ----
@@ -5451,7 +5874,7 @@
     }
 
     // ---- 5b. Brush hover preview ----
-    if(isLoggedIn && tileView.hover && !tileView.pendingDecal){
+    if(isLoggedIn && tileView.hover && tileView.tool !== 'sprite'){
       const rad = tileView.brush - 1;
       c.save();
       c.strokeStyle = tileView.tool === 'erase' ? 'rgba(255,140,140,0.95)' : 'rgba(255,232,90,0.95)';
@@ -5574,15 +5997,15 @@
     tileView.ground = gen.ground;
     tileView.scatter = gen.scatter;
     tileView.paint = {};
-    tileView.decals = [];
-    tileView.pendingDecal = null;
+    tileView.placed = [];
+    tileView.activeSprite = tileView.activeSprite || null;
     tileView.dirty = false;
     tileView.animT = 0;
     tileView.zoom = 1;
     tileView.panX = 0; tileView.panY = 0;
     tileView.hover = null;
 
-    // Load any saved paint/decals for this tile
+    // Load any saved paint/sprites for this tile
     await loadTileDetail(tx, ty);
 
     // Header text
@@ -5607,6 +6030,7 @@
     document.getElementById('tileTools').style.display = isLoggedIn ? 'block' : 'none';
     document.getElementById('enterTileBtn').style.display = 'none';
     buildMaterialGrid();
+    if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
     updateTileZoomLabel();
     startTileLoop();
   }
@@ -5636,14 +6060,25 @@
   function buildMaterialGrid(){
     const grid = document.getElementById('materialGrid');
     if(grid.childElementCount) { highlightMaterial(); return; }
-    for(const m of MATERIALS){
-      const b = document.createElement('button');
-      b.className = 'matbtn';
-      b.dataset.mat = m.id;
-      b.title = m.label;
-      b.style.cssText = `height:26px;border-radius:4px;cursor:pointer;border:2px solid transparent;background:rgb(${m.color[0]},${m.color[1]},${m.color[2]});`;
-      b.onclick = ()=>{ tileView.material = m.id; tileView.tool = 'paint'; highlightMaterial(); highlightTool(); };
-      grid.appendChild(b);
+    // Group swatches under collapsible category headings so the (now long)
+    // library stays browsable in the narrow toolbar.
+    for(const cat of MATERIAL_CATS){
+      const head = document.createElement('div');
+      head.textContent = cat;
+      head.style.cssText = 'font-size:10px;opacity:0.55;margin:6px 0 3px;letter-spacing:0.4px;text-transform:uppercase;';
+      grid.appendChild(head);
+      const row = document.createElement('div');
+      row.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:3px;';
+      for(const m of MATERIALS.filter(mm=>mm.cat===cat)){
+        const b = document.createElement('button');
+        b.className = 'matbtn';
+        b.dataset.mat = m.id;
+        b.title = `${m.label} (${m.tex})`;
+        b.style.cssText = `height:22px;border-radius:4px;cursor:pointer;border:2px solid transparent;background:rgb(${m.color[0]},${m.color[1]},${m.color[2]});`;
+        b.onclick = ()=>{ tileView.material = m.id; tileView.tool = 'paint'; highlightMaterial(); highlightTool(); };
+        row.appendChild(b);
+      }
+      grid.appendChild(row);
     }
     highlightMaterial();
   }
@@ -5696,23 +6131,21 @@
       return;
     }
     if(!isLoggedIn) return;
-    // Placing a decal takes priority
-    if(tileView.pendingDecal){
+    // Placing a sprite takes priority over painting
+    if(tileView.tool === 'sprite' && tileView.activeSprite){
       const p = tileCanvasToSub(e.clientX, e.clientY);
       if(p){
-        const img = tileView.pendingDecal.img;
-        const maxSide = tileView.decalSize || 12;
-        const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
-        const w = ar >= 1 ? maxSide : maxSide*ar;
-        const h = ar >= 1 ? maxSide/ar : maxSide;
-        tileView.decals.push({
-          dataUrl: tileView.pendingDecal.dataUrl,
-          x: p.sx - w/2, y: p.sy - h/2, w, h, img
+        const sz = tileView.spriteSize;
+        tileView.placed.push({
+          sid: tileView.activeSprite,
+          x: p.sx - Math.floor(sz/2),
+          y: p.sy - Math.floor(sz/2),
+          size: sz
         });
-        tileView.pendingDecal = null;
         tileView.dirty = true;
-        document.getElementById('decalPlaceBtn').style.display = 'none';
-        document.getElementById('decalStatus').textContent = 'Image placed.';
+        const sp = getSprite(tileView.activeSprite);
+        document.getElementById('spriteStatus').textContent =
+          `Placed "${sp?sp.name:''}" (${tileView.placed.length} on this tile)`;
       }
       return;
     }
@@ -5853,27 +6286,6 @@
     return paint;
   }
 
-  // Downscale + recompress an uploaded image so decals stay small.
-  // Returns a data URL (WebP when supported, PNG otherwise) capped at MAX_DECAL_PX.
-  const MAX_DECAL_PX = 192;
-  function compressImage(img){
-    const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
-    let w = img.naturalWidth, h = img.naturalHeight;
-    if(Math.max(w, h) > MAX_DECAL_PX){
-      if(ar >= 1){ w = MAX_DECAL_PX; h = Math.round(MAX_DECAL_PX/ar); }
-      else       { h = MAX_DECAL_PX; w = Math.round(MAX_DECAL_PX*ar); }
-    }
-    const oc = document.createElement('canvas');
-    oc.width = w; oc.height = h;
-    const octx = oc.getContext('2d');
-    octx.imageSmoothingEnabled = true;
-    octx.drawImage(img, 0, 0, w, h);
-    // Try WebP first (much smaller); fall back to PNG if unsupported
-    let url = oc.toDataURL('image/webp', 0.82);
-    if(!url.startsWith('data:image/webp')) url = oc.toDataURL('image/png');
-    return url;
-  }
-
   function humanBytes(n){
     if(n < 1024) return n + ' B';
     if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
@@ -5881,91 +6293,55 @@
   }
 
   // ---- Save / load ----
-  // Paint and decals are stored under SEPARATE keys so a heavy image layer
-  // can't stop the paint layer from saving, and each stays well under the cap.
+  // Everything is stored as compact strings, so a fully-painted tile with
+  // hundreds of sprite placements is only a few KB. Nothing is base64.
+  //   :paint  -> RLE material indices for the whole sub-grid
+  //   :placed -> "sid.x.y.size,..." sprite instances
   async function saveTileDetail(){
     const status = document.getElementById('tileSaveStatus');
     const base = `pixelworld:tile:${tileView.tx},${tileView.ty}`;
-    let savedParts = [];
-    let failedParts = [];
-
-    // 1) Paint layer (small, always try first)
     try{
       const encoded = encodePaint(tileView.paint);
-      await window.storage.set(base + ':paint', encoded, true);
-      savedParts.push('paint ' + humanBytes(encoded.length));
-    }catch(err){
-      console.warn('paint save failed', err);
-      failedParts.push('paint');
-    }
-
-    // 2) Decals — one key per image so a single big one can't sink the rest
-    try{
-      const meta = tileView.decals.map((d,i)=>({i, x:d.x, y:d.y, w:d.w, h:d.h}));
-      await window.storage.set(base + ':decalmeta', JSON.stringify(meta), true);
-      let totalBytes = 0;
-      for(let i=0;i<tileView.decals.length;i++){
-        const d = tileView.decals[i];
-        await window.storage.set(base + ':decal' + i, d.dataUrl, true);
-        totalBytes += d.dataUrl.length;
-      }
-      // Clear any leftover keys from previously-removed images
-      for(let i=tileView.decals.length; i<tileView.decals.length+6; i++){
-        try{ await window.storage.delete(base + ':decal' + i, true); }catch(_){}
-      }
-      if(tileView.decals.length) savedParts.push(`${tileView.decals.length} image${tileView.decals.length>1?'s':''} ${humanBytes(totalBytes)}`);
-    }catch(err){
-      console.warn('decal save failed', err);
-      failedParts.push('images');
-    }
-
-    if(failedParts.length === 0){
+      const placedStr = tileView.placed
+        .map(p=>`${p.sid}.${Math.round(p.x)}.${Math.round(p.y)}.${p.size}`)
+        .join(',');
+      await window.storage.set(base + ':paint',  encoded,   true);
+      await window.storage.set(base + ':placed', placedStr, true);
       tileView.dirty = false;
-      status.textContent = 'Saved · ' + savedParts.join(' · ');
+      const total = encoded.length + placedStr.length;
+      const painted = Object.keys(tileView.paint).length;
+      status.textContent = `Saved · ${painted} cells, ${tileView.placed.length} sprites · ${humanBytes(total)}`;
       status.style.color = '#9fe0a8';
       setTimeout(()=>{ status.textContent=''; }, 3500);
-    } else {
-      status.textContent = `Saved ${savedParts.join(', ') || 'nothing'} — ${failedParts.join(' & ')} too large`;
+    }catch(err){
+      console.error('tile save failed', err);
+      status.textContent = 'Save failed: ' + (err && err.message ? err.message : 'unknown');
       status.style.color = '#ffb0b0';
     }
   }
 
   async function loadTileDetail(tx, ty){
     const base = `pixelworld:tile:${tx},${ty}`;
-    // Paint layer
     try{
       const res = await window.storage.get(base + ':paint', true);
       if(res && res.value) tileView.paint = decodePaint(res.value);
     }catch(e){ /* nothing saved */ }
-    // Decals
     try{
-      const metaRes = await window.storage.get(base + ':decalmeta', true);
-      if(metaRes && metaRes.value){
-        const meta = JSON.parse(metaRes.value);
-        for(const m of meta){
-          try{
-            const dr = await window.storage.get(base + ':decal' + m.i, true);
-            if(dr && dr.value){
-              const img = new Image();
-              img.src = dr.value;
-              tileView.decals.push({dataUrl: dr.value, x:m.x, y:m.y, w:m.w, h:m.h, img});
-            }
-          }catch(_){}
+      const res = await window.storage.get(base + ':placed', true);
+      if(res && res.value){
+        for(const rec of res.value.split(',')){
+          if(!rec) continue;
+          const parts = rec.split('.');
+          if(parts.length < 4) continue;
+          tileView.placed.push({
+            sid:  parts[0],
+            x:    parseInt(parts[1], 10),
+            y:    parseInt(parts[2], 10),
+            size: parseInt(parts[3], 10)
+          });
         }
       }
     }catch(e){ /* nothing saved */ }
-    // Legacy single-key format from an earlier version
-    try{
-      const old = await window.storage.get(base, true);
-      if(old && old.value && Object.keys(tileView.paint).length === 0){
-        const saved = JSON.parse(old.value);
-        if(saved.paint) tileView.paint = saved.paint;
-        if(saved.decals) for(const d of saved.decals){
-          const img = new Image(); img.src = d.dataUrl;
-          tileView.decals.push({...d, img});
-        }
-      }
-    }catch(e){ /* no legacy data */ }
   }
 
   // ---- Enter-tile button positioning ----
@@ -6007,9 +6383,10 @@
     const n = tileView.brush === 1 ? '1 cell' : `${tileView.brush*2-1} cells`;
     document.getElementById('brushLabel').textContent = n;
   });
-  document.getElementById('decalSize').addEventListener('input', (e)=>{
-    tileView.decalSize = parseInt(e.target.value, 10);
-    document.getElementById('decalSizeLabel').textContent = `${tileView.decalSize} cells`;
+  document.getElementById('spriteSize').addEventListener('input', (e)=>{
+    tileView.spriteSize = parseInt(e.target.value, 10);
+    const n = tileView.spriteSize;
+    document.getElementById('spriteSizeLabel').textContent = n === 1 ? '1 cell' : `${n} cells`;
   });
   document.getElementById('tileZoomIn').onclick = ()=>{
     tileView.zoom = Math.min(14, tileView.zoom * 1.4); clampTilePan(); updateTileZoomLabel();
@@ -6022,44 +6399,289 @@
   };
   document.getElementById('tileSave').onclick = saveTileDetail;
   document.getElementById('tileClear').onclick = ()=>{
-    if(!confirm('Clear all paint and images from this tile?')) return;
+    if(!confirm('Clear all paint and placed sprites from this tile?')) return;
     tileView.paint = {};
-    tileView.decals = [];
+    tileView.placed = [];
     tileView.dirty = true;
   };
-  document.getElementById('decalUndo').onclick = ()=>{
-    tileView.decals.pop();
+  document.getElementById('spriteUndo').onclick = ()=>{
+    tileView.placed.pop();
     tileView.dirty = true;
+    document.getElementById('spriteStatus').textContent = `${tileView.placed.length} sprites on this tile`;
   };
-  document.getElementById('decalUpload').addEventListener('change', (e)=>{
-    const file = e.target.files && e.target.files[0];
-    if(!file) return;
-    const status = document.getElementById('decalStatus');
-    status.textContent = 'Processing…';
-    status.style.color = '#cdd5e0';
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      const img = new Image();
-      img.onload = ()=>{
-        // Downscale and recompress so the stored payload stays small
-        const compressed = compressImage(img);
-        const finalImg = new Image();
-        finalImg.onload = ()=>{
-          tileView.pendingDecal = {dataUrl: compressed, img: finalImg};
-          document.getElementById('decalPlaceBtn').style.display = 'block';
-          status.textContent = `Ready · ${finalImg.naturalWidth}×${finalImg.naturalHeight} · ${humanBytes(compressed.length)}`;
-          status.style.color = '#9fe0a8';
-        };
-        finalImg.src = compressed;
-      };
-      img.onerror = ()=>{
-        status.textContent = 'Could not read that image.';
-        status.style.color = '#ffb0b0';
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+  document.getElementById('spriteNew').onclick  = ()=> openSpriteEditor(null);
+  document.getElementById('spriteEdit').onclick = ()=>{
+    if(tileView.activeSprite) openSpriteEditor(tileView.activeSprite);
+    else document.getElementById('spriteStatus').textContent = 'Select a sprite first.';
+  };
+
+  // ============ SPRITE EDITOR ============
+  // A small pixel-art editor. Sprites are stored as palette-indexed RLE so the
+  // whole library stays tiny compared with embedded images.
+  const SPRITE_PALETTE = [
+    '000000','2b2b33','4a4a55','6e6e7c','9a9aa8','c8c8d4','ececf2','ffffff',
+    '3d2314','5c3a1e','7d5430','a06d3c','c08d52','d9ae76','ecd0a0','f7e8c8',
+    '2a1a3d','4a2d63','6b428a','8a5db0','a87dcc','c39fe0','1a3a2a','2d5c40',
+    '3f7d55','54a06d','6dc08d','96d9ae','3a1a1a','5c2d2d','8a3f3f','b05454',
+    'cc6d6d','e09696','1a2a3d','2d4463','3f628a','5480b0','6d9ecc','96bce0',
+    '3d3a1a','63602d','8a863f','b0ab54','ccc76d','e0dc96','3d1a2e','632d4c',
+    '8a3f6a','b05489','cc6da6','e096c4','143d3a','1e5c58','2d8a80','3fb0a4',
+    '54ccbe','7de0d4','ff4d4d','ff9d4d','ffe14d','9dff4d','4dff9d','4de1ff',
+  ];
+  const spriteEd = {
+    res: 32,
+    cells: null,          // Int16Array of palette indices (0 = transparent)
+    colors: [],           // hex strings used by this sprite
+    current: '88cc66',
+    tool: 'pen',
+    editingId: null,
+    drawing: false,
+    mirror: false,
+  };
+  const spCv  = document.getElementById('spriteCanvas');
+  const spCtx = spCv.getContext('2d');
+  spCtx.imageSmoothingEnabled = false;
+
+  function spriteColorIndex(hex){
+    let i = spriteEd.colors.indexOf(hex);
+    if(i === -1){ spriteEd.colors.push(hex); i = spriteEd.colors.length - 1; }
+    return i + 1;   // 0 is reserved for transparent
+  }
+
+  function openSpriteEditor(id){
+    spriteEd.editingId = id;
+    if(id){
+      const s = getSprite(id);
+      const dec = decodeSprite(s.data);
+      spriteEd.res = dec.res;
+      spriteEd.colors = dec.colors.slice();
+      spriteEd.cells = Int16Array.from(dec.cells);
+      document.getElementById('spriteName').value = s.name || '';
+      document.getElementById('spriteRes').value = String(dec.res);
+      document.getElementById('spriteDelete').style.display = 'block';
+    } else {
+      spriteEd.res = parseInt(document.getElementById('spriteRes').value, 10) || 32;
+      spriteEd.colors = [];
+      spriteEd.cells = new Int16Array(spriteEd.res * spriteEd.res);
+      document.getElementById('spriteName').value = '';
+      document.getElementById('spriteDelete').style.display = 'none';
+    }
+    document.getElementById('spriteEditor').style.display = 'flex';
+    buildSpritePalette();
+    updateSpriteCurrentSwatch();
+    highlightSpriteTool();
+    drawSpriteEditor();
+  }
+  function closeSpriteEditor(){
+    document.getElementById('spriteEditor').style.display = 'none';
+  }
+
+  function buildSpritePalette(){
+    const pal = document.getElementById('spritePalette');
+    if(pal.childElementCount) return;
+    for(const hex of SPRITE_PALETTE){
+      const b = document.createElement('button');
+      b.style.cssText = `height:20px;border-radius:3px;border:1px solid rgba(0,0,0,0.4);cursor:pointer;background:#${hex};`;
+      b.onclick = ()=>{ spriteEd.current = hex; spriteEd.tool = 'pen'; updateSpriteCurrentSwatch(); highlightSpriteTool(); };
+      pal.appendChild(b);
+    }
+  }
+  function updateSpriteCurrentSwatch(){
+    document.getElementById('spriteCurrent').style.background = '#' + spriteEd.current;
+    document.getElementById('spriteCustomColor').value = '#' + spriteEd.current;
+  }
+  function highlightSpriteTool(){
+    document.querySelectorAll('.sptool').forEach(b=>{
+      const on = b.dataset.sptool === spriteEd.tool;
+      b.style.background = on ? 'rgba(60,90,140,0.8)' : 'rgba(40,55,80,0.6)';
+      b.style.borderColor = on ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)';
+    });
+  }
+
+  function drawSpriteEditor(){
+    const res = spriteEd.res;
+    const size = spCv.width;              // fixed backing size
+    const u = size / res;
+    spCtx.clearRect(0, 0, size, size);
+    // checkerboard for transparency
+    const chk = u;
+    for(let y=0;y<res;y++){
+      for(let x=0;x<res;x++){
+        spCtx.fillStyle = ((x+y)%2) ? '#131b29' : '#0d141f';
+        spCtx.fillRect(x*chk, y*chk, chk, chk);
+      }
+    }
+    // pixels
+    for(let y=0;y<res;y++){
+      for(let x=0;x<res;x++){
+        const code = spriteEd.cells[y*res+x];
+        if(code === 0) continue;
+        spCtx.fillStyle = '#' + (spriteEd.colors[code-1] || '888888');
+        spCtx.fillRect(x*u, y*u, Math.ceil(u), Math.ceil(u));
+      }
+    }
+    // grid
+    if(u >= 8){
+      spCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+      spCtx.lineWidth = 1;
+      spCtx.beginPath();
+      for(let i=0;i<=res;i++){
+        spCtx.moveTo(i*u, 0); spCtx.lineTo(i*u, size);
+        spCtx.moveTo(0, i*u); spCtx.lineTo(size, i*u);
+      }
+      spCtx.stroke();
+    }
+  }
+
+  function spriteCanvasToCell(clientX, clientY){
+    const r = spCv.getBoundingClientRect();
+    const x = Math.floor(((clientX - r.left) / r.width) * spriteEd.res);
+    const y = Math.floor(((clientY - r.top) / r.height) * spriteEd.res);
+    if(x<0||x>=spriteEd.res||y<0||y>=spriteEd.res) return null;
+    return {x, y};
+  }
+  function spriteSet(x, y, code){
+    const res = spriteEd.res;
+    spriteEd.cells[y*res+x] = code;
+    if(spriteEd.mirror){
+      const mx = res - 1 - x;
+      if(mx !== x) spriteEd.cells[y*res+mx] = code;
+    }
+  }
+  function spriteFloodFill(sx, sy, code){
+    const res = spriteEd.res;
+    const target = spriteEd.cells[sy*res+sx];
+    if(target === code) return;
+    const stack = [[sx, sy]];
+    const seen = new Set();
+    while(stack.length){
+      const [x, y] = stack.pop();
+      if(x<0||x>=res||y<0||y>=res) continue;
+      const k = y*res+x;
+      if(seen.has(k)) continue;
+      if(spriteEd.cells[k] !== target) continue;
+      seen.add(k);
+      spriteSet(x, y, code);
+      stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+    }
+  }
+  function spriteApply(p, erasing){
+    if(spriteEd.tool === 'picker'){
+      const code = spriteEd.cells[p.y*spriteEd.res+p.x];
+      if(code > 0){
+        spriteEd.current = spriteEd.colors[code-1];
+        updateSpriteCurrentSwatch();
+      }
+      spriteEd.tool = 'pen';
+      highlightSpriteTool();
+      return;
+    }
+    const code = (erasing || spriteEd.tool === 'erase') ? 0 : spriteColorIndex(spriteEd.current);
+    if(spriteEd.tool === 'fill') spriteFloodFill(p.x, p.y, code);
+    else spriteSet(p.x, p.y, code);
+    drawSpriteEditor();
+  }
+
+  spCv.addEventListener('pointerdown', (e)=>{
+    const p = spriteCanvasToCell(e.clientX, e.clientY);
+    if(!p) return;
+    spriteEd.drawing = true;
+    spriteEd.erasing = (e.button === 2);
+    spCv.setPointerCapture(e.pointerId);
+    spriteApply(p, spriteEd.erasing);
+    e.preventDefault();
   });
+  spCv.addEventListener('pointermove', (e)=>{
+    if(!spriteEd.drawing) return;
+    if(spriteEd.tool === 'fill' || spriteEd.tool === 'picker') return;
+    const p = spriteCanvasToCell(e.clientX, e.clientY);
+    if(p) spriteApply(p, spriteEd.erasing);
+  });
+  function endSpriteDraw(e){
+    spriteEd.drawing = false;
+    try{ spCv.releasePointerCapture(e.pointerId); }catch(_){}
+  }
+  spCv.addEventListener('pointerup', endSpriteDraw);
+  spCv.addEventListener('pointercancel', endSpriteDraw);
+  spCv.addEventListener('contextmenu', (e)=>e.preventDefault());
+
+  document.querySelectorAll('.sptool').forEach(b=>{
+    b.onclick = ()=>{ spriteEd.tool = b.dataset.sptool; highlightSpriteTool(); };
+  });
+  document.getElementById('spriteMirror').addEventListener('change', (e)=>{
+    spriteEd.mirror = e.target.checked;
+  });
+  document.getElementById('spriteCustomColor').addEventListener('input', (e)=>{
+    spriteEd.current = e.target.value.replace('#','');
+    spriteEd.tool = 'pen';
+    updateSpriteCurrentSwatch();
+    highlightSpriteTool();
+  });
+  document.getElementById('spriteRes').addEventListener('change', (e)=>{
+    const newRes = parseInt(e.target.value, 10);
+    // Resample the existing artwork into the new resolution
+    const old = spriteEd.cells, oldRes = spriteEd.res;
+    const next = new Int16Array(newRes*newRes);
+    for(let y=0;y<newRes;y++){
+      for(let x=0;x<newRes;x++){
+        const ox = Math.floor(x * oldRes / newRes);
+        const oy = Math.floor(y * oldRes / newRes);
+        next[y*newRes+x] = old[oy*oldRes+ox] || 0;
+      }
+    }
+    spriteEd.res = newRes;
+    spriteEd.cells = next;
+    drawSpriteEditor();
+  });
+  document.getElementById('spriteClearBtn').onclick = ()=>{
+    spriteEd.cells = new Int16Array(spriteEd.res*spriteEd.res);
+    drawSpriteEditor();
+  };
+  document.getElementById('spriteCancel').onclick = closeSpriteEditor;
+  document.getElementById('spriteDelete').onclick = async ()=>{
+    if(!spriteEd.editingId) return;
+    if(!confirm('Delete this sprite? Placements of it will disappear.')) return;
+    spriteLib = spriteLib.filter(s=>s.id !== spriteEd.editingId);
+    if(tileView.activeSprite === spriteEd.editingId) tileView.activeSprite = null;
+    await saveSpriteLib();
+    renderSpriteLibrary();
+    closeSpriteEditor();
+  };
+  document.getElementById('spriteSave').onclick = async ()=>{
+    // Compact the palette to only the colours actually used
+    const used = new Map();
+    const compact = new Int16Array(spriteEd.cells.length);
+    const newColors = [];
+    for(let i=0;i<spriteEd.cells.length;i++){
+      const code = spriteEd.cells[i];
+      if(code === 0){ compact[i] = 0; continue; }
+      const hex = spriteEd.colors[code-1];
+      if(!used.has(hex)){ newColors.push(hex); used.set(hex, newColors.length); }
+      compact[i] = used.get(hex);
+    }
+    const data = encodeSprite(spriteEd.res, Array.from(compact), newColors);
+    const name = (document.getElementById('spriteName').value || '').trim() || 'sprite';
+    if(spriteEd.editingId){
+      const s = getSprite(spriteEd.editingId);
+      s.name = name; s.data = data;
+      buildSpriteCanvas(s);
+    } else {
+      const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
+      const s = {id, name, data};
+      buildSpriteCanvas(s);
+      spriteLib.push(s);
+      tileView.activeSprite = id;
+      tileView.tool = 'sprite';
+      highlightTool();
+    }
+    try{
+      await saveSpriteLib();
+      renderSpriteLibrary();
+      closeSpriteEditor();
+    }catch(err){
+      alert('Could not save sprite library: ' + (err && err.message ? err.message : 'unknown error'));
+    }
+  };
 
   // Escape closes the tile view
   window.addEventListener('keydown', (e)=>{
