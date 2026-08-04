@@ -1,286 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PIXELTALE — Retro Story Studio</title>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#ffcc33;--cyan:#6fe3ff;--pink:#ff5d7d;--green:#7dee6a;--panel:#13131f;--panel2:#0e0e1a;--line:#30304e;--txt:#e8e8f2}
-html,body{min-height:100%}
-body{font-family:'Press Start 2P','Courier New',monospace;color:var(--txt);background-color:#0a0a13;
- background-image:linear-gradient(45deg,#0e0e19 25%,transparent 25%,transparent 75%,#0e0e19 75%),
- linear-gradient(45deg,#0e0e19 25%,transparent 25%,transparent 75%,#0e0e19 75%);
- background-size:28px 28px;background-position:0 0,14px 14px}
-header{display:flex;align-items:center;gap:10px;padding:12px 18px;background:#101020;border-bottom:4px solid var(--line);flex-wrap:wrap}
-h1{font-size:15px;color:var(--gold);text-shadow:2px 2px 0 #7a4a00,4px 4px 0 #000;letter-spacing:2px}
-.tag{font-size:7px;color:#8a8ab0;letter-spacing:1px}
-.heart{display:inline-block;width:3px;height:3px;background:transparent;margin:6px 20px 0 4px;box-shadow:
- 3px 0 var(--pink),6px 0 var(--pink),12px 0 var(--pink),15px 0 var(--pink),
- 0 3px var(--pink),3px 3px var(--pink),6px 3px var(--pink),9px 3px var(--pink),12px 3px var(--pink),15px 3px var(--pink),18px 3px var(--pink),
- 0 6px var(--pink),3px 6px var(--pink),6px 6px var(--pink),9px 6px var(--pink),12px 6px var(--pink),15px 6px var(--pink),18px 6px var(--pink),
- 3px 9px var(--pink),6px 9px var(--pink),9px 9px var(--pink),12px 9px var(--pink),15px 9px var(--pink),
- 6px 12px var(--pink),9px 12px var(--pink),12px 12px var(--pink),9px 15px var(--pink)}
-.hspace{flex:1}
-.btn{font-family:inherit;font-size:8px;padding:9px 11px;background:#24243c;color:#fff;border:0;cursor:pointer;
- box-shadow:inset -3px -3px 0 #12121f,inset 3px 3px 0 #3c3c60,0 0 0 2px #05050c;letter-spacing:1px}
-.btn:hover{background:#2d2d4c}.btn:active{transform:translateY(1px)}
-.btn.gold{background:#6e5510;box-shadow:inset -3px -3px 0 #3c2e06,inset 3px 3px 0 #a8862a,0 0 0 2px #05050c;color:#ffe9a0}
-.btn.gold:hover{background:#82661a}
-.btn.cyan{background:#1a4a5e;box-shadow:inset -3px -3px 0 #0c2630,inset 3px 3px 0 #3a7a90,0 0 0 2px #05050c;color:#cff}
-.btn.green{background:#1a4a2e;box-shadow:inset -3px -3px 0 #0c2618,inset 3px 3px 0 #3a7a50,0 0 0 2px #05050c;color:#cfc}
-.btn.big{font-size:10px;padding:12px 16px}.btn.mini{font-size:7px;padding:7px 9px}
-input[type=range]{accent-color:var(--gold);cursor:pointer}
-.chk{font-size:7px;color:#aab;display:flex;align-items:center;gap:5px;cursor:pointer}
-.chk input{accent-color:var(--gold)}
-main{display:grid;grid-template-columns:1fr 400px;gap:18px;padding:18px;max-width:1560px;margin:0 auto;align-items:start}
-@media(max-width:1080px){main{grid-template-columns:1fr}}
-#stageCol{display:flex;flex-direction:column;gap:10px;min-width:0}
-.pbox{background:var(--panel);border:3px solid var(--line);box-shadow:0 0 0 3px #05050c}
-#statusBar{font-size:7px;color:#9a9ac0;padding:8px 12px;letter-spacing:1px}
-#stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;cursor:pointer;--px:8px}
-#bgCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
-#lightFx{position:absolute;inset:0;pointer-events:none;z-index:3}
-#scanFx{position:absolute;inset:0;pointer-events:none;z-index:4;opacity:.5;
- background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 4px)}
-#stageVignette{position:absolute;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 70px rgba(0,0,0,.55)}
-.fx-night{background:rgba(16,26,120,.42)}.fx-dusk{background:rgba(255,110,30,.22)}
-.fx-candle{background:rgba(255,150,50,.16);animation:candle 2.1s steps(10) infinite}
-.fx-storm{background:rgba(6,10,30,.5);animation:storm 6.5s linear infinite}
-@keyframes candle{0%,100%{opacity:.7}22%{opacity:1}47%{opacity:.55}71%{opacity:.95}86%{opacity:.8}}
-@keyframes storm{0%,86%,93%,100%{background:rgba(6,10,30,.5)}88%{background:rgba(225,238,255,.55)}89.5%{background:rgba(6,10,30,.5)}91%{background:rgba(225,238,255,.4)}}
-#sceneUI{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:3%}
-#picWindow{display:none;background:#05050f;padding:3px;margin-bottom:14px;box-shadow:6px 6px 0 rgba(0,0,0,.45)}
-#picWindow.show{display:block;animation:pop .16s steps(3)}
-@keyframes pop{from{transform:scale(.5)}to{transform:scale(1)}}
-#picMid{background:#e8e8f4;padding:3px}
-#storyPic{display:block;height:calc(var(--px)*30);max-width:calc(var(--px)*66);width:auto;image-rendering:pixelated;background:#111}
-#dialogWrap{width:86%;background:#05050f;padding:3px;box-shadow:6px 6px 0 rgba(0,0,0,.45)}
-#dialogMid{background:#e8e8f4;padding:3px}
-#dialogInner{background:#10102c;padding:14px 16px;min-height:7.5em;font-size:calc(var(--px)*2.3);line-height:2;
- text-shadow:2px 2px 0 rgba(0,0,0,.85);word-break:break-word;
- box-shadow:inset 3px 3px 0 rgba(255,255,255,.07),inset -3px -3px 0 rgba(0,0,0,.4)}
-#cursor{margin-left:5px;animation:blink .85s steps(1) infinite}
-@keyframes blink{50%{opacity:0}}
-#titleCard{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10%}
-#titleCard.show{display:flex}
-#titleText{font-size:calc(var(--px)*4);line-height:1.6;text-shadow:4px 4px 0 #000;margin-bottom:20px}
-#titleSub{font-size:calc(var(--px)*1.5);opacity:.8;text-shadow:2px 2px 0 #000}
-#dialoguePanel{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;justify-content:center;gap:calc(var(--px)*2.5);padding:calc(var(--px)*4) calc(var(--px)*5)}
-#dialoguePanel.show{display:flex}
-.dlg-row{display:flex;align-items:flex-start;gap:calc(var(--px)*2.5);padding:calc(var(--px)*2) calc(var(--px)*2.5);
- background:rgba(8,8,20,.82);border:3px solid rgba(255,255,255,.12);box-shadow:4px 4px 0 rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.04);backdrop-filter:blur(2px)}
-.dlg-portrait-frame{flex-shrink:0;width:calc(var(--px)*16);height:calc(var(--px)*16);background:#0a0a18;border:3px solid #e8e8f4;box-shadow:0 0 0 2px #05050c,3px 3px 0 rgba(0,0,0,.5);padding:2px;image-rendering:pixelated}
-.dlg-portrait{display:block;width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
-.dlg-portrait-frame.empty{border-style:dashed;border-color:#444}
-.dlg-content{flex:1;min-width:0}
-.dlg-name{font-size:calc(var(--px)*1.4);letter-spacing:2px;margin-bottom:calc(var(--px)*1);text-shadow:2px 2px 0 #000;text-transform:uppercase}
-.dlg-text{font-size:calc(var(--px)*1.7);line-height:2;text-shadow:2px 2px 0 rgba(0,0,0,.9);word-break:break-word}
-#endCard{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;gap:20px;align-items:center;justify-content:center;
- background:rgba(0,0,0,.6);color:var(--gold);font-size:calc(var(--px)*4.2);text-shadow:3px 3px 0 #000;letter-spacing:4px}
-#endCard.show{display:flex}
-#endCard small{font-size:calc(var(--px)*1.2);color:#cfcfe8;animation:blink 1s steps(1) infinite}
-#playHint{position:absolute;right:10px;bottom:8px;z-index:6;display:none;font-size:calc(var(--px)*1.1);color:rgba(255,255,255,.55)}
-body.playing #playHint{display:block}
-body.playing #editor{display:none}
-body.playing main{grid-template-columns:1fr}
-body.playing #stageCol{align-items:center}
-body.playing #stage{width:min(100%,calc((100vh - 170px)*16/9))}
-
-/* ===== TRANSITION OVERLAYS ===== */
-#transOverlay{position:absolute;inset:0;z-index:9;pointer-events:none;overflow:hidden}
-/* Fade */
-#transFade{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .8s ease-in-out}
-/* Pixelate - uses canvas for real pixel effect */
-#transPixelCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;opacity:0;transition:opacity .1s}
-/* Slide */
-#transSlide{position:absolute;inset:0;background:#000;transform:translateX(-100%);transition:transform .7s cubic-bezier(.4,0,.2,1)}
-/* Iris */
-#transIris{position:absolute;inset:0;background:#000;clip-path:circle(0% at 50% 50%);transition:clip-path .9s cubic-bezier(.4,0,.2,1)}
-/* Dissolve - checkerboard via CSS gradient */
-#transDissolve{position:absolute;inset:0;background:#000;opacity:0;
- background-image:
-  linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%,#000),
-  linear-gradient(45deg,#000 25%,transparent 25%,transparent 75%,#000 75%,#000);
- background-size:20px 20px;background-position:0 0,10px 10px;
- transition:opacity .6s steps(8)}
-
-/* Transition active states */
-.trans-fade-in #transFade{opacity:0}
-.trans-fade-out #transFade{opacity:1}
-.trans-pixel-in #transPixelCanvas{opacity:0}
-.trans-pixel-out #transPixelCanvas{opacity:1}
-.trans-slide-in #transSlide{transform:translateX(100%)}
-.trans-slide-out #transSlide{transform:translateX(0)}
-.trans-slide-in-rev #transSlide{transform:translateX(-100%)}
-.trans-iris-in #transIris{clip-path:circle(150% at 50% 50%)}
-.trans-iris-out #transIris{clip-path:circle(0% at 50% 50%)}
-.trans-dissolve-in #transDissolve{opacity:0}
-.trans-dissolve-out #transDissolve{opacity:1}
-
-#editor{padding:14px;display:flex;flex-direction:column;gap:16px;max-height:calc(100vh - 120px);overflow-y:auto;position:sticky;top:14px}
-#editor::-webkit-scrollbar{width:10px}
-#editor::-webkit-scrollbar-thumb{background:#30304e;border:2px solid #05050c}
-.sec{border:2px solid var(--line);background:var(--panel2);padding:12px}
-.sec h2{font-size:8px;color:var(--gold);letter-spacing:1px;margin-bottom:10px;text-shadow:2px 2px 0 #000}
-.row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-.lbl{font-size:7px;color:#aab;white-space:nowrap}
-.val{font-size:8px;color:var(--cyan);min-width:14px}
-.note{font-size:6px;color:#66668c;line-height:1.8;margin-top:8px}
-#bgGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
-.bgCard{border:3px solid var(--line);cursor:pointer;background:#000;padding:0;font-family:inherit;color:#aab}
-.bgCard canvas{display:block;width:100%;image-rendering:pixelated}
-.bgCard span{display:block;font-size:5px;padding:3px 1px;text-align:center;background:#101020;font-family:inherit}
-.bgCard.sel{border-color:var(--gold);box-shadow:0 0 10px rgba(255,204,51,.35)}
-#lineList{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.line{border:2px solid var(--line);background:#101020;padding:8px}
-.line.title-type{border-color:var(--gold);background:#1a1510}
-.line.dialogue-type{border-color:var(--green);background:#0f1a12}
-.line-top{display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap}
-.lnum{font-size:8px;color:var(--gold);min-width:18px}
-.ltype{font-size:6px;padding:2px 4px;border:1px solid;margin-right:auto}
-.ltype.t-text{color:var(--cyan);border-color:var(--cyan)}
-.ltype.t-title{color:var(--gold);border-color:var(--gold)}
-.ltype.t-dialogue{color:var(--green);border-color:var(--green)}
-.line input[type=color]{width:28px;height:22px;border:2px solid var(--line);background:#000;padding:1px;cursor:pointer}
-.line select{font-family:inherit;font-size:6px;background:#181830;color:#ddd;border:2px solid var(--line);padding:3px;max-width:120px}
-.spacer{flex:1}
-.ibtn{font-family:inherit;font-size:7px;width:22px;height:22px;background:#24243c;color:#fff;border:0;cursor:pointer;box-shadow:0 2px 0 #05050c}
-.ibtn:hover{background:#33335a}.ibtn.del:hover{background:#5e2434}
-.line textarea{width:100%;font-family:inherit;font-size:8px;line-height:1.8;background:#0b0b16;color:#fff;border:2px solid var(--line);padding:6px;resize:vertical;min-height:40px}
-.line textarea:focus{outline:none;border-color:var(--cyan)}
-.dlg-fields{display:flex;flex-direction:column;gap:4px;margin-top:4px;padding:6px;background:#0a120e;border:1px dashed var(--green)}
-.dlg-field{display:flex;align-items:center;gap:5px}
-.dlg-field label{font-size:6px;color:var(--green);min-width:50px}
-.fxbtn{font-family:inherit;font-size:6px;padding:7px 8px;background:#1c1c30;color:#bbc;border:2px solid var(--line);cursor:pointer}
-.fxbtn:hover{border-color:#55558a}
-.fxbtn.on{background:#41325e;border-color:var(--gold);color:#ffe9a0}
-#imgGrid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.thumb{border:3px solid var(--line);background:#000;width:72px}
-.thumb img{display:block;width:100%;height:48px;object-fit:cover;image-rendering:pixelated}
-.tname{font-size:5px;padding:3px 2px;text-align:center;color:#aab;white-space:nowrap;overflow:hidden}
-.tbtns{display:flex;gap:2px;padding:0 3px 3px}
-.tbtns button{flex:1;font-family:inherit;font-size:5px;padding:3px 0;background:#22223a;color:#fff;border:0;cursor:pointer;box-shadow:0 2px 0 #05050c}
-.tbtns button:hover{background:#31425e}.tbtns button.del:hover{background:#5e2434}
-#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#000;border:3px solid var(--gold);
- color:var(--gold);padding:10px 14px;font-size:8px;display:none;z-index:99;letter-spacing:1px;text-align:center;max-width:90%}
-#errBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:999;background:#5e1020;color:#ffd0d0;
- border-bottom:3px solid #ff5d7d;padding:10px 14px;font-size:9px;line-height:1.7;font-family:monospace}
-footer{text-align:center;font-size:6px;color:#4a4a6a;padding:12px;letter-spacing:1px}
-</style>
 <script>
-window.addEventListener('error',function(e){var b=document.getElementById('errBanner');if(b){b.style.display='block';b.textContent='JS ERROR: '+(e.message||'unknown')+' (line '+(e.lineno||'?')+')';}});
-</script>
-</head>
-<body>
-<div id="errBanner"></div>
-
-<header>
-  <span class="heart"></span>
-  <h1>PIXELTALE</h1>
-  <span class="tag">RETRO STORY STUDIO</span>
-  <div class="hspace"></div>
-  <button class="btn mini" id="sfxBtn" type="button">SFX ON</button>
-  <button class="btn green mini" id="saveBtn" type="button">SAVE</button>
-  <button class="btn green mini" id="loadBtn" type="button">LOAD</button>
-  <button class="btn cyan mini" id="shareBtn" type="button">SHARE</button>
-  <button class="btn gold big" id="playBtn" type="button">&#9654; PLAY</button>
-</header>
-
-<main>
-  <div id="stageCol">
-    <div id="stage" class="pbox">
-      <canvas id="bgCanvas" width="320" height="180"></canvas>
-      <div id="lightFx"></div>
-      <div id="scanFx"></div>
-      <div id="stageVignette"></div>
-
-      <!-- Transition overlays -->
-      <div id="transOverlay">
-        <div id="transFade"></div>
-        <canvas id="transPixelCanvas"></canvas>
-        <div id="transSlide"></div>
-        <div id="transIris"></div>
-        <div id="transDissolve"></div>
-      </div>
-
-      <div id="sceneUI">
-        <div id="picWindow"><div id="picMid"><img id="storyPic" alt=""></div></div>
-        <div id="dialogWrap"><div id="dialogMid"><div id="dialogInner"><span id="dialogText"></span><span id="cursor" style="visibility:hidden">&#9660;</span></div></div></div>
-      </div>
-      <div id="titleCard"><div id="titleText"></div><div id="titleSub">PRESS SPACE / CLICK</div></div>
-      <div id="dialoguePanel">
-        <div class="dlg-row"><div class="dlg-portrait-frame" id="dlgFrameA"><img class="dlg-portrait" id="dlgPortA" alt=""></div><div class="dlg-content"><div class="dlg-name" id="dlgNameA"></div><div class="dlg-text" id="dlgTextA"></div></div></div>
-        <div class="dlg-row"><div class="dlg-portrait-frame" id="dlgFrameB"><img class="dlg-portrait" id="dlgPortB" alt=""></div><div class="dlg-content"><div class="dlg-name" id="dlgNameB"></div><div class="dlg-text" id="dlgTextB"></div></div></div>
-      </div>
-      <div id="endCard">&#10022; THE END &#10022;<small>CLICK OR PRESS ESC</small></div>
-      <div id="playHint">CLICK / SPACE = NEXT</div>
-    </div>
-    <div id="statusBar" class="pbox">BOOTING...</div>
-  </div>
-
-  <aside id="editor" class="pbox">
-    <div class="sec">
-      <h2>BACKGROUND</h2>
-      <div id="bgGrid"></div>
-      <div class="row">
-        <button class="btn mini" id="bgUploadBtn" type="button">UPLOAD BG</button>
-        <label class="chk"><input type="checkbox" id="pixelChk" checked>PIXELATE</label>
-        <button class="btn mini" id="bgClearBtn" type="button" style="display:none">CLEAR</button>
-      </div>
-      <div class="note" id="bgNote">PICK A PRESET OR UPLOAD JPG/PNG/GIF</div>
-    </div>
-    <div class="sec">
-      <h2>STORY LINES</h2>
-      <div id="lineList"></div>
-      <div class="row">
-        <button class="btn gold" id="addLine" type="button">+ LINE</button>
-        <button class="btn cyan" id="addTitle" type="button">+ TITLE</button>
-        <button class="btn green" id="addDialogue" type="button">+ DIALOGUE</button>
-      </div>
-      <div class="note">EACH LINE HAS ITS OWN TRANSITION EFFECT</div>
-    </div>
-    <div class="sec">
-      <h2>REVEAL &amp; LIGHTING</h2>
-      <div class="row"><span class="lbl">SPEED</span><input type="range" id="speed" min="1" max="10" value="5" style="flex:1"><span class="val" id="speedVal">5</span></div>
-      <div class="row" id="fxRow">
-        <button class="fxbtn on" data-fx="none" type="button">NONE</button>
-        <button class="fxbtn" data-fx="night" type="button">NIGHT</button>
-        <button class="fxbtn" data-fx="dusk" type="button">DUSK</button>
-        <button class="fxbtn" data-fx="candle" type="button">CANDLE</button>
-        <button class="fxbtn" data-fx="storm" type="button">STORM</button>
-      </div>
-      <div class="row">
-        <label class="chk"><input type="checkbox" id="scanChk" checked>SCANLINES</label>
-        <label class="chk"><input type="checkbox" id="autoChk">AUTO-NEXT</label>
-      </div>
-    </div>
-    <div class="sec">
-      <h2>PICTURES / PORTRAITS</h2>
-      <button class="btn mini" id="imgUploadBtn" type="button">UPLOAD IMAGES</button>
-      <div id="imgGrid"></div>
-    </div>
-    <div class="sec">
-      <h2>MUSIC</h2>
-      <div class="row">
-        <button class="btn mini" id="musicBtn" type="button">UPLOAD MP3</button>
-        <span class="note" id="musicName" style="margin:0">NO TRACK</span>
-      </div>
-      <div class="row"><span class="lbl">VOL</span><input type="range" id="vol" min="0" max="100" value="70" style="flex:1"></div>
-    </div>
-  </aside>
-</main>
-
-<footer>SPACE / ENTER / CLICK = ADVANCE · ESC = STOP</footer>
-
-<input type="file" id="bgFileInput" accept="image/*" hidden>
-<input type="file" id="imgFileInput" accept="image/*" multiple hidden>
-<input type="file" id="musicFileInput" accept="audio/*" hidden>
-<input type="file" id="loadFileInput" accept=".json,application/json" hidden>
-<div id="toast"></div>
-
-<script>
+// PATCHED TRANSITION ENGINE - Replace the old one
 (function(){
 'use strict';
 var W=320,H=180;
@@ -320,7 +39,7 @@ var state={
 var customImg=null,customName='',imgSeq=0,toastTimer=null,isReadOnly=false;
 
 /* ==================== REFS ==================== */
-var stage=$('#stage'),bctx=$('#bgCanvas').getContext('2d'),statusBar=$('#statusBar');
+var stage=$('#stage'),bctx=$('#bgCanvas').getContext('2d'),bgCanvas=$('#bgCanvas'),statusBar=$('#statusBar');
 var lightFx=$('#lightFx'),scanFx=$('#scanFx');
 var picWindow=$('#picWindow'),storyPic=$('#storyPic'),dialogText=$('#dialogText'),cursorEl=$('#cursor');
 var sceneUI=$('#sceneUI'),dialogWrap=$('#dialogWrap');
@@ -334,7 +53,6 @@ var lineList=$('#lineList'),imgGrid=$('#imgGrid'),bgGrid=$('#bgGrid');
 var audio=new Audio();audio.loop=true;
 bctx.imageSmoothingEnabled=false;
 var tmp=document.createElement('canvas');tmp.width=128;tmp.height=72;var tctx=tmp.getContext('2d');
-// Pixelate transition canvas
 var pxlCtx=transPixelCanvas.getContext('2d');
 
 function toast(msg){var el=$('#toast');el.textContent=msg;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.style.display='none';},3000);}
@@ -346,7 +64,7 @@ var frameErrShown=false;
 function frame(ts){var t=ts/1000;try{if(customImg){if(state.pixelate){tctx.drawImage(customImg,0,0,128,72);bctx.imageSmoothingEnabled=false;bctx.drawImage(tmp,0,0,W,H);}else{bctx.imageSmoothingEnabled=true;bctx.drawImage(customImg,0,0,W,H);}}else{bctx.imageSmoothingEnabled=false;BG[state.bg].draw(bctx,t);}}catch(err){if(!frameErrShown){frameErrShown=true;toast('BG ERROR: '+err.message);}}requestAnimationFrame(frame);}
 requestAnimationFrame(frame);
 
-/* ==================== TRANSITION ENGINE ==================== */
+/* ==================== FIXED TRANSITION ENGINE ==================== */
 var transBusy=false;
 
 function clearTransClasses(){
@@ -358,14 +76,22 @@ function clearTransClasses(){
  transDissolve.style.opacity='0';
 }
 
-// Capture current stage as pixelated snapshot for pixel transition
+/**
+ * Capture the current background canvas as a pixelated snapshot.
+ * FIXED: Draws from #bgCanvas (a real canvas element) instead of the stage div.
+ * This avoids the "Argument 1 could not be converted" TypeError.
+ */
 function captureStagePixelated(){
- var sw=stage.clientWidth,sh=stage.clientHeight;
- // Draw at very low res then scale up
- var lowW=40,lowH=Math.round(40*(sh/sw));
+ var sw=transPixelCanvas.width||stage.clientWidth;
+ var sh=transPixelCanvas.height||stage.clientHeight;
+ if(sw===0||sh===0)return;
+ // Draw bgCanvas at very low res then scale up for chunky pixel effect
+ var lowW=40,lowH=Math.round(40*(sh/sw))||22;
  var lc=document.createElement('canvas');lc.width=lowW;lc.height=lowH;
  var lctx=lc.getContext('2d');
- lctx.drawImage(stage,0,0,lowW,lowH);
+ lctx.imageSmoothingEnabled=false;
+ // Source is always a valid HTMLCanvasElement
+ lctx.drawImage(bgCanvas,0,0,lowW,lowH);
  pxlCtx.imageSmoothingEnabled=false;
  pxlCtx.clearRect(0,0,sw,sh);
  pxlCtx.drawImage(lc,0,0,sw,sh);
@@ -375,7 +101,7 @@ function captureStagePixelated(){
  * Run a transition.
  * @param {string} type - 'none','fade','pixel','slide','iris','dissolve'
  * @param {string} dir - 'in' or 'out'
- * @param {function} midCb - called at the midpoint (when screen is covered) for 'out' transitions
+ * @param {function} midCb - called at midpoint for 'out' transitions (content swap)
  * @param {function} doneCb - called when transition completes
  */
 function runTransition(type,dir,midCb,doneCb){
@@ -385,33 +111,25 @@ function runTransition(type,dir,midCb,doneCb){
  var duration=type==='slide'?700:type==='iris'?900:type==='dissolve'?600:800;
 
  if(dir==='out'){
-  // For pixel out, capture first
   if(type==='pixel')captureStagePixelated();
-  // Set initial state (hidden)
   clearTransClasses();
-  // Force reflow
-  void transOverlay.offsetWidth;
-  // Apply out class
+  void transOverlay.offsetWidth; // force reflow
   transOverlay.classList.add('trans-'+type+'-out');
-  // At midpoint, call midCb (content swap happens while covered)
   if(midCb)setTimeout(midCb,Math.floor(duration*0.5));
   setTimeout(function(){transBusy=false;if(doneCb)doneCb();},duration);
  }else{
-  // IN transition: start covered, reveal
   if(type==='pixel')captureStagePixelated();
-  // Set covered state without animation
+  // Disable transitions, set covered state
   transFade.style.transition='none';transPixelCanvas.style.transition='none';
   transSlide.style.transition='none';transIris.style.transition='none';transDissolve.style.transition='none';
   clearTransClasses();
-  // Manually set to "covered" state
   if(type==='fade')transFade.style.opacity='1';
-  else if(type==='pixel'){transPixelCanvas.style.opacity='1';}
+  else if(type==='pixel')transPixelCanvas.style.opacity='1';
   else if(type==='slide')transSlide.style.transform='translateX(0)';
   else if(type==='iris')transIris.style.clipPath='circle(0% at 50% 50%)';
   else if(type==='dissolve')transDissolve.style.opacity='1';
-  // Force reflow
-  void transOverlay.offsetWidth;
-  // Re-enable transitions and apply "in" class (reveals content)
+  void transOverlay.offsetWidth; // force reflow
+  // Re-enable transitions, apply reveal class
   transFade.style.transition='';transPixelCanvas.style.transition='';
   transSlide.style.transition='';transIris.style.transition='';transDissolve.style.transition='';
   transOverlay.classList.add('trans-'+type+'-in');
@@ -519,33 +237,20 @@ function nextLine(){
  var L=state.lines[lineIdx];
  var prevTrans=(lineIdx>0)?(state.lines[lineIdx-1].trans||'none'):'none';
  var curTrans=L.trans||'none';
-
- // Determine what transitions to run
  var doOut=(prevTrans!=='none'&&lineIdx>0);
  var doIn=(curTrans!=='none');
 
  if(doOut){
-  // Run OUT transition, swap content at midpoint, then run IN if needed
   runTransition(prevTrans,'out',function(){
-   // Midpoint: swap content while covered
    setupLine(L);
-   if(doIn){
-    // After out finishes, run IN
-    // (handled in doneCb below)
-   }else{
-    startTyping(L);
-   }
+   if(!doIn)startTyping(L);
   },function(){
-   if(doIn){
-    runTransition(curTrans,'in',null,function(){startTyping(L);});
-   }
+   if(doIn)runTransition(curTrans,'in',null,function(){startTyping(L);});
   });
  }else if(doIn){
-  // No out, just fade/pixel/etc IN
   setupLine(L);
   runTransition(curTrans,'in',null,function(){startTyping(L);});
  }else{
-  // No transitions at all
   setupLine(L);startTyping(L);
  }
 }
@@ -593,10 +298,6 @@ function stepDlgB(){if(!playing||!typing)return;var s=document.createElement('sp
 function finishLine(){
  typing=false;waiting=true;var L=state.lines[lineIdx];
  if(L&&L.type!=='dialogue')cursorEl.style.visibility='visible';
- if(L&&(L.trans||'none')!=='none'){
-  // Preview the out transition at end of line (optional visual cue)
-  // Actually we run it on advance, not here. Keep clean.
- }
  if(state.autoNext)autoTimer=setTimeout(advance,2000);
 }
 function revealAll(){clearTimeout(typeTimer);var L=state.lines[lineIdx];if(L.type==='dialogue'){dlgTextA.innerHTML=esc(L.charA.text||'');dlgTextB.innerHTML=esc(L.charB.text||'');}else if(L.type!=='title'){while(wi<words.length){var s=document.createElement('span');s.textContent=words[wi];dialogText.appendChild(s);dialogText.appendChild(document.createTextNode(' '));wi++;}}finishLine();}
@@ -621,5 +322,3 @@ $('#shareBtn').addEventListener('click',function(){var data={v:4,bg:state.bg,px:
 if(!isReadOnly){renderLines();renderImages();updateBgUI();refreshStatus();fitStage();statusBar.textContent+=' - READY';}else{fitStage();}
 })();
 </script>
-</body>
-</html>
