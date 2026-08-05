@@ -28,6 +28,12 @@ try {
   }
 } catch(e) { console.warn('Supabase failed:', e); }
 
+/* A shared ?story= link is a viewing session, not an editing one. Detected
+   before anything renders so the editor is never built or shown. */
+var VIEWER_SLUG = (function(){ var m = location.search.match(/[?&]story=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; })();
+var VIEWER = !!VIEWER_SLUG;
+if (VIEWER) document.documentElement.classList.add('viewer');
+
 var session = null;
 var isLoggedIn = false;
 var pendingDeleteId = null;
@@ -240,12 +246,12 @@ function fmtBytes(n){ if(!n)return '0B'; var u=['B','KB','MB']; var i=Math.min(u
    Now: procedural scenes run at 30fps, static images draw once, and everything
    stops when the tab is in the background.
    ========================================================================== */
-var bgDirty = true, lastDraw = 0, FRAME_MS = 1000/30;
+var bgDirty = true, lastDraw = 0, FRAME_MS = 1000/30, showOver = false;
 function markBgDirty(){ bgDirty = true; }
 
 function frame(ts){
   requestAnimationFrame(frame);
-  if (document.hidden) return;
+  if (document.hidden || showOver) return;
   var isStatic = !!customImg;
   if (isStatic && !bgDirty) return;
   if (!isStatic && ts - lastDraw < FRAME_MS) return;
@@ -302,6 +308,7 @@ function runTrans(type,dir,midCb,doneCb){
    ========================================================================== */
 var thumbJobs=[], bgGridVisible=true, thumbTimer=null;
 (function(){
+  if(VIEWER)return;
   for(var key in BG){
     (function(k){
       var b=document.createElement('button'); b.className='bgCard'; b.dataset.bg=k; b.type='button';
@@ -459,6 +466,7 @@ async function uploadPending(){
 }
 
 function renderImages(){
+  if(VIEWER)return;
   imgGrid.innerHTML='';
   var frag=document.createDocumentFragment();
   for(var i=0;i<state.images.length;i++){
@@ -518,6 +526,7 @@ $('#imgFileInput').addEventListener('change',async function(e){
    EDITOR
    ========================================================================== */
 function refreshStatus(){
+  if(VIEWER)return;
   var el=$('#statusText'); if(!el)return;
   el.textContent='BG: '+(customImg?'CUSTOM':BG[state.bg].name)+' | FX: '+state.lighting.toUpperCase()+' | '+state.lines.length+' ITEMS';
 }
@@ -632,6 +641,7 @@ function makeLineNode(L,i){
 }
 
 function renderLines(){
+  if(VIEWER)return;
   var scroll=editorEl?editorEl.scrollTop:0;
   buildOptionCaches();
   var frag=document.createDocumentFragment();
@@ -1115,7 +1125,11 @@ function nextLine(){
     if(has)break;
     lineIdx++;
   }
-  if(lineIdx>=state.lines.length){ended=true;typing=false;waiting=false;hideAll();sceneUI.style.display='';endCard.classList.add('show');return;}
+  if(lineIdx>=state.lines.length){
+    ended=true;typing=false;waiting=false;hideAll();sceneUI.style.display='';
+    if(VIEWER)endShow(); else endCard.classList.add('show');
+    return;
+  }
   var L2=state.lines[lineIdx];
   var prev=(lineIdx>0)?(state.lines[lineIdx-1].trans||'none'):'none';
   var cur=L2.trans||'none';
@@ -1127,7 +1141,7 @@ function nextLine(){
 }
 
 function advance(){
-  if(!playing)return;
+  if(!playing||showOver)return;
   clearTimeout(autoTimer);
   var L=state.lines[lineIdx];
   if(L&&L.type==='interactive')return;
@@ -1143,6 +1157,30 @@ function advance(){
   if(typing){revealAll();return;}
   if(waiting){waiting=false;cursorEl.style.visibility='hidden';nextLine();return;}
   if(ended)stopPlay();
+}
+
+/* Viewers get a fade to black instead of a THE END card. window.close() only
+   succeeds when the page was opened by a script, so the black screen is the
+   real ending and closing is a bonus when the browser permits it. */
+function fadeOutAudio(ms){
+  var v=audio.volume, steps=24, i=0;
+  var t=setInterval(function(){
+    i++;
+    try{ audio.volume = Math.max(0, v*(1-i/steps)); }catch(e){}
+    if(i>=steps){ clearInterval(t); try{audio.pause();audio.volume=v;}catch(e){} }
+  }, Math.max(16, ms/steps));
+}
+
+function endShow(){
+  playing=false; typing=false; waiting=false;
+  clearTimeout(typeTimer); clearTimeout(autoTimer);
+  fadeOutAudio(1200);
+  var b=$('#blackout'); if(b)b.classList.add('show');
+  setTimeout(function(){
+    showOver = true;               // stops the canvas loop entirely
+    try{ audio.pause(); }catch(e){}
+    try{ window.close(); }catch(e){}
+  }, 1400);
 }
 
 function startPlay(){
@@ -1178,15 +1216,15 @@ function stopPlay(){
   hideAll(); sceneUI.style.display=''; clearTrans();
 }
 playBtn.addEventListener('click',function(){if(playing)stopPlay();else startPlay();});
-stageEl.addEventListener('click',function(e){if(playing&&!transBusy){if(e.target.closest('.interact-btn')||e.target.closest('.hotspot'))return;advance();}});
+stageEl.addEventListener('click',function(e){if(playing&&!transBusy&&!showOver){if(e.target.closest('.interact-btn')||e.target.closest('.hotspot'))return;advance();}});
 document.addEventListener('keydown',function(e){
-  if(!playing)return;
+  if(!playing||showOver)return;
   if(e.code==='Space'||e.code==='Enter'){
     e.preventDefault();
     var L=state.lines[lineIdx];
     if(L&&L.type==='interactive')return;
     if(!transBusy)advance();
-  } else if(e.code==='Escape')stopPlay();
+  } else if(e.code==='Escape'&&!VIEWER)stopPlay();
 });
 
 /* ==========================================================================
@@ -1590,21 +1628,34 @@ document.addEventListener('keydown',function(e){
 (async function boot(){
   await initAuth();
 
-  var slugMatch=location.search.match(/[?&]story=([^&]+)/);
-  if(slugMatch){
-    var slug=decodeURIComponent(slugMatch[1]);
-    $('#statusText').textContent='LOADING STORY...';
-    var row=await loadStoryBySlug(slug,true);
-    if(row&&row.data){
-      loadStateFromData(row.data);
-      document.body.classList.add('playing');
-      $('header').style.display='none';
-      $('#editor').style.display='none';
-      $('#statusBar').style.display='none';
-      setTimeout(startPlay,600);
+  if(VIEWER){
+    var gate=$('#viewerGate'), gateMsg=$('#gateMsg'), gateBtn=$('#gateBtn');
+    var row=await loadStoryBySlug(VIEWER_SLUG,true);
+    if(!row||!row.data){
+      gateMsg.textContent='STORY NOT FOUND';
       return;
     }
-    toast('STORY NOT FOUND');
+    loadStateFromData(row.data);
+    document.body.classList.add('playing');
+
+    // One tap before the first frame. Browsers refuse to start audio without a
+    // gesture, so without this the music and typing sounds are silently muted
+    // on every shared link.
+    gateMsg.textContent=(row.title||'').toUpperCase().slice(0,48);
+    gateBtn.classList.add('show');
+    var started=false;
+    function begin(){
+      if(started)return; started=true;
+      gate.classList.add('gone');
+      setTimeout(function(){ gate.style.display='none'; }, 700);
+      setTimeout(startPlay, 350);
+    }
+    gateBtn.addEventListener('click',begin);
+    gate.addEventListener('click',begin);
+    document.addEventListener('keydown',function(e){
+      if(!started&&(e.code==='Space'||e.code==='Enter')){e.preventDefault();begin();}
+    });
+    return;
   }
 
   renderLines(); renderImages(); updateBgUI(); refreshStatus();
