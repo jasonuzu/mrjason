@@ -1,10 +1,24 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIXELTALE — Retro Story Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+SUPABASE SETUP — Run this SQL in your Supabase SQL Editor:
+  create table stories (
+    id uuid default gen_random_uuid() primary key,
+    slug text unique not null, title text not null, data jsonb not null,
+    author_email text not null, view_count integer default 0,
+    created_at timestamptz default now(), updated_at timestamptz default now()
+  );
+  create index on stories(slug); create index on stories(author_email);
+  alter table stories enable row level security;
+  create policy "public_select" on stories for select using (true);
+  create policy "public_insert" on stories for insert with check (true);
+  create policy "public_update" on stories for update using (true);
+  create policy "public_delete" on stories for delete using (true);
+-->
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--gold:#ffcc33;--cyan:#6fe3ff;--pink:#ff5d7d;--green:#7dee6a;--orange:#ff9040;--panel:#13131f;--panel2:#0e0e1a;--line:#30304e;--txt:#e8e8f2}
