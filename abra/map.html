@@ -336,6 +336,8 @@
     <label class="ly"><input type="checkbox" data-layer="landmarks" checked> Landmarks</label>
     <div style="font-weight:500;margin:12px 0 8px;font-size:13px;">Cultural & data</div>
     <label class="ly"><input type="checkbox" data-layer="regions"> Region names</label>
+    <label class="ly"><input type="checkbox" data-layer="climate"> Climate zones</label>
+    <label class="ly"><input type="checkbox" data-layer="pressure"> Pressure systems</label>
     <label class="ly"><input type="checkbox" data-layer="cultural"> Cultural zones</label>
     <label class="ly"><input type="checkbox" data-layer="political"> Political control</label>
     <label class="ly"><input type="checkbox" data-layer="population"> Population density</label>
@@ -1276,6 +1278,87 @@
       }
       tiles[y*WORLD_W+x] = code;
     }
+  }
+
+  // ============ THE WORLD'S HIGHEST PEAK ============
+  // Raise a great massif around (264, 145) so the map has a definitive
+  // summit — a shade under 10 km, about 1000 m above Everest. The bump is
+  // smooth and falls off over ~26 tiles so it reads as a mountain range
+  // rising to a single dominant peak rather than a spike.
+  const SUMMIT_X = 264, SUMMIT_Y = 145;
+  const SUMMIT_METERS = 9849;                 // Everest (8849 m) + 1000 m
+  (function raiseGreatPeak(){
+    const R = 26;
+    for(let dy=-R; dy<=R; dy++){
+      for(let dx=-R; dx<=R; dx++){
+        const x = SUMMIT_X + dx, y = SUMMIT_Y + dy;
+        if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if(d > R) continue;
+        const i = y*WORLD_W + x;
+        // Smooth cosine falloff, with ridge noise so the flanks aren't a cone
+        const falloff = 0.5 + 0.5*Math.cos(Math.PI * d / R);
+        const ridge = 1 + (warpNoiseA(x*0.35, y*0.35) - 0.5) * 0.45;
+        const lift = Math.pow(falloff, 1.7) * 0.62 * ridge;
+        elev[i] = Math.max(elev[i], 0.06) + lift;
+        // Cool it with height so the classifier makes snow peaks up top
+        temp[i] -= lift * 2.2;
+      }
+    }
+    // Guarantee the exact summit tile is the single highest point on the map.
+    // The ridge noise can push a flank above the centre, so compare against
+    // every tile in the world, not just the immediate neighbours.
+    const si = SUMMIT_Y*WORLD_W + SUMMIT_X;
+    let worldMax = 0;
+    for(let i=0;i<elev.length;i++) if(i !== si && elev[i] > worldMax) worldMax = elev[i];
+    elev[si] = worldMax + 0.015;
+    temp[si] -= 0.15;
+    // Reclassify the whole massif now that its heights have changed
+    for(let dy=-R; dy<=R; dy++){
+      for(let dx=-R; dx<=R; dx++){
+        const x = SUMMIT_X + dx, y = SUMMIT_Y + dy;
+        if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+        if(Math.sqrt(dx*dx+dy*dy) > R) continue;
+        const i = y*WORLD_W + x;
+        const e = elev[i], t = temp[i];
+        if(e > 0.45 && t < 0.35) tiles[i] = 11;      // snow peak
+        else if(e > 0.32) tiles[i] = 10;             // bare mountain
+        else if(e > 0.22) tiles[i] = 9;              // hills
+      }
+    }
+  })();
+
+  // ---- Real-world elevation scale ----
+  // Land begins at e = 0.02 (the beach/shallow boundary), so beaches must
+  // report 0 m or a little above — never below sea level. Heights follow a
+  // hypsometric curve: most land is low, and only the very top of the range
+  // reaches the extremes, which is how real continents are distributed.
+  const SEA_LEVEL = 0.02;
+  const ELEV_EXP = 2.35;
+  let ELEV_MAX_RAW = SEA_LEVEL;
+  for(let i=0;i<elev.length;i++) if(elev[i] > ELEV_MAX_RAW) ELEV_MAX_RAW = elev[i];
+  let OCEAN_MIN_RAW = 0;
+  for(let i=0;i<elev.length;i++) if(elev[i] < OCEAN_MIN_RAW) OCEAN_MIN_RAW = elev[i];
+
+  // Metres above (or below) sea level for a raw elevation value.
+  function elevMeters(e){
+    if(e <= SEA_LEVEL){
+      // Ocean floor — deepest trench around 8000 m down
+      const d = (SEA_LEVEL - e) / Math.max(1e-6, SEA_LEVEL - OCEAN_MIN_RAW);
+      return -Math.pow(Math.max(0, d), 1.25) * 8000;
+    }
+    const t = (e - SEA_LEVEL) / Math.max(1e-6, ELEV_MAX_RAW - SEA_LEVEL);
+    return Math.pow(Math.max(0, Math.min(1, t)), ELEV_EXP) * SUMMIT_METERS;
+  }
+  function elevMetersAt(x, y){
+    if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return 0;
+    return elevMeters(elev[y*WORLD_W + x]);
+  }
+  function formatElevation(e){
+    const m = elevMeters(e);
+    if(m < -1) return `${Math.round(-m).toLocaleString()} m below sea`;
+    if(m < 1)  return `sea level`;
+    return `${Math.round(m).toLocaleString()} m`;
   }
 
   // Carve some inland lakes
@@ -2251,191 +2334,572 @@
   // weather changes once per game day per region.
 
   const TIME_ZONES = 6;                                // number of longitude bands
-  const WEATHER_CELL_SIZE = 40;                        // tiles per side of one weather cell (smaller → more variety)
+  // ============================================================
+  // ================= CLIMATE & WEATHER ENGINE =================
+  // ============================================================
+  // The model is built from physical drivers rather than a lookup table, so
+  // weather emerges from where a place actually is:
+  //
+  //   1. LATITUDE      — sets the baseline energy budget (hot equator, cold poles)
+  //   2. SOLAR CYCLE   — the sun's declination migrates over the 360-day year,
+  //                      driving opposite seasons in each hemisphere
+  //   3. ITCZ          — the tropical rain belt follows the sun, creating
+  //                      wet/dry seasons and monsoons in the tropics
+  //   4. CONTINENTALITY— distance from the sea; inland means bigger temperature
+  //                      swings and less moisture, coasts stay mild and damp
+  //   5. ELEVATION     — 6.5 °C lost per 1000 m, so peaks are frozen even at
+  //                      the equator, and precipitation there falls as snow
+  //   6. OROGRAPHICS   — air forced up a windward slope rains out; the leeward
+  //                      side sits in a rain shadow and turns to desert
+  //   7. PRESSURE SYSTEMS — coherent lows and highs spawn on the mid-latitude
+  //                      storm tracks and travel east over several days, so
+  //                      weather arrives, passes through, and clears
+  //   8. TROPICAL CYCLONES — spawn over warm ocean in late summer only
+  //
+  // Everything is a pure function of (position, day, hour), so it's identical
+  // for every viewer and reproducible without storing any state.
+  // ============================================================
+
+  const DAYS_PER_YEAR = 360;                           // length of the in-game year
+  const WEATHER_CELL_SIZE = 12;                        // tiles per weather cell — finer than before
   const WEATHER_CELLS_X = Math.ceil(WORLD_W / WEATHER_CELL_SIZE);
   const WEATHER_CELLS_Y = Math.ceil(WORLD_H / WEATHER_CELL_SIZE);
-  const WEATHER_PERIODS_PER_DAY = 3;                   // weather can change every (24/3) = 8 in-game hours
+  const WEATHER_PERIODS_PER_DAY = 8;                   // re-evaluate every 3 in-game hours
 
-  // Pre-compute a "biome bucket" for each weather cell.
-  // Buckets group terrain types into a small set of weather climates:
-  //   ocean, coast, grass, forest, desert, savanna, jungle, swamp,
-  //   tundra, alpine (mountain/snow peak), lake.
-  // We sample a handful of tiles inside the cell and take the most common.
-  function tileToClimate(t){
-    if(t<=2) return 'ocean';
-    if(t===3) return 'coast';
-    if(t===4) return 'grass';
-    if(t===5 || t===6) return 'forest';
-    if(t===7) return 'desert';
-    if(t===8) return 'savanna';
-    if(t===9) return 'grass';     // hills are grasslandy for weather purposes
-    if(t===10) return 'alpine';
-    if(t===11) return 'alpine';
-    if(t===12) return 'tundra';
-    if(t===13) return 'swamp';
-    if(t===14) return 'jungle';
-    if(t===15) return 'lake';
-    return 'grass';
-  }
-  const cellClimate = new Array(WEATHER_CELLS_X * WEATHER_CELLS_Y);
-  for(let cy=0; cy<WEATHER_CELLS_Y; cy++){
-    for(let cx=0; cx<WEATHER_CELLS_X; cx++){
-      const counts = {};
-      const x0 = cx*WEATHER_CELL_SIZE, y0 = cy*WEATHER_CELL_SIZE;
-      const x1 = Math.min(WORLD_W, x0+WEATHER_CELL_SIZE), y1 = Math.min(WORLD_H, y0+WEATHER_CELL_SIZE);
-      // sample on a coarse grid for speed
-      for(let sy=y0; sy<y1; sy+=4){
-        for(let sx=x0; sx<x1; sx+=4){
-          const c = tileToClimate(tiles[sy*WORLD_W+sx]);
-          counts[c] = (counts[c]||0) + 1;
-        }
-      }
-      // Pick the dominant; tie-break by ranking land over water if both are close.
-      let best='ocean', bestN=0;
-      for(const k in counts){ if(counts[k]>bestN){ bestN=counts[k]; best=k; } }
-      cellClimate[cy*WEATHER_CELLS_X + cx] = best;
+  // ---------- Static field 1: distance to the nearest ocean ----------
+  // Multi-source BFS out from every water tile. Continentality drives how
+  // extreme the seasons are and how much moisture reaches a place.
+  const oceanDist = new Uint16Array(WORLD_W * WORLD_H);
+  (function computeOceanDistance(){
+    const INF = 65535;
+    oceanDist.fill(INF);
+    const queue = new Int32Array(WORLD_W * WORLD_H);
+    let head = 0, tail = 0;
+    for(let i=0;i<tiles.length;i++){
+      if(tiles[i] <= 2){ oceanDist[i] = 0; queue[tail++] = i; }
     }
+    while(head < tail){
+      const idx = queue[head++];
+      const d = oceanDist[idx];
+      const x = idx % WORLD_W, y = (idx - x) / WORLD_W;
+      for(let k=0;k<4;k++){
+        const nx = x + (k===0?1:k===1?-1:0);
+        const ny = y + (k===2?1:k===3?-1:0);
+        if(nx<0||nx>=WORLD_W||ny<0||ny>=WORLD_H) continue;
+        const ni = ny*WORLD_W + nx;
+        if(oceanDist[ni] !== INF) continue;
+        oceanDist[ni] = d + 1;
+        queue[tail++] = ni;
+      }
+    }
+  })();
+  // 0 at the coast → 1 deep inland. Saturates around 120 tiles (1200 km).
+  function continentality(x, y){
+    return Math.min(1, oceanDist[y*WORLD_W + x] / 120);
   }
 
-  // Weather distribution per climate. Each entry is an array of [weather, weight].
-  // Weights don't have to sum to anything specific — we normalize per-pick.
-  const CLIMATE_WEATHER = {
-    desert:   [['clear', 60], ['cloudy', 18], ['sandstorm', 14], ['fog', 5], ['storm', 3]],
-    savanna:  [['clear', 55], ['cloudy', 22], ['rain', 13], ['storm', 8], ['fog', 2]],
-    grass:    [['clear', 38], ['cloudy', 28], ['rain', 20], ['fog', 8], ['storm', 6]],
-    forest:   [['clear', 28], ['cloudy', 30], ['rain', 24], ['fog', 12], ['storm', 6]],
-    jungle:   [['clear', 22], ['cloudy', 22], ['rain', 35], ['storm', 16], ['fog', 5]],
-    swamp:    [['fog', 35], ['cloudy', 25], ['rain', 22], ['clear', 12], ['storm', 6]],
-    coast:    [['clear', 35], ['cloudy', 25], ['fog', 18], ['rain', 15], ['storm', 7]],
-    ocean:    [['clear', 30], ['cloudy', 28], ['fog', 14], ['rain', 16], ['storm', 12]],
-    lake:     [['clear', 35], ['cloudy', 28], ['fog', 17], ['rain', 14], ['storm', 6]],
-    tundra:   [['clear', 22], ['cloudy', 28], ['snow', 28], ['fog', 18], ['blizzard', 4]],
-    alpine:   [['snow', 35], ['cloudy', 22], ['fog', 18], ['clear', 17], ['blizzard', 8]],
+  // ---------- Prevailing winds ----------
+  // Three classic circulation bands per hemisphere. Returns the direction the
+  // air is travelling TOWARD, in radians (0 = east).
+  function prevailingWindAngle(fy, day){
+    const north = fy < 0.5;
+    const lat = Math.abs(fy - 0.5) * 2;          // 0 equator → 1 pole
+    let ang;
+    if(lat < 0.30)      ang = Math.PI;            // trade winds: blow west
+    else if(lat < 0.65) ang = 0;                  // westerlies: blow east
+    else                ang = Math.PI;            // polar easterlies: blow west
+    // Coriolis deflection — poleward in the tropics, equatorward at the poles
+    const defl = (lat < 0.30 ? 0.35 : lat < 0.65 ? -0.28 : 0.30) * (north ? 1 : -1);
+    // Seasonal wobble as the whole circulation shifts with the sun
+    const wobble = solarDeclination(day) * 0.12 * (north ? 1 : -1);
+    return ang + defl + wobble;
+  }
+
+  // ---------- Static field 2: orographic lift ----------
+  // Positive where the land rises into the prevailing wind (rain falls here),
+  // negative on the sheltered side (rain shadow → arid).
+  const orographic = new Float32Array(WORLD_W * WORLD_H);
+  (function computeOrographic(){
+    const SAMPLE = 6;                             // look this many tiles upwind
+    for(let y=0;y<WORLD_H;y++){
+      const fy = y / WORLD_H;
+      // Use the annual-mean wind so the field stays static
+      const ang = prevailingWindAngle(fy, 90);
+      const ux = Math.cos(ang), uy = Math.sin(ang) * 0.5;
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        if(tiles[i] <= 2){ orographic[i] = 0; continue; }
+        // Upwind is opposite the direction of travel
+        const sx = Math.round(x - ux*SAMPLE);
+        const sy = Math.round(y - uy*SAMPLE);
+        if(sx<0||sx>=WORLD_W||sy<0||sy>=WORLD_H){ orographic[i] = 0; continue; }
+        orographic[i] = elev[i] - elev[sy*WORLD_W + sx];
+      }
+    }
+  })();
+
+  // ---------- Solar cycle ----------
+  // -1 (southern summer) → +1 (northern summer). Peaks near day 172 / 356.
+  function solarDeclination(day){
+    return Math.sin(2 * Math.PI * ((day - 80) / DAYS_PER_YEAR));
+  }
+  // ---------- Solar geometry ----------
+  // Proper spherical astronomy, so sunrise and sunset land where they should:
+  // roughly 06:00/18:00 at the equator all year, swinging to midnight sun and
+  // polar night inside the circles, with everything in between.
+  const AXIAL_TILT = 23.44 * Math.PI / 180;
+  function solarDeclRad(day){ return AXIAL_TILT * solarDeclination(day); }
+  function latRad(fy){ return (0.5 - fy) * Math.PI; }        // +90° at the top
+  // Sun's altitude above the horizon, in radians (negative = below).
+  function solarAltitude(fy, day, localHour){
+    const lat = latRad(fy), dec = solarDeclRad(day);
+    const H = (localHour - 12) * 15 * Math.PI / 180;         // hour angle
+    const sinAlt = Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(H);
+    return Math.asin(Math.max(-1, Math.min(1, sinAlt)));
+  }
+  // Hours of daylight, handling midnight sun and polar night.
+  function dayLength(fy, day){
+    const lat = latRad(fy), dec = solarDeclRad(day);
+    const c = -Math.tan(lat) * Math.tan(dec);
+    if(c <= -1) return 24;      // sun never sets
+    if(c >=  1) return 0;       // sun never rises
+    return 2 * Math.acos(c) * 12 / Math.PI;
+  }
+  function sunTimes(fy, day){
+    const L = dayLength(fy, day);
+    if(L >= 24) return {sunrise:null, sunset:null, length:24, midnightSun:true};
+    if(L <= 0)  return {sunrise:null, sunset:null, length:0,  polarNight:true};
+    return {sunrise: 12 - L/2, sunset: 12 + L/2, length: L};
+  }
+  // Mean insolation across the whole day — the baseline the diurnal swing
+  // oscillates around, so a place with a long day runs warmer overall.
+  function meanInsolation(fy, day){
+    let sum = 0;
+    for(let h=0; h<24; h+=2) sum += Math.max(0, Math.sin(solarAltitude(fy, day, h)));
+    return sum / 12;
+  }
+
+  // The tropical rain belt follows the sun but lags and stays nearer the equator.
+  function itczFy(day){
+    return 0.5 - solarDeclination(day) * 0.085;
+  }
+  // Mid-latitude storm tracks migrate equatorward in winter, poleward in summer.
+  function stormTrackFy(day, north){
+    const decl = solarDeclination(day) * (north ? 1 : -1);
+    const base = north ? 0.30 : 0.70;
+    return base + (north ? -1 : 1) * decl * 0.06;
+  }
+
+  // ---------- Climate zones ----------
+  const ZONE = {
+    OCEAN:0, ICECAP:1, TUNDRA:2, BOREAL:3, OCEANIC:4, CONTINENTAL:5,
+    MEDITERRANEAN:6, SUBTROPICAL:7, STEPPE:8, DESERT:9, SAVANNA:10,
+    MONSOON:11, RAINFOREST:12, ALPINE:13, HIGHLAND:14
   };
-  // ============ SEASONS & WIND ============
-  // The world cycles through 4 seasons over 360 in-game days. Northern and
-  // southern hemispheres run opposite seasons (when one is in summer, the
-  // other is in winter). The current season biases weather: summer = more
-  // storms and clear, winter = more snow/blizzard, spring/autumn = more rain
-  // and fog.
-  // Wind direction per cell drifts slowly, and weather animations use it for
-  // visual drift direction (rain comes from upwind, sandstorms blow that way).
-  const DAYS_PER_YEAR = 360;
-  const SEASONS = ['spring','summer','autumn','winter'];
-  function seasonAt(day, latitude /* fy in 0..1 */){
-    // Day 0..89 = spring (north hemisphere), 90..179 = summer, etc.
-    const yearDay = ((day - 1) % DAYS_PER_YEAR + DAYS_PER_YEAR) % DAYS_PER_YEAR;
-    let s = Math.floor(yearDay / 90);     // 0..3 in northern hem
-    // Southern hemisphere is offset by 2 (opposite season)
-    if(latitude > 0.5) s = (s + 2) % 4;
-    return SEASONS[s];
-  }
-  // Apply seasonal modulation to a weather table.
-  function seasonalShift(table, season){
-    return table.map(([w, wt]) => {
-      let nw = w, nwt = wt;
-      if(season === 'summer'){
-        if(w === 'snow' || w === 'blizzard') nwt = wt * 0.05;     // very rare
-        if(w === 'storm') nwt = wt * 1.6;                          // more frequent
-        if(w === 'clear') nwt = wt * 1.3;
-        if(w === 'fog')   nwt = wt * 0.6;
-      } else if(season === 'winter'){
-        if(w === 'rain')  { nw = 'snow'; nwt = wt * 1.4; }         // rain becomes snow
-        if(w === 'storm') { nw = 'blizzard'; nwt = wt * 0.8; }
-        if(w === 'snow' || w === 'blizzard') nwt = wt * 1.6;
-        if(w === 'sandstorm') nwt = wt * 0.4;
-        if(w === 'clear') nwt = wt * 0.85;
-        if(w === 'fog')   nwt = wt * 1.4;
-      } else if(season === 'spring' || season === 'autumn'){
-        if(w === 'rain')  nwt = wt * 1.3;
-        if(w === 'fog')   nwt = wt * 1.2;
-        if(w === 'storm') nwt = wt * 0.9;
-        if(w === 'snow' || w === 'blizzard') nwt = wt * (season==='spring' ? 0.4 : 0.7);
+  const ZONE_NAMES = [
+    'Ocean','Ice cap','Tundra','Boreal forest','Temperate oceanic','Humid continental',
+    'Mediterranean','Humid subtropical','Steppe','Desert','Tropical savanna',
+    'Monsoon','Rainforest','Alpine','Highland'
+  ];
+  const ZONE_COLORS = [
+    [40,70,110],[226,236,244],[178,196,196],[54,92,74],[92,150,110],[110,146,96],
+    [190,176,96],[110,164,88],[196,182,112],[222,196,130],[196,178,86],
+    [96,150,120],[36,110,70],[212,216,226],[150,160,150]
+  ];
+
+  // Each tile's zone, computed once from latitude, elevation, moisture and
+  // distance to the sea. This is the Köppen-style backbone of the model.
+  const zoneMap = new Uint8Array(WORLD_W * WORLD_H);
+  (function computeZones(){
+    for(let y=0;y<WORLD_H;y++){
+      const fy = y / WORLD_H;
+      const lat = Math.abs(fy - 0.5) * 2;
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        const t = tiles[i];
+        if(t <= 2 || t === 15){ zoneMap[i] = ZONE.OCEAN; continue; }
+        const e = elev[i];
+        const m = moist[i];
+        const cont = continentality(x, y);
+        const oro = orographic[i];
+        const elevM = Math.max(0, elevMeters(e));
+
+        // Polar belt first — a mountain inside the ice cap is still ice cap
+        if(lat > 0.88){ zoneMap[i] = ZONE.ICECAP; continue; }
+
+        // Elevation trumps latitude, but the snow line drops as you go poleward:
+        // ~3200 m at the equator falling to ~600 m near the poles.
+        const alpineLine   = 3200 - 2600 * lat;
+        const highlandLine = 1900 - 1400 * lat;
+        if(elevM > alpineLine){ zoneMap[i] = ZONE.ALPINE; continue; }
+        if(elevM > highlandLine){ zoneMap[i] = ZONE.HIGHLAND; continue; }
+
+        if(lat > 0.76){ zoneMap[i] = ZONE.TUNDRA; continue; }
+        if(lat > 0.62){ zoneMap[i] = ZONE.BOREAL; continue; }
+
+        // Subtropical dry belt (~15–35°) plus any strong rain shadow
+        const inDryBelt = lat > 0.28 && lat < 0.48;
+        const shadow = oro < -0.035;
+        const dry = m < 0.34 || (inDryBelt && m < 0.46) || (shadow && m < 0.52);
+
+        if(lat < 0.24){
+          // Tropics
+          if(dry) { zoneMap[i] = m < 0.26 ? ZONE.DESERT : ZONE.SAVANNA; continue; }
+          if(m > 0.62 && cont < 0.55){ zoneMap[i] = ZONE.RAINFOREST; continue; }
+          if(m > 0.48){ zoneMap[i] = ZONE.MONSOON; continue; }
+          zoneMap[i] = ZONE.SAVANNA; continue;
+        }
+        if(dry){
+          zoneMap[i] = m < 0.28 ? ZONE.DESERT : ZONE.STEPPE;
+          continue;
+        }
+        if(lat < 0.40){
+          // Warm temperate: dry-summer west coasts vs humid east
+          zoneMap[i] = (cont < 0.35 && m < 0.55) ? ZONE.MEDITERRANEAN : ZONE.SUBTROPICAL;
+          continue;
+        }
+        // Cool temperate: maritime near the sea, continental inland
+        zoneMap[i] = cont > 0.45 ? ZONE.CONTINENTAL : ZONE.OCEANIC;
       }
-      return [nw, nwt];
-    });
-  }
-
-  // Wind direction at a cell on a given day (in radians, 0 = east).
-  // Modeled as broad pressure cells that rotate slowly across the year and
-  // are deflected by latitude (Coriolis-ish effect — equator winds blow east,
-  // mid-latitudes blow west, etc.). Returns {angle, speed}.
-  function windAtCell(cellX, cellY, day){
-    const fy = cellY / WEATHER_CELLS_Y;
-    // Latitudinal "trade wind" baseline: equatorial = westerly, mid = easterly,
-    // polar = westerly again — but simplified to two bands.
-    const latAbs = Math.abs(fy - 0.5) * 2;   // 0..1 (0 at equator)
-    let baseAngle;
-    if(latAbs < 0.35) baseAngle = Math.PI;          // tropics: wind from east → blows west (angle = π)
-    else if(latAbs < 0.7) baseAngle = 0;             // mid-lat: westerlies (blow east)
-    else baseAngle = Math.PI;                        // polar easterlies
-    // Slow seasonal/regional perturbation
-    const yearPhase = (day / DAYS_PER_YEAR) * Math.PI * 2;
-    const cellPhase = (cellX * 0.7 + cellY * 0.5);
-    const perturbation = Math.sin(yearPhase + cellPhase) * 0.5
-                       + Math.cos(yearPhase * 0.5 + cellY * 0.3) * 0.3;
-    const angle = baseAngle + perturbation;
-    // Speed: stronger in mid-latitudes
-    const speed = 0.5 + Math.sin(latAbs * Math.PI) * 0.5
-                + Math.abs(Math.sin(yearPhase + cellX * 0.4)) * 0.3;
-    return {angle, speed};
-  }
-
-  // Latitude can also nudge picks — colder climates near the poles get more snow even on grass.
-  function climatePolarShift(climate, latAbs){
-    const base = CLIMATE_WEATHER[climate] || CLIMATE_WEATHER.grass;
-    if(latAbs < 0.55) return base;     // not polar — return the base weather table
-    // Replace "rain" with "snow" probabilistically in cold latitudes
-    return base.map(([w, wt]) => {
-      if(w === 'rain') return ['snow', wt];
-      if(w === 'storm' && latAbs > 0.8) return ['blizzard', wt];
-      return [w, wt];
-    });
-  }
-
-  // Hash (cellX, cellY, day, period) → 0..1 deterministic
-  function weatherHash(cellX, cellY, day, period){
-    let h = (cellX*73856093) ^ (cellY*19349663) ^ (day*83492791) ^ (period*131) ^ SEED;
-    h = (h ^ (h>>>16)) >>> 0;
-    h = (h * 2246822507) >>> 0;
-    h = (h ^ (h>>>13)) >>> 0;
-    h = (h * 3266489917) >>> 0;
-    h = (h ^ (h>>>16)) >>> 0;
-    return (h % 100000) / 100000;
-  }
-
-  function pickWeighted(table, r){
-    let total = 0;
-    for(const [, wt] of table) total += wt;
-    let acc = 0;
-    const target = r * total;
-    for(const [w, wt] of table){
-      acc += wt;
-      if(target <= acc) return w;
     }
-    return table[table.length-1][0];
+  })();
+
+  function zoneAt(x, y){
+    if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return ZONE.OCEAN;
+    return zoneMap[y*WORLD_W + x];
+  }
+  function zoneName(x, y){ return ZONE_NAMES[zoneAt(x, y)]; }
+
+  // ---------- Seasons ----------
+  // Different latitudes experience fundamentally different season types: the
+  // tropics alternate wet and dry rather than warm and cold, and the poles
+  // swing between endless day and endless night.
+  function seasonAt(day, fy){
+    const lat = Math.abs(fy - 0.5) * 2;
+    const north = fy < 0.5;
+    const decl = solarDeclination(day) * (north ? 1 : -1);   // + = local summer
+    if(lat > 0.80){
+      return decl > 0.25 ? 'polar day' : decl < -0.25 ? 'polar night' : (decl > 0 ? 'thaw' : 'freeze');
+    }
+    if(lat < 0.24){
+      // Wet when the rain belt is overhead, dry when it has moved away
+      const d = Math.abs(fy - itczFy(day));
+      return d < 0.075 ? 'wet' : d < 0.13 ? 'turning' : 'dry';
+    }
+    // Quarters are anchored to the equinoxes/solstices: spring begins at the
+    // March-equivalent equinox (day 80), so summer brackets the solstice.
+    const yearDay = ((day - 80) % DAYS_PER_YEAR + DAYS_PER_YEAR) % DAYS_PER_YEAR;
+    let s = Math.floor(yearDay / (DAYS_PER_YEAR/4));
+    if(!north) s = (s + 2) % 4;
+    return ['spring','summer','autumn','winter'][s];
   }
 
-  function weatherAtCell(cellX, cellY, day, period){
-    if(cellX < 0 || cellX >= WEATHER_CELLS_X || cellY < 0 || cellY >= WEATHER_CELLS_Y) return 'clear';
-    const climate = cellClimate[cellY*WEATHER_CELLS_X + cellX];
-    if(!climate) return 'clear';
-    const fy = cellY / WEATHER_CELLS_Y;
-    const latAbs = Math.abs(fy - 0.5) * 2;
-    let table = climatePolarShift(climate, latAbs);
-    // Apply seasonal modulation
-    const season = seasonAt(day, fy);
-    table = seasonalShift(table, season);
-    const r = weatherHash(cellX, cellY, day, period);
-    return pickWeighted(table, r);
+  // ---------- Pressure systems ----------
+  // Lows and highs are spawned on a fixed schedule and drift east along the
+  // storm track, so a given place sees a front approach, arrive and clear.
+  const SYS_SPAWN_HOURS = 16;      // a new system enters roughly every 16 h
+  const SYS_LIFETIME_H  = 200;     // and takes ~8 days to cross the map
+  function hash32(n){
+    n = (n ^ 61) ^ (n >>> 16);
+    n = n + (n << 3);
+    n = n ^ (n >>> 4);
+    n = Math.imul(n, 0x27d4eb2d);
+    n = n ^ (n >>> 15);
+    return (n >>> 0) / 4294967296;
+  }
+  // Returns every system influencing the world at this absolute hour.
+  function activeSystems(absHour){
+    const out = [];
+    const newest = Math.floor(absHour / SYS_SPAWN_HOURS);
+    const oldest = newest - Math.ceil(SYS_LIFETIME_H / SYS_SPAWN_HOURS) - 1;
+    for(let id = oldest; id <= newest; id++){
+      const age = absHour - id * SYS_SPAWN_HOURS;
+      if(age < 0 || age > SYS_LIFETIME_H) continue;
+      const r1 = hash32(id * 2654435761);
+      const r2 = hash32(id * 40503 + 7);
+      const r3 = hash32(id * 92837 + 13);
+      const r4 = hash32(id * 15485863 + 29);
+      const north = r1 < 0.5;
+      const day = Math.floor(id * SYS_SPAWN_HOURS / 24);
+
+      // 1 in 6 systems is a tropical cyclone, and only in late local summer
+      const decl = solarDeclination(day) * (north ? 1 : -1);
+      const cycloneSeason = decl > 0.45;
+      if(r4 > 0.84 && cycloneSeason){
+        const fy0 = itczFy(day) + (north ? -0.055 : 0.055) + (r2 - 0.5) * 0.03;
+        const speed = 2.6 + r3 * 1.6;              // slower, but far more intense
+        const x = WORLD_W + 40 - speed * age;      // tropical systems track west
+        const drift = (north ? -1 : 1) * age * 0.055;
+        const y = (fy0 * WORLD_H) + drift;
+        if(x < -60) continue;
+        out.push({
+          x, y, kind:'cyclone', low:true,
+          radius: 46 + r2 * 26,
+          strength: 1.25,
+          spin: north ? 1 : -1
+        });
+        continue;
+      }
+
+      // Ordinary mid-latitude low or high on the storm track
+      const trackFy = stormTrackFy(day, north);
+      const fy0 = trackFy + (r2 - 0.5) * 0.11;
+      const speed = 3.2 + r3 * 3.4;                // tiles per hour, eastward
+      const x = -70 + speed * age;
+      if(x > WORLD_W + 70) continue;
+      const y = fy0 * WORLD_H + Math.sin(age * 0.02 + r1 * 6) * 12;
+      const isLow = r4 < 0.62;                     // lows are the more common
+      out.push({
+        x, y, kind: isLow ? 'low' : 'high', low: isLow,
+        radius: 70 + r2 * 80,
+        strength: isLow ? (0.55 + r3 * 0.55) : (0.45 + r3 * 0.4),
+        spin: north ? 1 : -1
+      });
+    }
+    return out;
   }
 
+  // Net effect of all systems at a point: positive lifts precipitation and
+  // wind, negative suppresses them (fair weather under a high).
+  function systemInfluence(x, y, absHour){
+    let lift = 0, gust = 0, swirlX = 0, swirlY = 0, cyclone = 0;
+    for(const s of activeSystems(absHour)){
+      const dx = x - s.x, dy = (y - s.y) * 1.6;    // systems are wider than tall
+      const d2 = dx*dx + dy*dy;
+      const r2 = s.radius * s.radius;
+      if(d2 > r2 * 2.6) continue;
+      const f = Math.exp(-d2 / r2);
+      if(s.low){
+        lift += f * s.strength;
+        gust += f * s.strength;
+        // Air spirals inward — counter-clockwise in the north
+        const d = Math.sqrt(d2) || 1;
+        swirlX += (-dy / d) * f * s.spin;
+        swirlY += ( dx / d) * f * s.spin;
+        if(s.kind === 'cyclone') cyclone = Math.max(cyclone, f * s.strength);
+      } else {
+        lift -= f * s.strength * 0.85;
+        gust -= f * s.strength * 0.35;
+      }
+    }
+    return {lift, gust, swirlX, swirlY, cyclone};
+  }
+
+  // ---------- The main climate solver ----------
+  // Everything the rest of the app needs about one place at one moment.
+  function climateAt(x, y, day, hour){
+    x = Math.max(0, Math.min(WORLD_W-1, Math.round(x)));
+    y = Math.max(0, Math.min(WORLD_H-1, Math.round(y)));
+    const i = y*WORLD_W + x;
+    const fy = y / WORLD_H;
+    const lat = Math.abs(fy - 0.5) * 2;
+    const north = fy < 0.5;
+    const zone = zoneMap[i];
+    const t = tiles[i];
+    const e = elev[i];
+    const m = moist[i];
+    const cont = continentality(x, y);
+    const oro = orographic[i];
+    const elevM = Math.max(0, elevMeters(e));
+    const absHour = day * 24 + hour;
+    const decl = solarDeclination(day) * (north ? 1 : -1);   // + = local summer
+
+    // ----- Temperature -----
+    // Annual mean falls steeply toward the poles
+    const annualMean = 30 - 56 * Math.pow(lat, 1.35);
+    // Seasonal swing is small at sea and near the equator, huge inland and poleward
+    const seasonalAmp = (2 + 24 * Math.pow(lat, 1.15)) * (0.45 + 0.75 * cont);
+    // Water heats and cools slowly, so the peak lags the solstice
+    const lagged = Math.sin(2 * Math.PI * ((day - 80 - 12*(1-cont)) / DAYS_PER_YEAR)) * (north ? 1 : -1);
+    let temp = annualMean + lagged * seasonalAmp;
+    // Lapse rate: 6.5 °C per 1000 m
+    temp -= elevM * 0.0065;
+    // Day/night swing driven by the sun's actual altitude, lagged ~2.2 h so the
+    // peak lands mid-afternoon. This makes polar day genuinely warm and polar
+    // night genuinely brutal, and gives long summer evenings their mildness.
+    const diurnalAmp = (3 + 9 * cont) * (zone === ZONE.DESERT ? 1.7 : 1) * (1 - 0.45 * m);
+    const sunNow  = Math.sin(solarAltitude(fy, day, hour - 2.2));
+    const sunMean = meanInsolation(fy, day);
+    temp += (sunNow - sunMean * 0.6) * diurnalAmp * 1.15;
+
+    // ----- Moisture supply -----
+    // Humidity is driven mainly by the land's own moisture and how much sea
+    // air reaches it — the floor is deliberately low so arid land stays arid.
+    let humidity = 0.10 + 0.58 * m + 0.22 * (1 - cont);
+    // The tropical rain belt is the single biggest source of rainfall, but it
+    // can only wet ground that has moisture to work with; a rain-shadowed or
+    // deep-interior desert stays dry even when the belt is overhead.
+    const itczDist = Math.abs(fy - itczFy(day));
+    const itczBoost = Math.max(0, 1 - itczDist / 0.11) * (0.35 + 0.65 * m);
+    humidity += itczBoost * (lat < 0.32 ? 0.55 : 0.15);
+    // Subtropical highs sit around 15–35° and suppress rain
+    const subtropicalDry = Math.max(0, 1 - Math.abs(lat - 0.36) / 0.14);
+    humidity -= subtropicalDry * 0.34;
+    // Cold air simply cannot hold much water
+    humidity *= Math.max(0.16, Math.min(1, (temp + 26) / 46));
+    humidity = Math.max(0, Math.min(1.4, humidity));
+
+    // ----- Wind -----
+    const sys = systemInfluence(x, y, absHour);
+    let windAng = prevailingWindAngle(fy, day);
+    let windSpd = 0.45 + Math.sin(Math.min(1, lat) * Math.PI) * 0.45;
+    // Storm circulation bends and strengthens the local wind
+    if(sys.swirlX || sys.swirlY){
+      const bx = Math.cos(windAng) * windSpd + sys.swirlX * 1.5;
+      const by = Math.sin(windAng) * windSpd + sys.swirlY * 1.5;
+      windAng = Math.atan2(by, bx);
+      windSpd = Math.sqrt(bx*bx + by*by);
+    }
+    windSpd += Math.max(0, sys.gust) * 1.2;
+    // Coasts are breezier, mountains windier still
+    windSpd *= 1 + 0.25 * (1 - cont) + elevM / 6000;
+    if(sys.cyclone > 0.4) windSpd += sys.cyclone * 2.2;
+
+    // ----- Precipitation chance -----
+    let precip = 0;
+    // Baseline: only reasonably moist air rains at all
+    precip += Math.max(0, humidity - 0.46) * 0.60;
+    // Fronts and lows, but a single system can't guarantee rain by itself
+    precip += Math.min(0.42, Math.max(0, sys.lift) * 0.38);
+    // Forced ascent on windward slopes — scaled to realistic enhancement
+    precip += Math.min(0.30, Math.max(0, oro) * 1.4);
+    // Rain shadow: strongly suppresses whatever the airmass had left
+    precip -= Math.min(0.55, Math.max(0, -oro) * 1.6);
+    if(sys.lift < 0) precip += sys.lift * 0.45;         // clear skies under a high
+    // Dry air simply cannot deliver much regardless of lift
+    precip *= 0.25 + 0.75 * Math.min(1, humidity / 0.75);
+    // Monsoon: a sharp seasonal reversal rather than a gentle one
+    if(zone === ZONE.MONSOON) precip += (itczBoost - 0.45) * 0.85;
+    // Mediterranean: reliably dry summers, wet winters
+    if(zone === ZONE.MEDITERRANEAN) precip += -decl * 0.30;
+    // Deserts and ice caps are dry by definition
+    if(zone === ZONE.DESERT) precip *= 0.16;
+    if(zone === ZONE.STEPPE) precip *= 0.55;
+    // Ice caps and high peaks: little new snow, but wind keeps loose snow
+    // airborne, so conditions are frequently blizzard-like.
+    if(zone === ZONE.ICECAP || zone === ZONE.ALPINE){
+      precip = Math.max(precip * 0.7, 0.30 + Math.max(0, windSpd - 0.9) * 0.35);
+    }
+    // Open water and swamps feed convection
+    if(t <= 2 || t === 15 || t === 13) precip += 0.10;
+    precip = Math.max(0, Math.min(0.97, precip));
+
+    // ----- Cloud cover -----
+    // Cloud needs moisture to condense — a front crossing a desert brings wind
+    // and dust, not overcast. Scale everything by what the air actually holds.
+    const moistureAvail = Math.min(1, humidity / 0.55);
+    let cloud = (0.08 + humidity * 0.55 + Math.max(0, sys.lift) * 0.5) * moistureAvail;
+    cloud += Math.min(0, sys.lift) * 0.5;               // highs clear the sky
+    if(zone === ZONE.DESERT) cloud *= 0.40;            // famously cloudless skies
+    else if(zone === ZONE.STEPPE) cloud *= 0.70;
+    cloud = Math.min(1, Math.max(0, cloud));
+
+    // ----- Convective potential (thunderstorms) -----
+    const convective = Math.max(0, Math.min(1,
+      (temp - 17) / 20 * (humidity - 0.45) * 2.4 + itczBoost * 0.5 + Math.max(0, sys.lift) * 0.3));
+
+    // Convert the internal wind index into km/h so it can be reported exactly
+    const windKmh = windSpd * 26;
+
+    return {
+      zone, zoneName: ZONE_NAMES[zone],
+      temp, humidity, precip, cloud, convective,
+      windAngle: windAng, windSpeed: windSpd, windKmh,
+      lat, north, cont, elevM, itczDist, itczBoost,
+      systemLift: sys.lift, cyclone: sys.cyclone,
+      season: seasonAt(day, fy),
+      sun: sunTimes(fy, day),
+      solarAlt: solarAltitude(fy, day, hour)
+    };
+  }
+
+  // ---------- Turning the physics into a named weather state ----------
+  function weatherFromClimate(c, x, y, day, period){
+    // One stable roll per weather cell per period. Because the underlying
+    // fields vary smoothly, neighbouring cells usually agree — which is what
+    // makes fronts read as coherent bands rather than random noise.
+    const cx = Math.floor(x / WEATHER_CELL_SIZE), cy = Math.floor(y / WEATHER_CELL_SIZE);
+    const r = hash32(((cx * 73856093) ^ (cy * 19349663) ^ (day * 83492791) ^ (period * 2654435761)) | 0);
+    const r2 = hash32(((cx * 19349663) ^ (cy * 83492791) ^ (day * 2654435761) ^ (period * 73856093) ^ 0x5f3a) | 0);
+
+    if(r < c.precip){
+      // Something is falling — temperature and wind decide what
+      if(c.temp < -4 && c.windSpeed > 1.05) return 'blizzard';
+      if(c.temp < 0 && c.windSpeed > 1.35) return 'blizzard';
+      if((c.zone === ZONE.ICECAP || c.zone === ZONE.ALPINE) && c.temp < -1 && c.windSpeed > 0.9) return 'blizzard';
+      if(c.temp < 1.5) return 'snow';
+      // Severe: deep convection with a strong wind field, or a cyclone core
+      if(c.cyclone > 0.55) return 'severe';
+      if(c.convective > 0.62 && c.windSpeed > 1.25 && r2 < 0.6) return 'severe';
+      if(c.cyclone > 0.35) return 'storm';
+      if(c.convective > 0.42 && r2 < 0.55) return 'storm';
+      return 'rain';
+    }
+    // Dry, but a sandstorm needs loose dry ground and real wind
+    if((c.zone === ZONE.DESERT || c.zone === ZONE.STEPPE) && c.windSpeed > 1.45 && r2 < 0.12){
+      return 'sandstorm';
+    }
+    // Radiation fog: calm, damp, cool, and around dawn
+    const hour = ((day * 24) % 24);
+    if(c.humidity > 0.62 && c.windSpeed < 0.75 && c.cloud < 0.6 && r2 < 0.22){
+      return 'fog';
+    }
+    if(c.cloud > 0.55) return 'cloudy';
+    if(c.cloud > 0.34 && r2 < 0.40) return 'cloudy';
+    return 'clear';
+  }
+
+  // Beaufort-scale description for an exact wind speed in km/h
+  function windDescription(kmh){
+    if(kmh <  2) return 'calm';
+    if(kmh <  6) return 'light air';
+    if(kmh < 12) return 'light breeze';
+    if(kmh < 20) return 'gentle breeze';
+    if(kmh < 29) return 'moderate breeze';
+    if(kmh < 39) return 'fresh breeze';
+    if(kmh < 50) return 'strong breeze';
+    if(kmh < 62) return 'near gale';
+    if(kmh < 75) return 'gale';
+    if(kmh < 89) return 'strong gale';
+    if(kmh <103) return 'storm';
+    if(kmh <118) return 'violent storm';
+    return 'hurricane force';
+  }
+
+  // ---------- Public API (kept compatible with the rest of the app) ----------
   function weatherAtTile(tx, ty, day, period){
-    const cx = Math.min(WEATHER_CELLS_X-1, Math.max(0, Math.floor(tx / WEATHER_CELL_SIZE)));
-    const cy = Math.min(WEATHER_CELLS_Y-1, Math.max(0, Math.floor(ty / WEATHER_CELL_SIZE)));
-    return weatherAtCell(cx, cy, day, period);
+    const hour = (period + 0.5) * (24 / WEATHER_PERIODS_PER_DAY);
+    const c = climateAt(tx, ty, day, hour);
+    return weatherFromClimate(c, tx, ty, day, period);
   }
-
+  function weatherAtCell(cellX, cellY, day, period){
+    return weatherAtTile(
+      cellX * WEATHER_CELL_SIZE + WEATHER_CELL_SIZE/2,
+      cellY * WEATHER_CELL_SIZE + WEATHER_CELL_SIZE/2,
+      day, period);
+  }
+  // Wind, addressed by weather cell (callers already work in cell coords)
+  function windAtCell(cellX, cellY, day){
+    const tx = cellX * WEATHER_CELL_SIZE + WEATHER_CELL_SIZE/2;
+    const ty = cellY * WEATHER_CELL_SIZE + WEATHER_CELL_SIZE/2;
+    const c = climateAt(tx, ty, day, 12);
+    return {angle: c.windAngle, speed: c.windSpeed};
+  }
+  // Temperature in °C at a place and time, already including weather effects
+  function temperatureAt(tx, ty, day, hour, weather){
+    const c = climateAt(tx, ty, day, hour);
+    let t = c.temp;
+    if(weather === 'rain')      t -= 2.5;
+    else if(weather === 'storm')t -= 3.5;
+    else if(weather === 'severe') t -= 5.0;
+    else if(weather === 'snow') t -= 2.0;
+    else if(weather === 'blizzard') t -= 5.0;
+    else if(weather === 'fog')  t -= 1.5;
+    else if(weather === 'sandstorm') t += 3.0;
+    else if(weather === 'cloudy') t -= 0.8;
+    else if(weather === 'clear') t += 0.8;
+    return t;
+  }
   // Convert an in-game (day, hour) to a "weather period" index that increments
   // WEATHER_PERIODS_PER_DAY times per day. Weather is fixed within a period
   // and reroll'd at period boundaries. Periods are global — but each cell
@@ -2459,9 +2923,7 @@
     world.hour = local.hour;
     const wp = currentWeatherPeriod(local.day, local.hour);
     world.weather = weatherAtTile(centerX, centerY, wp.day, wp.period);
-    const cx = Math.min(WEATHER_CELLS_X-1, Math.floor(centerX / WEATHER_CELL_SIZE));
-    const cy = Math.min(WEATHER_CELLS_Y-1, Math.floor(centerY / WEATHER_CELL_SIZE));
-    world.climate = cellClimate[cy*WEATHER_CELLS_X + cx] || 'grass';
+    world.climate = zoneName(centerX, centerY);
   }
 
   function tileTimeZone(x){
@@ -2560,6 +3022,7 @@
     rivers:true, roads:true, trade:true, ferries:true, waterTrade:true, borders:false,
     cities:true, towns:true, villages:true, landmarks:true,
     regions:false, cultural:false, political:false, population:false, economy:false,
+    climate:false, pressure:false,
     events:true
   };
 
@@ -3880,6 +4343,59 @@
       }
     }
 
+    // Climate zone overlay — colours each tile by its Köppen-style zone
+    if(layers.climate){
+      for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+        const z = zoneMap[y*WORLD_W+x];
+        if(z === ZONE.OCEAN) continue;
+        const col = ZONE_COLORS[z] || [128,128,128];
+        const [sx,sy] = worldToScreen(x,y);
+        ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.55)`;
+        ctx.fillRect(sx|0, sy|0, Math.ceil(view.scale)+1, Math.ceil(view.scale)+1);
+      }
+      // Mark the tropical rain belt, which migrates through the year
+      const itzY = itczFy(world.day) * WORLD_H;
+      const [, iy] = worldToScreen(0, itzY);
+      ctx.strokeStyle = 'rgba(255,220,120,0.7)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10,6]);
+      ctx.beginPath(); ctx.moveTo(0, iy); ctx.lineTo(W, iy); ctx.stroke();
+      ctx.setLineDash([]);
+      if(view.scale > 2){
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(255,220,120,0.9)';
+        ctx.textAlign = 'left';
+        ctx.fillText('rain belt (ITCZ)', 8, iy - 5);
+      }
+    }
+
+    // Pressure systems — shows the lows and highs currently crossing the world
+    if(layers.pressure){
+      const absHour = world.day*24 + world.hour;
+      for(const sysm of activeSystems(absHour)){
+        const [px,py] = worldToScreen(sysm.x, sysm.y);
+        const rpx = sysm.radius * view.scale;
+        if(px < -rpx || px > W + rpx) continue;
+        const g = ctx.createRadialGradient(px, py, 0, px, py, Math.max(4, rpx));
+        if(sysm.low){
+          const hot = sysm.kind === 'cyclone';
+          g.addColorStop(0, hot ? 'rgba(255,90,90,0.42)' : 'rgba(90,150,255,0.34)');
+          g.addColorStop(1, 'rgba(90,150,255,0)');
+        } else {
+          g.addColorStop(0, 'rgba(255,210,120,0.26)');
+          g.addColorStop(1, 'rgba(255,210,120,0)');
+        }
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(px, py, Math.max(4, rpx), 0, Math.PI*2); ctx.fill();
+        if(view.scale > 1.2){
+          ctx.font = 'bold 13px system-ui, sans-serif';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = sysm.kind === 'cyclone' ? '#ff8a8a' : sysm.low ? '#9ec9ff' : '#ffd894';
+          ctx.fillText(sysm.kind === 'cyclone' ? '🌀' : sysm.low ? 'L' : 'H', px, py);
+        }
+      }
+    }
+
     // Borders / regions / political / population
     if(layers.borders || layers.political || layers.population || layers.cultural){
       // overlay tinted regions
@@ -4464,9 +4980,108 @@
 
   // ============ WEATHER ANIMATION ============
   const weatherParticles = [];
+  // Lightning bolt generator — a jagged forked path, cached per strike
+  function makeLightning(x0, y0, len, rng){
+    const pts = [[x0, y0]];
+    let x = x0, y = y0;
+    const steps = 8 + Math.floor(rng()*5);
+    for(let i=0;i<steps;i++){
+      x += (rng()-0.5) * len * 0.22;
+      y += len / steps;
+      pts.push([x, y]);
+    }
+    // A couple of forks branching off the main channel
+    const forks = [];
+    for(let f=0; f<2; f++){
+      const at = 2 + Math.floor(rng()*(pts.length-4));
+      let fx = pts[at][0], fy = pts[at][1];
+      const fpts = [[fx, fy]];
+      const fsteps = 3 + Math.floor(rng()*3);
+      for(let i=0;i<fsteps;i++){
+        fx += (rng()-0.5) * len * 0.26 + (rng()<0.5?-1:1)*len*0.04;
+        fy += len / (steps*1.5);
+        fpts.push([fx, fy]);
+      }
+      forks.push(fpts);
+    }
+    return {main: pts, forks, born: performance.now()};
+  }
+  let activeBolts = [];
+  let lastBoltAt = 0;
+  function drawLightning(W, H, intensity){
+    const now = performance.now();
+    // Strike frequency scales with how severe the storm is
+    const gap = intensity > 0.8 ? 380 : 900;
+    if(now - lastBoltAt > gap * (0.4 + Math.random())){
+      lastBoltAt = now;
+      const rng = Math.random;
+      activeBolts.push(makeLightning(Math.random()*W, -20, H*(0.55+Math.random()*0.5), rng));
+      if(activeBolts.length > 4) activeBolts.shift();
+    }
+    for(let i=activeBolts.length-1; i>=0; i--){
+      const b = activeBolts[i];
+      const age = now - b.born;
+      if(age > 260){ activeBolts.splice(i,1); continue; }
+      // Flicker: bright flash, brief dark, second flash
+      const phase = age < 60 ? 1 : age < 110 ? 0.25 : age < 170 ? 0.85 : 1 - (age-170)/90;
+      const a = Math.max(0, phase);
+      // Full-screen flash
+      ctx.fillStyle = `rgba(210,225,255,${(a*0.20).toFixed(3)})`;
+      ctx.fillRect(0,0,W,H);
+      // The channel itself
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(190,215,255,0.95)';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = `rgba(235,243,255,${a.toFixed(3)})`;
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      b.main.forEach((p,k)=> k ? ctx.lineTo(p[0],p[1]) : ctx.moveTo(p[0],p[1]));
+      ctx.stroke();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = `rgba(200,220,255,${(a*0.8).toFixed(3)})`;
+      for(const f of b.forks){
+        ctx.beginPath();
+        f.forEach((p,k)=> k ? ctx.lineTo(p[0],p[1]) : ctx.moveTo(p[0],p[1]));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawWeather(W,H){
     const w = world.weather;
     if(w==='clear') return;
+    if(w==='severe'){
+      // Torrential wind-driven rain, dark sky, and forked lightning
+      ctx.fillStyle = 'rgba(18,22,38,0.34)';
+      ctx.fillRect(0,0,W,H);
+      const N = 420;
+      while(weatherParticles.length<N) weatherParticles.push({x:Math.random()*W, y:Math.random()*H, v:22+Math.random()*16, len:16+Math.random()*18});
+      ctx.strokeStyle = 'rgba(185,208,240,0.72)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      const slant = 0.55;
+      for(const p of weatherParticles){
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.len*slant, p.y + p.len);
+        p.x -= p.v*slant; p.y += p.v;
+        if(p.y > H){ p.y = -20; p.x = Math.random()*W*1.4; }
+        if(p.x < -40) p.x += W + 60;
+      }
+      ctx.stroke();
+      // Wind-driven spray streaks
+      ctx.strokeStyle = 'rgba(210,225,250,0.22)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for(let i=0;i<12;i++){
+        const yy = ((performance.now()*0.12 + i*97) % (H+80)) - 40;
+        ctx.moveTo(0, yy); ctx.lineTo(W, yy + 40);
+      }
+      ctx.stroke();
+      drawLightning(W, H, 1);
+      return;
+    }
     if(w==='cloudy'){
       // soft cloud cover
       ctx.fillStyle = 'rgba(220,225,235,0.07)';
@@ -4549,10 +5164,8 @@
       // tint
       ctx.fillStyle = w==='storm'? 'rgba(40,45,70,0.18)':'rgba(80,100,130,0.07)';
       ctx.fillRect(0,0,W,H);
-      // lightning
-      if(w==='storm' && Math.random()<0.005){
-        ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fillRect(0,0,W,H);
-      }
+      // Proper forked lightning for thunderstorms
+      if(w==='storm') drawLightning(W, H, 0.5);
     }
   }
 
@@ -5130,7 +5743,7 @@
     const m = moist[ty*WORLD_W+tx];
     const tp = temp[ty*WORLD_W+tx];
     const reg = regionMap[ty*WORLD_W+tx];
-    const elevLabel = e<0.05 ? `${Math.round((0.05-e)*-4000)}m (below sea)` : `${Math.round((e-0.05)*4000)}m`;
+    const elevLabel = formatElevation(e);
     const editKey = `${tx},${ty}`;
     const customNote = userData.edits[editKey];
     const feat = findFeatureAt(tx, ty);
@@ -5141,7 +5754,7 @@
     const wp = currentWeatherPeriod(localHere.day, localHere.hour);
     const tileWeather = weatherAtTile(tx, ty, wp.day, wp.period);
     const weatherIcons = {
-      clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️',
+      clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️', severe:'🌩️',
       snow:'❄️', fog:'🌫️', sandstorm:'🌪️', blizzard:'🌨️'
     };
     const wIcon = weatherIcons[tileWeather] || '';
@@ -5149,12 +5762,11 @@
     const lm = Math.floor((localHere.hour - lh)*60);
     const localStr = `${String(lh).padStart(2,'0')}:${String(lm).padStart(2,'0')}`;
 
-    // Season + wind for this tile
+    // Full climate solve for this tile — temperature, wind, humidity, zone
     const fy = ty / WORLD_H;
-    const season = seasonAt(localHere.day, fy);
-    const cellX = Math.min(WEATHER_CELLS_X-1, Math.max(0, Math.floor(tx / WEATHER_CELL_SIZE)));
-    const cellY = Math.min(WEATHER_CELLS_Y-1, Math.max(0, Math.floor(ty / WEATHER_CELL_SIZE)));
-    const wind = windAtCell(cellX, cellY, localHere.day);
+    const clim = climateAt(tx, ty, localHere.day, localHere.hour);
+    const season = clim.season;
+    const wind = {angle: clim.windAngle, speed: clim.windSpeed};
     // Convert wind angle to compass direction (where it BLOWS TO)
     function windCompass(rad){
       let deg = (rad * 180 / Math.PI) % 360;
@@ -5163,21 +5775,8 @@
       return dirs[Math.round(deg / 45) % 8];
     }
     const windDir = windCompass(wind.angle);
-    const windSpeedLabel = wind.speed < 0.6 ? 'calm'
-                          : wind.speed < 0.95 ? 'light'
-                          : wind.speed < 1.3 ? 'moderate'
-                          : wind.speed < 1.6 ? 'strong'
-                          : 'gale';
-
-    // Temperature modulation: weather affects perceived temperature
-    let tempC = tp * 30 + 5;
-    if(tileWeather === 'storm' || tileWeather === 'rain') tempC -= 4;
-    else if(tileWeather === 'snow' || tileWeather === 'blizzard') tempC -= 8;
-    else if(tileWeather === 'sandstorm') tempC += 6;
-    else if(tileWeather === 'fog') tempC -= 2;
-    // Seasonal swing on top of base temperature (warmer in summer, colder in winter)
-    if(season === 'summer') tempC += 5;
-    else if(season === 'winter') tempC -= 7;
+    const windSpeedLabel = `${Math.round(clim.windKmh)} km/h · ${windDescription(clim.windKmh)}`;
+    const tempC = temperatureAt(tx, ty, localHere.day, localHere.hour, tileWeather);
 
     let html = `<div style="font-weight:500;font-size:13px;margin-bottom:6px;">Tile (${tx}, ${ty})</div>`;
     html += `<div style="font-size:11px;line-height:1.6;opacity:0.95;">`;
@@ -5208,10 +5807,29 @@
     html += `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,0.08);">`;
     html += `<span style="opacity:0.6;">Local time:</span> Day ${localHere.day}, ${localStr}`;
     html += `</div>`;
-    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️' };
-    html += `<div><span style="opacity:0.6;">Season:</span> ${seasonIcons[season]} ${season}</div>`;
+    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊' };
+    html += `<div><span style="opacity:0.6;">Season:</span> ${seasonIcons[season] || ''} ${season}</div>`;
+    html += `<div><span style="opacity:0.6;">Climate:</span> ${clim.zoneName}</div>`;
+    html += `<div><span style="opacity:0.6;">Humidity:</span> ${Math.round(Math.min(1,clim.humidity)*100)}%</div>`;
     html += `<div><span style="opacity:0.6;">Weather:</span> ${wIcon} ${tileWeather}</div>`;
-    html += `<div><span style="opacity:0.6;">Wind:</span> ${windDir} (${windSpeedLabel})</div>`;
+    html += `<div><span style="opacity:0.6;">Wind:</span> ${windDir} ${windSpeedLabel}</div>`;
+    // Sunrise / sunset from real solar geometry
+    const st = clim.sun;
+    const fmtT = (h)=>{
+      const hh = Math.floor(((h % 24) + 24) % 24);
+      const mm = Math.floor((h - Math.floor(h)) * 60);
+      return `${String(hh).padStart(2,'0')}:${String(Math.abs(mm)).padStart(2,'0')}`;
+    };
+    if(st.midnightSun)      html += `<div><span style="opacity:0.6;">Sun:</span> midnight sun — never sets</div>`;
+    else if(st.polarNight)  html += `<div><span style="opacity:0.6;">Sun:</span> polar night — never rises</div>`;
+    else html += `<div><span style="opacity:0.6;">Sun:</span> ↑${fmtT(st.sunrise)} ↓${fmtT(st.sunset)} · ${st.length.toFixed(1)}h daylight</div>`;
+    if(clim.cyclone > 0.35){
+      html += `<div style="color:#ff9d9d;">⚠ Tropical cyclone overhead</div>`;
+    } else if(clim.systemLift > 0.35){
+      html += `<div style="opacity:0.75;">Low pressure — unsettled</div>`;
+    } else if(clim.systemLift < -0.30){
+      html += `<div style="opacity:0.75;">High pressure — settled</div>`;
+    }
     if(reg>=0 && regionSeeds[reg]) html += `<div><span style="opacity:0.6;">Region:</span> ${regionSeeds[reg].name} · <em style="opacity:0.7;">${regionSeeds[reg].culture}</em></div>`;
     if(riverMask[ty*WORLD_W+tx]) html += `<div><span style="opacity:0.6;">River tile</span></div>`;
     if(feat){
@@ -6512,9 +7130,15 @@
     c.save();
     c.beginPath(); c.rect(ox, oy, side, side); c.clip();
 
-    if(w === 'rain' || w === 'storm'){
-      const n = w === 'storm' ? 220 : 130;
-      c.strokeStyle = w === 'storm' ? 'rgba(180,205,235,0.55)' : 'rgba(170,200,230,0.42)';
+    if(w === 'rain' || w === 'storm' || w === 'severe'){
+      const n = w === 'severe' ? 340 : w === 'storm' ? 220 : 130;
+      if(w === 'severe'){
+        c.fillStyle = 'rgba(16,20,34,0.34)';
+        c.fillRect(ox, oy, side, side);
+      }
+      c.strokeStyle = w === 'severe' ? 'rgba(190,212,244,0.72)'
+                    : w === 'storm'  ? 'rgba(180,205,235,0.55)'
+                                     : 'rgba(170,200,230,0.42)';
       c.lineWidth = Math.max(1, u*0.05);
       for(let i=0;i<n;i++){
         const seed = i*0.618;
@@ -6522,9 +7146,31 @@
         const y = oy + ((seed*7919 % side) + t*u*22) % side;
         c.beginPath(); c.moveTo(x, y); c.lineTo(x + wx*u*0.5, y + u*0.7); c.stroke();
       }
-      if(w === 'storm' && Math.sin(t*0.7)>0.985){
-        c.fillStyle = 'rgba(255,255,255,0.30)';
+      // Lightning inside the tile scene — a jagged bolt plus a flash
+      const strikeGap = w === 'severe' ? 2.1 : 5.5;
+      const phase = (t % strikeGap) / strikeGap;
+      if((w === 'storm' || w === 'severe') && phase < 0.10){
+        const fl = 1 - phase/0.10;
+        c.fillStyle = `rgba(214,228,255,${(fl*0.38).toFixed(3)})`;
         c.fillRect(ox, oy, side, side);
+        // Deterministic bolt for this strike, so it doesn't jitter mid-flash
+        const strikeId = Math.floor(t / strikeGap);
+        const br = (n)=>hash32((strikeId*2654435761 ^ n*40503) | 0);
+        let bx = ox + br(1) * side, by = oy;
+        c.save();
+        c.strokeStyle = `rgba(240,246,255,${fl.toFixed(3)})`;
+        c.lineWidth = Math.max(1.5, u*0.09);
+        c.lineCap='round'; c.lineJoin='round';
+        c.shadowColor = 'rgba(200,220,255,0.9)';
+        c.shadowBlur = 14;
+        c.beginPath(); c.moveTo(bx, by);
+        for(let k=1;k<=9;k++){
+          bx += (br(k+10) - 0.5) * side * 0.16;
+          by += side / 9;
+          c.lineTo(bx, by);
+        }
+        c.stroke();
+        c.restore();
       }
     } else if(w === 'snow' || w === 'blizzard'){
       const n = w === 'blizzard' ? 260 : 120;
@@ -6620,11 +7266,11 @@
     const wp = currentWeatherPeriod(localHere.day, localHere.hour);
     const w  = weatherAtTile(tx, ty, wp.day, wp.period);
     const season = seasonAt(localHere.day, ty / WORLD_H);
-    const elevLabel = e<0.05 ? `${Math.round((0.05-e)*-4000)}m` : `${Math.round((e-0.05)*4000)}m`;
+    const elevLabel = formatElevation(e);
     document.getElementById('tileTitle').textContent = `Tile (${tx}, ${ty}) · ${TERRAIN_NAMES[t]}`;
     document.getElementById('tileSubtitle').textContent = `${BIOME_NAMES[t]} · ${elevLabel}`;
-    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️' };
-    const weatherIcons = { clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️', snow:'❄️', fog:'🌫️', sandstorm:'🌪️', blizzard:'🌨️' };
+    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊' };
+    const weatherIcons = { clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️', severe:'🌩️', snow:'❄️', fog:'🌫️', sandstorm:'🌪️', blizzard:'🌨️' };
     document.getElementById('tileFooter').innerHTML =
       `<div>${weatherIcons[w]||''} ${w} · ${seasonIcons[season]} ${season}</div>` +
       `<div style="opacity:0.65;">${SUB_GRID}×${SUB_GRID} sub-grid · ${Math.round(KM_PER_TILE*1000/SUB_GRID)} m per cell</div>` +
@@ -8747,8 +9393,8 @@
       const inCloudRange = (view.scale >= 2.0 && view.scale <= 5.0);
       const inWeatherRange = (view.scale >= 120 && view.scale <= 300);
       const animatedWeather = inWeatherRange && (
-        world.weather==='rain' || world.weather==='storm' || world.weather==='snow' ||
-        world.weather==='sandstorm' || world.weather==='blizzard'
+        world.weather==='rain' || world.weather==='storm' || world.weather==='severe' ||
+        world.weather==='snow' || world.weather==='sandstorm' || world.weather==='blizzard'
       );
       const pulsingSelection = view.selected && view.scale >= 8;
       const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection;
