@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>if(/[?&]story=/.test(location.search))document.documentElement.className+=" viewer";</script>
 <title>PIXELTALE</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://mhlwfevnjpezaaocbwwr.supabase.co" crossorigin>
@@ -166,6 +167,26 @@ input[type=range]{accent-color:#ffcc33}
 .btn:focus-visible,.ibtn:focus-visible,.bgCard:focus-visible,.interact-btn:focus-visible{outline:3px solid #6fe3ff;outline-offset:2px}
 @media (prefers-reduced-motion:reduce){#scanFx,#cursor,.fx-candle,.fx-storm{animation:none!important}
 #transFade,#transSlide,#transIris{transition-duration:.01ms!important}}
+
+/* ---- shared-link viewer: stage only, on black ---- */
+html.viewer{background:#000}
+html.viewer body{background:#000;overflow:hidden;height:100%}
+html.viewer header,html.viewer #editor,html.viewer #statusBar,html.viewer #toast{display:none!important}
+html.viewer main{display:block;padding:0;margin:0;max-width:none;height:100vh;gap:0}
+html.viewer #stageCol{height:100vh;gap:0;justify-content:center}
+html.viewer #stage{width:min(100vw,calc(100vh*16/9));height:min(56.25vw,100vh);aspect-ratio:16/9;border:0;box-shadow:none;margin:0 auto}
+html.viewer #playHint{animation:hintfade .8s ease-in 6s forwards}
+@keyframes hintfade{to{opacity:0}}
+#viewerGate{position:fixed;inset:0;z-index:400;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .6s ease-out}
+html.viewer #viewerGate{display:flex}
+#viewerGate.gone{opacity:0;pointer-events:none}
+#gateMsg{font-size:8px;color:#3a3a52;letter-spacing:3px}
+#gateBtn{display:none;font-family:inherit;font-size:14px;padding:16px 26px;background:#10102c;color:#ffcc33;border:3px solid #ffcc33;cursor:pointer;letter-spacing:2px;text-shadow:2px 2px 0 #000;box-shadow:5px 5px 0 rgba(0,0,0,.6)}
+#gateBtn:hover{background:#1a1a3a}
+#gateBtn.show{display:block}
+#blackout{position:fixed;inset:0;z-index:600;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s ease-in}
+#blackout.show{opacity:1;pointer-events:auto}
+@media (prefers-reduced-motion:reduce){#viewerGate,#blackout{transition-duration:.01ms!important}html.viewer #playHint{animation:none}}
 </style>
 </head>
 <body>
@@ -209,6 +230,8 @@ input[type=range]{accent-color:#ffcc33}
 <input type="file" id="musicFileInput" accept="audio/*" hidden>
 <input type="file" id="loadFileInput" accept=".json,application/json" hidden>
 <div id="toast"></div>
+<div id="viewerGate"><div id="gateMsg">LOADING STORY</div><button id="gateBtn" type="button">&#9654; BEGIN</button></div>
+<div id="blackout"></div>
 <div class="modal" id="loginModal"><div class="modal-box"><h2>SIGN IN</h2><input type="email" class="modal-input" id="loginEmail" placeholder="EMAIL"><input type="password" class="modal-input" id="loginPass" placeholder="PASSWORD"><div class="modal-actions"><button class="btn gold" id="loginSubmit">SIGN IN</button><button class="btn" id="loginCancel">CANCEL</button></div></div></div>
 <div class="modal" id="storiesModal"><div class="modal-box"><h2>MY STORIES</h2><div id="storiesList"></div><div class="modal-actions"><button class="btn" id="storiesClose">CLOSE</button><button class="btn cyan" id="storiesRefresh">REFRESH</button></div></div></div>
 <div class="modal" id="confirmModal"><div class="modal-box"><h2>CONFIRM DELETE</h2><p id="confirmMsg">ARE YOU SURE?</p><div class="modal-actions"><button class="btn red" id="confirmYes">YES, DELETE</button><button class="btn" id="confirmNo">CANCEL</button></div></div></div>
