@@ -301,11 +301,26 @@
     <div style="flex:1;"></div>
     <button id="timeBtn" style="display:none;pointer-events:auto;background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);color:#e8eef7;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">⏱ Set time</button>
     <button id="gridBtn" style="pointer-events:auto;background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);color:#e8eef7;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Grid: off</button>
+    <button id="editedBtn" title="Jump to a tile you've edited" style="display:none;pointer-events:auto;background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);color:#e8eef7;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">📍 Edited tiles</button>
     <button id="loginBtn" title="Log in to edit the map" style="pointer-events:auto;background:rgba(60,110,180,0.6);backdrop-filter:blur(8px);border:1px solid rgba(120,160,220,0.4);color:#e8eef7;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">🔑 Log in to edit</button>
     <button id="layersBtn" style="pointer-events:auto;background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);color:#e8eef7;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer;">Layers</button>
   </div>
 
   <!-- Layers panel -->
+  <!-- Index of every tile with saved edits, with teleport links -->
+  <div id="editedPanel" style="position:absolute;top:60px;right:10px;width:300px;background:rgba(15,23,42,0.94);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:12px;display:none;z-index:11;max-height:620px;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-weight:500;">Edited tiles</span>
+      <span style="display:flex;gap:5px;">
+        <button id="editedRefresh" style="background:rgba(40,55,80,0.7);border:1px solid rgba(255,255,255,0.12);color:#cdd5e0;padding:3px 8px;border-radius:5px;font-size:10px;cursor:pointer;">Refresh</button>
+        <button id="editedClose" style="width:22px;height:22px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cdd5e0;border-radius:5px;font-size:13px;line-height:1;cursor:pointer;padding:0;">×</button>
+      </span>
+    </div>
+    <input id="editedFilter" type="text" placeholder="Filter by coords or region…" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px 8px;border-radius:6px;font-size:11px;margin-bottom:8px;box-sizing:border-box;">
+    <div id="editedList" style="display:flex;flex-direction:column;gap:4px;"></div>
+    <div id="editedSummary" style="font-size:10px;opacity:0.5;margin-top:8px;text-align:center;"></div>
+  </div>
+
   <div id="layersPanel" style="position:absolute;top:60px;right:10px;width:240px;background:rgba(15,23,42,0.92);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px;font-size:12px;display:none;z-index:10;max-height:600px;overflow-y:auto;">
     <div style="font-weight:500;margin-bottom:8px;font-size:13px;">Structure</div>
     <label class="ly"><input type="checkbox" data-layer="rivers" checked> Rivers</label>
@@ -7237,6 +7252,158 @@
     }catch(e){ /* nothing saved */ }
   }
 
+  // ============ EDITED TILE INDEX ============
+  // Scans storage for every tile that has saved edits and lists them with
+  // teleport links. Keys look like "pixelworld:tile:X,Y:paint" — we group by
+  // the coordinate part and load each tile's payload to summarise it.
+  let editedTiles = [];      // [{x, y, cells, sprites, ix, region}]
+
+  async function scanEditedTiles(){
+    const list = document.getElementById('editedList');
+    const summary = document.getElementById('editedSummary');
+    list.innerHTML = '<div style="opacity:0.5;font-size:11px;text-align:center;padding:10px 0;">Scanning…</div>';
+    const found = new Map();   // "x,y" -> {x, y}
+    try{
+      const res = await Store.list('pixelworld:tile:', true);
+      for(const key of (res && res.keys) || []){
+        const m = key.match(/^pixelworld:tile:(-?\d+),(-?\d+):/);
+        if(!m) continue;
+        const k = `${m[1]},${m[2]}`;
+        if(!found.has(k)) found.set(k, {x: parseInt(m[1],10), y: parseInt(m[2],10)});
+      }
+    }catch(e){
+      console.warn('tile scan failed', e);
+    }
+
+    // Summarise each tile. Runs in small batches so a big world stays responsive.
+    const out = [];
+    const entries = [...found.values()];
+    for(let i=0;i<entries.length;i+=8){
+      const batch = entries.slice(i, i+8);
+      await Promise.all(batch.map(async (t)=>{
+        const base = `pixelworld:tile:${t.x},${t.y}`;
+        let cells = 0, sprites = 0, ix = 0;
+        try{
+          const r = await Store.get(base + ':paint', true);
+          if(r && r.value){
+            // Count painted cells straight from the RLE without expanding it
+            for(const run of r.value.split(',')){
+              const dot = run.indexOf('.');
+              if(dot < 0) continue;
+              const len = parseInt(run.slice(0,dot),10);
+              const code = parseInt(run.slice(dot+1),10);
+              if(code > 0) cells += len;
+            }
+          }
+        }catch(e){}
+        try{
+          const r = await Store.get(base + ':placed', true);
+          if(r && r.value){
+            const raw = r.value.trim();
+            sprites = raw.startsWith('[') ? (JSON.parse(raw) || []).length
+                    : raw ? raw.split(',').filter(Boolean).length : 0;
+          }
+        }catch(e){}
+        try{
+          const r = await Store.get(base + ':meta', true);
+          if(r && r.value){
+            const meta = JSON.parse(r.value);
+            ix = Object.keys(meta.interactions || {}).length;
+          }
+        }catch(e){}
+        if(cells || sprites || ix){
+          const inBounds = t.x>=0 && t.x<WORLD_W && t.y>=0 && t.y<WORLD_H;
+          const terrain = inBounds ? TERRAIN_NAMES[tiles[t.y*WORLD_W+t.x]] : '—';
+          const reg = inBounds ? regionMap[t.y*WORLD_W+t.x] : null;
+          const regionName = (reg >= 0 && regionSeeds[reg]) ? regionSeeds[reg].name : '';
+          out.push({...t, cells, sprites, ix, terrain, regionName});
+        }
+      }));
+    }
+    // Busiest tiles first — most likely the ones worth revisiting
+    out.sort((a,b)=>(b.cells+b.sprites*40+b.ix*80) - (a.cells+a.sprites*40+a.ix*80));
+    editedTiles = out;
+    renderEditedList();
+  }
+
+  function renderEditedList(){
+    const list = document.getElementById('editedList');
+    const summary = document.getElementById('editedSummary');
+    const q = (document.getElementById('editedFilter').value || '').trim().toLowerCase();
+    const rows = editedTiles.filter(t=>{
+      if(!q) return true;
+      return `${t.x},${t.y}`.includes(q)
+          || (t.regionName||'').toLowerCase().includes(q)
+          || (t.terrain||'').toLowerCase().includes(q);
+    });
+    list.innerHTML = '';
+    if(editedTiles.length === 0){
+      list.innerHTML = '<div style="opacity:0.5;font-size:11px;text-align:center;padding:12px 0;line-height:1.5;">No edited tiles yet.<br>Zoom in past 60× and use “⤢ Enter tile”.</div>';
+      summary.textContent = '';
+      return;
+    }
+    if(rows.length === 0){
+      list.innerHTML = '<div style="opacity:0.5;font-size:11px;text-align:center;padding:12px 0;">Nothing matches that filter.</div>';
+    }
+    for(const t of rows){
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:7px;padding:6px 8px;';
+
+      const link = document.createElement('button');
+      link.style.cssText = 'flex:1;text-align:left;background:none;border:none;color:#cfe0f5;cursor:pointer;padding:0;font-size:11px;line-height:1.4;';
+      const bits = [];
+      if(t.cells)   bits.push(`${t.cells} painted`);
+      if(t.sprites) bits.push(`${t.sprites} sprite${t.sprites>1?'s':''}`);
+      if(t.ix)      bits.push(`${t.ix} interaction${t.ix>1?'s':''}`);
+      link.innerHTML =
+        `<div style="font-weight:500;color:#e8eef7;">(${t.x}, ${t.y}) <span style="opacity:0.55;font-weight:400;">${t.terrain}</span></div>` +
+        `<div style="opacity:0.6;font-size:10px;">${t.regionName ? t.regionName + ' · ' : ''}${bits.join(' · ')}</div>`;
+      link.onclick = ()=> teleportToTile(t.x, t.y, false);
+      row.appendChild(link);
+
+      const enter = document.createElement('button');
+      enter.textContent = '⤢';
+      enter.title = 'Open this tile full screen';
+      enter.style.cssText = 'background:rgba(60,90,140,0.6);border:1px solid rgba(255,255,255,0.14);color:#e8eef7;width:26px;height:26px;border-radius:6px;font-size:12px;cursor:pointer;padding:0;flex:none;';
+      enter.onclick = (ev)=>{ ev.stopPropagation(); teleportToTile(t.x, t.y, true); };
+      row.appendChild(enter);
+
+      list.appendChild(row);
+    }
+    summary.textContent = q
+      ? `${rows.length} of ${editedTiles.length} tiles`
+      : `${editedTiles.length} edited tile${editedTiles.length===1?'':'s'}`;
+  }
+
+  // Jump the map to a tile, optionally opening its full-screen view
+  function teleportToTile(x, y, enter){
+    if(tileView.open) closeTileDetail();
+    view.x = x + 0.5;
+    view.y = y + 0.5;
+    // Land at a zoom where the "Enter tile" button is already available
+    view.scale = Math.max(view.scale, ENTER_TILE_MIN_ZOOM + 10);
+    clampView();
+    view.selected = {x, y};
+    updateZoomLabel();
+    showInfo(x, y);
+    draw();
+    document.getElementById('editedPanel').style.display = 'none';
+    if(enter) openTileDetail(x, y);
+  }
+
+  document.getElementById('editedBtn').onclick = ()=>{
+    const p = document.getElementById('editedPanel');
+    const opening = p.style.display === 'none';
+    p.style.display = opening ? 'block' : 'none';
+    document.getElementById('layersPanel').style.display = 'none';
+    if(opening) scanEditedTiles();
+  };
+  document.getElementById('editedClose').onclick = ()=>{
+    document.getElementById('editedPanel').style.display = 'none';
+  };
+  document.getElementById('editedRefresh').onclick = scanEditedTiles;
+  document.getElementById('editedFilter').addEventListener('input', renderEditedList);
+
   // ---- Enter-tile button positioning ----
   function updateEnterTileButton(){
     const btn = document.getElementById('enterTileBtn');
@@ -8340,6 +8507,7 @@
     draw();
   };
   document.getElementById('layersBtn').onclick = ()=>{
+    document.getElementById('editedPanel').style.display = 'none';
     const p = document.getElementById('layersPanel');
     p.style.display = p.style.display==='none' ? 'block':'none';
   };
@@ -8378,6 +8546,8 @@
       document.getElementById('editControls').style.display='none';
       document.getElementById('editorBar').style.display='none';
       document.getElementById('timeBtn').style.display='none';
+      document.getElementById('editedBtn').style.display='none';
+      document.getElementById('editedPanel').style.display='none';
       editor.tool = 'select';
       editor.drawing = null;
       editor.hoverTile = null;
@@ -8400,6 +8570,7 @@
       document.getElementById('pwInput').value='';
       document.getElementById('editorBar').style.display='block';
       document.getElementById('timeBtn').style.display='inline-block';
+      document.getElementById('editedBtn').style.display='inline-block';
       setTool('select');
       if(view.selected) showInfo(view.selected.x, view.selected.y);
       // If the full-screen tile view is open, reveal its paint tools too
