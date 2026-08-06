@@ -1344,8 +1344,11 @@
   const LANDMARK_SITES = {
     stormPeak:   {x: 53,  y: 95,  meters: 2898, radius: 30},
     fireMountain:{x: 345, y: 192, meters: 2450, radius: 26},   // active volcano
-    ashenCrown:  {x: 320, y: 61,  meters: 3100, radius: 32},   // dormant volcano
+    ashenCrown:  {x: 320, y: 61,  meters: 3100, radius: 40},   // dormant volcano
     whirlpool:   {x: 469, y: 169, radius: 9},
+    // The caldera lies on the shoulder of the Ashen Crown, far enough from the
+    // summit that its heat never reaches the peak — the summit stays frozen.
+    calderaOffset: {dx: 9, dy: 6},
     blackIsle:   {x: 673, y: 310, radius: 46}
   };
 
@@ -1355,20 +1358,34 @@
     function raise(cx, cy, targetM, R, opts){
       opts = opts || {};
       const targetRaw = rawForMeters(targetM);
-      for(let dy=-R; dy<=R; dy++){
-        for(let dx=-R; dx<=R; dx++){
+      const phase = opts.phase || 0;
+      // Search a wider box, because the warped outline can push past R
+      const RB = Math.ceil(R * 1.5);
+      for(let dy=-RB; dy<=RB; dy++){
+        for(let dx=-RB; dx<=RB; dx++){
           const x = cx+dx, y = cy+dy;
           if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
           const d = Math.sqrt(dx*dx + dy*dy);
-          if(d > R) continue;
+          const ang = Math.atan2(dy, dx);
+          // Warp the effective radius so the massif — and the coastline it
+          // creates — is a ragged, lobed shape rather than a disc. Three
+          // frequencies of angular wobble plus positional noise gives bays,
+          // headlands and spurs at different scales.
+          const wob = 1
+            + Math.sin(ang*2.0 + phase)        * 0.24
+            + Math.sin(ang*3.7 - phase*1.7)    * 0.14
+            + Math.sin(ang*6.3 + phase*0.6)    * 0.07
+            + (warpNoiseA(x*0.075, y*0.075) - 0.5) * 0.55
+            + (warpNoiseB(x*0.19,  y*0.19)  - 0.5) * 0.22;
+          const Reff = R * Math.max(0.30, wob);
+          if(d > Reff) continue;
           const i = y*WORLD_W + x;
-          const nd = d / R;
+          const nd = d / Reff;
           // Two-part profile: gentle apron outside, steep cone inside
           let profile = nd < 0.35
             ? 1 - Math.pow(nd/0.35, 1.9) * 0.42
             : 0.58 * Math.pow(1 - (nd-0.35)/0.65, 1.8);
-          // Ridges and gullies radiating from the summit
-          const ang = Math.atan2(dy, dx);
+          // Ridges and gullies radiating from the summit (reuses `ang` above)
           const ridge = 1 + Math.sin(ang * (opts.ridges || 6) + (warpNoiseA(x*0.2,y*0.2)-0.5)*3) * 0.12 * (1-nd);
           profile *= ridge;
           profile += (warpNoiseB(x*0.5, y*0.5) - 0.5) * 0.10 * (1 - nd*0.6);
@@ -1385,9 +1402,9 @@
     }
 
     const S = LANDMARK_SITES;
-    raise(S.stormPeak.x,    S.stormPeak.y,    S.stormPeak.meters,    S.stormPeak.radius,    {ridges: 7});
-    raise(S.fireMountain.x, S.fireMountain.y, S.fireMountain.meters, S.fireMountain.radius, {ridges: 5});
-    raise(S.ashenCrown.x,   S.ashenCrown.y,   S.ashenCrown.meters,   S.ashenCrown.radius,   {ridges: 6});
+    raise(S.stormPeak.x,    S.stormPeak.y,    S.stormPeak.meters,    S.stormPeak.radius,    {ridges: 7, phase: 0.7});
+    raise(S.fireMountain.x, S.fireMountain.y, S.fireMountain.meters, S.fireMountain.radius, {ridges: 5, phase: 2.9});
+    raise(S.ashenCrown.x,   S.ashenCrown.y,   S.ashenCrown.meters,   S.ashenCrown.radius,   {ridges: 6, phase: 4.4});
 
     // Volcanic craters: carve a caldera into the two cones
     function crater(cx, cy, r, depthM){
@@ -1411,7 +1428,7 @@
     // Craters. The Ashen Crown's caldera is offset so the named tile remains a
     // true summit — you stand on the peak and look down into the crater beside it.
     crater(S.fireMountain.x, S.fireMountain.y, 4, 520);
-    crater(S.ashenCrown.x + 5, S.ashenCrown.y + 3, 6, 760);
+    crater(S.ashenCrown.x + S.calderaOffset.dx, S.ashenCrown.y + S.calderaOffset.dy, 5, 700);
 
     // Ridge noise can push a flank above the intended summit, which reads as
     // wrong the moment you compare two tiles. Clamp each massif to its target
@@ -1422,7 +1439,7 @@
         for(let dx=-R-4; dx<=R+4; dx++){
           const x=cx+dx, y=cy+dy;
           if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
-          if(Math.hypot(dx,dy) > R+4) continue;
+          if(Math.hypot(dx,dy) > R*1.6) continue;
           const i=y*WORLD_W+x;
           if(elev[i] > cap) elev[i] = cap - 0.0004;   // just under the summit
         }
@@ -1495,6 +1512,22 @@
     return Math.min(1, oceanDist[y*WORLD_W + x] / 120);
   }
 
+  // ============ GEOTHERMAL HEAT ============
+  // The Ashen Crown is dormant, not dead. Its caldera still vents enough heat
+  // to hold a jungle a few tiles from permanent snow — extreme, but a real
+  // phenomenon (crater lakes and fumarole fields do exactly this). The profile
+  // is a warm plateau over the vent field falling off steeply, so the boundary
+  // between jungle and snow is genuinely abrupt.
+  function geothermalBoost(x, y){
+    const S = LANDMARK_SITES;
+    const cx = S.ashenCrown.x + S.calderaOffset.dx;
+    const cy = S.ashenCrown.y + S.calderaOffset.dy;
+    const d = Math.hypot(x - cx, y - cy);
+    if(d > 14) return 0;
+    // High exponent = a plateau with a cliff edge, not a gentle bell curve
+    return 42 / (1 + Math.pow(d / 5.8, 10));
+  }
+
   // ============ REAL TEMPERATURE FIELDS ============
   // Annual mean, warmest-month and coldest-month temperatures in °C, using the
   // same physics the weather engine uses: latitude sets the baseline, altitude
@@ -1514,7 +1547,7 @@
         const cont = continentality(x, y);
         const elevM = Math.max(0, elevMeters(elev[i]));
         const amp = (2 + 24 * Math.pow(lat, 1.15)) * (0.45 + 0.75 * cont);
-        const base = annualMean - elevM * 0.0065;
+        const base = annualMean - elevM * 0.0065 + geothermalBoost(x, y);
         tempMean[i]   = base;
         tempSummer[i] = base + amp;
         tempWinter[i] = base - amp;
@@ -1805,7 +1838,7 @@
       const {x:sx0, y:sy0} = S.ashenCrown;
       // The caldera sits beside the summit, not on it — so the named tile stays
       // a true peak you can stand on and look down into the crater.
-      const cx = sx0 + 5, cy = sy0 + 3;
+      const cx = sx0 + S.calderaOffset.dx, cy = sy0 + S.calderaOffset.dy;
       for(let dy=-20; dy<=20; dy++){
         for(let dx=-20; dx<=20; dx++){
           const x=cx+dx, y=cy+dy;
@@ -1815,9 +1848,32 @@
           const i=y*WORLD_W+x;
           if(tiles[i] <= 2) continue;
           const wob=(warpNoiseB(x*0.3,y*0.3)-0.5)*2.2;
-          if(d <= 3.2 + wob*0.4)      setTile(x,y,15);  // cold crater lake
-          else if(d <= 6.0 + wob*0.6) setTile(x,y,17);  // basalt rim
-          else if(d <= 12 + wob)      setTile(x,y,20);  // long-weathered ash
+          // A geothermally heated caldera: a steaming hot spring at the centre,
+          // ringed by jungle that the volcano's own warmth keeps alive, all of
+          // it walled in by the frozen slopes of the mountain outside.
+          if(d <= 2.0 + wob*0.28)     setTile(x,y,21);  // steaming hot spring
+          else if(d <= 4.6 + wob*0.45) setTile(x,y,14); // crater jungle
+          else if(d <= 13 + wob){
+            // Permanent snow, but only where it truly never melts — otherwise
+            // leave the mountain as the classifier found it.
+            if(tempSummer[i] <= 0.5) setTile(x,y,11);
+            else if(tempSummer[i] < 7) setTile(x,y,10);
+          }
+        }
+      }
+    })();
+
+    // Give the caldera floor a single coherent climate label
+    (function labelCaldera(){
+      const cx = S.ashenCrown.x + S.calderaOffset.dx;
+      const cy = S.ashenCrown.y + S.calderaOffset.dy;
+      for(let dy=-8; dy<=8; dy++){
+        for(let dx=-8; dx<=8; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          if(Math.hypot(dx,dy) > 6.5) continue;
+          const i=y*WORLD_W+x;
+          if(tiles[i]===14 || tiles[i]===21) zoneMap[i] = ZONE.RAINFOREST;
         }
       }
     })();
@@ -2798,7 +2854,7 @@
   const TERRAIN_NAMES = {
     0:'deep ocean',1:'ocean',2:'shallow water',3:'beach',4:'grassland',5:'forest',6:'dark forest',
     7:'desert',8:'savanna',9:'hills',10:'mountain',11:'snowy peak',12:'tundra',13:'swamp',14:'jungle',15:'lake',
-    16:'black sand', 17:'black rock', 18:'ancient forest', 19:'molten lava', 20:'ash field'
+    16:'black sand', 17:'black rock', 18:'ancient forest', 19:'molten lava', 20:'ash field', 21:'hot spring'
   };
   // Biome labels are generated from the tile's real climate rather than a fixed
   // per-terrain table, so a snow peak at the equator reads "tropical alpine"
@@ -2821,6 +2877,7 @@
       case 18: return 'primeval canopy — unclassified';
       case 19: return 'active lava field';
       case 20: return 'volcanic ashland';
+      case 21: return 'geothermal hot spring';
       case 11: {
         if(elevM > 1200) return `${band === 'polar' ? 'arctic' : band} alpine — permanent snow`;
         return 'polar ice';
@@ -2834,7 +2891,10 @@
       case 12: return elevM > 900 ? `${band} alpine tundra` : `${band} tundra`;
       case 7:  return tMean > 18 ? `hot ${band} desert` : `cold ${band} desert`;
       case 8:  return `${band} savanna`;
-      case 14: return 'tropical rainforest';
+      case 14:
+        // A jungle growing where the map says it should be frozen
+        if(geothermalBoost(x, y) > 12) return 'geothermal crater jungle';
+        return 'tropical rainforest';
       case 13: return `${band} wetlands`;
       case 6:  return band === 'subarctic' || band === 'polar' ? 'boreal forest' : `${band} old-growth woodland`;
       case 5:  return band === 'subarctic' || band === 'polar' ? 'taiga' : `${band} woodland`;
@@ -2846,7 +2906,7 @@
   const BIOME_NAMES = {
     0:'oceanic',1:'oceanic',2:'coastal waters',3:'coastal',4:'grassland',5:'woodland',6:'dense forest',
     7:'desert',8:'savanna',9:'highland',10:'montane rock',11:'permanent snow',12:'tundra',13:'wetlands',14:'rainforest',15:'inland lake',
-    16:'black volcanic sand',17:'basalt rampart',18:'primeval canopy',19:'active lava field',20:'volcanic ashland'
+    16:'black volcanic sand',17:'basalt rampart',18:'primeval canopy',19:'active lava field',20:'volcanic ashland',21:'geothermal hot spring'
   };
   // Day palette
   const PAL_DAY = {
@@ -2854,7 +2914,7 @@
     4:[124,166,86], 5:[80,134,72], 6:[48,96,58], 7:[222,196,140],
     8:[180,170,90], 9:[140,134,90], 10:[120,108,96], 11:[238,238,242],
     12:[202,210,220], 13:[80,108,80], 14:[40,116,68], 15:[78,144,176],
-    16:[38,36,42], 17:[26,24,30], 18:[30,58,44], 19:[214,86,30], 20:[74,68,70]
+    16:[38,36,42], 17:[26,24,30], 18:[30,58,44], 19:[214,86,30], 20:[74,68,70], 21:[108,198,196]
   };
   // Mix palette by lighting/weather
   function lerpColor(a,b,t){return [a[0]+(b[0]-a[0])*t|0,a[1]+(b[1]-a[1])*t|0,a[2]+(b[2]-a[2])*t|0];}
@@ -3111,6 +3171,8 @@
     let temp = annualMean + lagged * seasonalAmp;
     // Lapse rate: 6.5 °C per 1000 m
     temp -= elevM * 0.0065;
+    // Volcanic ground heat, where there is any
+    temp += geothermalBoost(x, y);
     // Day/night swing driven by the sun's actual altitude, lagged ~2.2 h so the
     // peak lands mid-afternoon. This makes polar day genuinely warm and polar
     // night genuinely brutal, and gives long summer evenings their mildness.
@@ -4539,6 +4601,41 @@
         const pulse = 0.6 + 0.4*Math.sin(t2*2.2 + i*1.7 + sx*0.01);
         ctx.fillStyle = `rgba(255,${Math.round(120+90*pulse)},40,${(0.85*pulse).toFixed(2)})`;
         ctx.fillRect(px|0, py|0, Math.ceil(w), Math.ceil(h));
+      }
+      return;
+    }
+    if(t === 21){                                   // geothermal hot spring
+      const t2 = (typeof performance !== 'undefined' ? performance.now() : 0)/1000;
+      const pool = applyLighting([96,190,186]);
+      const rim  = applyLighting([176,148,96]);
+      const pale = applyLighting([200,240,236]);
+      // Mineral-crusted rim
+      ctx.fillStyle = rgbStr(rim);
+      ctx.fillRect(sx|0, sy|0, Math.ceil(sz)+1, Math.ceil(sz)+1);
+      // The pool itself
+      ctx.fillStyle = rgbStr(pool);
+      ctx.beginPath();
+      ctx.ellipse(sx+sz*0.5, sy+sz*0.5, sz*0.40, sz*0.36, 0, 0, Math.PI*2);
+      ctx.fill();
+      // Slowly turning surface, catching light
+      ctx.fillStyle = rgbStr(pale);
+      for(let i=0;i<3;i++){
+        const a = t2*0.5 + i*2.1;
+        ctx.fillRect((sx+sz*0.5+Math.cos(a)*sz*0.20)|0,
+                     (sy+sz*0.5+Math.sin(a)*sz*0.16)|0,
+                     Math.max(1,sz*0.12)|0, Math.max(1,sz*0.05)|0);
+      }
+      // Steam rising off the water
+      if(ultraZoom){
+        for(let i=0;i<4;i++){
+          const ph = (t2*0.35 + i*0.27) % 1;
+          const a = 0.32*(1-ph);
+          ctx.fillStyle = `rgba(226,244,242,${a.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(sx+sz*(0.3+i*0.15)+Math.sin(t2+i)*sz*0.06,
+                  sy+sz*0.5 - ph*sz*0.7, sz*(0.10+ph*0.18), 0, Math.PI*2);
+          ctx.fill();
+        }
       }
       return;
     }
@@ -6749,6 +6846,7 @@
     18: {ground:[['moss',0.55],['peat',0.30],['darkgrass',0.15]], scatter:[['tree',0.16],['bush',0.07],['flower',0.03],['stump',0.01]]},
     19: {ground:[['lava',0.62],['charcoal',0.25],['ash',0.13]], scatter:[['rock',0.015]]},
     20: {ground:[['ash',0.60],['gravel',0.25],['charcoal',0.15]], scatter:[['rock',0.03],['boulder',0.01]]},
+    21: {ground:[['water',0.72],['verdigris',0.16],['clay',0.12]], scatter:[['ripple',0.06],['rock',0.02]], liquid:true},
   };
 
   // Tile detail state
