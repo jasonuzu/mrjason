@@ -1256,27 +1256,9 @@
       elev[y*WORLD_W+x] = e;
       moist[y*WORLD_W+x] = m;
       temp[y*WORLD_W+x] = t;
-
-      let code;
-      if(e < -0.10) code = 0;          // deep ocean
-      else if(e < -0.02) code = 1;      // ocean
-      else if(e < 0.02) code = 2;       // shallow
-      else if(e < 0.05) code = 3;       // beach
-      else if(e > 0.45 && t < 0.35) code = 11;  // snow peak (must be cold)
-      else if(e > 0.32) code = 10;      // mountain (bare rock if too warm for snow)
-      else if(e > 0.22) code = 9;       // hills
-      else {
-        // lowland — biome based on moisture/temp
-        if(t < 0.25) code = 12;                              // tundra
-        else if(t > 0.7 && m < 0.35) code = 7;               // desert
-        else if(t > 0.65 && m < 0.5) code = 8;               // savanna
-        else if(m > 0.7 && t > 0.6) code = 14;               // jungle
-        else if(m > 0.78) code = 13;                         // swamp
-        else if(m > 0.55) code = 6;                          // dark forest
-        else if(m > 0.42) code = 5;                          // forest
-        else code = 4;                                        // grass
-      }
-      tiles[y*WORLD_W+x] = code;
+      // Terrain is NOT classified here. It's assigned in a later pass, once
+      // real elevations in metres and real temperatures in °C are known, so
+      // that snow peaks only appear where it is genuinely cold enough.
     }
   }
 
@@ -1313,19 +1295,6 @@
     for(let i=0;i<elev.length;i++) if(i !== si && elev[i] > worldMax) worldMax = elev[i];
     elev[si] = worldMax + 0.015;
     temp[si] -= 0.15;
-    // Reclassify the whole massif now that its heights have changed
-    for(let dy=-R; dy<=R; dy++){
-      for(let dx=-R; dx<=R; dx++){
-        const x = SUMMIT_X + dx, y = SUMMIT_Y + dy;
-        if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
-        if(Math.sqrt(dx*dx+dy*dy) > R) continue;
-        const i = y*WORLD_W + x;
-        const e = elev[i], t = temp[i];
-        if(e > 0.45 && t < 0.35) tiles[i] = 11;      // snow peak
-        else if(e > 0.32) tiles[i] = 10;             // bare mountain
-        else if(e > 0.22) tiles[i] = 9;              // hills
-      }
-    }
   })();
 
   // ---- Real-world elevation scale ----
@@ -1360,6 +1329,304 @@
     if(m < 1)  return `sea level`;
     return `${Math.round(m).toLocaleString()} m`;
   }
+
+  // ============ CONTINENTALITY (needed before classification) ============
+  // Distance to the nearest sea, by flood fill. Drives how extreme a place's
+  // seasons are and how much moisture reaches it.
+  const oceanDist = new Uint16Array(WORLD_W * WORLD_H);
+  (function computeOceanDistance(){
+    const INF = 65535;
+    oceanDist.fill(INF);
+    const queue = new Int32Array(WORLD_W * WORLD_H);
+    let head = 0, tail = 0;
+    for(let i=0;i<elev.length;i++){
+      if(elev[i] <= SEA_LEVEL){ oceanDist[i] = 0; queue[tail++] = i; }
+    }
+    while(head < tail){
+      const idx = queue[head++];
+      const d = oceanDist[idx];
+      const x = idx % WORLD_W, y = (idx - x) / WORLD_W;
+      for(let k=0;k<4;k++){
+        const nx = x + (k===0?1:k===1?-1:0);
+        const ny = y + (k===2?1:k===3?-1:0);
+        if(nx<0||nx>=WORLD_W||ny<0||ny>=WORLD_H) continue;
+        const ni = ny*WORLD_W + nx;
+        if(oceanDist[ni] !== INF) continue;
+        oceanDist[ni] = d + 1;
+        queue[tail++] = ni;
+      }
+    }
+  })();
+  function continentality(x, y){
+    return Math.min(1, oceanDist[y*WORLD_W + x] / 120);
+  }
+
+  // ============ REAL TEMPERATURE FIELDS ============
+  // Annual mean, warmest-month and coldest-month temperatures in °C, using the
+  // same physics the weather engine uses: latitude sets the baseline, altitude
+  // subtracts 6.5 °C per km, and continentality widens the seasonal swing.
+  // Classifying terrain from these means a "snow peak" is genuinely a place
+  // where snow lies year-round, not merely a tall tile.
+  const tempMean   = new Float32Array(WORLD_W*WORLD_H);
+  const tempSummer = new Float32Array(WORLD_W*WORLD_H);
+  const tempWinter = new Float32Array(WORLD_W*WORLD_H);
+  (function computeTemperatureFields(){
+    for(let y=0;y<WORLD_H;y++){
+      const fy = y / WORLD_H;
+      const lat = Math.abs(fy - 0.5) * 2;
+      const annualMean = 30 - 56 * Math.pow(lat, 1.35);
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        const cont = continentality(x, y);
+        const elevM = Math.max(0, elevMeters(elev[i]));
+        const amp = (2 + 24 * Math.pow(lat, 1.15)) * (0.45 + 0.75 * cont);
+        const base = annualMean - elevM * 0.0065;
+        tempMean[i]   = base;
+        tempSummer[i] = base + amp;
+        tempWinter[i] = base - amp;
+      }
+    }
+  })();
+
+  // ============ TERRAIN CLASSIFICATION ============
+  // Now that heights are in metres and temperatures in °C, terrain can be
+  // assigned the way a geographer would: the snow line is where the warmest
+  // month stays below freezing, tundra is where the warmest month can't get
+  // above ~10 °C (the real treeline rule), and so on.
+  (function classifyTerrain(){
+    for(let y=0;y<WORLD_H;y++){
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        const e = elev[i], m = moist[i];
+        const elevM = elevMeters(e);
+        const tSum = tempSummer[i], tMean = tempMean[i];
+
+        let code;
+        if(e < -0.10)      code = 0;   // deep ocean
+        else if(e < -0.02) code = 1;   // ocean
+        else if(e < 0.02)  code = 2;   // shallow
+        else if(e < 0.05)  code = 3;   // beach
+        // --- Permanent snow: warmest month stays at or below freezing ---
+        else if(tSum <= 0.5 && elevM > 250) code = 11;
+        // --- Bare rock above the treeline but below the permanent snow line ---
+        else if(elevM > 900 && tSum < 7)    code = 10;
+        else if(elevM > 1500)               code = 10;   // steep, thin-soiled
+        else if(elevM > 500)                code = 9;    // hills
+        else {
+          // Lowland biomes keyed off real temperature and moisture
+          if(tSum < 10)                     code = 12;   // tundra (treeline rule)
+          else if(tMean > 18 && m < 0.34)   code = 7;    // hot desert
+          else if(tMean > 20 && m < 0.50)   code = 8;    // savanna
+          else if(tMean > 20 && m > 0.70)   code = 14;   // tropical rainforest
+          else if(m > 0.78)                 code = 13;   // swamp / wetland
+          else if(m > 0.55)                 code = 6;    // dense forest
+          else if(m > 0.40)                 code = 5;    // forest
+          else if(m < 0.30)                 code = 7;    // cold desert
+          else                              code = 4;    // grassland
+        }
+        tiles[i] = code;
+      }
+    }
+  })();
+
+  // Solar cycle basics — declared here because prevailing winds (and through
+  // them the orographic field and the climate zones) depend on the season.
+  const DAYS_PER_YEAR = 360;
+  function solarDeclination(day){
+    return Math.sin(2 * Math.PI * ((day - 80) / DAYS_PER_YEAR));
+  }
+  // ---------- Prevailing winds ----------
+  // Three classic circulation bands per hemisphere. Returns the direction the
+  // air is travelling TOWARD, in radians (0 = east).
+  function prevailingWindAngle(fy, day){
+    const north = fy < 0.5;
+    const lat = Math.abs(fy - 0.5) * 2;          // 0 equator → 1 pole
+    let ang;
+    if(lat < 0.30)      ang = Math.PI;            // trade winds: blow west
+    else if(lat < 0.65) ang = 0;                  // westerlies: blow east
+    else                ang = Math.PI;            // polar easterlies: blow west
+    // Coriolis deflection — poleward in the tropics, equatorward at the poles
+    const defl = (lat < 0.30 ? 0.35 : lat < 0.65 ? -0.28 : 0.30) * (north ? 1 : -1);
+    // Seasonal wobble as the whole circulation shifts with the sun
+    const wobble = solarDeclination(day) * 0.12 * (north ? 1 : -1);
+    return ang + defl + wobble;
+  }
+
+  // ---------- Static field 2: orographic lift ----------
+  // Positive where the land rises into the prevailing wind (rain falls here),
+  // negative on the sheltered side (rain shadow → arid).
+  const orographic = new Float32Array(WORLD_W * WORLD_H);
+  (function computeOrographic(){
+    const SAMPLE = 6;                             // look this many tiles upwind
+    for(let y=0;y<WORLD_H;y++){
+      const fy = y / WORLD_H;
+      // Use the annual-mean wind so the field stays static
+      const ang = prevailingWindAngle(fy, 90);
+      const ux = Math.cos(ang), uy = Math.sin(ang) * 0.5;
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        if(tiles[i] <= 2){ orographic[i] = 0; continue; }
+        // Upwind is opposite the direction of travel
+        const sx = Math.round(x - ux*SAMPLE);
+        const sy = Math.round(y - uy*SAMPLE);
+        if(sx<0||sx>=WORLD_W||sy<0||sy>=WORLD_H){ orographic[i] = 0; continue; }
+        orographic[i] = elev[i] - elev[sy*WORLD_W + sx];
+      }
+    }
+  })();
+
+  // ---------- Climate zones ----------
+  const ZONE = {
+    OCEAN:0, ICECAP:1, TUNDRA:2, BOREAL:3, OCEANIC:4, CONTINENTAL:5,
+    MEDITERRANEAN:6, SUBTROPICAL:7, STEPPE:8, DESERT:9, SAVANNA:10,
+    MONSOON:11, RAINFOREST:12, ALPINE:13, HIGHLAND:14
+  };
+  const ZONE_NAMES = [
+    'Ocean','Ice cap','Tundra','Boreal forest','Temperate oceanic','Humid continental',
+    'Mediterranean','Humid subtropical','Steppe','Desert','Tropical savanna',
+    'Monsoon','Rainforest','Alpine','Highland'
+  ];
+  const ZONE_COLORS = [
+    [40,70,110],[226,236,244],[178,196,196],[54,92,74],[92,150,110],[110,146,96],
+    [190,176,96],[110,164,88],[196,182,112],[222,196,130],[196,178,86],
+    [96,150,120],[36,110,70],[212,216,226],[150,160,150]
+  ];
+
+  // Each tile's zone, computed once from latitude, elevation, moisture and
+  // distance to the sea. This is the Köppen-style backbone of the model.
+  const zoneMap = new Uint8Array(WORLD_W * WORLD_H);
+  (function computeZones(){
+    for(let y=0;y<WORLD_H;y++){
+      const fy = y / WORLD_H;
+      const lat = Math.abs(fy - 0.5) * 2;
+      for(let x=0;x<WORLD_W;x++){
+        const i = y*WORLD_W + x;
+        const t = tiles[i];
+        if(t <= 2 || t === 15){ zoneMap[i] = ZONE.OCEAN; continue; }
+        const e = elev[i];
+        const m = moist[i];
+        const cont = continentality(x, y);
+        const oro = orographic[i];
+        const elevM = Math.max(0, elevMeters(e));
+
+        // Zones are decided by temperature, not by raw latitude or height, so
+        // they can never contradict the terrain sitting on top of them.
+        const tSum  = tempSummer[i];      // warmest month, °C
+        const tMean = tempMean[i];
+
+        // Permanent ice: the warmest month never gets above freezing
+        if(tSum <= 0.5){ zoneMap[i] = (elevM > 900) ? ZONE.ALPINE : ZONE.ICECAP; continue; }
+        // Above the treeline — alpine if it's the mountain doing it, tundra if
+        // it's latitude. Real treeline rule: warmest month below ~10 °C.
+        if(tSum < 6.5){ zoneMap[i] = (elevM > 900) ? ZONE.ALPINE : ZONE.TUNDRA; continue; }
+        if(tSum < 10){  zoneMap[i] = (elevM > 900) ? ZONE.HIGHLAND : ZONE.TUNDRA; continue; }
+        // Cold but forested
+        if(tMean < 3){  zoneMap[i] = (elevM > 1200) ? ZONE.HIGHLAND : ZONE.BOREAL; continue; }
+        // A cool upland in a warm latitude reads as highland
+        if(elevM > 1500 && tMean < 14){ zoneMap[i] = ZONE.HIGHLAND; continue; }
+
+        // Subtropical dry belt (~15–35°) plus any strong rain shadow
+        const inDryBelt = lat > 0.28 && lat < 0.48;
+        const shadow = oro < -0.035;
+        const dry = m < 0.34 || (inDryBelt && m < 0.46) || (shadow && m < 0.52);
+
+        // Tropical zones need genuine tropical warmth, not just low latitude —
+        // this is what stops a 4,000 m peak near the equator being "desert".
+        if(lat < 0.24 && tMean > 18){
+          if(dry) { zoneMap[i] = m < 0.26 ? ZONE.DESERT : ZONE.SAVANNA; continue; }
+          if(m > 0.62 && cont < 0.55){ zoneMap[i] = ZONE.RAINFOREST; continue; }
+          if(m > 0.48){ zoneMap[i] = ZONE.MONSOON; continue; }
+          zoneMap[i] = ZONE.SAVANNA; continue;
+        }
+        if(dry){
+          // Cold arid land is steppe, not desert — deserts imply heat
+          zoneMap[i] = (m < 0.28 && tMean > 12) ? ZONE.DESERT : ZONE.STEPPE;
+          continue;
+        }
+        if(lat < 0.40){
+          // Warm temperate: dry-summer west coasts vs humid east
+          zoneMap[i] = (cont < 0.35 && m < 0.55) ? ZONE.MEDITERRANEAN : ZONE.SUBTROPICAL;
+          continue;
+        }
+        // Cool temperate: maritime near the sea, continental inland
+        zoneMap[i] = cont > 0.45 ? ZONE.CONTINENTAL : ZONE.OCEANIC;
+      }
+    }
+  })();
+
+  function zoneAt(x, y){
+    if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return ZONE.OCEAN;
+    return zoneMap[y*WORLD_W + x];
+  }
+  function zoneName(x, y){ return ZONE_NAMES[zoneAt(x, y)]; }
+
+
+  // ============ RECONCILE TERRAIN WITH CLIMATE ============
+  // The terrain classifier and the zone classifier look at the same world from
+  // different angles, and where they disagreed the map read as nonsense —
+  // forest growing in a steppe, tundra inside an ice cap, desert on a frozen
+  // summit. This pass makes the ground cover agree with the climate above it.
+  (function reconcileTerrainToZone(){
+    for(let i=0;i<tiles.length;i++){
+      const t = tiles[i];
+      if(t < 3 || t === 15) continue;               // leave water alone
+      const z = zoneMap[i];
+      const m = moist[i];
+      const elevM = Math.max(0, elevMeters(elev[i]));
+      switch(z){
+        case ZONE.ICECAP:  tiles[i] = 11; break;               // permanent ice sheet
+        case ZONE.ALPINE:
+          // Permanent snow only where the warmest month stays below freezing;
+          // otherwise it's bare alpine rock that clears in summer.
+          tiles[i] = (tempSummer[i] <= 0.5) ? 11 : 10;
+          break;
+        case ZONE.DESERT:
+          if(t===5||t===6||t===14||t===13) tiles[i] = 7;
+          else if(t===4||t===8) tiles[i] = m < 0.24 ? 7 : 8;
+          break;
+        case ZONE.STEPPE:                                       // treeless grassland
+          if(t===5||t===6||t===14||t===13) tiles[i] = 4;
+          else if(t===7 && m > 0.30) tiles[i] = 4;
+          break;
+        case ZONE.TUNDRA:                                       // too cold for forest
+          if(t===5||t===6||t===14||t===8||t===7) tiles[i] = 12;
+          break;
+        case ZONE.BOREAL:                                       // taiga and bog
+          if(t===14||t===8||t===7) tiles[i] = m > 0.72 ? 13 : 6;
+          else if(t===4 && m > 0.50) tiles[i] = 6;
+          break;
+        case ZONE.RAINFOREST:
+          if(t===7||t===8||t===12) tiles[i] = 14;
+          else if(t===4||t===5) tiles[i] = m > 0.72 ? 14 : 6;
+          break;
+        case ZONE.MONSOON:
+          if(t===7||t===12) tiles[i] = m > 0.60 ? 6 : 8;
+          else if(t===14 && m < 0.55) tiles[i] = 6;
+          break;
+        case ZONE.SAVANNA:
+          if(t===14||t===12) tiles[i] = 8;
+          else if(t===6) tiles[i] = m > 0.55 ? 5 : 8;
+          else if(t===7 && m > 0.32) tiles[i] = 8;
+          break;
+        case ZONE.MEDITERRANEAN:
+          if(t===14||t===12) tiles[i] = 5;
+          break;
+        case ZONE.OCEANIC:
+        case ZONE.CONTINENTAL:
+          if(t===14) tiles[i] = 6;
+          else if(t===12) tiles[i] = 5;
+          else if(t===7)  tiles[i] = m > 0.38 ? 4 : 7;
+          break;
+        case ZONE.SUBTROPICAL:
+          if(t===12) tiles[i] = 5;
+          break;
+        case ZONE.HIGHLAND:
+          if(t===14||t===8) tiles[i] = 6;
+          else if(t===7 && elevM > 1200) tiles[i] = 9;
+          break;
+      }
+    }
+  })();
 
   // Carve some inland lakes
   const lakeRng = mulberry32(SEED+99);
@@ -2301,9 +2568,47 @@
     0:'deep ocean',1:'ocean',2:'shallow water',3:'beach',4:'grassland',5:'forest',6:'dark forest',
     7:'desert',8:'savanna',9:'hills',10:'mountain',11:'snowy peak',12:'tundra',13:'swamp',14:'jungle',15:'lake'
   };
+  // Biome labels are generated from the tile's real climate rather than a fixed
+  // per-terrain table, so a snow peak at the equator reads "tropical alpine"
+  // and one near the pole reads "arctic alpine" — never the wrong one.
+  function biomeNameAt(x, y){
+    const i = y*WORLD_W + x;
+    const t = tiles[i];
+    if(t === 0 || t === 1) return 'oceanic';
+    if(t === 2) return 'coastal waters';
+    if(t === 15) return 'inland lake';
+    if(t === 3) return 'coastal';
+    const lat = Math.abs(y/WORLD_H - 0.5) * 2;
+    const band = lat > 0.72 ? 'polar' : lat > 0.55 ? 'subarctic'
+               : lat > 0.34 ? 'temperate' : lat > 0.20 ? 'subtropical' : 'tropical';
+    const elevM = Math.max(0, elevMeters(elev[i]));
+    const tSum = tempSummer[i], tMean = tempMean[i];
+    switch(t){
+      case 11: {
+        if(elevM > 1200) return `${band === 'polar' ? 'arctic' : band} alpine — permanent snow`;
+        return 'polar ice';
+      }
+      case 10: {
+        if(elevM > 2500) return `${band} high alpine`;
+        if(tSum < 7)     return `${band} alpine barrens`;
+        return `${band} montane rock`;
+      }
+      case 9:  return `${band} highland`;
+      case 12: return elevM > 900 ? `${band} alpine tundra` : `${band} tundra`;
+      case 7:  return tMean > 18 ? `hot ${band} desert` : `cold ${band} desert`;
+      case 8:  return `${band} savanna`;
+      case 14: return 'tropical rainforest';
+      case 13: return `${band} wetlands`;
+      case 6:  return band === 'subarctic' || band === 'polar' ? 'boreal forest' : `${band} old-growth woodland`;
+      case 5:  return band === 'subarctic' || band === 'polar' ? 'taiga' : `${band} woodland`;
+      case 4:  return `${band} grassland`;
+    }
+    return 'unclassified';
+  }
+  // Kept for the few places that index by terrain code alone
   const BIOME_NAMES = {
-    0:'oceanic',1:'oceanic',2:'coastal',3:'coastal',4:'temperate plains',5:'temperate woodland',6:'old-growth woodland',
-    7:'arid desert',8:'tropical savanna',9:'highland',10:'alpine',11:'arctic alpine',12:'tundra',13:'wetlands',14:'tropical rainforest',15:'inland lake'
+    0:'oceanic',1:'oceanic',2:'coastal waters',3:'coastal',4:'grassland',5:'woodland',6:'dense forest',
+    7:'desert',8:'savanna',9:'highland',10:'montane rock',11:'permanent snow',12:'tundra',13:'wetlands',14:'rainforest',15:'inland lake'
   };
   // Day palette
   const PAL_DAY = {
@@ -2360,89 +2665,15 @@
   // for every viewer and reproducible without storing any state.
   // ============================================================
 
-  const DAYS_PER_YEAR = 360;                           // length of the in-game year
   const WEATHER_CELL_SIZE = 12;                        // tiles per weather cell — finer than before
   const WEATHER_CELLS_X = Math.ceil(WORLD_W / WEATHER_CELL_SIZE);
   const WEATHER_CELLS_Y = Math.ceil(WORLD_H / WEATHER_CELL_SIZE);
   const WEATHER_PERIODS_PER_DAY = 8;                   // re-evaluate every 3 in-game hours
 
-  // ---------- Static field 1: distance to the nearest ocean ----------
-  // Multi-source BFS out from every water tile. Continentality drives how
-  // extreme the seasons are and how much moisture reaches a place.
-  const oceanDist = new Uint16Array(WORLD_W * WORLD_H);
-  (function computeOceanDistance(){
-    const INF = 65535;
-    oceanDist.fill(INF);
-    const queue = new Int32Array(WORLD_W * WORLD_H);
-    let head = 0, tail = 0;
-    for(let i=0;i<tiles.length;i++){
-      if(tiles[i] <= 2){ oceanDist[i] = 0; queue[tail++] = i; }
-    }
-    while(head < tail){
-      const idx = queue[head++];
-      const d = oceanDist[idx];
-      const x = idx % WORLD_W, y = (idx - x) / WORLD_W;
-      for(let k=0;k<4;k++){
-        const nx = x + (k===0?1:k===1?-1:0);
-        const ny = y + (k===2?1:k===3?-1:0);
-        if(nx<0||nx>=WORLD_W||ny<0||ny>=WORLD_H) continue;
-        const ni = ny*WORLD_W + nx;
-        if(oceanDist[ni] !== INF) continue;
-        oceanDist[ni] = d + 1;
-        queue[tail++] = ni;
-      }
-    }
-  })();
-  // 0 at the coast → 1 deep inland. Saturates around 120 tiles (1200 km).
-  function continentality(x, y){
-    return Math.min(1, oceanDist[y*WORLD_W + x] / 120);
-  }
-
-  // ---------- Prevailing winds ----------
-  // Three classic circulation bands per hemisphere. Returns the direction the
-  // air is travelling TOWARD, in radians (0 = east).
-  function prevailingWindAngle(fy, day){
-    const north = fy < 0.5;
-    const lat = Math.abs(fy - 0.5) * 2;          // 0 equator → 1 pole
-    let ang;
-    if(lat < 0.30)      ang = Math.PI;            // trade winds: blow west
-    else if(lat < 0.65) ang = 0;                  // westerlies: blow east
-    else                ang = Math.PI;            // polar easterlies: blow west
-    // Coriolis deflection — poleward in the tropics, equatorward at the poles
-    const defl = (lat < 0.30 ? 0.35 : lat < 0.65 ? -0.28 : 0.30) * (north ? 1 : -1);
-    // Seasonal wobble as the whole circulation shifts with the sun
-    const wobble = solarDeclination(day) * 0.12 * (north ? 1 : -1);
-    return ang + defl + wobble;
-  }
-
-  // ---------- Static field 2: orographic lift ----------
-  // Positive where the land rises into the prevailing wind (rain falls here),
-  // negative on the sheltered side (rain shadow → arid).
-  const orographic = new Float32Array(WORLD_W * WORLD_H);
-  (function computeOrographic(){
-    const SAMPLE = 6;                             // look this many tiles upwind
-    for(let y=0;y<WORLD_H;y++){
-      const fy = y / WORLD_H;
-      // Use the annual-mean wind so the field stays static
-      const ang = prevailingWindAngle(fy, 90);
-      const ux = Math.cos(ang), uy = Math.sin(ang) * 0.5;
-      for(let x=0;x<WORLD_W;x++){
-        const i = y*WORLD_W + x;
-        if(tiles[i] <= 2){ orographic[i] = 0; continue; }
-        // Upwind is opposite the direction of travel
-        const sx = Math.round(x - ux*SAMPLE);
-        const sy = Math.round(y - uy*SAMPLE);
-        if(sx<0||sx>=WORLD_W||sy<0||sy>=WORLD_H){ orographic[i] = 0; continue; }
-        orographic[i] = elev[i] - elev[sy*WORLD_W + sx];
-      }
-    }
-  })();
+  // (Continentality and the ocean-distance field are computed during world
+  //  generation, above, because terrain classification depends on them.)
 
   // ---------- Solar cycle ----------
-  // -1 (southern summer) → +1 (northern summer). Peaks near day 172 / 356.
-  function solarDeclination(day){
-    return Math.sin(2 * Math.PI * ((day - 80) / DAYS_PER_YEAR));
-  }
   // ---------- Solar geometry ----------
   // Proper spherical astronomy, so sunrise and sunset land where they should:
   // roughly 06:00/18:00 at the equator all year, swinging to midnight sun and
@@ -2490,98 +2721,25 @@
     return base + (north ? -1 : 1) * decl * 0.06;
   }
 
-  // ---------- Climate zones ----------
-  const ZONE = {
-    OCEAN:0, ICECAP:1, TUNDRA:2, BOREAL:3, OCEANIC:4, CONTINENTAL:5,
-    MEDITERRANEAN:6, SUBTROPICAL:7, STEPPE:8, DESERT:9, SAVANNA:10,
-    MONSOON:11, RAINFOREST:12, ALPINE:13, HIGHLAND:14
-  };
-  const ZONE_NAMES = [
-    'Ocean','Ice cap','Tundra','Boreal forest','Temperate oceanic','Humid continental',
-    'Mediterranean','Humid subtropical','Steppe','Desert','Tropical savanna',
-    'Monsoon','Rainforest','Alpine','Highland'
-  ];
-  const ZONE_COLORS = [
-    [40,70,110],[226,236,244],[178,196,196],[54,92,74],[92,150,110],[110,146,96],
-    [190,176,96],[110,164,88],[196,182,112],[222,196,130],[196,178,86],
-    [96,150,120],[36,110,70],[212,216,226],[150,160,150]
-  ];
-
-  // Each tile's zone, computed once from latitude, elevation, moisture and
-  // distance to the sea. This is the Köppen-style backbone of the model.
-  const zoneMap = new Uint8Array(WORLD_W * WORLD_H);
-  (function computeZones(){
-    for(let y=0;y<WORLD_H;y++){
-      const fy = y / WORLD_H;
-      const lat = Math.abs(fy - 0.5) * 2;
-      for(let x=0;x<WORLD_W;x++){
-        const i = y*WORLD_W + x;
-        const t = tiles[i];
-        if(t <= 2 || t === 15){ zoneMap[i] = ZONE.OCEAN; continue; }
-        const e = elev[i];
-        const m = moist[i];
-        const cont = continentality(x, y);
-        const oro = orographic[i];
-        const elevM = Math.max(0, elevMeters(e));
-
-        // Polar belt first — a mountain inside the ice cap is still ice cap
-        if(lat > 0.88){ zoneMap[i] = ZONE.ICECAP; continue; }
-
-        // Elevation trumps latitude, but the snow line drops as you go poleward:
-        // ~3200 m at the equator falling to ~600 m near the poles.
-        const alpineLine   = 3200 - 2600 * lat;
-        const highlandLine = 1900 - 1400 * lat;
-        if(elevM > alpineLine){ zoneMap[i] = ZONE.ALPINE; continue; }
-        if(elevM > highlandLine){ zoneMap[i] = ZONE.HIGHLAND; continue; }
-
-        if(lat > 0.76){ zoneMap[i] = ZONE.TUNDRA; continue; }
-        if(lat > 0.62){ zoneMap[i] = ZONE.BOREAL; continue; }
-
-        // Subtropical dry belt (~15–35°) plus any strong rain shadow
-        const inDryBelt = lat > 0.28 && lat < 0.48;
-        const shadow = oro < -0.035;
-        const dry = m < 0.34 || (inDryBelt && m < 0.46) || (shadow && m < 0.52);
-
-        if(lat < 0.24){
-          // Tropics
-          if(dry) { zoneMap[i] = m < 0.26 ? ZONE.DESERT : ZONE.SAVANNA; continue; }
-          if(m > 0.62 && cont < 0.55){ zoneMap[i] = ZONE.RAINFOREST; continue; }
-          if(m > 0.48){ zoneMap[i] = ZONE.MONSOON; continue; }
-          zoneMap[i] = ZONE.SAVANNA; continue;
-        }
-        if(dry){
-          zoneMap[i] = m < 0.28 ? ZONE.DESERT : ZONE.STEPPE;
-          continue;
-        }
-        if(lat < 0.40){
-          // Warm temperate: dry-summer west coasts vs humid east
-          zoneMap[i] = (cont < 0.35 && m < 0.55) ? ZONE.MEDITERRANEAN : ZONE.SUBTROPICAL;
-          continue;
-        }
-        // Cool temperate: maritime near the sea, continental inland
-        zoneMap[i] = cont > 0.45 ? ZONE.CONTINENTAL : ZONE.OCEANIC;
-      }
-    }
-  })();
-
-  function zoneAt(x, y){
-    if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return ZONE.OCEAN;
-    return zoneMap[y*WORLD_W + x];
-  }
-  function zoneName(x, y){ return ZONE_NAMES[zoneAt(x, y)]; }
-
   // ---------- Seasons ----------
   // Different latitudes experience fundamentally different season types: the
   // tropics alternate wet and dry rather than warm and cold, and the poles
   // swing between endless day and endless night.
-  function seasonAt(day, fy){
+  // `coldMean` lets a caller say "this specific place is frozen", so a tropical
+  // summit gets an alpine season cycle rather than a wet/dry one.
+  function seasonAt(day, fy, coldMean){
     const lat = Math.abs(fy - 0.5) * 2;
     const north = fy < 0.5;
     const decl = solarDeclination(day) * (north ? 1 : -1);   // + = local summer
+    // Anywhere that never really thaws runs on a freeze/thaw cycle regardless
+    // of where it sits on the map — this is what high mountains actually do.
+    if(coldMean != null && coldMean < 1){
+      return decl > 0.3 ? 'brief thaw' : decl > 0 ? 'cold season' : decl > -0.3 ? 'deep freeze' : 'deep freeze';
+    }
     if(lat > 0.80){
       return decl > 0.25 ? 'polar day' : decl < -0.25 ? 'polar night' : (decl > 0 ? 'thaw' : 'freeze');
     }
-    if(lat < 0.24){
+    if(lat < 0.24 && (coldMean == null || coldMean > 16)){
       // Wet when the rain belt is overhead, dry when it has moved away
       const d = Math.abs(fy - itczFy(day));
       return d < 0.075 ? 'wet' : d < 0.13 ? 'turning' : 'dry';
@@ -2807,7 +2965,7 @@
       windAngle: windAng, windSpeed: windSpd, windKmh,
       lat, north, cont, elevM, itczDist, itczBoost,
       systemLift: sys.lift, cyclone: sys.cyclone,
-      season: seasonAt(day, fy),
+      season: seasonAt(day, fy, tempMean[i]),
       sun: sunTimes(fy, day),
       solarAlt: solarAltitude(fy, day, hour)
     };
@@ -5808,7 +5966,6 @@
     const t = tiles[ty*WORLD_W+tx];
     const e = elev[ty*WORLD_W+tx];
     const m = moist[ty*WORLD_W+tx];
-    const tp = temp[ty*WORLD_W+tx];
     const reg = regionMap[ty*WORLD_W+tx];
     const elevLabel = formatElevation(e);
     const editKey = `${tx},${ty}`;
@@ -5848,7 +6005,7 @@
     let html = `<div style="font-weight:500;font-size:13px;margin-bottom:6px;">Tile (${tx}, ${ty})</div>`;
     html += `<div style="font-size:11px;line-height:1.6;opacity:0.95;">`;
     html += `<div><span style="opacity:0.6;">Terrain:</span> ${TERRAIN_NAMES[t]}</div>`;
-    html += `<div><span style="opacity:0.6;">Biome:</span> ${BIOME_NAMES[t]}</div>`;
+    html += `<div><span style="opacity:0.6;">Biome:</span> ${biomeNameAt(tx, ty)}</div>`;
     html += `<div><span style="opacity:0.6;">Elevation:</span> ${elevLabel}</div>`;
     html += `<div><span style="opacity:0.6;">Moisture:</span> ${(m*100).toFixed(0)}%</div>`;
     html += `<div><span style="opacity:0.6;">Temperature:</span> ${tempC.toFixed(0)}°C</div>`;
@@ -5874,7 +6031,7 @@
     html += `<div style="margin-top:4px;padding-top:4px;border-top:1px dashed rgba(255,255,255,0.08);">`;
     html += `<span style="opacity:0.6;">Local time:</span> Day ${localHere.day}, ${localStr}`;
     html += `</div>`;
-    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊' };
+    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊', 'brief thaw':'💧', 'cold season':'🌨️', 'deep freeze':'🧊' };
     html += `<div><span style="opacity:0.6;">Season:</span> ${seasonIcons[season] || ''} ${season}</div>`;
     html += `<div><span style="opacity:0.6;">Climate:</span> ${clim.zoneName}</div>`;
     html += `<div><span style="opacity:0.6;">Humidity:</span> ${Math.round(Math.min(1,clim.humidity)*100)}%</div>`;
@@ -7332,11 +7489,11 @@
     const localHere = localTimeAtTile(tx, ms);
     const wp = currentWeatherPeriod(localHere.day, localHere.hour);
     const w  = weatherAtTile(tx, ty, wp.day, wp.period);
-    const season = seasonAt(localHere.day, ty / WORLD_H);
+    const season = seasonAt(localHere.day, ty / WORLD_H, tempMean[ty*WORLD_W+tx]);
     const elevLabel = formatElevation(e);
     document.getElementById('tileTitle').textContent = `Tile (${tx}, ${ty}) · ${TERRAIN_NAMES[t]}`;
-    document.getElementById('tileSubtitle').textContent = `${BIOME_NAMES[t]} · ${elevLabel}`;
-    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊' };
+    document.getElementById('tileSubtitle').textContent = `${biomeNameAt(tx, ty)} · ${elevLabel}`;
+    const seasonIcons = { spring:'🌸', summer:'☀️', autumn:'🍂', winter:'❄️', wet:'🌧️', dry:'🌵', turning:'🌤️', 'polar day':'🌞', 'polar night':'🌑', thaw:'💧', freeze:'🧊', 'brief thaw':'💧', 'cold season':'🌨️', 'deep freeze':'🧊' };
     const weatherIcons = { clear:'☀️', cloudy:'☁️', rain:'🌧️', storm:'⛈️', severe:'🌩️', snow:'❄️', fog:'🌫️', sandstorm:'🌪️', blizzard:'🌨️' };
     document.getElementById('tileFooter').innerHTML =
       `<div>${weatherIcons[w]||''} ${w} · ${seasonIcons[season]} ${season}</div>` +
