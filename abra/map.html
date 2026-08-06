@@ -1330,6 +1330,140 @@
     return `${Math.round(m).toLocaleString()} m`;
   }
 
+  // Inverse of elevMeters — the raw value needed to reach a given height.
+  // Lets hand-placed landmarks be sculpted to exact real-world altitudes.
+  function rawForMeters(m){
+    const t = Math.pow(Math.max(0, m) / SUMMIT_METERS, 1 / ELEV_EXP);
+    return SEA_LEVEL + t * (ELEV_MAX_RAW - SEA_LEVEL);
+  }
+
+  // ============ HAND-PLACED LANDMARKS: TERRAIN SCULPTING ============
+  // These are authored features. Their elevation is shaped here, before the
+  // classifier runs, so the surrounding land grades into them naturally and
+  // rivers, roads and settlements all react to the new topography.
+  const LANDMARK_SITES = {
+    stormPeak:   {x: 53,  y: 95,  meters: 2898, radius: 30},
+    fireMountain:{x: 345, y: 192, meters: 2450, radius: 26},   // active volcano
+    ashenCrown:  {x: 320, y: 61,  meters: 3100, radius: 32},   // dormant volcano
+    whirlpool:   {x: 469, y: 169, radius: 9},
+    blackIsle:   {x: 673, y: 310, radius: 46}
+  };
+
+  (function sculptLandmarks(){
+    // Raise a believable massif: a broad shoulder, a steeper cone, and ridge
+    // noise so the flanks read as real terrain rather than a smooth dome.
+    function raise(cx, cy, targetM, R, opts){
+      opts = opts || {};
+      const targetRaw = rawForMeters(targetM);
+      for(let dy=-R; dy<=R; dy++){
+        for(let dx=-R; dx<=R; dx++){
+          const x = cx+dx, y = cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if(d > R) continue;
+          const i = y*WORLD_W + x;
+          const nd = d / R;
+          // Two-part profile: gentle apron outside, steep cone inside
+          let profile = nd < 0.35
+            ? 1 - Math.pow(nd/0.35, 1.9) * 0.42
+            : 0.58 * Math.pow(1 - (nd-0.35)/0.65, 1.8);
+          // Ridges and gullies radiating from the summit
+          const ang = Math.atan2(dy, dx);
+          const ridge = 1 + Math.sin(ang * (opts.ridges || 6) + (warpNoiseA(x*0.2,y*0.2)-0.5)*3) * 0.12 * (1-nd);
+          profile *= ridge;
+          profile += (warpNoiseB(x*0.5, y*0.5) - 0.5) * 0.10 * (1 - nd*0.6);
+          profile = Math.max(0, profile);
+          const lift = targetRaw * profile;
+          // Blend rather than overwrite, so existing land isn't flattened
+          elev[i] = Math.max(elev[i], Math.max(elev[i]*(1-profile*0.8) + lift, SEA_LEVEL + 0.005));
+          temp[i] -= profile * 1.6;
+        }
+      }
+      // Pin the exact summit height
+      const si = cy*WORLD_W + cx;
+      elev[si] = targetRaw;
+    }
+
+    const S = LANDMARK_SITES;
+    raise(S.stormPeak.x,    S.stormPeak.y,    S.stormPeak.meters,    S.stormPeak.radius,    {ridges: 7});
+    raise(S.fireMountain.x, S.fireMountain.y, S.fireMountain.meters, S.fireMountain.radius, {ridges: 5});
+    raise(S.ashenCrown.x,   S.ashenCrown.y,   S.ashenCrown.meters,   S.ashenCrown.radius,   {ridges: 6});
+
+    // Volcanic craters: carve a caldera into the two cones
+    function crater(cx, cy, r, depthM){
+      const rimRaw = elev[cy*WORLD_W+cx];
+      const floorRaw = rawForMeters(Math.max(0, elevMeters(rimRaw) - depthM));
+      for(let dy=-r; dy<=r; dy++){
+        for(let dx=-r; dx<=r; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          const d=Math.sqrt(dx*dx+dy*dy);
+          if(d>r) continue;
+          const i=y*WORLD_W+x;
+          const t = d/r;
+          // Bowl floor, rising sharply to a raised rim
+          const bowl = t < 0.75 ? floorRaw + (rimRaw-floorRaw)*Math.pow(t/0.75, 2.4)
+                                : rimRaw * (1 + (1-Math.abs(t-0.88)/0.13) * 0.02);
+          elev[i] = bowl;
+        }
+      }
+    }
+    // Craters. The Ashen Crown's caldera is offset so the named tile remains a
+    // true summit — you stand on the peak and look down into the crater beside it.
+    crater(S.fireMountain.x, S.fireMountain.y, 4, 520);
+    crater(S.ashenCrown.x + 5, S.ashenCrown.y + 3, 6, 760);
+
+    // Ridge noise can push a flank above the intended summit, which reads as
+    // wrong the moment you compare two tiles. Clamp each massif to its target
+    // height and pin the named tile at exactly that value.
+    function crownMassif(cx, cy, targetM, R){
+      const cap = rawForMeters(targetM);
+      for(let dy=-R-4; dy<=R+4; dy++){
+        for(let dx=-R-4; dx<=R+4; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          if(Math.hypot(dx,dy) > R+4) continue;
+          const i=y*WORLD_W+x;
+          if(elev[i] > cap) elev[i] = cap - 0.0004;   // just under the summit
+        }
+      }
+      elev[cy*WORLD_W+cx] = cap;
+    }
+    crownMassif(S.stormPeak.x,    S.stormPeak.y,    S.stormPeak.meters,    S.stormPeak.radius);
+    crownMassif(S.ashenCrown.x,   S.ashenCrown.y,   S.ashenCrown.meters,   S.ashenCrown.radius);
+    // Ashmaw's summit *is* the vent, so cap the cone and let the crater sit in it
+    crownMassif(S.fireMountain.x, S.fireMountain.y, S.fireMountain.meters, S.fireMountain.radius);
+    elev[S.fireMountain.y*WORLD_W + S.fireMountain.x] = rawForMeters(S.fireMountain.meters - 380);
+
+    // The Black Isle: ring the island in a wall of volcanic rock by lifting a
+    // narrow band at its rim, and make sure the interior sits above the sea.
+    (function shapeBlackIsle(){
+      const {x:cx, y:cy, radius:R} = S.blackIsle;
+      const wallRaw = rawForMeters(340);
+      for(let dy=-R-4; dy<=R+4; dy++){
+        for(let dx=-R-4; dx<=R+4; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          const d=Math.sqrt(dx*dx+dy*dy);
+          const i=y*WORLD_W+x;
+          // Wobble the coastline so the island isn't a perfect circle
+          const wob = 1 + (warpNoiseA(x*0.11, y*0.11) - 0.5) * 0.24;
+          const rEff = R * wob;
+          if(d > rEff + 3) continue;
+          if(d > rEff - 4.0){
+            // The wall itself — deliberately thick so it never breaks
+            elev[i] = Math.max(elev[i], wallRaw);
+          } else {
+            // Interior plateau, gently undulating
+            const inner = rawForMeters(40 + (warpNoiseB(x*0.3,y*0.3))*90);
+            elev[i] = Math.max(elev[i], inner);
+          }
+        }
+      }
+    })();
+  })();
+
+
   // ============ CONTINENTALITY (needed before classification) ============
   // Distance to the nearest sea, by flood fill. Drives how extreme a place's
   // seasons are and how much moisture reaches it.
@@ -1570,6 +1704,7 @@
     for(let i=0;i<tiles.length;i++){
       const t = tiles[i];
       if(t < 3 || t === 15) continue;               // leave water alone
+      if(t >= 16) continue;                          // authored landmark surfaces
       const z = zoneMap[i];
       const m = moist[i];
       const elevM = Math.max(0, elevMeters(elev[i]));
@@ -1626,6 +1761,95 @@
           break;
       }
     }
+  })();
+
+  // ============ HAND-PLACED LANDMARKS: SURFACE PAINTING ============
+  // Runs after reconciliation so the climate passes can't overwrite these
+  // authored surfaces. `protectedTiles` marks them off-limits to any later
+  // automatic reclassification.
+  const protectedTiles = new Uint8Array(WORLD_W*WORLD_H);
+  (function paintLandmarks(){
+    const S = LANDMARK_SITES;
+    function setTile(x, y, code){
+      if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return;
+      const i = y*WORLD_W+x;
+      tiles[i] = code;
+      protectedTiles[i] = 1;
+    }
+
+    // ---- Active volcano: lava crater, fresh ash flanks, scorched skirt ----
+    (function fireMountain(){
+      const {x:cx, y:cy} = S.fireMountain;
+      for(let dy=-24; dy<=24; dy++){
+        for(let dx=-24; dx<=24; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          const d=Math.sqrt(dx*dx+dy*dy);
+          const i=y*WORLD_W+x;
+          if(tiles[i] <= 2) continue;                   // don't pave the sea
+          const wob = (warpNoiseA(x*0.25,y*0.25)-0.5)*3;
+          if(d <= 2.4 + wob*0.3)      setTile(x,y,19);  // molten crater
+          else if(d <= 4.5 + wob*0.5) setTile(x,y,17);  // cooled crater rim
+          else if(d <= 13 + wob)      setTile(x,y,20);  // ash and cinder slopes
+          else if(d <= 20 + wob*1.5){
+            // Old lava flows fingering downslope
+            const ang = Math.atan2(dy,dx);
+            if(Math.sin(ang*5 + wob) > 0.45) setTile(x,y,20);
+          }
+        }
+      }
+    })();
+
+    // ---- Dormant volcano: cold crater lake ringed by old ash ----
+    (function ashenCrown(){
+      const {x:sx0, y:sy0} = S.ashenCrown;
+      // The caldera sits beside the summit, not on it — so the named tile stays
+      // a true peak you can stand on and look down into the crater.
+      const cx = sx0 + 5, cy = sy0 + 3;
+      for(let dy=-20; dy<=20; dy++){
+        for(let dx=-20; dx<=20; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          if(x===sx0 && y===sy0) continue;            // never pave the summit
+          const d=Math.sqrt(dx*dx+dy*dy);
+          const i=y*WORLD_W+x;
+          if(tiles[i] <= 2) continue;
+          const wob=(warpNoiseB(x*0.3,y*0.3)-0.5)*2.2;
+          if(d <= 3.2 + wob*0.4)      setTile(x,y,15);  // cold crater lake
+          else if(d <= 6.0 + wob*0.6) setTile(x,y,17);  // basalt rim
+          else if(d <= 12 + wob)      setTile(x,y,20);  // long-weathered ash
+        }
+      }
+    })();
+
+    // ---- The Black Isle ----
+    // Black volcanic sand over the southern half, ancient forest over the
+    // north, and a continuous wall of black rock around the whole rim.
+    (function blackIsle(){
+      const {x:cx, y:cy, radius:R} = S.blackIsle;
+      for(let dy=-R-5; dy<=R+5; dy++){
+        for(let dx=-R-5; dx<=R+5; dx++){
+          const x=cx+dx, y=cy+dy;
+          if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) continue;
+          const d=Math.sqrt(dx*dx+dy*dy);
+          const wob = 1 + (warpNoiseA(x*0.11, y*0.11) - 0.5) * 0.24;
+          const rEff = R * wob;
+          if(d > rEff + 2) continue;
+          const i=y*WORLD_W+x;
+          if(d > rEff - 4.0){
+            setTile(x,y,17);                    // the great black wall
+          } else if(dy > -2 + (warpNoiseB(x*0.2,y*0.2)-0.5)*10){
+            setTile(x,y,16);                    // black sand, southern half
+          } else {
+            // Northern half: dense ancient forest, with glades and dark tarns
+            const n = warpNoiseB(x*0.16, y*0.16);
+            if(n > 0.82)      setTile(x,y,15);  // still black water
+            else if(n > 0.14) setTile(x,y,18);  // ancient super-trees
+            else              setTile(x,y,16);  // rare sand clearings
+          }
+        }
+      }
+    })();
   })();
 
   // Carve some inland lakes
@@ -2332,6 +2556,13 @@
       return;
     }
   }
+  // Hand-placed landmarks, pinned to their exact tiles
+  landmarks.push({x: LANDMARK_SITES.stormPeak.x,    y: LANDMARK_SITES.stormPeak.y,    name:'Storm Peak',            kind:'peak'});
+  landmarks.push({x: LANDMARK_SITES.fireMountain.x, y: LANDMARK_SITES.fireMountain.y, name:'Ashmaw (active volcano)',kind:'volcano_active'});
+  landmarks.push({x: LANDMARK_SITES.ashenCrown.x,   y: LANDMARK_SITES.ashenCrown.y,   name:'The Ashen Crown',        kind:'volcano'});
+  landmarks.push({x: LANDMARK_SITES.whirlpool.x,    y: LANDMARK_SITES.whirlpool.y,    name:'The Maw',                kind:'whirlpool'});
+  landmarks.push({x: LANDMARK_SITES.blackIsle.x,    y: LANDMARK_SITES.blackIsle.y,    name:'The Black Isle',         kind:'anomaly'});
+
   placeLandmark('Cleoreby (dormant volcano)','volcano','mountain');
   placeLandmark('Nylmlalin Hot Springs','hotspring','hills');
   placeLandmark('Bhiccug Hot Springs','hotspring','hills');
@@ -2566,7 +2797,8 @@
   // ============ COLORS / RENDERING ============
   const TERRAIN_NAMES = {
     0:'deep ocean',1:'ocean',2:'shallow water',3:'beach',4:'grassland',5:'forest',6:'dark forest',
-    7:'desert',8:'savanna',9:'hills',10:'mountain',11:'snowy peak',12:'tundra',13:'swamp',14:'jungle',15:'lake'
+    7:'desert',8:'savanna',9:'hills',10:'mountain',11:'snowy peak',12:'tundra',13:'swamp',14:'jungle',15:'lake',
+    16:'black sand', 17:'black rock', 18:'ancient forest', 19:'molten lava', 20:'ash field'
   };
   // Biome labels are generated from the tile's real climate rather than a fixed
   // per-terrain table, so a snow peak at the equator reads "tropical alpine"
@@ -2584,6 +2816,11 @@
     const elevM = Math.max(0, elevMeters(elev[i]));
     const tSum = tempSummer[i], tMean = tempMean[i];
     switch(t){
+      case 16: return 'black volcanic sand';
+      case 17: return 'basalt rampart';
+      case 18: return 'primeval canopy — unclassified';
+      case 19: return 'active lava field';
+      case 20: return 'volcanic ashland';
       case 11: {
         if(elevM > 1200) return `${band === 'polar' ? 'arctic' : band} alpine — permanent snow`;
         return 'polar ice';
@@ -2608,14 +2845,16 @@
   // Kept for the few places that index by terrain code alone
   const BIOME_NAMES = {
     0:'oceanic',1:'oceanic',2:'coastal waters',3:'coastal',4:'grassland',5:'woodland',6:'dense forest',
-    7:'desert',8:'savanna',9:'highland',10:'montane rock',11:'permanent snow',12:'tundra',13:'wetlands',14:'rainforest',15:'inland lake'
+    7:'desert',8:'savanna',9:'highland',10:'montane rock',11:'permanent snow',12:'tundra',13:'wetlands',14:'rainforest',15:'inland lake',
+    16:'black volcanic sand',17:'basalt rampart',18:'primeval canopy',19:'active lava field',20:'volcanic ashland'
   };
   // Day palette
   const PAL_DAY = {
     0:[27,46,82], 1:[44,72,118], 2:[78,128,176], 3:[224,210,164],
     4:[124,166,86], 5:[80,134,72], 6:[48,96,58], 7:[222,196,140],
     8:[180,170,90], 9:[140,134,90], 10:[120,108,96], 11:[238,238,242],
-    12:[202,210,220], 13:[80,108,80], 14:[40,116,68], 15:[78,144,176]
+    12:[202,210,220], 13:[80,108,80], 14:[40,116,68], 15:[78,144,176],
+    16:[38,36,42], 17:[26,24,30], 18:[30,58,44], 19:[214,86,30], 20:[74,68,70]
   };
   // Mix palette by lighting/weather
   function lerpColor(a,b,t){return [a[0]+(b[0]-a[0])*t|0,a[1]+(b[1]-a[1])*t|0,a[2]+(b[2]-a[2])*t|0];}
@@ -2971,8 +3210,50 @@
     };
   }
 
+  // ---------- Localised weather anomalies ----------
+  // Two places on the map do not obey the global circulation. Both are strictly
+  // bounded: step outside the radius and normal weather resumes immediately.
+  function anomalyAt(x, y){
+    const S = LANDMARK_SITES;
+    // Storm Peak — a notoriously unpredictable summit. Its own violent
+    // micro-climate: sudden whiteouts that blow up and vanish within hours.
+    const dP = Math.hypot(x - S.stormPeak.x, y - S.stormPeak.y);
+    if(dP < 18) return {kind:'stormpeak', f: 1 - dP/18};
+    // The Black Isle — a sealed weather system that never leaves the island.
+    const dI = Math.hypot(x - S.blackIsle.x, y - S.blackIsle.y);
+    if(dI < S.blackIsle.radius + 2) return {kind:'blackisle', f: 1 - dI/(S.blackIsle.radius+2)};
+    return null;
+  }
+
   // ---------- Turning the physics into a named weather state ----------
   function weatherFromClimate(c, x, y, day, period){
+    // Authored micro-climates take precedence over the global model
+    const anom = anomalyAt(x, y);
+    if(anom){
+      const h = hash32(((x*73856093) ^ (y*19349663) ^ (day*83492791) ^ (period*2654435761)) | 0);
+      const h2 = hash32(((day*40503) ^ (period*92837) ^ 0x9e37) | 0);
+      if(anom.kind === 'stormpeak'){
+        // Weather here changes without warning and is hostile out of proportion
+        // to the altitude. Blizzards dominate; brief clear spells tease between.
+        const p = 0.30 + anom.f * 0.55;
+        if(h < p)            return 'blizzard';
+        if(h < p + 0.14)     return c.temp < 2 ? 'snow' : 'storm';
+        if(h < p + 0.24)     return 'fog';
+        if(h < p + 0.34)     return 'cloudy';
+        return 'clear';
+      }
+      if(anom.kind === 'blackisle'){
+        // A self-contained system: it cycles on its own short rhythm, unrelated
+        // to the seasons or to anything happening on the mainland.
+        const cycle = (day * 8 + period) % 23;          // ~3-day private cycle
+        if(cycle < 5)  return 'fog';                     // the isle breathes mist
+        if(cycle < 9)  return h2 < 0.5 ? 'storm' : 'rain';
+        if(cycle < 12) return 'sandstorm';               // black sand on the wind
+        if(cycle < 15) return 'severe';
+        if(cycle < 19) return 'cloudy';
+        return h < 0.35 ? 'fog' : 'clear';
+      }
+    }
     // One stable roll per weather cell per period. Because the underlying
     // fields vary smoothly, neighbouring cells usually agree — which is what
     // makes fronts read as coherent bands rather than random noise.
@@ -4175,6 +4456,117 @@
   }
 
   function drawTerrainFeatures(t, sx, sy, sz, rng, baseColor, ultraZoom, megaZoom){
+    // ---- Authored landmark surfaces ----
+    if(t === 16){                                   // black volcanic sand
+      const dark = applyLighting([22,20,26]);
+      const glint = applyLighting([120,118,132]);
+      ctx.fillStyle = rgbStr(dark);
+      const n = megaZoom ? 16 : 8;
+      for(let i=0;i<n;i++){
+        const px=sx+rng()*sz, py=sy+rng()*sz;
+        ctx.fillRect(px|0, py|0, Math.max(1,sz*0.05)|0, Math.max(1,sz*0.05)|0);
+      }
+      // Flecks of obsidian catching the light
+      ctx.fillStyle = rgbStr(glint);
+      for(let i=0;i<(megaZoom?5:2);i++){
+        const px=sx+rng()*sz, py=sy+rng()*sz;
+        ctx.fillRect(px|0, py|0, Math.max(1,sz*0.035)|0, Math.max(1,sz*0.035)|0);
+      }
+      return;
+    }
+    if(t === 17){                                   // black rock rampart
+      const face = applyLighting([34,31,39]);
+      const lit  = applyLighting([62,58,70]);
+      const dark = applyLighting([12,11,15]);
+      ctx.fillStyle = rgbStr(dark);
+      ctx.fillRect(sx|0, sy|0, Math.ceil(sz)+1, Math.ceil(sz)+1);
+      // Columnar basalt — tall angular blocks
+      const cols = megaZoom ? 4 : 3;
+      for(let i=0;i<cols;i++){
+        const cw = sz/cols;
+        const cx0 = sx + i*cw;
+        const h = sz*(0.55 + rng()*0.45);
+        ctx.fillStyle = rgbStr(i%2 ? face : lit);
+        ctx.fillRect(cx0|0, (sy+sz-h)|0, Math.ceil(cw*0.92), Math.ceil(h));
+        ctx.fillStyle = rgbStr(dark);
+        ctx.fillRect(cx0|0, (sy+sz-h)|0, Math.max(1,cw*0.10)|0, Math.ceil(h));
+      }
+      return;
+    }
+    if(t === 18){                                   // ancient super-trees
+      // Trunks far too large for an ordinary forest, crowns overlapping
+      const trunk = applyLighting([48,34,26]);
+      const trunkLit = applyLighting([76,56,40]);
+      const canopy = applyLighting([20,52,36]);
+      const canopyLit = applyLighting([34,84,52]);
+      const glow = applyLighting([120,200,150]);
+      const n = megaZoom ? 3 : 2;
+      for(let i=0;i<n;i++){
+        const bx = sx + sz*(0.15 + rng()*0.7);
+        const by = sy + sz*(0.6 + rng()*0.4);
+        const tw = sz*(0.20 + rng()*0.12);
+        const th = sz*(1.5 + rng()*0.8);
+        ctx.fillStyle = rgbStr(trunk);
+        ctx.fillRect((bx-tw/2)|0, (by-th)|0, Math.ceil(tw), Math.ceil(th));
+        ctx.fillStyle = rgbStr(trunkLit);
+        ctx.fillRect((bx-tw/2)|0, (by-th)|0, Math.ceil(tw*0.35), Math.ceil(th));
+        // Vast crown
+        ctx.fillStyle = rgbStr(canopy);
+        ctx.beginPath(); ctx.arc(bx, by-th, sz*0.85, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = rgbStr(canopyLit);
+        ctx.beginPath(); ctx.arc(bx-sz*0.22, by-th-sz*0.18, sz*0.52, 0, Math.PI*2); ctx.fill();
+        if(megaZoom){
+          // Bioluminescence in the canopy
+          ctx.fillStyle = rgbStr(glow);
+          for(let k=0;k<4;k++){
+            ctx.fillRect((bx+(rng()-0.5)*sz*1.2)|0, (by-th+(rng()-0.5)*sz*1.0)|0,
+                         Math.max(1,sz*0.05)|0, Math.max(1,sz*0.05)|0);
+          }
+        }
+      }
+      return;
+    }
+    if(t === 19){                                   // molten lava
+      const t2 = (typeof performance !== 'undefined' ? performance.now() : 0)/1000;
+      const crust = applyLighting([46,26,22]);
+      ctx.fillStyle = rgbStr(crust);
+      ctx.fillRect(sx|0, sy|0, Math.ceil(sz)+1, Math.ceil(sz)+1);
+      // Cracks of glowing rock, breathing
+      const cells = megaZoom ? 5 : 3;
+      for(let i=0;i<cells;i++){
+        const px = sx + rng()*sz*0.8, py = sy + rng()*sz*0.8;
+        const w = sz*(0.15+rng()*0.35), h = sz*(0.06+rng()*0.10);
+        const pulse = 0.6 + 0.4*Math.sin(t2*2.2 + i*1.7 + sx*0.01);
+        ctx.fillStyle = `rgba(255,${Math.round(120+90*pulse)},40,${(0.85*pulse).toFixed(2)})`;
+        ctx.fillRect(px|0, py|0, Math.ceil(w), Math.ceil(h));
+      }
+      return;
+    }
+    if(t === 20){                                   // ash field
+      const ash = applyLighting([58,54,56]);
+      const pale = applyLighting([104,98,100]);
+      ctx.fillStyle = rgbStr(ash);
+      for(let i=0;i<(megaZoom?10:5);i++){
+        const px=sx+rng()*sz, py=sy+rng()*sz;
+        ctx.fillRect(px|0, py|0, Math.max(1,sz*0.06)|0, Math.max(1,sz*0.06)|0);
+      }
+      // Wind-drifted ripples of ash
+      ctx.strokeStyle = rgbStr(pale);
+      ctx.lineWidth = Math.max(1, sz/50);
+      for(let i=0;i<2;i++){
+        const yy = sy + sz*(0.3+i*0.35) + rng()*sz*0.06;
+        ctx.beginPath();
+        ctx.moveTo(sx, yy);
+        ctx.bezierCurveTo(sx+sz*0.35, yy-sz*0.05, sx+sz*0.65, yy+sz*0.05, sx+sz, yy);
+        ctx.stroke();
+      }
+      if(megaZoom && rng()>0.7){
+        // A scorched boulder half-buried in ash
+        drawRock(sx+sz*(0.2+rng()*0.6), sy+sz*(0.4+rng()*0.4), sz*0.16, true);
+      }
+      return;
+    }
+
     // Forest variants
     if(t===5){ // light forest
       const num = megaZoom ? 7 : ultraZoom ? 4 : 3;
@@ -4817,10 +5209,75 @@
         const [px,py] = worldToScreen(lm.x+0.5, lm.y+0.5);
         let col='#e040c8', sym='✦';
         if(lm.kind==='volcano'){col='#e85a2a'; sym='▲';}
+        else if(lm.kind==='volcano_active'){col='#ff6a20'; sym='🌋';}
+        else if(lm.kind==='peak'){col='#cfe4ff'; sym='⛰';}
+        else if(lm.kind==='whirlpool'){col='#5fd8e0'; sym='🌀';}
+        else if(lm.kind==='anomaly'){col='#9a7ad0'; sym='◈';}
         else if(lm.kind==='hotspring'){col='#ff9090'; sym='∿';}
         else if(lm.kind==='waterfall'){col='#60d0f0'; sym='≋';}
         else if(lm.kind==='magic'){col='#d090ff'; sym='✦';}
         else if(lm.kind==='ruins'){col='#a89070'; sym='⚷';}
+
+        // ---- The Maw: an animated whirlpool carved into the sea ----
+        if(lm.kind==='whirlpool'){
+          const R = LANDMARK_SITES.whirlpool.radius * view.scale;
+          if(R > 3){
+            const spin = (performance.now()/1000) * 0.9;
+            ctx.save();
+            ctx.translate(px, py);
+            // Dark throat
+            const g = ctx.createRadialGradient(0,0,0, 0,0,R);
+            g.addColorStop(0,   'rgba(2,6,14,0.95)');
+            g.addColorStop(0.35,'rgba(10,28,52,0.75)');
+            g.addColorStop(1,   'rgba(30,70,110,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.fill();
+            // Spiral arms of dragged water
+            ctx.strokeStyle = 'rgba(180,220,240,0.55)';
+            ctx.lineWidth = Math.max(1, view.scale*0.16);
+            for(let arm=0; arm<4; arm++){
+              ctx.beginPath();
+              for(let k=0;k<=48;k++){
+                const t = k/48;
+                const rr = R * (0.10 + t*0.92);
+                const a = spin + arm*Math.PI/2 + t*4.6;
+                const xx = Math.cos(a)*rr, yy = Math.sin(a)*rr*0.92;
+                k ? ctx.lineTo(xx,yy) : ctx.moveTo(xx,yy);
+              }
+              ctx.stroke();
+            }
+            // Foam ring near the rim
+            ctx.strokeStyle = 'rgba(235,248,255,0.35)';
+            ctx.lineWidth = Math.max(1, view.scale*0.10);
+            ctx.beginPath(); ctx.arc(0,0,R*0.86,0,Math.PI*2); ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // ---- Ashmaw: a smoking, glowing crater ----
+        if(lm.kind==='volcano_active' && view.scale >= 3){
+          const t = performance.now()/1000;
+          const R = view.scale * 2.6;
+          // Glow from the vent, pulsing like a heartbeat
+          const pulse = 0.55 + 0.45*Math.sin(t*1.6);
+          const gg = ctx.createRadialGradient(px,py,0, px,py,R*1.6);
+          gg.addColorStop(0, `rgba(255,150,40,${(0.55*pulse).toFixed(3)})`);
+          gg.addColorStop(0.5,`rgba(220,70,20,${(0.22*pulse).toFixed(3)})`);
+          gg.addColorStop(1, 'rgba(180,40,10,0)');
+          ctx.fillStyle = gg;
+          ctx.beginPath(); ctx.arc(px,py,R*1.6,0,Math.PI*2); ctx.fill();
+          // Ash plume drifting downwind
+          const wAng = prevailingWindAngle(lm.y/WORLD_H, world.day);
+          const wx = Math.cos(wAng), wy = Math.sin(wAng)*0.5;
+          for(let k=0;k<7;k++){
+            const age = ((t*0.35 + k/7) % 1);
+            const dist = age * R * 5;
+            const sx2 = px + wx*dist, sy2 = py + wy*dist - age*R*1.2;
+            const rad = R*(0.35 + age*1.5);
+            ctx.fillStyle = `rgba(70,64,66,${(0.30*(1-age)).toFixed(3)})`;
+            ctx.beginPath(); ctx.arc(sx2, sy2, rad, 0, Math.PI*2); ctx.fill();
+          }
+        }
 
         // Ruins get a special multi-pixel rendering at high zoom — broken pillars
         if(lm.kind==='ruins' && view.scale >= 8){
@@ -6047,6 +6504,12 @@
     if(st.midnightSun)      html += `<div><span style="opacity:0.6;">Sun:</span> midnight sun — never sets</div>`;
     else if(st.polarNight)  html += `<div><span style="opacity:0.6;">Sun:</span> polar night — never rises</div>`;
     else html += `<div><span style="opacity:0.6;">Sun:</span> ↑${fmtT(st.sunrise)} ↓${fmtT(st.sunset)} · ${st.length.toFixed(1)}h daylight</div>`;
+    const anom = anomalyAt(tx, ty);
+    if(anom && anom.kind === 'stormpeak'){
+      html += `<div style="color:#bcd8ff;">⛰ Storm Peak — weather here is notoriously unpredictable</div>`;
+    } else if(anom && anom.kind === 'blackisle'){
+      html += `<div style="color:#c8b0ff;">◈ The Black Isle — a weather system unto itself</div>`;
+    }
     if(clim.cyclone > 0.35){
       html += `<div style="color:#ff9d9d;">⚠ Tropical cyclone overhead</div>`;
     } else if(clim.systemLift > 0.35){
@@ -6281,6 +6744,11 @@
     13: {ground:[['mud',0.5],['water',0.3],['moss',0.2]],         scatter:[['reed',0.09],['tree',0.02],['lily',0.03]]},
     14: {ground:[['moss',0.45],['darkgrass',0.4],['mud',0.15]],   scatter:[['palm',0.13],['bush',0.09],['flower',0.04],['reed',0.02]]},
     15: {ground:[['water',0.94],['mud',0.06]],            scatter:[['ripple',0.05],['lily',0.015]], liquid:true},
+    16: {ground:[['obsidian',0.55],['ash',0.30],['charcoal',0.15]], scatter:[['rock',0.02],['crystal',0.006]]},
+    17: {ground:[['obsidian',0.70],['blackmarb',0.30]],   scatter:[['boulder',0.06],['rock',0.05]]},
+    18: {ground:[['moss',0.55],['peat',0.30],['darkgrass',0.15]], scatter:[['tree',0.16],['bush',0.07],['flower',0.03],['stump',0.01]]},
+    19: {ground:[['lava',0.62],['charcoal',0.25],['ash',0.13]], scatter:[['rock',0.015]]},
+    20: {ground:[['ash',0.60],['gravel',0.25],['charcoal',0.15]], scatter:[['rock',0.03],['boulder',0.01]]},
   };
 
   // Tile detail state
@@ -9621,7 +10089,14 @@
         world.weather==='snow' || world.weather==='sandstorm' || world.weather==='blizzard'
       );
       const pulsingSelection = view.selected && view.scale >= 8;
-      const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection;
+      // The whirlpool spins and the lava breathes, so those views need frames
+      const nearLiveFeature = (() => {
+        const S = LANDMARK_SITES;
+        const span = 60 / Math.max(0.5, view.scale) + 40;
+        return Math.hypot(view.x-S.whirlpool.x, view.y-S.whirlpool.y) < span
+            || Math.hypot(view.x-S.fireMountain.x, view.y-S.fireMountain.y) < span;
+      })();
+      const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection || nearLiveFeature;
       // Refresh often enough that the terminator glides rather than steps
       const needLight = minChanged || (now - lastDrawAt > 1500);
       if(needAnim){
