@@ -3038,14 +3038,37 @@
   resize();
 
   // ============ DRAW ============
+  // ---------- Longitude and local solar time ----------
+  // The map is a window onto a planet, not the whole globe: 720 tiles at
+  // 10 km each is 7,200 km, about 18% of a 40,000 km circumference. So the
+  // map spans roughly 4.3 hours of longitude, and the sunrise line takes
+  // that long to sweep across it from east to west.
+  const PLANET_CIRCUMFERENCE_KM = 40000;
+  const MAP_SPAN_HOURS = (WORLD_W * KM_PER_TILE / PLANET_CIRCUMFERENCE_KM) * 24;
+  // Continuous local solar time at a given column (east runs ahead of west).
+  function localSolarHour(x, utcHour){
+    return utcHour + ((x / WORLD_W) - 0.5) * MAP_SPAN_HOURS;
+  }
+  // Sun's altitude in degrees at any point on the map right now.
+  function solarAltitudeAt(x, y, day, utcHour){
+    const fy = Math.max(0, Math.min(1, y / WORLD_H));
+    return solarAltitude(fy, day, localSolarHour(x, utcHour)) * 180 / Math.PI;
+  }
+
+  // Base tint for sprites and features — driven by the sun at the viewport
+  // centre. Kept deliberately gentle, because the terminator overlay does the
+  // real day/night darkening per-pixel across the map.
   function getLighting(){
-    // hour 0-6 night, 6-8 dawn, 8-18 day, 18-20 dusk, 20-24 night
-    const h = world.hour;
-    if(h<5) return {amb:0.35, hue:[20,25,55]};
-    if(h<7) return {amb:0.55 + (h-5)*0.2, hue:[200,140,90]};
-    if(h<18) return {amb:1.0, hue:[255,255,255]};
-    if(h<20) return {amb:0.95 - (h-18)*0.25, hue:[230,140,80]};
-    return {amb:0.4, hue:[30,35,70]};
+    const alt = solarAltitudeAt(view.x, view.y, world.day, world.hour);
+    // amb: 1 in full day, easing down through twilight to 0.5 at deep night
+    const amb = 0.5 + 0.5 * Math.max(0, Math.min(1, (alt + 8) / 18));
+    // Warm near the horizon, cool blue once the sun is well down
+    let hue;
+    if(alt > 12)      hue = [255,255,255];
+    else if(alt > -2) hue = [255,170,105];      // golden hour
+    else if(alt > -10)hue = [140,120,160];      // fading twilight
+    else              hue = [40,55,105];        // night blue
+    return {amb, hue, alt};
   }
   function applyLighting(rgb){
     const L = getLighting();
@@ -3055,6 +3078,53 @@
       Math.round(rgb[1]*L.amb + L.hue[1]*t*0.4),
       Math.round(rgb[2]*L.amb + L.hue[2]*t*0.4)
     ];
+  }
+
+  // ---------- Day/night terminator ----------
+  // Rendered as a low-resolution RGBA field stretched smoothly over the
+  // viewport, so the shadow line and its twilight bands sweep across the map
+  // exactly as the sun moves. Sampling coarsely and letting the browser
+  // interpolate keeps it cheap at any zoom.
+  const termCv = document.createElement('canvas');
+  termCv.width = 96; termCv.height = 72;
+  const termCtx = termCv.getContext('2d');
+  const termImg = termCtx.createImageData(termCv.width, termCv.height);
+  function drawDayNight(W, H){
+    const day = world.day, utc = world.hour;
+    const iw = termCv.width, ih = termCv.height;
+    const d = termImg.data;
+    for(let py=0; py<ih; py++){
+      // Screen → world for this row
+      const sy = (py + 0.5) / ih * H;
+      const wy = (sy - H/2) / view.scale + view.y;
+      for(let px=0; px<iw; px++){
+        const sx = (px + 0.5) / iw * W;
+        const wx = (sx - W/2) / view.scale + view.x;
+        const alt = solarAltitudeAt(wx, wy, day, utc);
+        const o = (py*iw + px) * 4;
+        if(alt >= 10){ d[o+3] = 0; continue; }          // full daylight
+        // How far into darkness we are: 0 at 10° up, 1 at 18° below
+        const k = Math.max(0, Math.min(1, (10 - alt) / 28));
+        // Golden band hugging the horizon
+        const horizonBand = Math.max(0, 1 - Math.abs(alt - 1) / 7);
+        // Night colour deepens toward a cold blue
+        const nr = 8 + horizonBand * 210;
+        const ng = 14 + horizonBand * 96;
+        const nb = 42 + horizonBand * 30;
+        // Alpha eases in with a smooth curve so there's no hard edge
+        const ease = k*k*(3 - 2*k);
+        const a = ease * 0.80 + horizonBand * 0.10;
+        d[o]   = nr;
+        d[o+1] = ng;
+        d[o+2] = nb;
+        d[o+3] = Math.round(Math.min(0.86, a) * 255);
+      }
+    }
+    termCtx.putImageData(termImg, 0, 0);
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = true;      // let the GPU blur the coarse grid
+    ctx.drawImage(termCv, 0, 0, W, H);
+    ctx.imageSmoothingEnabled = prev;
   }
   function rgbStr(c){return `rgb(${c[0]},${c[1]},${c[2]})`;}
 
@@ -4815,13 +4885,10 @@
       drawWeather(W, H);
     }
 
-    // Vignette at night
-    if(getLighting().amb < 0.7){
-      const grad = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.3, W/2,H/2,Math.max(W,H)*0.7);
-      grad.addColorStop(0,'rgba(0,0,0,0)');
-      grad.addColorStop(1,'rgba(0,5,20,0.5)');
-      ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-    }
+    // Day/night terminator — the shadow line and its twilight bands sweep
+    // across the map as the planet turns, so at dawn the eastern edge is
+    // already lit while the west is still dark.
+    drawDayNight(W, H);
 
     // Selected tile highlight — implemented as an HTML overlay div instead of
     // canvas drawing. This guarantees the selection is always visible above
@@ -9398,7 +9465,8 @@
       );
       const pulsingSelection = view.selected && view.scale >= 8;
       const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection;
-      const needLight = minChanged || (now - lastDrawAt > 4000);
+      // Refresh often enough that the terminator glides rather than steps
+      const needLight = minChanged || (now - lastDrawAt > 1500);
       if(needAnim){
         if(now - lastDrawAt >= 33){
           draw();
