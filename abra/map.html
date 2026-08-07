@@ -1349,7 +1349,7 @@
     // The caldera lies on the shoulder of the Ashen Crown, far enough from the
     // summit that its heat never reaches the peak — the summit stays frozen.
     calderaOffset: {dx: 9, dy: 6},
-    blackIsle:   {x: 673, y: 310, radius: 46}
+    locrianIsle:   {x: 673, y: 310, radius: 46}
   };
 
   (function sculptLandmarks(){
@@ -1452,10 +1452,10 @@
     crownMassif(S.fireMountain.x, S.fireMountain.y, S.fireMountain.meters, S.fireMountain.radius);
     elev[S.fireMountain.y*WORLD_W + S.fireMountain.x] = rawForMeters(S.fireMountain.meters - 380);
 
-    // The Black Isle: ring the island in a wall of volcanic rock by lifting a
+    // Locrian Isle: ring the island in a wall of volcanic rock by lifting a
     // narrow band at its rim, and make sure the interior sits above the sea.
-    (function shapeBlackIsle(){
-      const {x:cx, y:cy, radius:R} = S.blackIsle;
+    (function shapeLocrianIsle(){
+      const {x:cx, y:cy, radius:R} = S.locrianIsle;
       const wallRaw = rawForMeters(340);
       for(let dy=-R-4; dy<=R+4; dy++){
         for(let dx=-R-4; dx<=R+4; dx++){
@@ -1528,6 +1528,23 @@
     return 42 / (1 + Math.pow(d / 5.8, 10));
   }
 
+  // Ashmaw is erupting, so its vent field radiates serious heat. At 10 km per
+  // tile the *air* temperature over a lava field is elevated but not molten —
+  // the rock itself is another matter, and is reported separately.
+  function volcanicBoost(x, y){
+    const S = LANDMARK_SITES;
+    const d = Math.hypot(x - S.fireMountain.x, y - S.fireMountain.y);
+    if(d > 16) return 0;
+    // Fierce over the vent, falling away fast across the ash slopes
+    return 46 / (1 + Math.pow(d / 3.4, 5));
+  }
+  // Surface temperature of exposed molten rock, in °C. Basaltic lava sits
+  // between roughly 1,000 and 1,200 °C; it cools as the crust thickens.
+  function lavaSurfaceTemp(x, y){
+    const h = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+    return 1040 + (h % 1000) / 1000 * 160;
+  }
+
   // ============ REAL TEMPERATURE FIELDS ============
   // Annual mean, warmest-month and coldest-month temperatures in °C, using the
   // same physics the weather engine uses: latitude sets the baseline, altitude
@@ -1547,7 +1564,7 @@
         const cont = continentality(x, y);
         const elevM = Math.max(0, elevMeters(elev[i]));
         const amp = (2 + 24 * Math.pow(lat, 1.15)) * (0.45 + 0.75 * cont);
-        const base = annualMean - elevM * 0.0065 + geothermalBoost(x, y);
+        const base = annualMean - elevM * 0.0065 + geothermalBoost(x, y) + volcanicBoost(x, y);
         tempMean[i]   = base;
         tempSummer[i] = base + amp;
         tempWinter[i] = base - amp;
@@ -1801,6 +1818,7 @@
   // authored surfaces. `protectedTiles` marks them off-limits to any later
   // automatic reclassification.
   const protectedTiles = new Uint8Array(WORLD_W*WORLD_H);
+  const lavaTiles = [];                 // [{x,y}] — used by the glow/smoke pass
   (function paintLandmarks(){
     const S = LANDMARK_SITES;
     function setTile(x, y, code){
@@ -1808,6 +1826,7 @@
       const i = y*WORLD_W+x;
       tiles[i] = code;
       protectedTiles[i] = 1;
+      if(code === 19) lavaTiles.push({x, y});
     }
 
     // ---- Active volcano: lava crater, fresh ash flanks, scorched skirt ----
@@ -1878,11 +1897,11 @@
       }
     })();
 
-    // ---- The Black Isle ----
+    // ---- Locrian Isle ----
     // Black volcanic sand over the southern half, ancient forest over the
     // north, and a continuous wall of black rock around the whole rim.
-    (function blackIsle(){
-      const {x:cx, y:cy, radius:R} = S.blackIsle;
+    (function locrianIsle(){
+      const {x:cx, y:cy, radius:R} = S.locrianIsle;
       for(let dy=-R-5; dy<=R+5; dy++){
         for(let dx=-R-5; dx<=R+5; dx++){
           const x=cx+dx, y=cy+dy;
@@ -2617,7 +2636,7 @@
   landmarks.push({x: LANDMARK_SITES.fireMountain.x, y: LANDMARK_SITES.fireMountain.y, name:'Ashmaw (active volcano)',kind:'volcano_active'});
   landmarks.push({x: LANDMARK_SITES.ashenCrown.x,   y: LANDMARK_SITES.ashenCrown.y,   name:'The Ashen Crown',        kind:'volcano'});
   landmarks.push({x: LANDMARK_SITES.whirlpool.x,    y: LANDMARK_SITES.whirlpool.y,    name:'The Maw',                kind:'whirlpool'});
-  landmarks.push({x: LANDMARK_SITES.blackIsle.x,    y: LANDMARK_SITES.blackIsle.y,    name:'The Black Isle',         kind:'anomaly'});
+  landmarks.push({x: LANDMARK_SITES.locrianIsle.x,    y: LANDMARK_SITES.locrianIsle.y,    name:'Locrian Isle',         kind:'anomaly'});
 
   placeLandmark('Cleoreby (dormant volcano)','volcano','mountain');
   placeLandmark('Nylmlalin Hot Springs','hotspring','hills');
@@ -3172,7 +3191,7 @@
     // Lapse rate: 6.5 °C per 1000 m
     temp -= elevM * 0.0065;
     // Volcanic ground heat, where there is any
-    temp += geothermalBoost(x, y);
+    temp += geothermalBoost(x, y) + volcanicBoost(x, y);
     // Day/night swing driven by the sun's actual altitude, lagged ~2.2 h so the
     // peak lands mid-afternoon. This makes polar day genuinely warm and polar
     // night genuinely brutal, and gives long summer evenings their mildness.
@@ -3281,9 +3300,9 @@
     // micro-climate: sudden whiteouts that blow up and vanish within hours.
     const dP = Math.hypot(x - S.stormPeak.x, y - S.stormPeak.y);
     if(dP < 18) return {kind:'stormpeak', f: 1 - dP/18};
-    // The Black Isle — a sealed weather system that never leaves the island.
-    const dI = Math.hypot(x - S.blackIsle.x, y - S.blackIsle.y);
-    if(dI < S.blackIsle.radius + 2) return {kind:'blackisle', f: 1 - dI/(S.blackIsle.radius+2)};
+    // Locrian Isle — a sealed weather system that never leaves the island.
+    const dI = Math.hypot(x - S.locrianIsle.x, y - S.locrianIsle.y);
+    if(dI < S.locrianIsle.radius + 2) return {kind:'locrian', f: 1 - dI/(S.locrianIsle.radius+2)};
     return null;
   }
 
@@ -3304,7 +3323,7 @@
         if(h < p + 0.34)     return 'cloudy';
         return 'clear';
       }
-      if(anom.kind === 'blackisle'){
+      if(anom.kind === 'locrian'){
         // A self-contained system: it cycles on its own short rhythm, unrelated
         // to the seasons or to anything happening on the mainland.
         const cycle = (day * 8 + period) % 23;          // ~3-day private cycle
@@ -3579,6 +3598,83 @@
       Math.round(rgb[1]*L.amb + L.hue[1]*t*0.4),
       Math.round(rgb[2]*L.amb + L.hue[2]*t*0.4)
     ];
+  }
+
+  // ---------- Lava glow and smoke ----------
+  // Drawn after the night overlay so molten rock lights itself, and so its
+  // plumes read against a dark sky. Only a handful of tiles are ever lava, so
+  // this iterates a prebuilt list rather than scanning the map.
+  function drawVolcanicEffects(W, H){
+    if(!lavaTiles.length) return;
+    const t = performance.now() / 1000;
+    // How dark is it here? 0 in daylight, 1 in deep night.
+    const alt = solarAltitudeAt(view.x, view.y, world.day, world.hour);
+    const night = Math.max(0, Math.min(1, (8 - alt) / 24));
+    const wAng = prevailingWindAngle(LANDMARK_SITES.fireMountain.y / WORLD_H, world.day);
+    const wx = Math.cos(wAng), wy = Math.sin(wAng) * 0.45;
+    const sz = view.scale;
+
+    ctx.save();
+    for(const L of lavaTiles){
+      const [px, py] = worldToScreen(L.x + 0.5, L.y + 0.5);
+      if(px < -80 || px > W + 80 || py < -120 || py > H + 80) continue;
+      const seed = ((L.x * 73856093) ^ (L.y * 19349663)) >>> 0;
+
+      // ---- Emissive glow ----
+      // Faint by day, fierce at night, breathing slightly as the crust shifts.
+      const breathe = 0.72 + 0.28 * Math.sin(t * 1.3 + (seed % 100) * 0.06);
+      const strength = (0.18 + night * 0.82) * breathe;
+      const R = Math.max(6, sz * 3.4);
+      ctx.globalCompositeOperation = 'lighter';
+      const g = ctx.createRadialGradient(px, py, 0, px, py, R);
+      g.addColorStop(0,    `rgba(255,190,110,${(0.55*strength).toFixed(3)})`);
+      g.addColorStop(0.28, `rgba(255,120,40,${(0.34*strength).toFixed(3)})`);
+      g.addColorStop(0.65, `rgba(200,50,15,${(0.14*strength).toFixed(3)})`);
+      g.addColorStop(1,    'rgba(140,20,5,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI*2); ctx.fill();
+      // The molten surface itself, bright enough to read at any zoom
+      ctx.fillStyle = `rgba(255,${Math.round(150 + 70*breathe)},60,${(0.30 + night*0.5).toFixed(3)})`;
+      ctx.fillRect(px - sz*0.5, py - sz*0.5, Math.max(1.5, sz), Math.max(1.5, sz));
+      ctx.globalCompositeOperation = 'source-over';
+
+      // ---- Smoke plumes ----
+      // Each vent puffs on its own irregular rhythm, alternating between black
+      // ash and white steam depending on what it's venting at the time.
+      if(sz < 0.8) continue;
+      for(let k = 0; k < 3; k++){
+        const s1 = hash32((seed ^ (k * 40503)) | 0);
+        const period = 3.2 + s1 * 7.0;            // seconds between puffs
+        const cycle = Math.floor(t / period + s1);
+        const phase = ((t / period + s1) % 1);
+        if(phase > 0.88) continue;                 // quiet gap between puffs
+        const life = phase / 0.88;                 // 0 at the vent, 1 dissipated
+        const s2 = hash32((seed ^ (cycle * 92837) ^ (k * 15485863)) | 0);
+        const isAsh = s2 < 0.5;                    // black ash vs white steam
+        const rise = life * sz * 7.5;
+        const drift = life * life * sz * 5.0;
+        const sxp = px + wx * drift + (s2 - 0.5) * sz * 1.2;
+        const syp = py - rise + wy * drift;
+        const rad = Math.max(2, sz * (0.5 + life * 2.4));
+        const fade = (1 - life) * (1 - life) * 0.62;
+        if(isAsh){
+          ctx.fillStyle = `rgba(${Math.round(38+20*life)},${Math.round(34+18*life)},${Math.round(36+20*life)},${fade.toFixed(3)})`;
+        } else {
+          ctx.fillStyle = `rgba(${Math.round(238-10*life)},${Math.round(240-8*life)},${Math.round(244-6*life)},${(fade*0.85).toFixed(3)})`;
+        }
+        ctx.beginPath(); ctx.arc(sxp, syp, rad, 0, Math.PI*2); ctx.fill();
+        // A smaller lobe so each puff isn't a plain circle
+        ctx.beginPath();
+        ctx.arc(sxp + rad*0.55, syp + rad*0.25, rad*0.62, 0, Math.PI*2);
+        ctx.fill();
+        // Embers riding the base of an ash puff
+        if(isAsh && life < 0.35 && sz > 2){
+          ctx.fillStyle = `rgba(255,150,60,${((0.35-life)*1.6).toFixed(3)})`;
+          ctx.fillRect(sxp + (s2-0.5)*rad, syp + rad*0.4, Math.max(1, sz*0.12), Math.max(1, sz*0.12));
+        }
+      }
+    }
+    ctx.restore();
   }
 
   // ---------- Day/night terminator ----------
@@ -4944,7 +5040,8 @@
           const m = moist[y*WORLD_W+x];
           const shade = Math.max(0.65, Math.min(1.2, 0.85 + e*0.35));
           c = [Math.min(255,c[0]*shade)|0, Math.min(255,c[1]*shade)|0, Math.min(255,c[2]*shade)|0];
-          const cLit = applyLighting(c);
+          // Lava emits its own light, so it is never dimmed by nightfall
+          const cLit = (t === 19) ? c : applyLighting(c);
           const [sx, sy] = worldToScreen(x, y);
           const sz = view.scale;
 
@@ -5601,6 +5698,10 @@
     // across the map as the planet turns, so at dawn the eastern edge is
     // already lit while the west is still dark.
     drawDayNight(W, H);
+
+    // Lava is emissive: it makes its own light, so it is drawn AFTER the
+    // terminator and actually brightens as the land around it goes dark.
+    drawVolcanicEffects(W, H);
 
     // Selected tile highlight — implemented as an HTML overlay div instead of
     // canvas drawing. This guarantees the selection is always visible above
@@ -6563,6 +6664,13 @@
     html += `<div><span style="opacity:0.6;">Elevation:</span> ${elevLabel}</div>`;
     html += `<div><span style="opacity:0.6;">Moisture:</span> ${(m*100).toFixed(0)}%</div>`;
     html += `<div><span style="opacity:0.6;">Temperature:</span> ${tempC.toFixed(0)}°C</div>`;
+    if(t === 19){
+      html += `<div style="color:#ff9a5a;">🌋 Molten rock: ~${Math.round(lavaSurfaceTemp(tx,ty)).toLocaleString()}°C at the surface</div>`;
+    } else if(volcanicBoost(tx, ty) > 4){
+      html += `<div style="color:#ffc08a;">Ground radiates volcanic heat</div>`;
+    } else if(geothermalBoost(tx, ty) > 4){
+      html += `<div style="color:#9fe0d8;">Ground warmed by geothermal vents</div>`;
+    }
     // Distance from Lucan's Rest (the world's reference point)
     const lucan = settlements.find(s => s.name === "Lucan's Rest");
     if(lucan && (tx !== lucan.x || ty !== lucan.y)){
@@ -6604,8 +6712,8 @@
     const anom = anomalyAt(tx, ty);
     if(anom && anom.kind === 'stormpeak'){
       html += `<div style="color:#bcd8ff;">⛰ Storm Peak — weather here is notoriously unpredictable</div>`;
-    } else if(anom && anom.kind === 'blackisle'){
-      html += `<div style="color:#c8b0ff;">◈ The Black Isle — a weather system unto itself</div>`;
+    } else if(anom && anom.kind === 'locrian'){
+      html += `<div style="color:#c8b0ff;">◈ Locrian Isle — a weather system unto itself</div>`;
     }
     if(clim.cyclone > 0.35){
       html += `<div style="color:#ff9d9d;">⚠ Tropical cyclone overhead</div>`;
@@ -10190,9 +10298,10 @@
       // The whirlpool spins and the lava breathes, so those views need frames
       const nearLiveFeature = (() => {
         const S = LANDMARK_SITES;
-        const span = 60 / Math.max(0.5, view.scale) + 40;
+        const span = 60 / Math.max(0.5, view.scale) + 60;
         return Math.hypot(view.x-S.whirlpool.x, view.y-S.whirlpool.y) < span
-            || Math.hypot(view.x-S.fireMountain.x, view.y-S.fireMountain.y) < span;
+            || Math.hypot(view.x-S.fireMountain.x, view.y-S.fireMountain.y) < span
+            || Math.hypot(view.x-S.ashenCrown.x, view.y-S.ashenCrown.y) < span;
       })();
       const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection || nearLiveFeature;
       // Refresh often enough that the terminator glides rather than steps
