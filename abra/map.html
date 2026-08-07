@@ -336,6 +336,8 @@
     <label class="ly"><input type="checkbox" data-layer="landmarks" checked> Landmarks</label>
     <div style="font-weight:500;margin:12px 0 8px;font-size:13px;">Cultural & data</div>
     <label class="ly"><input type="checkbox" data-layer="regions"> Region names</label>
+    <label class="ly"><input type="checkbox" data-layer="thalen" checked> Path of Thalen</label>
+    <label class="ly"><input type="checkbox" data-layer="fog" checked> Fog of war</label>
     <label class="ly"><input type="checkbox" data-layer="climate"> Climate zones</label>
     <label class="ly"><input type="checkbox" data-layer="pressure"> Pressure systems</label>
     <label class="ly"><input type="checkbox" data-layer="cultural"> Cultural zones</label>
@@ -454,6 +456,30 @@
     <button class="tool" data-tool="road" style="width:100%;text-align:left;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">━ Draw road</button>
     <button class="tool" data-tool="trade" style="width:100%;text-align:left;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">┄ Draw trade route</button>
     <button class="tool" data-tool="ferry" style="width:100%;text-align:left;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">⛴ Draw ferry route</button>
+    <button class="tool" data-tool="thalen" style="width:100%;text-align:left;background:rgba(70,50,100,0.7);border:1px solid rgba(190,150,255,0.35);color:#e6d8ff;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">✧ Path of Thalen</button>
+    <div style="display:flex;gap:3px;margin-bottom:3px;">
+      <button id="thalenUndo" style="flex:1;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Undo step</button>
+      <button id="thalenClear" style="flex:1;background:rgba(60,55,80,0.6);border:1px solid rgba(180,170,230,0.25);color:#e2ddf7;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Clear path</button>
+    </div>
+    <div id="thalenStatus" style="font-size:9px;opacity:0.55;margin-bottom:5px;min-height:11px;"></div>
+
+    <!-- Fog of war brush — admin only -->
+    <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:6px;padding-top:6px;">
+      <div style="font-size:10px;opacity:0.7;margin-bottom:4px;">Fog of war</div>
+      <div style="display:flex;gap:3px;margin-bottom:4px;">
+        <button class="tool" data-tool="fogclear" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Reveal</button>
+        <button class="tool" data-tool="fogadd" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Re-fog</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;opacity:0.65;margin-bottom:2px;">
+        <span>Brush</span><span id="fogBrushLabel">6 tiles</span>
+      </div>
+      <input id="fogBrush" type="range" min="1" max="40" value="6" style="width:100%;accent-color:#5a8fd6;margin-bottom:4px;">
+      <div style="display:flex;gap:3px;">
+        <button id="fogRevealAll" style="flex:1;background:rgba(50,80,60,0.6);border:1px solid rgba(140,220,170,0.25);color:#dff5e6;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Reveal all</button>
+        <button id="fogHideAll" style="flex:1;background:rgba(60,55,80,0.6);border:1px solid rgba(180,170,230,0.25);color:#e2ddf7;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Fog all</button>
+      </div>
+      <div id="fogStatus" style="font-size:9px;opacity:0.55;margin-top:4px;min-height:11px;"></div>
+    </div>
     <button class="tool" data-tool="erase" style="width:100%;text-align:left;background:rgba(80,40,40,0.5);border:1px solid rgba(220,120,120,0.3);color:#ffcfcf;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">✕ Erase user feature</button>
 
     <!-- Drawing-in-progress panel: shown while a multi-point drawing is active -->
@@ -3479,6 +3505,82 @@
 
   // ============ STORAGE ============
   const STORAGE_KEY = 'pixelworld:userdata';
+
+  // ============ FOG OF WAR ============
+  // The world starts shrouded. Only the admin can lift the fog, painting it
+  // away (or back) with a brush. Visitors see only what has been revealed.
+  //
+  // Stored on a coarse 4-tile grid — 180x120 cells — which is plenty for a
+  // soft-edged fog and run-length encodes down to a few hundred bytes.
+  const FOG_CELL = 4;
+  const FOG_W = Math.ceil(WORLD_W / FOG_CELL);
+  const FOG_H = Math.ceil(WORLD_H / FOG_CELL);
+  const FOG_KEY = 'pixelworld:fog';
+  const fogMask = new Uint8Array(FOG_W * FOG_H).fill(1);   // 1 = hidden
+  let fogDirty = false;
+
+  function isFogged(tx, ty){
+    const cx = Math.floor(tx / FOG_CELL), cy = Math.floor(ty / FOG_CELL);
+    if(cx<0||cx>=FOG_W||cy<0||cy>=FOG_H) return true;
+    return fogMask[cy*FOG_W + cx] === 1;
+  }
+  // Paint fog on or off in a circular brush measured in world tiles
+  function paintFog(tx, ty, radiusTiles, hide){
+    const r = Math.max(1, Math.round(radiusTiles / FOG_CELL));
+    const cx = Math.floor(tx / FOG_CELL), cy = Math.floor(ty / FOG_CELL);
+    for(let dy=-r; dy<=r; dy++){
+      for(let dx=-r; dx<=r; dx++){
+        if(dx*dx + dy*dy > r*r + r) continue;
+        const nx = cx+dx, ny = cy+dy;
+        if(nx<0||nx>=FOG_W||ny<0||ny>=FOG_H) continue;
+        fogMask[ny*FOG_W + nx] = hide ? 1 : 0;
+      }
+    }
+    fogDirty = true;
+  }
+  function encodeFog(){
+    const runs = [];
+    let cur = fogMask[0], len = 1;
+    for(let i=1;i<fogMask.length;i++){
+      if(fogMask[i] === cur) len++;
+      else { runs.push(len + '.' + cur); cur = fogMask[i]; len = 1; }
+    }
+    runs.push(len + '.' + cur);
+    return runs.join(',');
+  }
+  function decodeFog(str){
+    if(!str) return;
+    let idx = 0;
+    for(const run of str.split(',')){
+      const dot = run.indexOf('.');
+      if(dot < 0) continue;
+      const len = parseInt(run.slice(0,dot),10);
+      const v   = parseInt(run.slice(dot+1),10);
+      for(let i=0;i<len && idx<fogMask.length;i++) fogMask[idx++] = v;
+    }
+  }
+  async function loadFog(){
+    try{
+      const r = await Store.get(FOG_KEY, true);
+      if(r && r.value) decodeFog(r.value);
+    }catch(e){ /* nothing saved — world stays shrouded */ }
+  }
+  async function saveFog(){
+    const enc = encodeFog();
+    try{
+      await Store.set(FOG_KEY, enc, true);
+      fogDirty = false;
+      const el = document.getElementById('fogStatus');
+      if(el){
+        const hidden = fogMask.reduce((a,b)=>a+b, 0);
+        el.textContent = `Saved · ${Math.round(100 - hidden/fogMask.length*100)}% revealed · ${enc.length} B`;
+        el.style.color = '#9fe0a8';
+      }
+    }catch(err){
+      const el = document.getElementById('fogStatus');
+      if(el){ el.textContent = 'Fog save failed'; el.style.color = '#ffb0b0'; }
+    }
+  }
   // userData schema:
   //   customSettlements: [{x,y,name,kind,tag,notes,id}]
   //   customLandmarks:   [{x,y,name,kind,notes,id}]
@@ -3491,6 +3593,7 @@
   let userData = {
     customSettlements: [], customLandmarks: [], customRivers: [], customRoads: [], customTrade: [], customFerries: [],
     customEvents: [],
+    thalenPath: {points: [], note: ''},   // the wanderer's route; last point = where he is now
     edits: {},
     frozenWorldMs: null,    // if non-null, time is paused at this ms-since-epoch
     timeOffsetMs: 0          // applied to live Date.now() when frozenWorldMs is null
@@ -3507,10 +3610,12 @@
       userData.customTrade = userData.customTrade || [];
       userData.customFerries = userData.customFerries || [];
       userData.customEvents = userData.customEvents || [];
+      userData.thalenPath = userData.thalenPath || {points: [], note: ''};
       if(typeof userData.frozenWorldMs === 'undefined') userData.frozenWorldMs = null;
       if(typeof userData.timeOffsetMs === 'undefined') userData.timeOffsetMs = 0;
     }
   }catch(e){ /* first time, no data */ }
+  await loadFog();
   async function saveUserData(){
     try{ await Store.set(STORAGE_KEY, JSON.stringify(userData), true); }catch(e){ console.warn('save failed',e); }
   }
@@ -3542,7 +3647,7 @@
     rivers:true, roads:true, trade:true, ferries:true, waterTrade:true, borders:false,
     cities:true, towns:true, villages:true, landmarks:true,
     regions:false, cultural:false, political:false, population:false, economy:false,
-    climate:false, pressure:false,
+    climate:false, pressure:false, thalen:true, fog:true,
     events:true
   };
 
@@ -3598,6 +3703,81 @@
       Math.round(rgb[1]*L.amb + L.hue[1]*t*0.4),
       Math.round(rgb[2]*L.amb + L.hue[2]*t*0.4)
     ];
+  }
+
+  // ---------- Fog of war ----------
+  // Sampled into a small offscreen buffer and stretched with smoothing, which
+  // gives soft billowing edges instead of visible cells. Two layers of slowly
+  // drifting noise make it feel alive rather than painted on.
+  const fogCv = document.createElement('canvas');
+  fogCv.width = 160; fogCv.height = 120;
+  const fogCtx = fogCv.getContext('2d');
+  const fogImg = fogCtx.createImageData(fogCv.width, fogCv.height);
+  const fogNoiseA = makeNoise(0xF06 ^ SEED, 32, 32);
+  const fogNoiseB = makeNoise(0xB17 ^ SEED, 16, 16);
+
+  function drawFog(W, H){
+    // The admin needs to see through it to work; visitors do not.
+    const maxAlpha = isLoggedIn ? 0.55 : 0.985;
+    const t = performance.now() / 1000;
+    const iw = fogCv.width, ih = fogCv.height;
+    const d = fogImg.data;
+    const drift1 = t * 0.9, drift2 = -t * 0.55;
+
+    for(let py=0; py<ih; py++){
+      const sy = (py + 0.5) / ih * H;
+      const wy = (sy - H/2) / view.scale + view.y;
+      for(let px=0; px<iw; px++){
+        const sx = (px + 0.5) / iw * W;
+        const wx = (sx - W/2) / view.scale + view.x;
+        const o = (py*iw + px) * 4;
+
+        // Sample the fog mask with a little blur so edges aren't blocky
+        const fcx = wx / FOG_CELL, fcy = wy / FOG_CELL;
+        let cover = 0, n = 0;
+        for(let oy=-1; oy<=1; oy++){
+          for(let ox=-1; ox<=1; ox++){
+            const cx = Math.floor(fcx)+ox, cy = Math.floor(fcy)+oy;
+            n++;
+            if(cx<0||cx>=FOG_W||cy<0||cy>=FOG_H){ cover += 1; continue; }
+            cover += fogMask[cy*FOG_W + cx];
+          }
+        }
+        cover /= n;
+        if(cover <= 0.001){ d[o+3] = 0; continue; }
+
+        // Billowing texture drifting across the shroud
+        const nA = fogNoiseA(wx*0.055 + drift1, wy*0.055 + drift1*0.4);
+        const nB = fogNoiseB(wx*0.13  + drift2, wy*0.13  - drift2*0.6);
+        const swirl = nA*0.65 + nB*0.35;
+
+        // Cold grey-violet, lighter where the noise piles up
+        const v = 96 + swirl*70;
+        d[o]   = v * 0.82;
+        d[o+1] = v * 0.86;
+        d[o+2] = v * 1.05;
+        // Cover drives opacity; noise varies it so the edge dissolves
+        const a = Math.min(1, cover * (0.72 + swirl*0.55)) * maxAlpha;
+        d[o+3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+      }
+    }
+    fogCtx.putImageData(fogImg, 0, 0);
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(fogCv, 0, 0, W, H);
+    ctx.imageSmoothingEnabled = prev;
+
+    // Show the admin exactly where their brush will land
+    if(isLoggedIn && (editor.tool === 'fogclear' || editor.tool === 'fogadd') && editor.hoverTile){
+      const rTiles = parseInt(document.getElementById('fogBrush').value, 10) || 6;
+      const [hx, hy] = worldToScreen(editor.hoverTile[0]+0.5, editor.hoverTile[1]+0.5);
+      ctx.save();
+      ctx.strokeStyle = editor.tool === 'fogadd' ? 'rgba(190,170,255,0.95)' : 'rgba(255,232,90,0.95)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath(); ctx.arc(hx, hy, rTiles*view.scale, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // ---------- Lava glow and smoke ----------
@@ -5694,6 +5874,69 @@
       drawWeather(W, H);
     }
 
+    // ---- The Path of Thalen ----
+    // A luminous violet thread tracing where the wanderer has been, ending in
+    // a pulsing mark at wherever he currently stands.
+    if(layers.thalen && userData.thalenPath && userData.thalenPath.points.length){
+      const pts = userData.thalenPath.points;
+      const tsec = performance.now()/1000;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      // Outer glow
+      ctx.strokeStyle = 'rgba(150,90,240,0.30)';
+      ctx.lineWidth = Math.max(5, view.scale*0.9);
+      ctx.beginPath();
+      pts.forEach((pt,k)=>{
+        const [px,py] = worldToScreen(pt[0]+0.5, pt[1]+0.5);
+        k ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+      });
+      ctx.stroke();
+      // Bright core
+      ctx.strokeStyle = 'rgba(226,196,255,0.95)';
+      ctx.lineWidth = Math.max(1.6, view.scale*0.28);
+      ctx.stroke();
+      // Travelled-direction ticks along the route
+      if(view.scale >= 3){
+        ctx.fillStyle = 'rgba(206,166,255,0.9)';
+        for(let k=0;k<pts.length-1;k++){
+          const [ax,ay] = worldToScreen(pts[k][0]+0.5, pts[k][1]+0.5);
+          const [bx,by] = worldToScreen(pts[k+1][0]+0.5, pts[k+1][1]+0.5);
+          const mx=(ax+bx)/2, my=(ay+by)/2, ang=Math.atan2(by-ay,bx-ax);
+          const sN = Math.max(3, view.scale*0.42);
+          ctx.save(); ctx.translate(mx,my); ctx.rotate(ang);
+          ctx.beginPath(); ctx.moveTo(sN,0); ctx.lineTo(-sN*0.6,-sN*0.5); ctx.lineTo(-sN*0.6,sN*0.5);
+          ctx.closePath(); ctx.fill(); ctx.restore();
+        }
+      }
+      // Waypoints he has already passed
+      ctx.fillStyle = 'rgba(180,130,255,0.75)';
+      for(let k=0;k<pts.length-1;k++){
+        const [px,py] = worldToScreen(pts[k][0]+0.5, pts[k][1]+0.5);
+        ctx.beginPath(); ctx.arc(px,py, Math.max(1.5, view.scale*0.16), 0, Math.PI*2); ctx.fill();
+      }
+      // Where he stands now — a pulsing beacon
+      const last = pts[pts.length-1];
+      const [lx,ly] = worldToScreen(last[0]+0.5, last[1]+0.5);
+      const pulse = 0.5 + 0.5*Math.sin(tsec*2.2);
+      const R = Math.max(7, view.scale*1.4);
+      const gg = ctx.createRadialGradient(lx,ly,0, lx,ly,R*(1.4+pulse*0.6));
+      gg.addColorStop(0, `rgba(230,200,255,${(0.85*(0.6+pulse*0.4)).toFixed(3)})`);
+      gg.addColorStop(0.45,`rgba(150,90,240,${(0.35*pulse).toFixed(3)})`);
+      gg.addColorStop(1, 'rgba(110,50,200,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(lx,ly,R*(1.4+pulse*0.6),0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(240,220,255,0.95)';
+      ctx.lineWidth = Math.max(1.5, view.scale*0.2);
+      ctx.beginPath(); ctx.arc(lx,ly,R*0.55,0,Math.PI*2); ctx.stroke();
+      if(view.scale >= 2){
+        ctx.font = `500 ${Math.max(11, Math.min(16, view.scale*0.6))}px system-ui, sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='bottom';
+        ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillText('Thalen', lx+1, ly-R*0.8+1);
+        ctx.fillStyle='#e9d8ff';          ctx.fillText('Thalen', lx,   ly-R*0.8);
+      }
+      ctx.restore();
+    }
+
     // Day/night terminator — the shadow line and its twilight bands sweep
     // across the map as the planet turns, so at dawn the eastern edge is
     // already lit while the west is still dark.
@@ -5702,6 +5945,9 @@
     // Lava is emissive: it makes its own light, so it is drawn AFTER the
     // terminator and actually brightens as the land around it goes dark.
     drawVolcanicEffects(W, H);
+
+    // Fog of war sits above everything — the world is hidden until revealed.
+    if(layers.fog) drawFog(W, H);
 
     // Selected tile highlight — implemented as an HTML overlay div instead of
     // canvas drawing. This guarantees the selection is always visible above
@@ -6122,6 +6368,8 @@
     activePointerId = null;
     cv.style.cursor = 'grab';
     try { cv.releasePointerCapture(e.pointerId); } catch(_) {}
+    // Commit a fog brush stroke once the button is released
+    if(fogDirty && isLoggedIn) saveFog();
   }
 
   cv.addEventListener('pointerup', endPointer);
@@ -6142,7 +6390,8 @@
   cv.addEventListener('pointermove', (e)=>{
     ensureNotStuck(e);
     // update hover tile for ghost-line preview in drawing modes
-    if(isLoggedIn && editor.drawing){
+    const fogBrushing = isLoggedIn && (editor.tool === 'fogclear' || editor.tool === 'fogadd');
+    if(isLoggedIn && (editor.drawing || fogBrushing)){
       const r = root.getBoundingClientRect();
       const sx = e.clientX - r.left, sy = e.clientY - r.top;
       const [wx,wy] = screenToWorld(sx,sy);
@@ -6151,6 +6400,11 @@
         const cur = editor.hoverTile;
         if(!cur || cur[0]!==tx || cur[1]!==ty){
           editor.hoverTile = [tx,ty];
+          // Held button + fog brush = paint continuously, like any paint tool
+          if(fogBrushing && dragging && e.buttons === 1){
+            const rad = parseInt(document.getElementById('fogBrush').value, 10) || 6;
+            paintFog(tx, ty, rad, editor.tool === 'fogadd');
+          }
           draw();
         }
       }
@@ -6324,6 +6578,21 @@
       switch(editor.tool){
         case 'settle': addSettlementAt(tx, ty); return;
         case 'poi':    addLandmarkAt(tx, ty);   return;
+        case 'fogclear':
+        case 'fogadd': {
+          const r = parseInt(document.getElementById('fogBrush').value, 10) || 6;
+          paintFog(tx, ty, r, editor.tool === 'fogadd');
+          draw();
+          return;
+        }
+        case 'thalen':
+          // Each click extends Thalen's route; the final point is where he is
+          userData.thalenPath = userData.thalenPath || {points: [], note: ''};
+          userData.thalenPath.points.push([tx, ty]);
+          saveUserData();
+          updateThalenStatus();
+          draw();
+          return;
         case 'river':
         case 'road':
         case 'trade':
@@ -6618,6 +6887,18 @@
   function showInfo(tx, ty){
     const panel = document.getElementById('infoPanel');
     const body = document.getElementById('infoBody');
+    // Fog conceals more than the view — a visitor learns nothing about a tile
+    // that has not been revealed to them.
+    if(!isLoggedIn && layers.fog && isFogged(tx, ty)){
+      panel.style.display = 'block';
+      body.innerHTML =
+        `<div style="font-weight:500;font-size:13px;margin-bottom:6px;">Tile (${tx}, ${ty})</div>` +
+        `<div style="font-size:12px;line-height:1.6;opacity:0.75;font-style:italic;">` +
+        `Shrouded. The fog here has not lifted, and nothing of this place is known.</div>`;
+      const eb = document.getElementById('editControls');
+      if(eb) eb.style.display = 'none';
+      return;
+    }
     const t = tiles[ty*WORLD_W+tx];
     const e = elev[ty*WORLD_W+tx];
     const m = moist[ty*WORLD_W+tx];
@@ -10045,6 +10326,39 @@
   }, true);
 
   // ============ UI WIRING ============
+  // ---- Path of Thalen controls ----
+  function updateThalenStatus(){
+    const el = document.getElementById('thalenStatus');
+    if(!el) return;
+    const pts = (userData.thalenPath && userData.thalenPath.points) || [];
+    if(!pts.length){ el.textContent = 'Click the map to trace his route.'; return; }
+    const last = pts[pts.length-1];
+    el.textContent = `${pts.length} step${pts.length>1?'s':''} · now at (${last[0]}, ${last[1]})`;
+  }
+  document.getElementById('thalenUndo').onclick = async ()=>{
+    const pts = (userData.thalenPath && userData.thalenPath.points) || [];
+    pts.pop();
+    await saveUserData(); updateThalenStatus(); draw();
+  };
+  document.getElementById('thalenClear').onclick = async ()=>{
+    if(!confirm("Erase Thalen's entire path?")) return;
+    userData.thalenPath = {points: [], note: ''};
+    await saveUserData(); updateThalenStatus(); draw();
+  };
+
+  // ---- Fog of war controls ----
+  document.getElementById('fogBrush').addEventListener('input', (e)=>{
+    document.getElementById('fogBrushLabel').textContent = e.target.value + ' tiles';
+  });
+  document.getElementById('fogRevealAll').onclick = async ()=>{
+    if(!confirm('Reveal the entire world to everyone?')) return;
+    fogMask.fill(0); fogDirty = true; draw(); await saveFog();
+  };
+  document.getElementById('fogHideAll').onclick = async ()=>{
+    if(!confirm('Shroud the entire world again?')) return;
+    fogMask.fill(1); fogDirty = true; draw(); await saveFog();
+  };
+
   document.getElementById('gridBtn').onclick = ()=>{
     view.showGrid = !view.showGrid;
     document.getElementById('gridBtn').textContent = `Grid: ${view.showGrid?'on':'off'}`;
@@ -10092,6 +10406,7 @@
       document.getElementById('timeBtn').style.display='none';
       document.getElementById('editedBtn').style.display='none';
       document.getElementById('editedPanel').style.display='none';
+      draw();   // fog closes back over the world
       editor.tool = 'select';
       editor.drawing = null;
       editor.hoverTile = null;
@@ -10115,6 +10430,11 @@
       document.getElementById('editorBar').style.display='block';
       document.getElementById('timeBtn').style.display='inline-block';
       document.getElementById('editedBtn').style.display='inline-block';
+      updateThalenStatus();
+      const hiddenNow = fogMask.reduce((a,b)=>a+b, 0);
+      const fs = document.getElementById('fogStatus');
+      if(fs) fs.textContent = `${Math.round(100 - hiddenNow/fogMask.length*100)}% of the world revealed`;
+      draw();   // fog thins for the admin the moment they log in
       setTool('select');
       if(view.selected) showInfo(view.selected.x, view.selected.y);
       // If the full-screen tile view is open, reveal its paint tools too
@@ -10303,7 +10623,11 @@
             || Math.hypot(view.x-S.fireMountain.x, view.y-S.fireMountain.y) < span
             || Math.hypot(view.x-S.ashenCrown.x, view.y-S.ashenCrown.y) < span;
       })();
-      const needAnim = inCloudRange || animatedWeather || layers.economy || pulsingSelection || nearLiveFeature;
+      // Drifting fog and Thalen's beacon both need a steady frame rate
+      const fogVisible = layers.fog;
+      const thalenVisible = layers.thalen && userData.thalenPath && userData.thalenPath.points.length > 0;
+      const needAnim = inCloudRange || animatedWeather || layers.economy
+                    || pulsingSelection || nearLiveFeature || fogVisible || thalenVisible;
       // Refresh often enough that the terminator glides rather than steps
       const needLight = minChanged || (now - lastDrawAt > 1500);
       if(needAnim){
