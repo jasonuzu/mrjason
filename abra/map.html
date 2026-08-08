@@ -474,10 +474,14 @@
         <span>Brush</span><span id="fogBrushLabel">6 tiles</span>
       </div>
       <input id="fogBrush" type="range" min="1" max="40" value="6" style="width:100%;accent-color:#5a8fd6;margin-bottom:4px;">
-      <div style="display:flex;gap:3px;">
-        <button id="fogRevealAll" style="flex:1;background:rgba(50,80,60,0.6);border:1px solid rgba(140,220,170,0.25);color:#dff5e6;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Reveal all</button>
-        <button id="fogHideAll" style="flex:1;background:rgba(60,55,80,0.6);border:1px solid rgba(180,170,230,0.25);color:#e2ddf7;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Fog all</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:10px;cursor:pointer;margin-bottom:4px;">
+        <input id="fogLiftAll" type="checkbox" style="accent-color:#5a8fd6;">
+        Lift all fog world-wide
+      </label>
+      <div style="font-size:8px;opacity:0.45;line-height:1.35;margin-bottom:4px;">
+        Unticking restores the fog, but everywhere you revealed by brush stays revealed.
       </div>
+      <button id="fogResetBrush" style="width:100%;background:rgba(90,60,60,0.5);border:1px solid rgba(255,140,140,0.2);color:#ffd8d8;padding:4px;border-radius:5px;font-size:9px;cursor:pointer;">Reset all brushwork</button>
       <div id="fogStatus" style="font-size:9px;opacity:0.55;margin-top:4px;min-height:11px;"></div>
     </div>
     <button class="tool" data-tool="erase" style="width:100%;text-align:left;background:rgba(80,40,40,0.5);border:1px solid rgba(220,120,120,0.3);color:#ffcfcf;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">✕ Erase user feature</button>
@@ -3518,8 +3522,13 @@
   const FOG_KEY = 'pixelworld:fog';
   const fogMask = new Uint8Array(FOG_W * FOG_H).fill(1);   // 1 = hidden
   let fogDirty = false;
+  // A world-wide override. Lifting all the fog does NOT erase the brushwork
+  // underneath — switch it back off and every region revealed by hand is
+  // still revealed, exactly as it was.
+  let fogLiftedAll = false;
 
   function isFogged(tx, ty){
+    if(fogLiftedAll) return false;
     const cx = Math.floor(tx / FOG_CELL), cy = Math.floor(ty / FOG_CELL);
     if(cx<0||cx>=FOG_W||cy<0||cy>=FOG_H) return true;
     return fogMask[cy*FOG_W + cx] === 1;
@@ -3539,7 +3548,7 @@
     fogDirty = true;
   }
   function encodeFog(){
-    const runs = [];
+    const runs = [fogLiftedAll ? 'A' : 'B'];   // leading flag, then the runs
     let cur = fogMask[0], len = 1;
     for(let i=1;i<fogMask.length;i++){
       if(fogMask[i] === cur) len++;
@@ -3552,6 +3561,8 @@
     if(!str) return;
     let idx = 0;
     for(const run of str.split(',')){
+      if(run === 'A'){ fogLiftedAll = true;  continue; }
+      if(run === 'B'){ fogLiftedAll = false; continue; }
       const dot = run.indexOf('.');
       if(dot < 0) continue;
       const len = parseInt(run.slice(0,dot),10);
@@ -3717,8 +3728,9 @@
   const fogNoiseB = makeNoise(0xB17 ^ SEED, 16, 16);
 
   function drawFog(W, H){
+    if(fogLiftedAll) return;              // the whole world is open
     // The admin needs to see through it to work; visitors do not.
-    const maxAlpha = isLoggedIn ? 0.55 : 0.985;
+    const maxAlpha = isLoggedIn ? 0.55 : 1.0;
     const t = performance.now() / 1000;
     const iw = fogCv.width, ih = fogCv.height;
     const d = fogImg.data;
@@ -3751,13 +3763,24 @@
         const nB = fogNoiseB(wx*0.13  + drift2, wy*0.13  - drift2*0.6);
         const swirl = nA*0.65 + nB*0.35;
 
-        // Cold grey-violet, lighter where the noise piles up
-        const v = 96 + swirl*70;
-        d[o]   = v * 0.82;
-        d[o+1] = v * 0.86;
-        d[o+2] = v * 1.05;
-        // Cover drives opacity; noise varies it so the edge dissolves
-        const a = Math.min(1, cover * (0.72 + swirl*0.55)) * maxAlpha;
+        // The shroud is opaque. All that shows through is the barest silhouette
+        // of land against sea — a dark shape with no detail, no names, nothing
+        // to read. Land sits a few shades lighter than water, and that is all.
+        const txi = Math.floor(wx), tyi = Math.floor(wy);
+        let isLand = false;
+        if(txi>=0 && txi<WORLD_W && tyi>=0 && tyi<WORLD_H){
+          const tt = tiles[tyi*WORLD_W + txi];
+          isLand = tt > 2 && tt !== 15;
+        }
+        // Base shade: near-black, faintly violet. Land is only just perceptible.
+        const base = isLand ? 30 : 15;
+        const v = base + swirl*13;
+        d[o]   = v * 0.86;
+        d[o+1] = v * 0.90;
+        d[o+2] = v * 1.18;
+        // Fully opaque wherever the fog covers, so nothing beneath can bleed
+        // through. Only the outermost feathered edge is partly transparent.
+        const a = Math.min(1, cover * 1.25) * maxAlpha;
         d[o+3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
       }
     }
@@ -6606,6 +6629,19 @@
         case 'erase':  eraseFeatureAt(tx, ty); return;
       }
     }
+    // Fogged ground cannot be selected by a visitor — there is nothing there
+    // to inspect until the shroud is lifted.
+    if(!isLoggedIn && layers.fog && isFogged(tx, ty)){
+      view.selected = null;
+      const panel = document.getElementById('infoPanel');
+      const body = document.getElementById('infoBody');
+      panel.style.display = 'block';
+      body.innerHTML =
+        `<div style="font-size:12px;line-height:1.6;opacity:0.75;font-style:italic;">` +
+        `Shrouded. Nothing of this place can be known while the fog holds.</div>`;
+      draw();
+      return;
+    }
     // Default select behaviour — clicking always selects (or re-selects) the
     // tile/feature under the cursor and shows its info panel. Use the × close
     // button on the panel or press Escape to dismiss the panel.
@@ -8416,6 +8452,7 @@
 
   // ---- Open / close ----
   async function openTileDetail(tx, ty){
+    if(!isLoggedIn && layers.fog && isFogged(tx, ty)) return;   // still shrouded
     tileView.open = true;
     tileView.tx = tx; tileView.ty = ty;
     const gen = generateTileDetail(tx, ty);
@@ -9233,6 +9270,11 @@
   function updateEnterTileButton(){
     const btn = document.getElementById('enterTileBtn');
     if(tileView.open || !view.selected || view.scale < ENTER_TILE_MIN_ZOOM){
+      btn.style.display = 'none';
+      return;
+    }
+    // Shrouded ground can't be entered until the fog lifts there
+    if(!isLoggedIn && layers.fog && isFogged(view.selected.x, view.selected.y)){
       btn.style.display = 'none';
       return;
     }
@@ -10350,12 +10392,14 @@
   document.getElementById('fogBrush').addEventListener('input', (e)=>{
     document.getElementById('fogBrushLabel').textContent = e.target.value + ' tiles';
   });
-  document.getElementById('fogRevealAll').onclick = async ()=>{
-    if(!confirm('Reveal the entire world to everyone?')) return;
-    fogMask.fill(0); fogDirty = true; draw(); await saveFog();
-  };
-  document.getElementById('fogHideAll').onclick = async ()=>{
-    if(!confirm('Shroud the entire world again?')) return;
+  document.getElementById('fogLiftAll').addEventListener('change', async (e)=>{
+    fogLiftedAll = e.target.checked;
+    fogDirty = true;
+    draw();
+    await saveFog();
+  });
+  document.getElementById('fogResetBrush').onclick = async ()=>{
+    if(!confirm('Shroud everything you have revealed by brush? The world-wide lift is unaffected.')) return;
     fogMask.fill(1); fogDirty = true; draw(); await saveFog();
   };
 
@@ -10431,6 +10475,7 @@
       document.getElementById('timeBtn').style.display='inline-block';
       document.getElementById('editedBtn').style.display='inline-block';
       updateThalenStatus();
+      document.getElementById('fogLiftAll').checked = fogLiftedAll;
       const hiddenNow = fogMask.reduce((a,b)=>a+b, 0);
       const fs = document.getElementById('fogStatus');
       if(fs) fs.textContent = `${Math.round(100 - hiddenNow/fogMask.length*100)}% of the world revealed`;
