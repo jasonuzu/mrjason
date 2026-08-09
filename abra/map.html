@@ -118,7 +118,11 @@
       <div style="display:flex;justify-content:space-between;margin-bottom:4px;opacity:0.7;font-size:10px;">
         <span>Place size</span><span id="spriteSizeLabel" style="opacity:0.9;">1 cell</span>
       </div>
-      <input id="spriteSize" type="range" min="1" max="32" value="1" style="width:100%;margin-bottom:6px;accent-color:#5a8fd6;">
+      <input id="spriteSize" type="range" min="1" max="64" value="1" style="width:100%;margin-bottom:4px;accent-color:#5a8fd6;">
+      <label id="origSizeWrap" style="display:none;align-items:center;gap:5px;font-size:9px;opacity:0.85;margin-bottom:6px;cursor:pointer;">
+        <input id="spriteOrigSize" type="checkbox" style="accent-color:#5a8fd6;">
+        <span id="origSizeLabel">Place at original size</span>
+      </label>
       <div id="spriteStatus" style="font-size:10px;opacity:0.6;margin-bottom:6px;min-height:12px;"></div>
       <div style="display:flex;gap:4px;margin-bottom:10px;">
         <button id="spriteEdit" style="flex:1;background:rgba(60,90,140,0.5);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:5px;border-radius:5px;font-size:10px;cursor:pointer;">Edit</button>
@@ -7397,6 +7401,7 @@
     material: 'stone',
     brush: 1,
     spriteSize: 1,       // placement size in sub-cells (1 = one cell)
+    origSize: false,     // grabbed regions: paste back at the exact size lifted
     // Per-cell interactions: "cellIdx" -> {msg, size}
     // `size` makes the clickable zone a square anchored at that cell, so a
     // marker can cover a multi-cell sprite rather than a single pixel.
@@ -7499,7 +7504,8 @@
     // Strip cached canvases before serializing; keep animation metadata
     const slim = spriteLib.map(s=> isAnim(s)
       ? {id:s.id, name:s.name, type:'anim', frames:s.frames, fps:s.fps, trigger:s.trigger, holdLast:!!s.holdLast}
-      : {id:s.id, name:s.name, data:s.data});
+      : (s.origin ? {id:s.id, name:s.name, data:s.data, origin:s.origin}
+                  : {id:s.id, name:s.name, data:s.data}));
     await Store.set(SPRITE_LIB_KEY, JSON.stringify(slim), true);
   }
 
@@ -7532,12 +7538,28 @@
       b.onclick = ()=>{
         tileView.activeSprite = s.id;
         tileView.tool = 'sprite';
+        // A grabbed region defaults to pasting back at the size it was lifted
+        if(s.origin){
+          tileView.origSize = true;
+          document.getElementById('spriteOrigSize').checked = true;
+        }
         highlightTool();
         renderSpriteLibrary();
-        document.getElementById('spriteStatus').textContent = `"${s.name}" — click the tile to place`;
+        syncSizeUI();
+        document.getElementById('spriteStatus').textContent = s.origin
+          ? `"${s.name}" — ${s.origin.w}×${s.origin.h}, click to place`
+          : `"${s.name}" — click the tile to place`;
       };
       wrap.appendChild(b);
 
+      // Grabbed-region badge, showing the footprint it was lifted from
+      if(!anim && s.origin){
+        const badge = document.createElement('div');
+        badge.textContent = '▣';
+        badge.title = `Grabbed region · ${s.origin.w}×${s.origin.h} cells`;
+        badge.style.cssText = 'position:absolute;bottom:-3px;left:-3px;width:14px;height:14px;border-radius:4px;background:rgba(40,80,120,0.95);border:1px solid rgba(140,200,255,0.5);color:#cfe8ff;font-size:8px;line-height:1;display:flex;align-items:center;justify-content:center;pointer-events:none;';
+        wrap.appendChild(badge);
+      }
       // Animation badge
       if(anim){
         const badge = document.createElement('div');
@@ -7566,6 +7588,22 @@
     }
   }
   function getSprite(id){ return spriteLib.find(s=>s.id===id); }
+
+  // How many sub-cells should this sprite occupy when placed? A grabbed region
+  // asked to go down at original size uses its padded resolution, which lands
+  // one source cell on one sub-cell — a pixel-perfect paste of what was lifted.
+  function placementSize(entry){
+    if(entry && entry.origin && tileView.origSize) return entry.origin.res;
+    return tileView.spriteSize;
+  }
+  // The visible content within that footprint (the padding is transparent)
+  function placementFootprint(entry){
+    const size = placementSize(entry);
+    if(entry && entry.origin && tileView.origSize){
+      return {size, w: entry.origin.w, h: entry.origin.h, exact: true};
+    }
+    return {size, w: size, h: size, exact: false};
+  }
 
   // ---- Animation entries ----
   // An animation is a library entry of type 'anim' that references two or more
@@ -8302,7 +8340,8 @@
       const entry = getSprite(tileView.activeSprite);
       if(entry){
         const frame = resolveFrameCanvas(entry, null, tsec);
-        const sz = tileView.spriteSize;
+        const fp = placementFootprint(entry);
+        const sz = fp.size;
         const gx = tileView.hover.sx - Math.floor(sz/2);
         const gy = tileView.hover.sy - Math.floor(sz/2);
         if(frame){
@@ -8313,7 +8352,25 @@
         }
         c.strokeStyle = 'rgba(255,232,90,0.9)';
         c.lineWidth = Math.max(1, u*0.08);
-        c.strokeRect(originX + gx*u, originY + gy*u, sz*u, sz*u);
+        // At original size, outline the actual content rather than the padded
+        // square, so you can see exactly which cells will be covered.
+        c.strokeRect(originX + gx*u, originY + gy*u, fp.w*u, fp.h*u);
+        if(fp.exact){
+          c.save();
+          c.strokeStyle = 'rgba(140,220,255,0.65)';
+          c.lineWidth = 1;
+          c.setLineDash([4,3]);
+          c.strokeRect(originX + gx*u, originY + gy*u, sz*u, sz*u);
+          c.restore();
+          if(u >= 6){
+            c.font = `${Math.max(9, Math.min(13, u*0.9))}px system-ui, sans-serif`;
+            c.textAlign = 'left'; c.textBaseline = 'bottom';
+            c.fillStyle = 'rgba(0,0,0,0.7)';
+            c.fillText(`${fp.w}×${fp.h} original`, originX + gx*u + 3, originY + gy*u - 2);
+            c.fillStyle = '#bfe4ff';
+            c.fillText(`${fp.w}×${fp.h} original`, originX + gx*u + 2, originY + gy*u - 3);
+          }
+        }
       }
     }
 
@@ -8641,6 +8698,7 @@
     highlightShape();
     renderRecentCustom();
     updateGrabInfo();
+    syncSizeUI();
     syncCellPanel();
     syncPathPanel();
     document.getElementById('showZones').checked = tileView.showZones !== false;
@@ -8885,7 +8943,9 @@
     if(tileView.tool === 'sprite' && tileView.activeSprite){
       const p = tileCanvasToSub(e.clientX, e.clientY);
       if(p){
-        const sz = tileView.spriteSize;
+        const sp = getSprite(tileView.activeSprite);
+        const fp = placementFootprint(sp);
+        const sz = fp.size;
         tileView.placed.push({
           sid: tileView.activeSprite,
           x: p.sx - Math.floor(sz/2),
@@ -8893,9 +8953,9 @@
           size: sz
         });
         tileView.dirty = true;
-        const sp = getSprite(tileView.activeSprite);
-        document.getElementById('spriteStatus').textContent =
-          `Placed "${sp?sp.name:''}" (${tileView.placed.length} on this tile)`;
+        document.getElementById('spriteStatus').textContent = fp.exact
+          ? `Placed "${sp?sp.name:''}" at original ${fp.w}×${fp.h} (${tileView.placed.length} on this tile)`
+          : `Placed "${sp?sp.name:''}" (${tileView.placed.length} on this tile)`;
       }
       return;
     }
@@ -9630,13 +9690,19 @@
     }
     const name = (document.getElementById('grabName').value || '').trim() || `region ${w}x${h}`;
     const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
-    const sp = {id, name, data: encodeSprite(res, cells, colors)};
+    // Remember the footprint it was lifted from. Because the sprite is padded
+    // to a square, placing it at `res` cells reproduces the original scale
+    // exactly — one source cell to one sub-cell.
+    const sp = {id, name, data: encodeSprite(res, cells, colors), origin: {w, h, res}};
     buildSpriteCanvas(sp);
     spriteLib.push(sp);
     tileView.activeSprite = id;
+    tileView.origSize = true;                     // ready to paste back 1:1
+    document.getElementById('spriteOrigSize').checked = true;
+    syncSizeUI();
     try{
       await saveSpriteLib();
-      status.textContent = `Saved "${name}" · ${res}×${res}, ${colors.length} colours`;
+      status.textContent = `Saved "${name}" · ${w}×${h} cells, ${colors.length} colours`;
       status.style.color = '#9fe0a8';
     }catch(err){
       status.textContent = 'Kept for this session — could not persist.';
@@ -9673,9 +9739,41 @@
   });
   document.getElementById('spriteSize').addEventListener('input', (e)=>{
     tileView.spriteSize = parseInt(e.target.value, 10);
-    const n = tileView.spriteSize;
-    document.getElementById('spriteSizeLabel').textContent = n === 1 ? '1 cell' : `${n} cells`;
+    // Dragging the slider means you want a custom size, not the original
+    if(tileView.origSize){
+      tileView.origSize = false;
+      document.getElementById('spriteOrigSize').checked = false;
+    }
+    syncSizeUI();
   });
+  document.getElementById('spriteOrigSize').addEventListener('change', (e)=>{
+    tileView.origSize = e.target.checked;
+    syncSizeUI();
+  });
+
+  // Keeps the size controls honest about what will actually be placed
+  function syncSizeUI(){
+    const entry = tileView.activeSprite ? getSprite(tileView.activeSprite) : null;
+    const wrap = document.getElementById('origSizeWrap');
+    const lbl  = document.getElementById('origSizeLabel');
+    const slider = document.getElementById('spriteSize');
+    const hasOrigin = !!(entry && entry.origin);
+    wrap.style.display = hasOrigin ? 'flex' : 'none';
+    if(hasOrigin){
+      lbl.textContent = `Place at original size (${entry.origin.w}×${entry.origin.h})`;
+    } else if(tileView.origSize){
+      // Selected something without an origin — fall back to the slider
+      tileView.origSize = false;
+      document.getElementById('spriteOrigSize').checked = false;
+    }
+    const active = hasOrigin && tileView.origSize;
+    slider.disabled = active;
+    slider.style.opacity = active ? '0.4' : '1';
+    const n = active ? entry.origin.res : tileView.spriteSize;
+    document.getElementById('spriteSizeLabel').textContent =
+      active ? `${entry.origin.w}×${entry.origin.h} original`
+             : (n === 1 ? '1 cell' : `${n} cells`);
+  }
   document.getElementById('tileZoomIn').onclick = ()=>{
     tileView.zoom = Math.min(14, tileView.zoom * 1.4); clampTilePan(); updateTileZoomLabel();
   };
