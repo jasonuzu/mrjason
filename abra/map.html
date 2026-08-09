@@ -3740,7 +3740,11 @@
     else              hue = [40,55,105];        // night blue
     return {amb, hue, alt};
   }
+  // When capturing a region to a sprite we want the materials' true colours,
+  // not whatever the sun is doing at that moment. This flag bypasses the tint.
+  let lightingBypass = false;
   function applyLighting(rgb){
+    if(lightingBypass) return [Math.round(rgb[0]), Math.round(rgb[1]), Math.round(rgb[2])];
     const L = getLighting();
     const t = 1 - L.amb;
     return [
@@ -7593,7 +7597,11 @@
   // asked to go down at original size uses its padded resolution, which lands
   // one source cell on one sub-cell — a pixel-perfect paste of what was lifted.
   function placementSize(entry){
-    if(entry && entry.origin && tileView.origSize) return entry.origin.res;
+    if(entry && entry.origin && tileView.origSize){
+      // `place` is the footprint in sub-cells. Older grabs stored only `res`,
+      // back when one sprite pixel was one sub-cell.
+      return entry.origin.place || entry.origin.res;
+    }
     return tileView.spriteSize;
   }
   // The visible content within that footprint (the padding is transparent)
@@ -9664,36 +9672,81 @@
     const status = document.getElementById('grabStatus');
     if(!sel){ status.textContent = 'Nothing selected.'; status.style.color='#ffb0b0'; return; }
     const w = sel.x1-sel.x0+1, h = sel.y1-sel.y0+1;
-    const res = Math.max(w, h);                       // square sprite, padded
-    if(res > 64){ status.textContent = 'Selection too large (max 64).'; status.style.color='#ffb0b0'; return; }
     const includeGround = document.getElementById('grabIncludeGround').checked;
 
-    // Convert the painted cells into a palette-indexed sprite
-    const colors = [];
-    const colorIdx = {};
-    const cells = new Array(res*res).fill(0);
-    const toHex = (c)=> c.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
-    for(let y=0;y<h;y++){
-      for(let x=0;x<w;x++){
-        const idx = (sel.y0+y)*SUB_GRID + (sel.x0+x);
-        const pid = tileView.paint[idx];
-        let mat = pid ? lookupMaterial(pid) : null;
-        if(!mat && includeGround) mat = MATERIALS[tileView.ground[idx]];
-        if(!mat) continue;                            // stays transparent
-        const hex = toHex(mat.color);
-        if(colorIdx[hex] === undefined){ colors.push(hex); colorIdx[hex] = colors.length; }
-        cells[y*res + x] = colorIdx[hex];
+    // Each sub-cell is rendered at several pixels so brick courses, plank
+    // grain, marbling and every other texture survive the capture. The sample
+    // rate adapts to the selection so the sprite stays a sane size.
+    const side = Math.max(w, h);
+    // 6 pixels per cell is enough to hold brick courses, plank grain and
+    // weave without the sprite ballooning in storage.
+    const CELL_PX = Math.max(1, Math.min(6, Math.floor(96 / side)));
+    const res = side * CELL_PX;
+
+    // Draw the region exactly as it appears, minus the daylight tint
+    const oc = document.createElement('canvas');
+    oc.width = res; oc.height = res;
+    const octx = oc.getContext('2d');
+    let painted = 0;
+    lightingBypass = true;
+    try{
+      // shadeCell takes its target context as an argument, so it can paint
+      // straight into the capture canvas.
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const gxi = sel.x0+x, gyi = sel.y0+y;
+          const idx = gyi*SUB_GRID + gxi;
+          const pid = tileView.paint[idx];
+          let mat = pid ? lookupMaterial(pid) : null;
+          if(!mat && includeGround) mat = MATERIALS[tileView.ground[idx]];
+          if(!mat) continue;                       // leave it transparent
+          painted++;
+          // Same cell seed the live view uses, so the texture is identical
+          const seed = (idx*73856093 ^ tileView.tx*19349663 ^ tileView.ty)>>>0;
+          shadeCell(octx, mat, x*CELL_PX, y*CELL_PX, CELL_PX, seed);
+        }
       }
+    } finally {
+      lightingBypass = false;
     }
-    if(colors.length === 0){
+    if(painted === 0){
       status.textContent = 'Nothing painted in that box.'; status.style.color='#ffb0b0'; return;
     }
+
+    // Read it back and quantise into a palette the sprite format can hold
+    const img = octx.getImageData(0, 0, res, res).data;
+    const colors = [], colorIdx = {};
+    const cells = new Array(res*res).fill(0);
+    let quantStep = 1;                              // tighten if the palette blows up
+    const build = (step)=>{
+      colors.length = 0;
+      for(const k in colorIdx) delete colorIdx[k];
+      for(let i2=0;i2<res*res;i2++){
+        const o = i2*4;
+        if(img[o+3] < 128){ cells[i2] = 0; continue; }
+        const q = (v)=> Math.min(255, Math.round(v/step)*step);
+        const hex = [q(img[o]), q(img[o+1]), q(img[o+2])]
+          .map(v=>v.toString(16).padStart(2,'0')).join('');
+        if(colorIdx[hex] === undefined){ colors.push(hex); colorIdx[hex] = colors.length; }
+        cells[i2] = colorIdx[hex];
+      }
+    };
+    build(quantStep);
+    // Textures with gradients (gloss, metal, marble) can produce a lot of
+    // shades; step up the quantisation until the palette is reasonable.
+    while(colors.length > 220 && quantStep < 32){
+      quantStep *= 2;
+      build(quantStep);
+    }
+
     const name = (document.getElementById('grabName').value || '').trim() || `region ${w}x${h}`;
     const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
-    // Remember the footprint it was lifted from. Because the sprite is padded
-    // to a square, placing it at `res` cells reproduces the original scale
-    // exactly — one source cell to one sub-cell.
-    const sp = {id, name, data: encodeSprite(res, cells, colors), origin: {w, h, res}};
+    // `place` is the footprint in sub-cells; `res` is the sprite's pixel size.
+    const sp = {
+      id, name,
+      data: encodeSprite(res, cells, colors),
+      origin: {w, h, place: side, res, cellPx: CELL_PX}
+    };
     buildSpriteCanvas(sp);
     spriteLib.push(sp);
     tileView.activeSprite = id;
@@ -9702,7 +9755,8 @@
     syncSizeUI();
     try{
       await saveSpriteLib();
-      status.textContent = `Saved "${name}" · ${w}×${h} cells, ${colors.length} colours`;
+      const kb = (sp.data.length/1024).toFixed(1);
+      status.textContent = `Saved "${name}" · ${w}×${h} cells, ${CELL_PX}px each · ${colors.length} colours · ${kb} KB`;
       status.style.color = '#9fe0a8';
     }catch(err){
       status.textContent = 'Kept for this session — could not persist.';
