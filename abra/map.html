@@ -37,6 +37,19 @@
         <button class="ttool" data-ttool="sprite" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;">Sprite</button>
         <button class="ttool" data-ttool="path" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;" title="Give a placed sprite a movement path">Path</button>
       </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px;">
+        <button class="ttool" data-ttool="grab" style="flex:1;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px;border-radius:5px;font-size:11px;cursor:pointer;" title="Drag a box around painted cells, then save them as a reusable sprite">▣ Grab region</button>
+      </div>
+      <div id="grabPanel" style="display:none;border:1px solid rgba(140,200,255,0.25);background:rgba(30,50,80,0.35);border-radius:7px;padding:8px;margin-bottom:8px;">
+        <div id="grabInfo" style="font-size:10px;opacity:0.75;margin-bottom:6px;line-height:1.4;">Drag a box over painted cells.</div>
+        <input id="grabName" type="text" placeholder="Sprite name" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:5px 7px;border-radius:5px;font-size:10px;margin-bottom:5px;box-sizing:border-box;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:9px;opacity:0.8;margin-bottom:5px;cursor:pointer;">
+          <input id="grabIncludeGround" type="checkbox" style="accent-color:#5a8fd6;">
+          Include the ground beneath (else transparent)
+        </label>
+        <button id="grabSave" style="width:100%;background:#3b6db8;border:none;color:#fff;padding:6px;border-radius:5px;font-size:10px;cursor:pointer;">Save selection as sprite</button>
+        <div id="grabStatus" style="font-size:9px;opacity:0.6;margin-top:4px;min-height:11px;"></div>
+      </div>
 
       <!-- Movement path editor -->
       <div id="pathPanel" style="display:none;border:1px solid rgba(160,200,255,0.25);background:rgba(30,50,80,0.35);border-radius:7px;padding:8px;margin-bottom:8px;">
@@ -75,7 +88,24 @@
       <div style="font-size:9px;opacity:0.5;margin-bottom:10px;line-height:1.35;">Hold <b>Shift</b> to draw a straight line from your last dab.</div>
 
       <div style="margin-bottom:6px;opacity:0.7;">Material</div>
-      <div id="materialGrid" style="margin-bottom:10px;"></div>
+      <div id="materialGrid" style="margin-bottom:6px;"></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+        <input id="paintCustomColor" type="color" value="#8ec06c" style="width:34px;height:24px;border:1px solid rgba(255,255,255,0.15);border-radius:5px;background:none;cursor:pointer;padding:0;">
+        <button id="paintCustomUse" style="flex:1;background:rgba(60,90,140,0.6);border:1px solid rgba(255,255,255,0.14);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;cursor:pointer;">Use custom colour</button>
+      </div>
+      <select id="paintCustomTex" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:4px;border-radius:5px;font-size:10px;margin-bottom:6px;">
+        <option value="flat">Flat</option>
+        <option value="grain">Grainy</option>
+        <option value="rough">Rough</option>
+        <option value="brick">Brick</option>
+        <option value="plank">Plank</option>
+        <option value="gloss">Glossy</option>
+        <option value="tile">Tiled</option>
+        <option value="metal">Metallic</option>
+        <option value="marble">Marbled</option>
+        <option value="weave">Woven</option>
+      </select>
+      <div id="paintCustomRecent" style="display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:10px;"></div>
 
       <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
         <span style="opacity:0.7;">Sprites</span>
@@ -7375,6 +7405,9 @@
     pathTarget: null,     // index into `placed` of the sprite being given a path
     selectedPlaced: null, // index into `placed` of the sprite selected for deletion
     shape: 'free',        // free | line | rect | rectFill | ellipse | ellipseFill
+    grab: null,           // {x0,y0,x1,y1} region marquee for saving as a sprite
+    grabDrag: null,
+    recentCustom: [],     // recently used custom colours, most recent first
     shapeStart: null,     // anchor cell while dragging a shape
     shapeEnd: null,
     lastDab: null,        // last painted cell, anchor for shift-line strokes
@@ -8159,7 +8192,7 @@
       for(let sx=cx0; sx<cx1; sx++){
         const idx = sy*SUB_GRID+sx;
         const painted = tileView.paint[idx];
-        const mat = painted ? MATERIAL_BY_ID[painted] : MATERIALS[tileView.ground[idx]];
+        const mat = painted ? lookupMaterial(painted) : MATERIALS[tileView.ground[idx]];
         if(!mat) continue;
         shadeCell(c, mat, originX + sx*u, originY + sy*u, u, (idx*73856093 ^ tileView.tx*19349663 ^ tileView.ty)>>>0);
       }
@@ -8172,7 +8205,7 @@
       for(let sx=cx0; sx<cx1; sx++){
         const idx = sy*SUB_GRID+sx;
         const painted = tileView.paint[idx];
-        const mat = painted ? MATERIAL_BY_ID[painted] : MATERIALS[tileView.ground[idx]];
+        const mat = painted ? lookupMaterial(painted) : MATERIALS[tileView.ground[idx]];
         if(!mat || (mat.id !== 'water' && mat.id !== 'ice')) continue;
         const ph = Math.sin(tsec*1.6 + sx*0.55 + sy*0.42);
         if(ph > 0.55){
@@ -8365,10 +8398,36 @@
       c.strokeRect(originX + sx*u - 1, originY + sy*u - 1, u+2, u+2);
     }
 
+    // ---- 5d2. Grab marquee ----
+    if(isLoggedIn && tileView.tool === 'grab' && tileView.grab){
+      const g = tileView.grab;
+      const ax = Math.min(g.x0,g.x1), ay = Math.min(g.y0,g.y1);
+      const bw = Math.abs(g.x1-g.x0)+1, bh = Math.abs(g.y1-g.y0)+1;
+      const rx = originX + ax*u, ry = originY + ay*u;
+      c.save();
+      c.fillStyle = 'rgba(120,200,255,0.14)';
+      c.fillRect(rx, ry, bw*u, bh*u);
+      c.strokeStyle = 'rgba(255,255,255,0.95)';
+      c.lineWidth = 2;
+      c.setLineDash([6,4]);
+      c.strokeRect(rx, ry, bw*u, bh*u);
+      c.strokeStyle = 'rgba(0,0,0,0.7)';
+      c.lineDashOffset = 5;
+      c.strokeRect(rx, ry, bw*u, bh*u);
+      c.setLineDash([]); c.lineDashOffset = 0;
+      // Corner grips
+      const gs = Math.max(4, Math.min(u*0.6, 10));
+      c.fillStyle = 'rgba(255,255,255,0.95)';
+      for(const [gx,gy] of [[rx,ry],[rx+bw*u,ry],[rx,ry+bh*u],[rx+bw*u,ry+bh*u]]){
+        c.fillRect(gx-gs/2, gy-gs/2, gs, gs);
+      }
+      c.restore();
+    }
+
     // ---- 5e. Shape preview while dragging ----
     if(isLoggedIn && tileView.shapeStart && tileView.shapeEnd){
       const a = tileView.shapeStart, b = tileView.shapeEnd;
-      const mat = MATERIAL_BY_ID[tileView.material];
+      const mat = lookupMaterial(tileView.material);
       const col = tileView.tool === 'erase' ? [255,120,120] : (mat ? mat.color : [255,232,90]);
       c.save();
       c.globalAlpha = 0.55;
@@ -8580,6 +8639,8 @@
     if(spriteLib.length === 0) await loadSpriteLib(); else renderSpriteLibrary();
     highlightTool();
     highlightShape();
+    renderRecentCustom();
+    updateGrabInfo();
     syncCellPanel();
     syncPathPanel();
     document.getElementById('showZones').checked = tileView.showZones !== false;
@@ -8838,6 +8899,15 @@
       }
       return;
     }
+    // Grab tool — drag a box around painted cells to lift them out as a sprite
+    if(tileView.tool === 'grab'){
+      const p = tileCanvasToSub(e.clientX, e.clientY);
+      if(!p) return;
+      tileView.grabDrag = {x0:p.sx, y0:p.sy, x1:p.sx, y1:p.sy};
+      tileView.grab = tileView.grabDrag;
+      updateGrabInfo();
+      return;
+    }
     // Path tool — first click picks a placed sprite, subsequent clicks add
     // waypoints to its movement path.
     if(tileView.tool === 'path'){
@@ -8869,8 +8939,8 @@
       }
       return;
     }
-    // The select tool is a pure cursor — it never modifies the tile.
-    if(tileView.tool === 'select') return;
+    // Select and Grab are pure cursors — they never modify the tile.
+    if(tileView.tool === 'select' || tileView.tool === 'grab') return;
     const p = tileCanvasToSub(e.clientX, e.clientY);
     if(!p) return;
     tileCv.setPointerCapture(e.pointerId);
@@ -8909,6 +8979,12 @@
     }
     const p = tileCanvasToSub(e.clientX, e.clientY);
     tileView.hover = p;   // drives the brush preview outline
+    if(tileView.grabDrag && p){
+      tileView.grabDrag.x1 = p.sx; tileView.grabDrag.y1 = p.sy;
+      tileView.grab = tileView.grabDrag;
+      updateGrabInfo();
+      return;
+    }
     // Live shape preview while dragging out a shape
     if(tileView.shapeStart && p){
       tileView.shapeEnd = e.shiftKey
@@ -8937,6 +9013,11 @@
   tileCv.addEventListener('pointerleave', ()=>{ tileView.hover = null; });
 
   function endTilePaint(e){
+    if(tileView.grabDrag){
+      tileView.grab = grabSelection();
+      tileView.grabDrag = null;
+      updateGrabInfo();
+    }
     // Commit a dragged shape on release
     if(tileView.shapeStart && tileView.shapeEnd){
       const a = tileView.shapeStart, b = tileView.shapeEnd;
@@ -9057,11 +9138,46 @@
   // the storage limit. Instead we run-length encode the whole grid as a string
   // of "count.materialIndex" pairs — a fully painted tile compresses to a few
   // hundred bytes, and a mostly-blank one to almost nothing.
+  // Custom colours picked from the colour wheel become materials on the fly.
+  // They live in their own registry so the fixed MATERIALS palette (and the
+  // indices the encoder depends on) stay stable.
+  const customMaterials = {};      // 'custom:rrggbb' -> material object
+  function customMaterial(hex, tex){
+    const clean = String(hex).replace('#','').toLowerCase();
+    const id = 'custom:' + clean + (tex && tex !== 'flat' ? ':' + tex : '');
+    if(!customMaterials[id]){
+      customMaterials[id] = {
+        id,
+        label: '#' + clean,
+        color: [parseInt(clean.slice(0,2),16)||0,
+                parseInt(clean.slice(2,4),16)||0,
+                parseInt(clean.slice(4,6),16)||0],
+        tex: tex || 'flat',
+        custom: true
+      };
+    }
+    return customMaterials[id];
+  }
+  // Any material lookup should find customs too
+  function lookupMaterial(id){
+    return MATERIAL_BY_ID[id] || customMaterials[id] || null;
+  }
+
+  // Encoding carries any custom colours used on this tile in a header, so a
+  // painted tile is fully self-describing:  "<hdr>|<runs>"  (header optional)
   function encodePaint(paint){
     const codes = new Array(SUB_GRID*SUB_GRID).fill(0);
+    const extras = [];                       // custom ids used here, in order
+    const extraCode = {};
     for(const k in paint){
-      const mi = MATERIALS.findIndex(m=>m.id === paint[k]);
-      if(mi >= 0) codes[k|0] = mi + 1;      // 0 means "unpainted"
+      const id = paint[k];
+      const mi = MATERIALS.findIndex(m=>m.id === id);
+      if(mi >= 0){ codes[k|0] = mi + 1; continue; }
+      if(extraCode[id] === undefined){
+        extras.push(id);
+        extraCode[id] = MATERIALS.length + extras.length;   // codes after the fixed set
+      }
+      codes[k|0] = extraCode[id];
     }
     const runs = [];
     let cur = codes[0], len = 1;
@@ -9070,19 +9186,39 @@
       else { runs.push(len + '.' + cur); cur = codes[i]; len = 1; }
     }
     runs.push(len + '.' + cur);
-    return runs.join(',');
+    const body = runs.join(',');
+    return extras.length ? extras.join('~') + '|' + body : body;
   }
   function decodePaint(str){
     const paint = {};
     if(!str) return paint;
+    // Split off the custom-colour header if there is one
+    let extras = [];
+    const bar = str.indexOf('|');
+    if(bar >= 0){
+      extras = str.slice(0, bar).split('~').filter(Boolean);
+      str = str.slice(bar + 1);
+      // Re-register them so they can be rendered and re-saved
+      for(const id of extras){
+        const parts = id.split(':');
+        customMaterial(parts[1] || '888888', parts[2]);
+      }
+    }
     let idx = 0;
     for(const run of str.split(',')){
       const dot = run.indexOf('.');
+      if(dot < 0) continue;
       const len = parseInt(run.slice(0, dot), 10);
       const code = parseInt(run.slice(dot+1), 10);
       if(code > 0){
-        const mat = MATERIALS[code-1];
-        if(mat) for(let i=0;i<len;i++) paint[idx+i] = mat.id;
+        let id = null;
+        if(code <= MATERIALS.length){
+          const mat = MATERIALS[code-1];
+          if(mat) id = mat.id;
+        } else {
+          id = extras[code - MATERIALS.length - 1] || null;
+        }
+        if(id) for(let i=0;i<len;i++) paint[idx+i] = id;
       }
       idx += len;
     }
@@ -9393,10 +9529,123 @@
         syncCellPanel();
       }
       if(tileView.tool !== 'path') tileView.pathTarget = null;
+      if(tileView.tool !== 'grab'){ tileView.grab = null; tileView.grabDrag = null; }
+      const gp = document.getElementById('grabPanel');
+      if(gp) gp.style.display = (tileView.tool === 'grab') ? 'block' : 'none';
+      updateGrabInfo();
       syncPathPanel();
       highlightTool();
     };
   });
+  // ---- Custom colour ----
+  function useCustomPaintColour(){
+    const hex = document.getElementById('paintCustomColor').value;
+    const tex = document.getElementById('paintCustomTex').value;
+    const mat = customMaterial(hex, tex);
+    tileView.material = mat.id;
+    tileView.tool = 'paint';
+    // Keep a short history so a palette of custom shades is one click away
+    const clean = hex.replace('#','').toLowerCase();
+    tileView.recentCustom = [ {hex:clean, tex}, ...tileView.recentCustom.filter(c=>!(c.hex===clean && c.tex===tex)) ].slice(0, 8);
+    renderRecentCustom();
+    highlightMaterial();
+    highlightTool();
+  }
+  function renderRecentCustom(){
+    const box = document.getElementById('paintCustomRecent');
+    if(!box) return;
+    box.innerHTML = '';
+    for(const c of tileView.recentCustom){
+      const b = document.createElement('button');
+      const id = 'custom:' + c.hex + (c.tex && c.tex !== 'flat' ? ':' + c.tex : '');
+      b.title = '#' + c.hex + ' · ' + c.tex;
+      b.style.cssText = `height:18px;border-radius:3px;cursor:pointer;border:2px solid ${tileView.material===id?'#ffe85a':'transparent'};background:#${c.hex};`;
+      b.onclick = ()=>{
+        customMaterial(c.hex, c.tex);
+        tileView.material = id;
+        tileView.tool = 'paint';
+        document.getElementById('paintCustomColor').value = '#' + c.hex;
+        document.getElementById('paintCustomTex').value = c.tex;
+        renderRecentCustom(); highlightMaterial(); highlightTool();
+      };
+      box.appendChild(b);
+    }
+  }
+  document.getElementById('paintCustomUse').onclick = useCustomPaintColour;
+  document.getElementById('paintCustomColor').addEventListener('input', useCustomPaintColour);
+  document.getElementById('paintCustomTex').addEventListener('change', ()=>{
+    if(String(tileView.material).startsWith('custom:')) useCustomPaintColour();
+  });
+
+  // ---- Grab a painted region and keep it as a sprite ----
+  function grabSelection(){
+    const g = tileView.grab;
+    if(!g) return null;
+    return {
+      x0: Math.max(0, Math.min(g.x0, g.x1)),
+      y0: Math.max(0, Math.min(g.y0, g.y1)),
+      x1: Math.min(SUB_GRID-1, Math.max(g.x0, g.x1)),
+      y1: Math.min(SUB_GRID-1, Math.max(g.y0, g.y1))
+    };
+  }
+  function updateGrabInfo(){
+    const el = document.getElementById('grabInfo');
+    if(!el) return;
+    const sel = grabSelection();
+    if(!sel){ el.textContent = 'Drag a box over painted cells.'; return; }
+    const w = sel.x1-sel.x0+1, h = sel.y1-sel.y0+1;
+    let painted = 0;
+    for(let y=sel.y0;y<=sel.y1;y++) for(let x=sel.x0;x<=sel.x1;x++)
+      if(tileView.paint[y*SUB_GRID+x]) painted++;
+    el.textContent = `${w}×${h} cells · ${painted} painted`;
+  }
+  document.getElementById('grabSave').onclick = async ()=>{
+    const sel = grabSelection();
+    const status = document.getElementById('grabStatus');
+    if(!sel){ status.textContent = 'Nothing selected.'; status.style.color='#ffb0b0'; return; }
+    const w = sel.x1-sel.x0+1, h = sel.y1-sel.y0+1;
+    const res = Math.max(w, h);                       // square sprite, padded
+    if(res > 64){ status.textContent = 'Selection too large (max 64).'; status.style.color='#ffb0b0'; return; }
+    const includeGround = document.getElementById('grabIncludeGround').checked;
+
+    // Convert the painted cells into a palette-indexed sprite
+    const colors = [];
+    const colorIdx = {};
+    const cells = new Array(res*res).fill(0);
+    const toHex = (c)=> c.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const idx = (sel.y0+y)*SUB_GRID + (sel.x0+x);
+        const pid = tileView.paint[idx];
+        let mat = pid ? lookupMaterial(pid) : null;
+        if(!mat && includeGround) mat = MATERIALS[tileView.ground[idx]];
+        if(!mat) continue;                            // stays transparent
+        const hex = toHex(mat.color);
+        if(colorIdx[hex] === undefined){ colors.push(hex); colorIdx[hex] = colors.length; }
+        cells[y*res + x] = colorIdx[hex];
+      }
+    }
+    if(colors.length === 0){
+      status.textContent = 'Nothing painted in that box.'; status.style.color='#ffb0b0'; return;
+    }
+    const name = (document.getElementById('grabName').value || '').trim() || `region ${w}x${h}`;
+    const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*900+100);
+    const sp = {id, name, data: encodeSprite(res, cells, colors)};
+    buildSpriteCanvas(sp);
+    spriteLib.push(sp);
+    tileView.activeSprite = id;
+    try{
+      await saveSpriteLib();
+      status.textContent = `Saved "${name}" · ${res}×${res}, ${colors.length} colours`;
+      status.style.color = '#9fe0a8';
+    }catch(err){
+      status.textContent = 'Kept for this session — could not persist.';
+      status.style.color = '#ffcf8a';
+    }
+    renderSpriteLibrary();
+    document.getElementById('grabName').value = '';
+  };
+
   // Shape picker for the tile painter
   function highlightShape(){
     document.querySelectorAll('.tshape').forEach(b=>{
@@ -9483,6 +9732,9 @@
     mirror: false,
     brush: 1,             // pen / eraser radius in pixels
     shape: 'free',        // free | line | rect | rectFill | ellipse | ellipseFill
+    grab: null,           // {x0,y0,x1,y1} region marquee for saving as a sprite
+    grabDrag: null,
+    recentCustom: [],     // recently used custom colours, most recent first
     shapeStart: null,     // anchor while dragging a shape
     shapeEnd: null,
     lastDab: null,        // anchor for shift-line strokes
