@@ -482,7 +482,11 @@
 
   <!-- Editor toolbar (shown when logged in) -->
   <div id="editorBar" style="position:absolute;top:90px;left:10px;background:rgba(15,23,42,0.92);backdrop-filter:blur(10px);border:1px solid rgba(120,160,220,0.3);border-radius:10px;padding:10px;display:none;z-index:5;font-size:11px;width:200px;max-height:580px;overflow-y:auto;">
-    <div style="font-weight:500;margin-bottom:6px;color:#9cc4f5;">Editor mode</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <span style="font-weight:500;color:#9cc4f5;">Editor mode</span>
+      <button id="editorCollapse" title="Hide the editor (press E to toggle)" style="width:22px;height:22px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:#cdd5e0;border-radius:5px;font-size:13px;line-height:1;cursor:pointer;padding:0;flex:none;">−</button>
+    </div>
+    <div id="editorBody">
     <button class="tool" data-tool="select" style="width:100%;text-align:left;background:rgba(60,110,180,0.4);border:1px solid rgba(120,160,220,0.4);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">↖ Select / inspect</button>
     <button class="tool" data-tool="settle" style="width:100%;text-align:left;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">▣ Add settlement</button>
     <button class="tool" data-tool="poi" style="width:100%;text-align:left;background:rgba(40,55,80,0.6);border:1px solid rgba(255,255,255,0.1);color:#e8eef7;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer;margin-bottom:3px;">★ Add landmark</button>
@@ -543,7 +547,12 @@
 
     <!-- Generic instruction line -->
     <div id="toolHint" style="font-size:10px;opacity:0.7;margin-top:6px;line-height:1.4;"></div>
+    <div style="font-size:9px;opacity:0.4;margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:5px;">Press <b>E</b> to hide or show this panel.</div>
+    </div><!-- /editorBody -->
   </div>
+
+  <!-- Floating tab to bring the editor back once it's hidden -->
+  <button id="editorRestore" title="Show the editor (E)" style="position:absolute;top:90px;left:10px;display:none;z-index:6;background:rgba(15,23,42,0.92);backdrop-filter:blur(10px);border:1px solid rgba(120,160,220,0.35);color:#9cc4f5;padding:7px 10px;border-radius:9px;font-size:12px;cursor:pointer;">✎ Editor</button>
 
   <!-- Floating save banner — shown prominently while drawing a path -->
   <div id="floatingSave" style="position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border:2px solid #5a8fd6;border-radius:12px;padding:10px 14px;display:none;z-index:15;box-shadow:0 4px 20px rgba(0,0,0,0.5);min-width:340px;">
@@ -4085,6 +4094,11 @@
   }
 
   // Draw a mountain peak shape with snow cap and shading
+  // ---- Mountain terrain ----
+  // A range is a continuous surface, not a row of identical cones. Each tile
+  // is shaded from the real elevation gradient of its neighbours, so slopes
+  // run into one another, ridge lines emerge where the ground turns over, and
+  // gullies fall away between them. Nothing is centred or repeated.
   // ---- Mountain terrain ----
   // A range is a continuous surface, not a row of identical cones. Each tile
   // is shaded from the real elevation gradient of its neighbours, so slopes
@@ -10990,6 +11004,39 @@
   }, true);
 
   // ============ UI WIRING ============
+  // ---- Editor panel show / hide ----
+  // The editor covers a good part of the map, which gets in the way while
+  // navigating. Collapsing leaves only a small tab, and the state is
+  // remembered so it stays how you left it.
+  let editorHidden = false;
+  function setEditorHidden(hidden){
+    editorHidden = hidden;
+    const bar = document.getElementById('editorBar');
+    const tab = document.getElementById('editorRestore');
+    if(!isLoggedIn){
+      bar.style.display = 'none';
+      tab.style.display = 'none';
+      return;
+    }
+    bar.style.display = hidden ? 'none' : 'block';
+    tab.style.display = hidden ? 'block' : 'none';
+    try{ localStorage.setItem('pw:editorHidden', hidden ? '1' : '0'); }catch(e){}
+  }
+  document.getElementById('editorCollapse').onclick = ()=> setEditorHidden(true);
+  document.getElementById('editorRestore').onclick  = ()=> setEditorHidden(false);
+
+  // "E" toggles it, as long as you aren't typing into something
+  window.addEventListener('keydown', (e)=>{
+    if(!isLoggedIn) return;
+    if(e.key !== 'e' && e.key !== 'E') return;
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = e.target && e.target.tagName;
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
+    if(tileView.open) return;                 // the tile view has its own tools
+    e.preventDefault();
+    setEditorHidden(!editorHidden);
+  });
+
   // ---- Path of Thalen controls ----
   function updateThalenStatus(){
     const el = document.getElementById('thalenStatus');
@@ -11069,6 +11116,7 @@
       loginBtn.textContent='🔑 Log in to edit';
       document.getElementById('editControls').style.display='none';
       document.getElementById('editorBar').style.display='none';
+      document.getElementById('editorRestore').style.display='none';
       document.getElementById('timeBtn').style.display='none';
       document.getElementById('editedBtn').style.display='none';
       document.getElementById('editedPanel').style.display='none';
@@ -11093,7 +11141,9 @@
       loginBtn.textContent='🚪 Log out';
       document.getElementById('loginModal').style.display='none';
       document.getElementById('pwInput').value='';
-      document.getElementById('editorBar').style.display='block';
+      let wasHidden = false;
+      try{ wasHidden = localStorage.getItem('pw:editorHidden') === '1'; }catch(e){}
+      setEditorHidden(wasHidden);
       document.getElementById('timeBtn').style.display='inline-block';
       document.getElementById('editedBtn').style.display='inline-block';
       updateThalenStatus();
