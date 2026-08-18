@@ -4085,44 +4085,181 @@
   }
 
   // Draw a mountain peak shape with snow cap and shading
-  function drawPeak(sx, sy, sz, withSnow){
-    const baseRock = withSnow ? [110, 100, 95] : [125, 115, 105];
-    const shadeRock = withSnow ? [78, 70, 65] : [90, 82, 75];
-    // Triangle silhouette pointing up
-    const cx = sx + sz*0.5;
-    const baseY = sy + sz*0.95;
-    const apexY = sy + sz*0.10;
-    const halfW = sz*0.42;
-    // Shadow side (right)
-    ctx.fillStyle = rgbStr(applyLighting(shadeRock));
-    ctx.beginPath();
-    ctx.moveTo(cx, apexY);
-    ctx.lineTo(cx + halfW, baseY);
-    ctx.lineTo(cx, baseY);
-    ctx.closePath(); ctx.fill();
-    // Lit side (left)
-    ctx.fillStyle = rgbStr(applyLighting(baseRock));
-    ctx.beginPath();
-    ctx.moveTo(cx, apexY);
-    ctx.lineTo(cx - halfW, baseY);
-    ctx.lineTo(cx, baseY);
-    ctx.closePath(); ctx.fill();
-    if(withSnow){
-      // Snow cap — irregular zigzag along the ridge
-      const snowH = sz*0.30;
-      ctx.fillStyle = rgbStr(applyLighting([248,250,253]));
+  // ---- Mountain terrain ----
+  // A range is a continuous surface, not a row of identical cones. Each tile
+  // is shaded from the real elevation gradient of its neighbours, so slopes
+  // run into one another, ridge lines emerge where the ground turns over, and
+  // gullies fall away between them. Nothing is centred or repeated.
+  function drawMountainTile(tx, ty, sx, sy, sz, withSnow, rng, ultraZoom, megaZoom){
+    const i = ty*WORLD_W + tx;
+    const eHere = elev[i];
+    const at = (x, y)=>{
+      if(x<0||x>=WORLD_W||y<0||y>=WORLD_H) return eHere;
+      return elev[y*WORLD_W + x];
+    };
+    // Central-difference gradient: which way the land falls, and how steeply
+    const eL = at(tx-1,ty), eR = at(tx+1,ty);
+    const eU = at(tx,ty-1), eD = at(tx,ty+1);
+    const gx = (eR - eL) * 0.5;
+    const gy = (eD - eU) * 0.5;
+    const slope = Math.sqrt(gx*gx + gy*gy);
+
+    // Light comes from the north-west, as on almost every printed relief map
+    const LX = -0.55, LY = -0.83;
+    // Positive where the surface faces the light, negative where it turns away
+    const facing = Math.max(-1, Math.min(1, -(gx*LX + gy*LY) / (slope + 0.006)));
+    const steepness = Math.min(1, slope * 55);
+
+    // Base rock colour, varied per tile so no two read identically. Two
+    // independent hashes give hue and value their own variation, and a slow
+    // noise field groups tiles into bands of similar stone — real ranges have
+    // strata, not per-tile confetti.
+    const h1 = (((i * 2654435761) >>> 0) % 1000) / 1000;
+    const h2 = (((i * 40503 + 7919) >>> 0) % 1000) / 1000;
+    const band = warpNoiseA(tx*0.09, ty*0.09);            // geological banding
+    const warm = (band - 0.5) * 26;
+    const rockBase = withSnow
+      ? [122 + h1*26 + warm*0.5, 122 + h2*22 + warm*0.4, 130 + h1*20 + warm*0.2]
+      : [100 + h1*38 + warm,     92 + h2*30 + warm*0.8,  82 + h1*26 + warm*0.4];
+    // Shade by aspect: lit faces brighten, shadowed faces darken, and the
+    // effect strengthens with steepness so flats stay flat. A little per-tile
+    // jitter keeps large uniform slopes from banding.
+    const jitter = (h2 - 0.5) * 0.10;
+    const shade = 1 + facing * (0.30 + steepness*0.42) - steepness*0.10 + jitter;
+    ctx.fillStyle = rgbStr(applyLighting(rgbAdj(rockBase, Math.max(0.42, Math.min(1.65, shade)))));
+    ctx.fillRect(sx|0, sy|0, Math.ceil(sz)+1, Math.ceil(sz)+1);
+
+    // Rock texture running across the slope, following the contour rather
+    // than the tile — this is what stops the grid from showing through.
+    const contourAng = Math.atan2(gx, -gy);
+    const strata = megaZoom ? 7 : ultraZoom ? 5 : 3;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(sx, sy, sz, sz); ctx.clip();
+    ctx.translate(sx + sz*0.5, sy + sz*0.5);
+    ctx.rotate(contourAng);
+    for(let k=0;k<strata;k++){
+      const f = (k + 0.5)/strata - 0.5;
+      const yy = f * sz * 1.5 + (rng()-0.5)*sz*0.10;
+      const dark = (k % 2) === 0;
+      ctx.strokeStyle = rgbStr(applyLighting(rgbAdj(rockBase, dark ? 0.80 : 1.16)));
+      ctx.lineWidth = Math.max(1, sz*(0.035 + rng()*0.03));
+      ctx.globalAlpha = 0.55 + steepness*0.35;
       ctx.beginPath();
-      ctx.moveTo(cx, apexY);
-      ctx.lineTo(cx + halfW*0.32, apexY + snowH*0.55);
-      ctx.lineTo(cx + halfW*0.55, apexY + snowH*0.30);
-      ctx.lineTo(cx + halfW*0.78, apexY + snowH*0.85);
-      ctx.lineTo(cx + halfW*0.40, apexY + snowH*1.10);
-      ctx.lineTo(cx, apexY + snowH*0.65);
-      ctx.lineTo(cx - halfW*0.40, apexY + snowH*1.05);
-      ctx.lineTo(cx - halfW*0.55, apexY + snowH*0.55);
-      ctx.lineTo(cx - halfW*0.30, apexY + snowH*0.30);
-      ctx.closePath();
+      ctx.moveTo(-sz*0.85, yy);
+      ctx.bezierCurveTo(-sz*0.3, yy + (rng()-0.5)*sz*0.16,
+                         sz*0.3, yy + (rng()-0.5)*sz*0.16,
+                         sz*0.85, yy + (rng()-0.5)*sz*0.10);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Ridge line: where the ground stops rising and starts falling, a bright
+    // crest with a shadow just beneath it. Only on genuinely convex ground.
+    const curvature = (eL + eR + eU + eD) - 4*eHere;
+    if(curvature < -0.004 && sz > 8){
+      const ridgeAng = Math.atan2(gx, -gy) + Math.PI/2;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(sx, sy, sz, sz); ctx.clip();
+      ctx.translate(sx + sz*0.5, sy + sz*0.5);
+      ctx.rotate(ridgeAng);
+      const crest = Math.min(1, -curvature * 140);
+      ctx.strokeStyle = rgbStr(applyLighting(rgbAdj(rockBase, 1.34)));
+      ctx.lineWidth = Math.max(1, sz*0.09*crest);
+      ctx.beginPath();
+      ctx.moveTo(-sz*0.8, (rng()-0.5)*sz*0.10);
+      ctx.bezierCurveTo(-sz*0.25, (rng()-0.5)*sz*0.22,
+                         sz*0.25, (rng()-0.5)*sz*0.22,
+                         sz*0.8,  (rng()-0.5)*sz*0.10);
+      ctx.stroke();
+      ctx.strokeStyle = rgbStr(applyLighting(rgbAdj(rockBase, 0.62)));
+      ctx.lineWidth = Math.max(1, sz*0.07*crest);
+      ctx.translate(0, sz*0.11);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Scree and outcrops, scattered by the tile's own seed
+    const outcrops = megaZoom ? 5 : ultraZoom ? 3 : 2;
+    for(let k=0;k<outcrops;k++){
+      const ox = sx + sz*(0.12 + rng()*0.76);
+      const oy = sy + sz*(0.12 + rng()*0.76);
+      const orad = sz*(0.05 + rng()*0.09) * (0.6 + steepness);
+      // Faces catch the light from the north-west
+      ctx.fillStyle = rgbStr(applyLighting(rgbAdj(rockBase, 0.58)));
+      ctx.beginPath();
+      ctx.ellipse(ox + orad*0.2, oy + orad*0.25, orad, orad*0.72, rng()*3, 0, Math.PI*2);
       ctx.fill();
+      ctx.fillStyle = rgbStr(applyLighting(rgbAdj(rockBase, 1.28)));
+      ctx.beginPath();
+      ctx.ellipse(ox - orad*0.15, oy - orad*0.18, orad*0.66, orad*0.46, rng()*3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ---- Snow ----
+    if(withSnow){
+      // Snow lies where the ground is flatter and on the shaded side, and is
+      // stripped from steep sunlit faces — which is what gives real peaks
+      // their streaked look rather than a uniform white cap.
+      const lee = Math.max(0, -facing);
+      const cover = Math.max(0, Math.min(1, 0.80 - steepness*0.55 + lee*0.45));
+      if(cover > 0.05){
+        ctx.save();
+        ctx.beginPath(); ctx.rect(sx, sy, sz, sz); ctx.clip();
+        ctx.fillStyle = rgbStr(applyLighting([248, 250, 255]));
+        ctx.globalAlpha = 0.35 + cover*0.6;
+        // Drifts aligned across the slope, so snow reads as lying on terrain
+        ctx.translate(sx + sz*0.5, sy + sz*0.5);
+        ctx.rotate(contourAng);
+        const bands = megaZoom ? 5 : 3;
+        for(let k=0;k<bands;k++){
+          const f = (k + 0.5)/bands - 0.5;
+          const yy = f * sz * 1.4;
+          const th = sz * (0.10 + cover*0.26) * (0.5 + rng()*0.9);
+          ctx.beginPath();
+          ctx.moveTo(-sz*0.9, yy);
+          ctx.bezierCurveTo(-sz*0.3, yy - th*0.8, sz*0.3, yy + th*0.5, sz*0.9, yy - th*0.2);
+          ctx.lineTo(sz*0.9, yy + th);
+          ctx.bezierCurveTo(sz*0.3, yy + th*1.3, -sz*0.3, yy + th*0.3, -sz*0.9, yy + th*0.9);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        // Blue-shadowed hollows in the snow
+        ctx.globalAlpha = 0.30 * cover;
+        ctx.fillStyle = rgbStr(applyLighting([170, 196, 226]));
+        for(let k=0;k<(megaZoom?3:2);k++){
+          ctx.beginPath();
+          ctx.ellipse(sx + sz*(0.15+rng()*0.7), sy + sz*(0.25+rng()*0.6),
+                      sz*(0.08+rng()*0.14), sz*(0.05+rng()*0.09), rng()*3, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      // Wind-scoured rock breaking through on the steepest sunlit faces
+      if(steepness > 0.55 && facing > 0.2){
+        ctx.fillStyle = rgbStr(applyLighting(rgbAdj(rockBase, 0.72)));
+        for(let k=0;k<2;k++){
+          ctx.beginPath();
+          ctx.ellipse(sx + sz*(0.2+rng()*0.6), sy + sz*(0.2+rng()*0.6),
+                      sz*(0.06+rng()*0.10), sz*(0.04+rng()*0.07), rng()*3, 0, Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // A few hardy conifers clinging to the lower, gentler slopes
+    if(!withSnow && megaZoom && steepness < 0.45 && rng() > 0.55){
+      const px = sx + sz*(0.2+rng()*0.6), py = sy + sz*(0.55+rng()*0.35);
+      const th = sz*0.22;
+      ctx.fillStyle = rgbStr(applyLighting([48,36,26]));
+      ctx.fillRect((px-sz*0.012)|0, (py-th*0.3)|0, Math.max(1,sz*0.025)|0, Math.max(1,th*0.35)|0);
+      ctx.fillStyle = rgbStr(applyLighting([34,62,42]));
+      ctx.beginPath();
+      ctx.moveTo(px, py - th);
+      ctx.lineTo(px - sz*0.055, py - th*0.15);
+      ctx.lineTo(px + sz*0.055, py - th*0.15);
+      ctx.closePath(); ctx.fill();
     }
   }
 
@@ -4854,7 +4991,7 @@
     ctx.stroke();
   }
 
-  function drawTerrainFeatures(t, sx, sy, sz, rng, baseColor, ultraZoom, megaZoom){
+  function drawTerrainFeatures(t, sx, sy, sz, rng, baseColor, ultraZoom, megaZoom, tx, ty){
     // ---- Authored landmark surfaces ----
     if(t === 16){                                   // black volcanic sand
       const dark = applyLighting([22,20,26]);
@@ -5047,8 +5184,8 @@
       return;
     }
     // Mountain / snow peak
-    if(t===10){ drawPeak(sx, sy, sz, false); return; }
-    if(t===11){ drawPeak(sx, sy, sz, true);  return; }
+    if(t===10){ drawMountainTile(tx, ty, sx, sy, sz, false, rng, ultraZoom, megaZoom); return; }
+    if(t===11){ drawMountainTile(tx, ty, sx, sy, sz, true,  rng, ultraZoom, megaZoom); return; }
     // Hills — small mounded shading
     if(t===9){
       const lit = applyLighting(rgbAdj(baseColor, 1.18));
@@ -5326,7 +5463,7 @@
           // ----- Per-terrain decorations -----
           if(richZoom){
             const tileRng = mulberry32(x*7919 ^ y*31 ^ SEED ^ (t<<16));
-            drawTerrainFeatures(t, sx, sy, sz, tileRng, c, ultraZoom, megaZoom);
+            drawTerrainFeatures(t, sx, sy, sz, tileRng, c, ultraZoom, megaZoom, x, y);
           }
 
           // ----- Military outposts (only at very close zoom: >= 200x) -----
