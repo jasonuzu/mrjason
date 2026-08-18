@@ -3793,17 +3793,37 @@
 
         // Sample the fog mask with a little blur so edges aren't blocky
         const fcx = wx / FOG_CELL, fcy = wy / FOG_CELL;
+        const bcx = Math.floor(fcx), bcy = Math.floor(fcy);
         let cover = 0, n = 0;
         for(let oy=-1; oy<=1; oy++){
           for(let ox=-1; ox<=1; ox++){
-            const cx = Math.floor(fcx)+ox, cy = Math.floor(fcy)+oy;
+            const cx = bcx+ox, cy = bcy+oy;
             n++;
             if(cx<0||cx>=FOG_W||cy<0||cy>=FOG_H){ cover += 1; continue; }
             cover += fogMask[cy*FOG_W + cx];
           }
         }
         cover /= n;
-        if(cover <= 0.001){ d[o+3] = 0; continue; }
+
+        // A second, wider sample locates the boundary. The 3x3 above spans
+        // barely one cell, which is far too tight to make a visible rim; this
+        // one reaches further so the frontier reads as a band rather than a
+        // hairline. Where it sits between 0 and 1, we are near an edge.
+        let wide = 0, wn = 0;
+        const RAD = 2;
+        for(let oy=-RAD; oy<=RAD; oy++){
+          for(let ox=-RAD; ox<=RAD; ox++){
+            const cx = bcx+ox, cy = bcy+oy;
+            wn++;
+            if(cx<0||cx>=FOG_W||cy<0||cy>=FOG_H){ wide += 1; continue; }
+            wide += fogMask[cy*FOG_W + cx];
+          }
+        }
+        wide /= wn;
+        // Peaks at the 50/50 line and falls away to either side
+        const edge = 1 - Math.min(1, Math.abs(wide - 0.5) / 0.5);
+
+        if(cover <= 0.001 && edge <= 0.001){ d[o+3] = 0; continue; }
 
         // Billowing texture drifting across the shroud
         const nA = fogNoiseA(wx*0.055 + drift1, wy*0.055 + drift1*0.4);
@@ -3822,13 +3842,30 @@
         // Base shade: near-black, faintly violet. Land is only just perceptible.
         const base = isLand ? 30 : 15;
         const v = base + swirl*13;
-        d[o]   = v * 0.86;
-        d[o+1] = v * 0.90;
-        d[o+2] = v * 1.18;
+        let r = v * 0.86, g = v * 0.90, b = v * 1.18;
         // Fully opaque wherever the fog covers, so nothing beneath can bleed
         // through. Only the outermost feathered edge is partly transparent.
-        const a = Math.min(1, cover * 1.25) * maxAlpha;
+        let a = Math.min(1, cover * 1.25) * maxAlpha;
+
+        // ---- Glowing rim along the boundary ----
+        // The frontier between shrouded and revealed land reads as a cold
+        // luminous edge, so at night you can still see the shape of what has
+        // been opened up. It breathes gently rather than sitting static.
+        if(edge > 0.02){
+          const pulse = 0.78 + 0.22 * Math.sin(t*1.5 + (wx+wy)*0.06);
+          const glow = Math.pow(edge, 1.7) * pulse;
+          // Pale cyan-violet, bright enough to carry over dark terrain
+          r += glow * 150;
+          g += glow * 205;
+          b += glow * 255;
+          // The rim stays visible even where the fog itself has faded out
+          a = Math.max(a, glow * 0.92);
+        }
+        d[o]   = Math.min(255, r);
+        d[o+1] = Math.min(255, g);
+        d[o+2] = Math.min(255, b);
         d[o+3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+        // (a may have been raised by the rim glow above)
       }
     }
     fogCtx.putImageData(fogImg, 0, 0);
