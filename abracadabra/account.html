@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cursed Reliquary — Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --gold:#c8a951; --gold-light:#f0d080; --gold-dark:#8a6f2e;
+  --blood:#8b0000; --blood-light:#cc2200;
+  --text-main:#e8d5a0; --text-dim:#a0885a;
+  --set-green:#44bb44; --border-color:#5a3f1e;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:#0a0705; color:var(--text-main);
+  font-family:'IM Fell English',serif; min-height:100vh;
+  display:flex; align-items:center; justify-content:center; padding:40px 16px;
+}
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:
+    radial-gradient(ellipse at 25% 30%, rgba(139,0,0,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 70%, rgba(153,102,204,0.05) 0%, transparent 50%);
+  pointer-events:none; z-index:0;
+}
+.auth-wrap { position:relative; z-index:1; width:100%; max-width:400px; }
+.brand { text-align:center; margin-bottom:26px; }
+.brand-title { font-family:'Cinzel Decorative',serif; font-size:16px; letter-spacing:4px; color:var(--gold-dark); text-transform:uppercase; }
+.brand-sub { font-family:'Cinzel',serif; font-size:9px; letter-spacing:3px; color:var(--text-dim); text-transform:uppercase; margin-top:6px; opacity:0.6; }
+.brand-huldufolk {
+  font-family:'Cinzel Decorative',serif; font-size:17px; letter-spacing:2px;
+  color:var(--gold-dark); margin-top:0;
+  text-shadow:0 0 16px rgba(200,169,81,0.2);
+}
+.brand-huldufolk .huldu-spark {
+  color:var(--gold-light); font-style:italic; letter-spacing:1px;
+}
+
+.auth-box {
+  background:linear-gradient(145deg, #1e1208, #120c06);
+  border:1px solid var(--border-color); border-radius:2px;
+  padding:34px 36px; position:relative;
+  box-shadow:0 8px 40px rgba(0,0,0,0.6);
+}
+.auth-box::before { content:''; position:absolute; inset:3px; border:1px solid rgba(90,63,30,0.22); pointer-events:none; }
+
+.tab-row { display:flex; margin-bottom:24px; border-bottom:1px solid rgba(90,63,30,0.3); }
+.tab-btn {
+  flex:1; font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-dim); background:transparent; border:none; padding:10px 0; cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-1px; transition:all 0.15s;
+}
+.tab-btn:hover { color:var(--gold-light); }
+.tab-btn.active { color:var(--gold); border-bottom-color:var(--gold-dark); }
+
+.field-label { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px; display:block; }
+.field-input {
+  width:100%; background:#0a0705; border:1px solid var(--border-color);
+  color:var(--text-main); font-family:'IM Fell English',serif; font-size:15px;
+  padding:11px 14px; border-radius:2px; outline:none; margin-bottom:16px; transition:border-color 0.15s;
+}
+.field-input:focus { border-color:var(--gold-dark); box-shadow:0 0 8px rgba(200,169,81,0.12); }
+.field-input::placeholder { color:rgba(90,63,30,0.5); font-style:italic; }
+
+.auth-btn {
+  width:100%; padding:13px 0; font-family:'Cinzel',serif; font-size:12px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase; color:#0a0705;
+  background:linear-gradient(180deg, #e0c060 0%, #c8a030 40%, #a07820 100%);
+  border:none; border-radius:2px; cursor:pointer; margin-top:4px; transition:all 0.15s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.auth-btn:hover:not(:disabled) { background:linear-gradient(180deg, #f0d070 0%, #d8b040 40%, #b08830 100%); }
+.auth-btn:disabled { opacity:0.5; cursor:default; }
+
+.auth-status { margin-top:16px; padding:11px 14px; border-radius:2px; font-family:'Cinzel',serif; font-size:11px; letter-spacing:1px; text-align:center; display:none; line-height:1.5; }
+.auth-status.error { background:rgba(100,0,0,0.25); border:1px solid rgba(139,0,0,0.4); color:#ff6666; display:block; }
+.auth-status.success { background:rgba(40,100,40,0.25); border:1px solid rgba(68,187,68,0.4); color:var(--set-green); display:block; }
+.auth-status.info { background:rgba(40,60,100,0.2); border:1px solid rgba(102,153,204,0.3); color:#88bbee; display:block; }
+
+.form-panel { display:none; }
+.form-panel.active { display:block; }
+
+.redirect-note { text-align:center; font-size:13px; color:var(--text-dim); font-style:italic; margin-top:16px; opacity:0.8; }
+
+.logged-in-panel { text-align:center; display:none; }
+.logged-in-panel.visible { display:block; }
+.li-deco { font-size:30px; color:var(--set-green); margin-bottom:14px; }
+.li-name { font-family:'Cinzel',serif; font-size:16px; color:var(--gold-light); letter-spacing:1px; margin-bottom:8px; }
+.li-email { font-size:13px; color:var(--text-dim); margin-bottom:20px; }
+.li-links { display:flex; flex-direction:column; gap:10px; }
+.li-link {
+  font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  padding:11px 0; border-radius:2px; text-decoration:none; text-align:center; transition:all 0.15s;
+}
+.li-link.primary { color:#0a0705; background:linear-gradient(180deg,#e0c060,#a07820); }
+.li-link.primary:hover { background:linear-gradient(180deg,#f0d070,#b08830); }
+.li-link.ghost { color:var(--text-dim); border:1px solid var(--border-color); background:transparent; }
+.li-link.ghost:hover { border-color:var(--gold-dark); color:var(--gold); }
+.li-signout { font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--blood-light); background:none; border:none; cursor:pointer; margin-top:16px; text-transform:uppercase; }
+.li-signout:hover { text-decoration:underline; }
+
+.footer-note { text-align:center; font-family:'Cinzel',serif; font-size:8px; letter-spacing:2px; color:rgba(90,63,30,0.5); text-transform:uppercase; margin-top:22px; }
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="brand">
+    <div class="brand-huldufolk"><span class="huldu-spark">Abracadabra</span> &mdash; Huldufólk Account</div>
+  </div>
+
+  <div class="auth-box">
+    <!-- Logged-in view -->
+    <div class="logged-in-panel" id="logged-in-panel">
+      <div class="li-deco">✦</div>
+      <div class="li-name" id="li-name">—</div>
+      <div class="li-email" id="li-email">—</div>
+      <div class="li-links">
+        <a class="li-link primary" href="collection.html">View My Collection</a>
+        <a class="li-link ghost" href="index.html">Return to Generator</a>
+      </div>
+      <button class="li-signout" onclick="signOut()">Sign Out</button>
+    </div>
+
+    <!-- Auth forms -->
+    <div id="auth-forms">
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Log In</button>
+        <button class="tab-btn" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div class="form-panel active" id="panel-login">
+        <label class="field-label">Email</label>
+        <input type="email" class="field-input" id="login-email" placeholder="you@example.com" autocomplete="email" />
+        <label class="field-label">Password</label>
+        <input type="password" class="field-input" id="login-password" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" />
+        <button class="auth-btn" id="login-btn" onclick="doLogin()">Enter the Reliquary</button>
+      </div>
+
+      <!-- SIGNUP -->
+      <div class="form-panel" id="panel-signup">
+        <label class="field-label">Display Name</label>
+        <input type="text" class="field-input" id="signup-name" placeholder="Your collector name" maxlength="64" autocomplete="off" />
+        <label class="field-label">Email</label>
+        <input type="email" class="field-input" id="signup-email" placeholder="you@example.com" autocomplete="email" />
+        <label class="field-label">Password</label>
+        <input type="password" class="field-input" id="signup-password" placeholder="Choose a password (min 6 chars)" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()" />
+        <button class="auth-btn" id="signup-btn" onclick="doSignup()">Create Account</button>
+      </div>
+
+      <div class="auth-status" id="auth-status"></div>
+      <div class="redirect-note" id="redirect-note"></div>
+    </div>
+  </div>
+
+  <div class="footer-note">Cursed Effects Archive · Collector Registry</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mhlwfevnjpezaaocbwwr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obHdmZXZuanBlemFhb2Nid3dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3OTA1NjcsImV4cCI6MjA5NjM2NjU2N30.pIpC9ZrNTd16_A0aLl6TPokhEshElq0dNrMNwyMEJg0';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// If a redirect target was passed (e.g. from collect page), remember it
+function getRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('redirect') || null;
+}
+
+function switchTab(which) {
+  document.getElementById('tab-login').classList.toggle('active', which === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', which === 'signup');
+  document.getElementById('panel-login').classList.toggle('active', which === 'login');
+  document.getElementById('panel-signup').classList.toggle('active', which === 'signup');
+  clearStatus();
+}
+
+function showStatus(type, msg) {
+  const el = document.getElementById('auth-status');
+  el.className = 'auth-status ' + type;
+  el.textContent = msg;
+}
+function clearStatus() {
+  const el = document.getElementById('auth-status');
+  el.className = 'auth-status';
+  el.textContent = '';
+}
+
+// ========================
+// LOGIN
+// ========================
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showStatus('error', 'Enter your email and password.'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Entering…';
+  clearStatus();
+
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    showStatus('success', 'Welcome back.');
+    handlePostAuth();
+  } catch(e) {
+    showStatus('error', e.message || 'Login failed.');
+    btn.disabled = false; btn.textContent = 'Enter the Reliquary';
+  }
+}
+
+// ========================
+// SIGNUP
+// ========================
+async function doSignup() {
+  const name = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!name || !email || !password) { showStatus('error', 'Fill in all fields.'); return; }
+  if (password.length < 6) { showStatus('error', 'Password must be at least 6 characters.'); return; }
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  clearStatus();
+
+  try {
+    const { data, error } = await db.auth.signUp({
+      email, password,
+      options: { data: { display_name: name } }
+    });
+    if (error) throw error;
+
+    // If email confirmation is on, session will be null
+    if (!data.session) {
+      showStatus('info', 'Account created. Check your email to confirm, then log in.');
+      btn.disabled = false; btn.textContent = 'Create Account';
+      switchTab('login');
+      return;
+    }
+    showStatus('success', 'Account created. Welcome.');
+    handlePostAuth();
+  } catch(e) {
+    showStatus('error', e.message || 'Signup failed.');
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+}
+
+// ========================
+// POST-AUTH — redirect or show logged-in panel
+// ========================
+function handlePostAuth() {
+  const redirect = getRedirect();
+  if (redirect) {
+    // Return to the collect page (or wherever) they came from
+    setTimeout(() => { window.location.href = decodeURIComponent(redirect); }, 600);
+  } else {
+    setTimeout(() => showLoggedIn(), 600);
+  }
+}
+
+async function showLoggedIn() {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return;
+
+  let name = user.user_metadata?.display_name;
+  // Try profiles table for authoritative name
+  try {
+    const { data: prof } = await db.from('profiles').select('display_name').eq('id', user.id).single();
+    if (prof?.display_name) name = prof.display_name;
+  } catch(e) {}
+
+  document.getElementById('li-name').textContent = name || 'Collector';
+  document.getElementById('li-email').textContent = user.email;
+  document.getElementById('auth-forms').style.display = 'none';
+  document.getElementById('logged-in-panel').classList.add('visible');
+}
+
+async function signOut() {
+  await db.auth.signOut();
+  window.location.reload();
+}
+
+// ========================
+// BOOT — if already logged in, show that; else show forms
+// ========================
+(async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    const redirect = getRedirect();
+    if (redirect) {
+      window.location.href = decodeURIComponent(redirect);
+    } else {
+      showLoggedIn();
+    }
+  }
+})();
+</script>
+</body>
+</html>
