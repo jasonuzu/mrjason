@@ -739,6 +739,11 @@ textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
       <span style="font-size:12px;color:var(--text-dim);font-style:italic;">each with a unique ID</span>
     </div>
 
+    <div class="share-copies-row" style="margin-top:-8px;">
+      <input type="checkbox" id="share-allow-title" checked style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;" />
+      <label for="share-allow-title" style="cursor:pointer;">Allow collectors to title this item</label>
+    </div>
+
     <button class="share-generate-btn" id="share-generate-btn" onclick="generateShare()">Generate Share Link</button>
 
     <div class="share-result" id="share-result">
@@ -1162,6 +1167,7 @@ function openShareModal(table, id, uid) {
   document.getElementById('share-result').classList.remove('visible');
   document.getElementById('share-generate-btn').disabled = false;
   document.getElementById('share-generate-btn').textContent = 'Generate Share Link';
+  document.getElementById('share-allow-title').checked = true;
   document.getElementById('share-modal-overlay').classList.add('visible');
 }
 
@@ -1205,7 +1211,8 @@ async function generateShare() {
         source_uid: shareTarget.uid,
         item_snapshot: itemData,
         total_copies: copies,
-        claimed_copies: 0
+        claimed_copies: 0,
+        allow_title: document.getElementById('share-allow-title').checked
       })
       .select()
       .single();
