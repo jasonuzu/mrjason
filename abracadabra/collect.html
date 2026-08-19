@@ -228,6 +228,8 @@ const DOMAIN_LABELS = { S:'Somatic', C:'Cognitive', E:'Environmental', M:'Metaph
 
 let currentShare = null;
 let currentSnapshot = null;
+let currentUser = null;
+let currentUserName = '';
 
 // ========================
 // GET SHARE TOKEN FROM URL
@@ -246,6 +248,10 @@ async function loadShare() {
     showError('No Relic Specified', 'This link is missing a share code. Please check the link and try again.');
     return;
   }
+
+  // Check auth session
+  const { data: { session } } = await db.auth.getSession();
+  currentUser = session ? session.user : null;
 
   try {
     const { data: share, error } = await db
@@ -275,6 +281,10 @@ function renderItem(share) {
   const snap = share.item_snapshot;
   const remaining = share.total_copies - share.claimed_copies;
   const exhausted = remaining <= 0;
+  // Resolve current user's display name (best-effort)
+  if (currentUser) {
+    currentUserName = currentUser.user_metadata?.display_name || currentUser.email || 'Collector';
+  }
 
   const cfg = RARITY_CONFIG[snap.rarity] || RARITY_CONFIG.common;
 
@@ -356,18 +366,24 @@ function renderItem(share) {
     <div class="collect-section">
       ${exhausted ? `
         <button class="collect-btn" disabled>This item has already been collected.</button>
+      ` : (!currentUser ? `
+        <button class="collect-btn" onclick="goToLogin()">☩ Log In to Collect</button>
+        <div class="form-hint" style="text-align:center;margin-top:12px;">You must have a collector account to claim this relic.</div>
       ` : `
         <button class="collect-btn" id="collect-btn" onclick="showCollectForm()">☩ Collect This Item</button>
         <div class="collect-form" id="collect-form">
-          <label class="form-label">Your Username <span class="req">*</span></label>
-          <input type="text" class="form-input" id="collector-username" placeholder="Enter your username" maxlength="64" autocomplete="off" />
-          <label class="form-label">Give This Item a Title</label>
-          <input type="text" class="form-input" id="collector-title" placeholder="e.g. My Cursed Heirloom" maxlength="120" autocomplete="off" />
-          <div class="form-hint">This custom title is yours alone — the item keeps its official name too.</div>
-          <button class="collect-btn" id="confirm-collect-btn" onclick="collectItem()">Confirm &amp; Collect</button>
+          <div class="form-hint" style="margin-top:0;margin-bottom:14px;color:var(--gold-light);opacity:0.9;">Collecting as <strong>${esc(currentUserName)}</strong></div>
+          ${share.allow_title ? `
+            <label class="form-label">Give This Item a Title</label>
+            <input type="text" class="form-input" id="collector-title" placeholder="e.g. My Cursed Heirloom" maxlength="120" autocomplete="off" />
+            <div class="form-hint">This custom title is yours alone — the item keeps its official name too.</div>
+          ` : `
+            <div class="form-hint" style="margin-bottom:14px;">This item cannot be given a title.</div>
+          `}
+          <button class="collect-btn" id="confirm-collect-btn" onclick="collectItem(${share.allow_title})">Confirm &amp; Collect</button>
           <div class="collect-status" id="collect-status"></div>
         </div>
-      `}
+      `)}
     </div>
 
     <div class="collected-panel" id="collected-panel">
@@ -429,26 +445,24 @@ function showCollectForm() {
   document.getElementById('collector-username').focus();
 }
 
-async function collectItem() {
-  const username = (document.getElementById('collector-username').value || '').trim();
-  const title = (document.getElementById('collector-title').value || '').trim();
+function goToLogin() {
+  const redirect = encodeURIComponent(window.location.href);
+  window.location.href = 'account.html?redirect=' + redirect;
+}
+
+async function collectItem(allowTitle) {
+  const titleEl = document.getElementById('collector-title');
+  const title = (allowTitle && titleEl) ? (titleEl.value || '').trim() : '';
   const status = document.getElementById('collect-status');
   const btn = document.getElementById('confirm-collect-btn');
 
-  if (!username) {
-    status.className = 'collect-status error';
-    status.textContent = 'Please enter a username to collect this item.';
-    return;
-  }
-
   btn.disabled = true;
   status.className = 'collect-status info';
-  status.textContent = 'Binding the relic to your name…';
+  status.textContent = 'Binding the relic to your account…';
 
   try {
-    const { data, error } = await db.rpc('claim_item_copy', {
+    const { data, error } = await db.rpc('claim_item_copy_auth', {
       p_share_token: currentShare.share_token,
-      p_username: username,
       p_custom_title: title || null
     });
 
@@ -464,13 +478,18 @@ async function collectItem() {
       const uidEl = document.getElementById('collected-uid');
       const officialName = currentSnapshot.item_name || currentSnapshot.base_type || currentShare.source_uid;
       detail.innerHTML = title
-        ? `<strong>${esc(title)}</strong><br><span style="font-size:13px;color:var(--text-dim);">(${esc(officialName)})</span><br>now belongs to <strong>${esc(username)}</strong>.`
-        : `<strong>${esc(officialName)}</strong><br>now belongs to <strong>${esc(username)}</strong>.`;
-      uidEl.textContent = 'Your copy: ' + result.result_copy_uid;
+        ? `<strong>${esc(title)}</strong><br><span style="font-size:13px;color:var(--text-dim);">(${esc(officialName)})</span><br>now belongs to <strong>${esc(currentUserName)}</strong>.`
+        : `<strong>${esc(officialName)}</strong><br>now belongs to <strong>${esc(currentUserName)}</strong>.`;
+      uidEl.innerHTML = 'Your copy: ' + esc(result.result_copy_uid) +
+        '<br><br><a href="collection.html" style="color:var(--gold);font-family:\'Cinzel\',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">View My Collection →</a>';
       panel.classList.add('visible');
+    } else if (result.result_status === 'not_logged_in') {
+      status.className = 'collect-status error';
+      status.textContent = 'Your session expired. Please log in again.';
+      setTimeout(goToLogin, 1200);
     } else if (result.result_status === 'already_owned') {
       status.className = 'collect-status error';
-      status.textContent = 'You have already collected a copy of this item.';
+      status.textContent = 'You have already collected this item.';
       btn.disabled = false;
     } else if (result.result_status === 'exhausted') {
       status.className = 'collect-status error';
