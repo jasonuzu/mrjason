@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cursed Reliquary — My Collection</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --gold:#c8a951; --gold-light:#f0d080; --gold-dark:#8a6f2e;
+  --blood:#8b0000; --blood-light:#cc2200;
+  --text-main:#e8d5a0; --text-dim:#a0885a; --text-bright:#f5e8c0;
+  --set-green:#44bb44; --magic-blue:#6699cc;
+  --border-color:#5a3f1e;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:#0a0705; color:var(--text-main); font-family:'IM Fell English',serif; min-height:100vh; }
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:
+    radial-gradient(ellipse at 20% 30%, rgba(139,0,0,0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 70%, rgba(153,102,204,0.04) 0%, transparent 50%);
+  pointer-events:none; z-index:0;
+}
+
+.nav-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 24px; background:rgba(10,7,5,0.96);
+  border-bottom:1px solid var(--border-color); position:sticky; top:0; z-index:100; backdrop-filter:blur(8px);
+}
+.nav-logo { font-family:'Cinzel',serif; font-size:11px; letter-spacing:3px; color:var(--gold-dark); text-transform:uppercase; }
+.nav-links a, .nav-links button {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--text-dim);
+  text-decoration:none; margin-left:20px; text-transform:uppercase; transition:color 0.2s;
+  background:none; border:none; cursor:pointer;
+}
+.nav-links a:hover, .nav-links button:hover { color:var(--gold-light); }
+.nav-links a.active { color:var(--gold); border-bottom:1px solid var(--gold-dark); }
+
+.page-wrap { position:relative; z-index:1; max-width:1000px; margin:0 auto; padding:32px 20px 80px; }
+
+.collection-header { text-align:center; margin-bottom:8px; }
+.collection-title { font-family:'Cinzel Decorative',serif; font-size:20px; letter-spacing:3px; color:var(--gold-light); text-transform:uppercase; }
+.collection-owner { font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; color:var(--text-dim); margin-top:8px; }
+.collection-count { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--gold-dark); text-transform:uppercase; margin-top:6px; }
+
+.divider-line { height:1px; background:linear-gradient(to right, transparent, var(--gold-dark), transparent); margin:24px 0 28px; opacity:0.5; }
+
+.state-msg { text-align:center; padding:60px 20px; }
+.state-deco { font-size:36px; color:var(--blood); opacity:0.5; margin-bottom:16px; }
+.state-title { font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; color:var(--gold-light); margin-bottom:10px; }
+.state-body { font-size:15px; color:var(--text-dim); font-style:italic; line-height:1.6; }
+.state-body a { color:var(--gold); }
+
+.collection-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; }
+
+.collect-card {
+  background:linear-gradient(170deg, #1e1208 0%, #160e06 60%, #1a1008 100%);
+  border:1px solid var(--border-color); border-radius:2px; padding:18px 20px 16px;
+  position:relative; transition:transform 0.15s, box-shadow 0.15s;
+}
+.collect-card:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(0,0,0,0.5); }
+.collect-card::before { content:''; position:absolute; inset:3px; border:1px solid rgba(90,63,30,0.2); pointer-events:none; }
+
+.cc-sprite-frame {
+  width:80px; height:80px; margin:0 auto 12px;
+  background:radial-gradient(circle at 50% 40%, rgba(40,28,16,0.9), rgba(12,8,5,0.95));
+  border:1px solid var(--border-color); border-radius:2px;
+  display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 14px rgba(0,0,0,0.6);
+}
+.cc-sprite-frame canvas { image-rendering:pixelated; width:64px; height:64px; }
+
+.cc-tier { display:block; text-align:center; font-family:'Cinzel',serif; font-size:8px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
+.cc-custom-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:var(--gold-light); text-align:center; line-height:1.2; margin-bottom:3px; }
+.cc-official { text-align:center; font-size:13px; color:var(--text-dim); font-style:italic; margin-bottom:2px; }
+.cc-base { text-align:center; font-size:12px; color:var(--text-dim); opacity:0.7; margin-bottom:10px; }
+
+.cc-divider { height:1px; background:rgba(90,63,30,0.3); margin:10px 0; }
+
+.cc-effect-name { font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin-bottom:4px; }
+.cc-effect-desc { font-size:13px; line-height:1.5; color:var(--text-main); margin-bottom:8px; }
+
+.cc-meta { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(90,63,30,0.25); }
+.cc-uid { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--gold-dark); }
+.cc-date { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+</style>
+</head>
+<body>
+
+<nav class="nav-bar">
+  <div class="nav-logo">☠ Cursed Reliquary</div>
+  <div class="nav-links">
+    <a href="index.html">Generator</a>
+    <a href="collection.html" class="active">My Collection</a>
+    <button onclick="signOut()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div id="content">
+    <div class="state-msg">
+      <div class="state-deco">⚗</div>
+      <div class="state-title">Opening Your Reliquary…</div>
+      <div class="state-body">Retrieving your collected relics.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mhlwfevnjpezaaocbwwr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obHdmZXZuanBlemFhb2Nid3dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3OTA1NjcsImV4cCI6MjA5NjM2NjU2N30.pIpC9ZrNTd16_A0aLl6TPokhEshElq0dNrMNwyMEJg0';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const RARITY_CONFIG = {
+  common:{label:'Common',color:'#b8b8b8'}, uncommon:{label:'Uncommon',color:'#6699cc'},
+  rare:{label:'Rare',color:'#ffdd44'}, corrupted:{label:'Corrupted',color:'#9966cc'},
+  extremelyRare:{label:'Extremely Rare',color:'#ff8844'}, mythical:{label:'Mythical',color:'#ff5588'},
+  legendary:{label:'Legendary',color:'#ffaa33'}, paradigm:{label:'Paradigm',color:'#44ddcc'},
+  nebulith:{label:'Nebulith',color:'#aa88ff'}, subumbral:{label:'Subumbral',color:'#8877aa'},
+  faeBound:{label:'Fae Bound',color:'#88ffcc'}, animalBound:{label:'Animal Bound',color:'#ccaa66'},
+  lesserMage:{label:'Lesser Mage Bound',color:'#99bbdd'}, humanBound:{label:'Human Bound',color:'#ddbb99'},
+  unknown:{label:'Unknown',color:'#888888'}
+};
+const DOMAIN_LABELS = { S:'Somatic', C:'Cognitive', E:'Environmental', M:'Metaphysical', Somatic:'Somatic', Cognitive:'Cognitive', Environmental:'Environmental', Metaphysical:'Metaphysical' };
+
+async function init() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) {
+    // Not logged in — send to account page with redirect back here
+    const redirect = encodeURIComponent(window.location.href);
+    window.location.href = 'account.html?redirect=' + redirect;
+    return;
+  }
+  loadCollection();
+}
+
+async function loadCollection() {
+  const { data: { user } } = await db.auth.getUser();
+  let displayName = user.user_metadata?.display_name || 'Collector';
+  try {
+    const { data: prof } = await db.from('profiles').select('display_name').eq('id', user.id).single();
+    if (prof?.display_name) displayName = prof.display_name;
+  } catch(e) {}
+
+  try {
+    const { data, error } = await db.rpc('get_my_collection');
+    if (error) throw error;
+
+    if (!data || !data.length) {
+      document.getElementById('content').innerHTML = `
+        <div class="collection-header">
+          <div class="collection-title">My Collection</div>
+          <div class="collection-owner">${esc(displayName)}</div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="state-msg">
+          <div class="state-deco">☒</div>
+          <div class="state-title">No Relics Collected Yet</div>
+          <div class="state-body">When someone shares a cursed item with you and you collect it,<br>it will appear here. <a href="index.html">Return to the generator.</a></div>
+        </div>`;
+      return;
+    }
+
+    const cards = data.map(renderCollectionCard).join('');
+    document.getElementById('content').innerHTML = `
+      <div class="collection-header">
+        <div class="collection-title">My Collection</div>
+        <div class="collection-owner">${esc(displayName)}</div>
+        <div class="collection-count">${data.length} Relic${data.length !== 1 ? 's' : ''} Bound to Your Name</div>
+      </div>
+      <div class="divider-line"></div>
+      <div class="collection-grid">${cards}</div>`;
+
+    // Paint sprites
+    requestAnimationFrame(() => {
+      data.forEach((item, i) => {
+        const canvas = document.getElementById('cc-sprite-' + i);
+        if (canvas) paintSprite(item.item_snapshot, canvas);
+      });
+    });
+  } catch(e) {
+    document.getElementById('content').innerHTML = `
+      <div class="state-msg">
+        <div class="state-deco">✗</div>
+        <div class="state-title">Could Not Load Collection</div>
+        <div class="state-body">${esc(e.message || 'Unknown error')}</div>
+      </div>`;
+    console.error(e);
+  }
+}
+
+function renderCollectionCard(item, i) {
+  const snap = item.item_snapshot || {};
+  const cfg = RARITY_CONFIG[snap.rarity] || RARITY_CONFIG.common;
+  const isManual = !!snap.item_name || !!snap.primary_effect_name;
+
+  const officialName = item.official_name || snap.item_name || snap.base_type || item.copy_uid;
+  const baseType = snap.base_type || '';
+
+  // Effect
+  let effName='', effDesc='';
+  if (isManual) {
+    effName = snap.primary_effect_name || '';
+    effDesc = snap.primary_effect_desc || '';
+  } else if (snap.effects && snap.effects.length) {
+    effName = snap.effects[0].name || '';
+    effDesc = snap.effects[0].shortDesc || snap.effects[0].desc || '';
+  }
+
+  const dateStr = new Date(item.collected_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+  const hasTitle = item.custom_title && item.custom_title.trim();
+
+  return `
+    <div class="collect-card">
+      <div class="cc-sprite-frame"><canvas id="cc-sprite-${i}" width="64" height="64"></canvas></div>
+      <span class="cc-tier" style="color:${cfg.color};">${cfg.label}</span>
+      ${hasTitle ? `<div class="cc-custom-title">${esc(item.custom_title)}</div><div class="cc-official">${esc(officialName)}</div>`
+                 : `<div class="cc-custom-title">${esc(officialName)}</div>`}
+      ${baseType ? `<div class="cc-base">${esc(baseType)}</div>` : ''}
+      ${effName ? `<div class="cc-divider"></div>
+        <div class="cc-effect-name">${(snap.domain?(DOMAIN_LABELS[snap.domain]||snap.domain)+' · ':'')}${esc(effName)}</div>
+        <div class="cc-effect-desc">${esc(truncate(effDesc, 140))}</div>` : ''}
+      <div class="cc-meta">
+        <span class="cc-uid">${esc(item.copy_uid)}</span>
+        <span class="cc-date">Collected ${dateStr}</span>
+      </div>
+    </div>`;
+}
+
+// Seeded placeholder sprite (same algorithm as collect.html)
+function paintSprite(snap, canvas) {
+  const ctx = canvas.getContext('2d');
+  const seedStr = (snap.image_uid || snap.archival_id || snap.uid_code || 'relic');
+  let seed = 0;
+  for (let i=0;i<seedStr.length;i++) seed = (seed*31 + seedStr.charCodeAt(i)) >>> 0;
+  function rng(){ seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; }
+  const cfg = RARITY_CONFIG[snap.rarity] || RARITY_CONFIG.common;
+  const grid = 16, cell = 64/grid;
+  ctx.clearRect(0,0,64,64);
+  for (let y=0;y<grid;y++){
+    for (let x=0;x<Math.ceil(grid/2);x++){
+      if (rng() > 0.55){
+        const shade = 0.5 + rng()*0.5;
+        ctx.fillStyle = shadeColor(cfg.color, shade);
+        ctx.fillRect(x*cell, y*cell, cell, cell);
+        ctx.fillRect((grid-1-x)*cell, y*cell, cell, cell);
+      }
+    }
+  }
+}
+function shadeColor(hex, factor){
+  const c = hex.replace('#','');
+  const r = Math.min(255, Math.round(parseInt(c.substr(0,2),16)*factor));
+  const g = Math.min(255, Math.round(parseInt(c.substr(2,2),16)*factor));
+  const b = Math.min(255, Math.round(parseInt(c.substr(4,2),16)*factor));
+  return `rgb(${r},${g},${b})`;
+}
+
+function truncate(s, n){ s = s || ''; return s.length > n ? s.slice(0,n) + '…' : s; }
+function esc(s){ if(s==null)return ''; return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function signOut(){ await db.auth.signOut(); window.location.href = 'account.html'; }
+
+init();
+</script>
+</body>
+</html>
