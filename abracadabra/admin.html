@@ -343,6 +343,67 @@ textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
   .combo-input:focus { border-color:var(--gold-dark); }
   .combo-input::placeholder { color:rgba(90,63,30,0.4); }
 
+
+  /* ===== SHARE MODAL ===== */
+  .share-modal-overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,0.85);
+    z-index:1000; display:flex; align-items:center; justify-content:center;
+    opacity:0; pointer-events:none; transition:opacity 0.2s;
+  }
+  .share-modal-overlay.visible { opacity:1; pointer-events:auto; }
+  .share-modal-box {
+    background:linear-gradient(145deg, #1e1208, #160e06);
+    border:1px solid var(--border-color); border-radius:2px;
+    padding:28px 32px; max-width:460px; width:92%; position:relative;
+  }
+  .share-modal-box::before { content:''; position:absolute; inset:3px; border:1px solid rgba(90,63,30,0.2); pointer-events:none; }
+  .share-modal-title { font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; color:var(--gold-light); margin-bottom:6px; }
+  .share-modal-item { font-size:14px; color:var(--text-dim); font-style:italic; margin-bottom:20px; }
+  .share-modal-item strong { color:var(--gold); font-style:normal; }
+  .share-copies-row { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+  .share-copies-row label { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; }
+  .share-copies-input { width:90px; background:#0d0906; border:1px solid var(--border-color); color:var(--text-main); font-family:'Cinzel',serif; font-size:16px; padding:8px 12px; border-radius:2px; outline:none; text-align:center; }
+  .share-copies-input:focus { border-color:var(--gold-dark); }
+  .share-generate-btn {
+    width:100%; padding:12px 0; font-family:'Cinzel',serif; font-size:12px; font-weight:700;
+    letter-spacing:3px; text-transform:uppercase; color:#0a0705;
+    background:linear-gradient(180deg,#e0c060,#a07820); border:none; border-radius:2px;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .share-generate-btn:hover { background:linear-gradient(180deg,#f0d070,#b08830); }
+  .share-generate-btn:disabled { opacity:0.4; cursor:default; }
+  .share-result { margin-top:20px; display:none; }
+  .share-result.visible { display:block; animation:fadeIn 0.3s ease-out; }
+  .share-link-box {
+    display:flex; gap:8px; margin-bottom:12px;
+  }
+  .share-link-input {
+    flex:1; background:#0a0705; border:1px solid var(--gold-dark); color:var(--gold-light);
+    font-family:'Cinzel',serif; font-size:11px; letter-spacing:1px; padding:10px 12px;
+    border-radius:2px; outline:none; min-width:0;
+  }
+  .share-copy-btn {
+    font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-dim); background:transparent; border:1px solid rgba(90,63,30,0.5);
+    padding:0 14px; border-radius:2px; cursor:pointer; white-space:nowrap; transition:all 0.15s;
+  }
+  .share-copy-btn:hover { border-color:var(--gold-dark); color:var(--gold); }
+  .share-copy-btn.copied { color:var(--set-green); border-color:var(--set-green); }
+  .share-copies-list {
+    max-height:180px; overflow-y:auto; margin-top:8px; padding:10px 12px;
+    background:rgba(90,63,30,0.06); border:1px solid rgba(90,63,30,0.2); border-radius:2px;
+  }
+  .share-copy-uid { font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--text-dim); padding:2px 0; }
+  .share-modal-close {
+    position:absolute; top:14px; right:16px; font-family:'Cinzel',serif; font-size:16px;
+    color:var(--text-dim); background:none; border:none; cursor:pointer; transition:color 0.15s;
+  }
+  .share-modal-close:hover { color:var(--gold); }
+  .share-note { font-size:12px; color:var(--text-dim); font-style:italic; margin-top:10px; opacity:0.7; }
+
+  /* Share button in item rows */
+  .row-btn.share:hover { border-color:var(--magic-blue); color:var(--magic-blue); }
+
 </style>
 </head>
 <body>
@@ -664,6 +725,33 @@ textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
 
 </div>
 
+
+<!-- SHARE MODAL -->
+<div class="share-modal-overlay" id="share-modal-overlay">
+  <div class="share-modal-box">
+    <button class="share-modal-close" onclick="closeShareModal()">✕</button>
+    <div class="share-modal-title">☩ Share Relic</div>
+    <div class="share-modal-item" id="share-modal-item">—</div>
+
+    <div class="share-copies-row">
+      <label>Number of copies</label>
+      <input type="number" class="share-copies-input" id="share-copies" value="1" min="1" max="999" />
+      <span style="font-size:12px;color:var(--text-dim);font-style:italic;">each with a unique ID</span>
+    </div>
+
+    <button class="share-generate-btn" id="share-generate-btn" onclick="generateShare()">Generate Share Link</button>
+
+    <div class="share-result" id="share-result">
+      <div class="share-link-box">
+        <input type="text" class="share-link-input" id="share-link-input" readonly />
+        <button class="share-copy-btn" id="share-copy-btn" onclick="copyShareLink()">Copy</button>
+      </div>
+      <div class="share-note">Anyone with this link can collect one copy (one per username) until all copies are claimed.</div>
+      <div class="share-copies-list" id="share-copies-list"></div>
+    </div>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal-box">
@@ -955,9 +1043,11 @@ function renderList() {
         <div class="row-meta">${r.rarity} · ${dateStr}</div>
         ${isManual ? `<div class="row-actions">
           <button class="row-btn" onclick="editItem('${r.id}')">Edit</button>
+          <button class="row-btn share" onclick="openShareModal('manual_items','${r.id}','${r.uid_code}')">Share</button>
           <button class="row-btn del" onclick="promptDelete('${r.id}','${r.uid_code}')">Delete</button>
           ${!r.is_published ? '<span style="font-size:9px;color:var(--blood-light);letter-spacing:1px;">UNPUBLISHED</span>' : ''}
         </div>` : `<div class="row-actions">
+          <button class="row-btn share" onclick="openShareModal('cursed_items','${r.id}','${r.uid_code}')">Share</button>
           <button class="row-btn del" onclick="promptDeleteGenerated('${r.id}','${r.uid_code}')">Remove</button>
         </div>`}
       </div>
@@ -1058,6 +1148,122 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 // ========================
 // initDB() is called by attemptLogin() after credentials verified
 
+
+
+// ========================
+// SHARE / COLLECT SYSTEM
+// ========================
+let shareTarget = null;
+
+function openShareModal(table, id, uid) {
+  shareTarget = { table, id, uid };
+  document.getElementById('share-modal-item').innerHTML = 'Sharing <strong>' + uid + '</strong>';
+  document.getElementById('share-copies').value = '1';
+  document.getElementById('share-result').classList.remove('visible');
+  document.getElementById('share-generate-btn').disabled = false;
+  document.getElementById('share-generate-btn').textContent = 'Generate Share Link';
+  document.getElementById('share-modal-overlay').classList.add('visible');
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal-overlay').classList.remove('visible');
+  shareTarget = null;
+}
+
+function makeShareToken() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let t = '';
+  for (let i=0;i<12;i++) t += chars[Math.floor(Math.random()*chars.length)];
+  return t;
+}
+
+async function generateShare() {
+  if (!shareTarget || !db) return;
+  const copies = Math.max(1, Math.min(999, parseInt(document.getElementById('share-copies').value) || 1));
+  const btn = document.getElementById('share-generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  try {
+    // Fetch the full item to snapshot it
+    const { data: itemData, error: fetchErr } = await db
+      .from(shareTarget.table)
+      .select('*')
+      .eq('id', shareTarget.id)
+      .single();
+    if (fetchErr) throw fetchErr;
+
+    const token = makeShareToken();
+
+    // Create the share row
+    const { data: shareRow, error: shareErr } = await db
+      .from('shared_links')
+      .insert({
+        share_token: token,
+        source_table: shareTarget.table,
+        source_id: shareTarget.id,
+        source_uid: shareTarget.uid,
+        item_snapshot: itemData,
+        total_copies: copies,
+        claimed_copies: 0
+      })
+      .select()
+      .single();
+    if (shareErr) throw shareErr;
+
+    // Create the copy rows with unique extended IDs
+    const copyRows = [];
+    for (let i=1; i<=copies; i++) {
+      const copyUid = shareTarget.uid + '#' + String(i).padStart(3,'0');
+      copyRows.push({
+        share_id: shareRow.id,
+        copy_uid: copyUid,
+        copy_number: i,
+        is_claimed: false
+      });
+    }
+    const { error: copyErr } = await db.from('item_copies').insert(copyRows);
+    if (copyErr) throw copyErr;
+
+    // Build the shareable URL (collect.html in same directory)
+    const baseUrl = window.location.href.replace(/admin\.html.*$/, '').replace(/\/[^/]*$/, '/');
+    const shareUrl = baseUrl + 'collect.html?s=' + token;
+
+    document.getElementById('share-link-input').value = shareUrl;
+    document.getElementById('share-copies-list').innerHTML =
+      '<div style="font-family:\'Cinzel\',serif;font-size:9px;letter-spacing:2px;color:var(--gold-dark);text-transform:uppercase;margin-bottom:6px;">' +
+      copies + ' Copy ID' + (copies>1?'s':'') + ' Created</div>' +
+      copyRows.map(c => '<div class="share-copy-uid">' + c.copy_uid + '</div>').join('');
+    document.getElementById('share-result').classList.add('visible');
+    btn.textContent = 'Link Generated ✓';
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Generate Share Link';
+    alert('Share failed: ' + e.message);
+    console.error(e);
+  }
+}
+
+function copyShareLink() {
+  const input = document.getElementById('share-link-input');
+  input.select();
+  input.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = document.getElementById('share-copy-btn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    document.execCommand('copy');
+  });
+}
+
+// Close share modal on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+  const ov = document.getElementById('share-modal-overlay');
+  if (ov) ov.addEventListener('click', e => { if (e.target === ov) closeShareModal(); });
+});
 
 // ========================
 // LOGIN GATE
