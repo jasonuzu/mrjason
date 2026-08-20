@@ -15,6 +15,395 @@
   --arrival:#7ad0ff; --arrival-glow:rgba(122,208,255,0.5);
   --border-color:#5a3f1e;
 }
+
+/* ===== COMPLETE ITEM CARD STYLES (exact copy from public generator) ===== */
+:root {
+    --gold: #c8a951;
+    --gold-light: #f0d080;
+    --gold-dark: #8a6f2e;
+    --blood: #8b0000;
+    --blood-light: #cc2200;
+    --parchment: #1a120a;
+    --parchment-mid: #120d07;
+    --parchment-light: #241a0e;
+    --text-main: #e8d5a0;
+    --text-dim: #a0885a;
+    --text-bright: #f5e8c0;
+    --magic-blue: #6699cc;
+    --magic-blue-bright: #88bbee;
+    --rare-yellow: #ffdd44;
+    --rare-yellow-dim: #ccaa22;
+    --set-green: #44bb44;
+    --unique-brown: #c8a03c;
+    --corrupt-purple: #9966cc;
+    --corrupt-purple-bright: #bb88ee;
+    --border-color: #5a3f1e;
+    --border-bright: #8a6030;
+    --glow-gold: rgba(200, 169, 81, 0.3);
+    --glow-blood: rgba(139, 0, 0, 0.4);
+    --glow-purple: rgba(153, 102, 204, 0.3);
+  }
+.skull-deco {
+    color: var(--blood);
+    font-size: 18px;
+    margin: 0 12px;
+    opacity: 0.7;
+  }
+.item-card {
+    background: linear-gradient(170deg, #1e1208 0%, #160e06 60%, #1a1008 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+    padding: 20px 22px 18px;
+    position: relative;
+    animation: cardReveal 0.35s ease-out both;
+    overflow: hidden;
+  }
+@keyframes cardReveal {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+.item-card::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 1px solid rgba(90,63,30,0.25);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+.item-sprite-frame {
+    position: absolute;
+    top: 54px;
+    right: 14px;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle at 35% 30%, #1a1208 0%, #0a0604 70%, #050302 100%);
+    border: 1px solid rgba(90, 63, 30, 0.6);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 18px rgba(0,0,0,0.6),
+      0 0 12px rgba(200, 169, 81, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    pointer-events: none;
+  }
+.item-sprite-frame::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(200, 169, 81, 0.15);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+.item-sprite {
+    width: 160px;
+    height: 160px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
+  }
+.item-card {
+    padding-right: 210px;
+    min-height: 210px;
+  }
+.item-card:has(.entity-portrait-frame) {
+    min-height: 450px;
+  }
+@media (max-width: 520px) {
+    .item-card { padding-right: 22px; padding-top: 220px; }
+    .item-sprite-frame { top: 44px; right: auto; left: 50%; transform: translateX(-50%); }
+    .entity-portrait-frame { top: 240px; right: auto; left: 50%; transform: translateX(-50%); }
+  }
+.entity-portrait-frame {
+    position: absolute;
+    top: 250px;
+    right: 14px;
+    width: 180px;
+    height: 180px;
+    background: radial-gradient(circle at 35% 30%, #0c1a10 0%, #040a06 70%, #020604 100%);
+    border: 1px solid rgba(60, 140, 80, 0.5);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 0 18px rgba(0,0,0,0.6),
+      0 0 12px rgba(80, 200, 120, 0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    pointer-events: none;
+    gap: 2px;
+  }
+.entity-portrait-frame::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(80, 200, 120, 0.12);
+    border-radius: 1px;
+    pointer-events: none;
+  }
+.entity-portrait {
+    width: 160px;
+    height: 160px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
+  }
+.entity-portrait-label {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+    color: rgba(140, 220, 160, 0.6);
+    font-family: 'Fira Mono', 'Courier New', monospace;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 104px;
+  }
+.item-card.tier-common      { border-color: #2a3d55; box-shadow: 0 0 14px rgba(51,85,136,0.15); }
+.item-card.tier-uncommon    { border-color: #2a4a2a; box-shadow: 0 0 16px rgba(40,140,60,0.18); }
+.item-card.tier-rare        { border-color: #5a4a10; box-shadow: 0 0 20px rgba(200,160,30,0.2), inset 0 0 30px rgba(200,160,30,0.05); }
+.item-card.tier-corrupted   { border-color: #3a1a55; box-shadow: 0 0 28px rgba(140,50,200,0.3), inset 0 0 40px rgba(100,30,160,0.08); }
+.item-card.tier-extremelyRare { border-color: #5a3010; box-shadow: 0 0 24px rgba(200,120,30,0.25), inset 0 0 40px rgba(200,100,20,0.06); }
+.item-card.tier-mythical    { border-color: #6a0a0a; box-shadow: 0 0 36px rgba(180,0,0,0.35), inset 0 0 50px rgba(120,0,0,0.1); }
+.item-card.tier-legendary   { border-color: #4a0a6a; box-shadow: 0 0 40px rgba(160,0,220,0.4), inset 0 0 55px rgba(120,0,180,0.12); }
+.item-card.tier-paradigm    { border-color: #0a4a5a; box-shadow: 0 0 44px rgba(0,180,220,0.35), inset 0 0 55px rgba(0,140,180,0.1); }
+.item-card.tier-nebulith    { border-color: #3a3a0a; box-shadow: 0 0 50px rgba(220,200,0,0.4), inset 0 0 60px rgba(180,160,0,0.12); }
+.item-card.tier-subumbral   { border-color: #1a1a1a; box-shadow: 0 0 60px rgba(255,255,255,0.12), inset 0 0 80px rgba(200,200,220,0.06); }
+.item-card.tier-faeBound    { border-color: #0a5a2a; box-shadow: 0 0 50px rgba(0,220,100,0.35), inset 0 0 60px rgba(0,180,80,0.1); }
+.item-card.tier-lesserMage  { border-color: #4a3a0a; box-shadow: 0 0 36px rgba(200,160,40,0.3), inset 0 0 50px rgba(160,120,20,0.1); }
+.item-card.tier-humanBound  { border-color: #3a2a1a; box-shadow: 0 0 28px rgba(180,140,80,0.25); }
+.item-card.tier-animalBound { border-color: #1a3a1a; box-shadow: 0 0 28px rgba(60,160,60,0.25); }
+.item-card.tier-unknown     { border-color: #0a0a0a; box-shadow: 0 0 80px rgba(255,255,255,0.06), inset 0 0 100px rgba(0,0,0,0.5); }
+.item-tier-badge {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 1px;
+    opacity: 0.85;
+  }
+.badge-common       { background: rgba(51,85,136,0.25);  color: #88aacc; border: 1px solid rgba(51,85,136,0.4); }
+.badge-uncommon     { background: rgba(40,140,60,0.2);   color: #66cc88; border: 1px solid rgba(40,140,60,0.4); }
+.badge-rare         { background: rgba(180,140,20,0.25); color: var(--rare-yellow); border: 1px solid rgba(180,140,20,0.4); }
+.badge-corrupted    { background: rgba(100,30,160,0.3);  color: var(--corrupt-purple-bright); border: 1px solid rgba(100,30,160,0.5); }
+.badge-extremelyRare{ background: rgba(180,100,20,0.25); color: #e8a040; border: 1px solid rgba(180,100,20,0.4); }
+.badge-mythical     { background: rgba(140,0,0,0.35);    color: #ff4444; border: 1px solid rgba(180,0,0,0.5); }
+.badge-legendary    { background: rgba(120,0,180,0.35);  color: #dd88ff; border: 1px solid rgba(160,0,220,0.5); }
+.badge-paradigm     { background: rgba(0,120,160,0.3);   color: #44ccff; border: 1px solid rgba(0,160,200,0.5); }
+.badge-nebulith     { background: rgba(160,140,0,0.3);   color: #ffee44; border: 1px solid rgba(200,180,0,0.5); }
+.badge-subumbral    { background: rgba(40,40,50,0.6);    color: #ccccdd; border: 1px solid rgba(180,180,200,0.3); }
+.badge-faeBound     { background: rgba(0,140,60,0.3);    color: #88ffbb; border: 1px solid rgba(0,200,80,0.5); }
+.badge-lesserMage   { background: rgba(160,120,20,0.3);  color: #ddaa44; border: 1px solid rgba(200,160,40,0.5); }
+.badge-humanBound   { background: rgba(140,100,50,0.3);  color: #ccaa77; border: 1px solid rgba(180,140,70,0.4); }
+.badge-animalBound  { background: rgba(40,120,40,0.3);   color: #88cc88; border: 1px solid rgba(60,160,60,0.4); }
+.badge-unknown      { background: rgba(10,10,10,0.8);    color: #666677; border: 1px solid rgba(80,80,100,0.3); }
+.name-common       { color: #88aacc; text-shadow: 0 0 10px rgba(102,153,204,0.3); }
+.name-uncommon     { color: #66cc88; text-shadow: 0 0 10px rgba(60,180,100,0.3); }
+.name-rare         { color: var(--rare-yellow); text-shadow: 0 0 12px rgba(255,220,60,0.35); }
+.name-corrupted    { color: var(--corrupt-purple-bright); text-shadow: 0 0 14px rgba(180,100,240,0.4); }
+.name-extremelyRare{ color: #e8a040; text-shadow: 0 0 12px rgba(220,140,40,0.35); }
+.name-mythical     { color: #ff6060; text-shadow: 0 0 18px rgba(220,50,50,0.5); }
+.name-legendary    { color: #dd88ff; text-shadow: 0 0 20px rgba(180,80,255,0.55); }
+.name-paradigm     { color: #44ccff; text-shadow: 0 0 22px rgba(40,200,255,0.5); }
+.name-nebulith     { color: #ffee44; text-shadow: 0 0 24px rgba(240,220,0,0.55); }
+.name-subumbral    { color: #ddddee; text-shadow: 0 0 30px rgba(220,220,255,0.4); }
+.name-faeBound     { color: #88ffbb; text-shadow: 0 0 20px rgba(80,255,150,0.5); }
+.name-lesserMage   { color: #ddaa44; text-shadow: 0 0 16px rgba(200,160,40,0.4); }
+.name-humanBound   { color: #ccaa77; text-shadow: 0 0 14px rgba(180,140,80,0.35); }
+.name-animalBound  { color: #88cc88; text-shadow: 0 0 14px rgba(80,180,80,0.35); }
+.name-unknown      { color: #666677; text-shadow: none; }
+.item-name {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: clamp(16px, 2.5vw, 22px);
+    line-height: 1.2;
+    margin-bottom: 2px;
+    padding-right: 80px;
+  }
+.item-base-type {
+    font-family: 'IM Fell English', serif;
+    font-size: 15px;
+    color: var(--text-dim);
+    font-style: italic;
+    margin-bottom: 4px;
+  }
+.item-curse-type {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    color: rgba(90,63,30,0.8);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+.item-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-color), transparent);
+    margin: 10px 0;
+  }
+.item-divider.gold {
+    background: linear-gradient(to right, transparent, var(--gold-dark), transparent);
+  }
+.item-properties { margin: 10px 0; }
+.prop-line {
+    font-size: 15px;
+    line-height: 1.65;
+    padding: 1px 0;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+.prop-bullet {
+    color: var(--blood-light);
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 10px;
+  }
+.prop-positive { color: #88aacc; }
+.prop-negative { color: #cc5544; }
+.prop-neutral { color: var(--text-dim); }
+.prop-lore { color: var(--text-dim); font-style: italic; font-size: 12.5px; }
+.effect-code {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: rgba(90,63,30,0.55);
+    letter-spacing: 1px;
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 3px;
+    white-space: nowrap;
+  }
+.intensity-section {
+    margin-top: 12px;
+  }
+.intensity-label {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+.intensity-bar-track {
+    height: 4px;
+    background: rgba(90,63,30,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+.intensity-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+.intensity-low { background: linear-gradient(to right, #446688, #6699aa); }
+.intensity-mid { background: linear-gradient(to right, #886622, #ccaa33); }
+.intensity-high { background: linear-gradient(to right, #882222, #cc4422); }
+.intensity-extreme { background: linear-gradient(to right, #660088, #cc22cc); }
+.temporal-tag {
+    display: inline-block;
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    margin: 2px 3px 2px 0;
+    border-radius: 1px;
+    background: rgba(100,50,20,0.3);
+    border: 1px solid rgba(100,50,20,0.5);
+    color: var(--text-dim);
+  }
+.temporal-tag.active {
+    background: rgba(140,100,20,0.25);
+    border-color: rgba(200,150,40,0.4);
+    color: var(--rare-yellow-dim);
+  }
+.lore-block {
+    margin-top: 14px;
+    border-top: 1px solid rgba(90,63,30,0.2);
+    padding-top: 10px;
+    font-style: italic;
+    font-size: 14px;
+    color: rgba(160,136,90,0.7);
+    line-height: 1.6;
+    text-align: center;
+  }
+.section-head {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    margin: 12px 0 6px;
+    opacity: 0.7;
+  }
+.curse-type-tip {
+    cursor: help;
+    border-bottom: 1px dashed rgba(90,63,30,0.5);
+    transition: border-color 0.15s;
+    position: relative;
+  }
+.curse-type-tip:hover { border-color: var(--gold-dark); color: var(--text-main); }
+.ct-tooltip {
+    position: fixed;
+    z-index: 999;
+    max-width: 280px;
+    background: #1a100a;
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+    padding: 10px 13px;
+    font-family: 'IM Fell English', serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-main);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  }
+.ct-tooltip.visible { opacity: 1; }
+@keyframes flashGold {
+    0% { box-shadow: 0 0 40px rgba(200,169,81,0.6); }
+    100% { box-shadow: inherit; }
+  }
+.item-card.new-flash { animation: cardReveal 0.35s ease-out both, flashGold 0.8s ease-out 0.35s both; }
+@media (max-width: 520px) {
+    .results-area.multi-grid { grid-template-columns: 1fr; }
+    .controls-grid { grid-template-columns: 1fr 1fr; }
+  }
+@keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+.item-card { padding-right: 22px !important; padding-top: 20px !important; }
+.item-sprite-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 0 auto 14px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 14px auto 8px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-label {
+  position: relative !important;
+  text-align: center;
+  left: auto !important; bottom: auto !important;
+  margin-top: 6px;
+}
+.item-card:has(.entity-portrait-frame) { min-height: 0 !important; }
+.item-name, .item-base-type, .item-curse-type { text-align:center; }
+
 * { box-sizing:border-box; margin:0; padding:0; }
 body { background:#0a0705; color:var(--text-main); font-family:'IM Fell English',serif; min-height:100vh; }
 body::before {
@@ -165,329 +554,6 @@ body::before {
 .send-flash.fire { animation:sendFlash 1s ease-out forwards; }
 @keyframes sendFlash { 0%{opacity:0} 25%{opacity:1} 100%{opacity:0} }
 
-/* ===== FULL ITEM CARD STYLES ===== */
-.skull-deco {
-    color: var(--blood);
-    font-size: 18px;
-    margin: 0 12px;
-    opacity: 0.7;
-  }
-/* ITEM CARD */
-  .item-card {
-    background: linear-gradient(170deg, #1e1208 0%, #160e06 60%, #1a1008 100%);
-    border: 1px solid var(--border-color);
-    border-radius: 2px;
-    padding: 20px 22px 18px;
-    position: relative;
-    animation: cardReveal 0.35s ease-out both;
-    overflow: hidden;
-  }
-@keyframes cardReveal {
-    from { opacity: 0; transform: translateY(8px); }
-.item-card::before {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border: 1px solid rgba(90,63,30,0.25);
-    border-radius: 1px;
-    pointer-events: none;
-  }
-/* 16-bit procedural sprite, top-right of each card */
-  .item-sprite-frame {
-    position: absolute;
-    top: 54px;
-    right: 14px;
-    width: 180px;
-    height: 180px;
-    background: radial-gradient(circle at 35% 30%, #1a1208 0%, #0a0604 70%, #050302 100%);
-    border: 1px solid rgba(90, 63, 30, 0.6);
-    border-radius: 2px;
-    box-shadow:
-      inset 0 0 18px rgba(0,0,0,0.6),
-      0 0 12px rgba(200, 169, 81, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-    pointer-events: none;
-  }
-.item-sprite-frame::before {
-    content: '';
-    position: absolute;
-    inset: 3px;
-    border: 1px solid rgba(200, 169, 81, 0.15);
-    border-radius: 1px;
-    pointer-events: none;
-  }
-.item-sprite {
-    width: 160px;
-    height: 160px;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    -ms-interpolation-mode: nearest-neighbor;
-  }
-/* Give cards extra right-padding so the name/content doesn't collide with the sprite */
-  .item-card {
-    padding-right: 210px;
-    min-height: 210px;
-  }
-/* Bound cards need room for both the item sprite and entity portrait stacked on the right */
-  .item-card:has(.entity-portrait-frame) {
-    min-height: 450px;
-  }
-.item-sprite-frame { top: 44px; right: auto; left: 50%; transform: translateX(-50%); }
-.entity-portrait-frame { top: 240px; right: auto; left: 50%; transform: translateX(-50%); }
-/* Entity portrait frame — appears below item sprite on bound cards only */
-  .entity-portrait-frame {
-    position: absolute;
-    top: 250px;
-    right: 14px;
-    width: 180px;
-    height: 180px;
-    background: radial-gradient(circle at 35% 30%, #0c1a10 0%, #040a06 70%, #020604 100%);
-    border: 1px solid rgba(60, 140, 80, 0.5);
-    border-radius: 2px;
-    box-shadow:
-      inset 0 0 18px rgba(0,0,0,0.6),
-      0 0 12px rgba(80, 200, 120, 0.08);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-    pointer-events: none;
-    gap: 2px;
-  }
-.entity-portrait-frame::before {
-    content: '';
-    position: absolute;
-    inset: 3px;
-    border: 1px solid rgba(80, 200, 120, 0.12);
-    border-radius: 1px;
-    pointer-events: none;
-  }
-.entity-portrait {
-    width: 160px;
-    height: 160px;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-    -ms-interpolation-mode: nearest-neighbor;
-  }
-.entity-portrait-label {
-    font-size: 7px;
-    letter-spacing: 0.5px;
-    color: rgba(140, 220, 160, 0.6);
-    font-family: 'Fira Mono', 'Courier New', monospace;
-    text-transform: uppercase;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    max-width: 104px;
-  }
-/* Rarity tiers affect card styling */
-  .item-card.tier-common      { border-color: #2a3d55; box-shadow: 0 0 14px rgba(51,85,136,0.15); }
-.item-card.tier-uncommon    { border-color: #2a4a2a; box-shadow: 0 0 16px rgba(40,140,60,0.18); }
-.item-card.tier-rare        { border-color: #5a4a10; box-shadow: 0 0 20px rgba(200,160,30,0.2), inset 0 0 30px rgba(200,160,30,0.05); }
-.item-card.tier-corrupted   { border-color: #3a1a55; box-shadow: 0 0 28px rgba(140,50,200,0.3), inset 0 0 40px rgba(100,30,160,0.08); }
-.item-card.tier-extremelyRare { border-color: #5a3010; box-shadow: 0 0 24px rgba(200,120,30,0.25), inset 0 0 40px rgba(200,100,20,0.06); }
-.item-card.tier-mythical    { border-color: #6a0a0a; box-shadow: 0 0 36px rgba(180,0,0,0.35), inset 0 0 50px rgba(120,0,0,0.1); }
-.item-card.tier-legendary   { border-color: #4a0a6a; box-shadow: 0 0 40px rgba(160,0,220,0.4), inset 0 0 55px rgba(120,0,180,0.12); }
-.item-card.tier-paradigm    { border-color: #0a4a5a; box-shadow: 0 0 44px rgba(0,180,220,0.35), inset 0 0 55px rgba(0,140,180,0.1); }
-.item-card.tier-nebulith    { border-color: #3a3a0a; box-shadow: 0 0 50px rgba(220,200,0,0.4), inset 0 0 60px rgba(180,160,0,0.12); }
-.item-card.tier-subumbral   { border-color: #1a1a1a; box-shadow: 0 0 60px rgba(255,255,255,0.12), inset 0 0 80px rgba(200,200,220,0.06); }
-.item-card.tier-faeBound    { border-color: #0a5a2a; box-shadow: 0 0 50px rgba(0,220,100,0.35), inset 0 0 60px rgba(0,180,80,0.1); }
-.item-card.tier-lesserMage  { border-color: #4a3a0a; box-shadow: 0 0 36px rgba(200,160,40,0.3), inset 0 0 50px rgba(160,120,20,0.1); }
-.item-card.tier-humanBound  { border-color: #3a2a1a; box-shadow: 0 0 28px rgba(180,140,80,0.25); }
-.item-card.tier-animalBound { border-color: #1a3a1a; box-shadow: 0 0 28px rgba(60,160,60,0.25); }
-.item-card.tier-unknown     { border-color: #0a0a0a; box-shadow: 0 0 80px rgba(255,255,255,0.06), inset 0 0 100px rgba(0,0,0,0.5); }
-/* Tier badge */
-  .item-tier-badge {
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    font-family: 'Cinzel', serif;
-    font-size: 9px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding: 3px 8px;
-    border-radius: 1px;
-    opacity: 0.85;
-  }
-.badge-common       { background: rgba(51,85,136,0.25);  color: #88aacc; border: 1px solid rgba(51,85,136,0.4); }
-.badge-uncommon     { background: rgba(40,140,60,0.2);   color: #66cc88; border: 1px solid rgba(40,140,60,0.4); }
-.badge-rare         { background: rgba(180,140,20,0.25); color: var(--rare-yellow); border: 1px solid rgba(180,140,20,0.4); }
-.badge-corrupted    { background: rgba(100,30,160,0.3);  color: var(--corrupt-purple-bright); border: 1px solid rgba(100,30,160,0.5); }
-.badge-extremelyRare{ background: rgba(180,100,20,0.25); color: #e8a040; border: 1px solid rgba(180,100,20,0.4); }
-.badge-mythical     { background: rgba(140,0,0,0.35);    color: #ff4444; border: 1px solid rgba(180,0,0,0.5); }
-.badge-legendary    { background: rgba(120,0,180,0.35);  color: #dd88ff; border: 1px solid rgba(160,0,220,0.5); }
-.badge-paradigm     { background: rgba(0,120,160,0.3);   color: #44ccff; border: 1px solid rgba(0,160,200,0.5); }
-.badge-nebulith     { background: rgba(160,140,0,0.3);   color: #ffee44; border: 1px solid rgba(200,180,0,0.5); }
-.badge-subumbral    { background: rgba(40,40,50,0.6);    color: #ccccdd; border: 1px solid rgba(180,180,200,0.3); }
-.badge-faeBound     { background: rgba(0,140,60,0.3);    color: #88ffbb; border: 1px solid rgba(0,200,80,0.5); }
-.badge-lesserMage   { background: rgba(160,120,20,0.3);  color: #ddaa44; border: 1px solid rgba(200,160,40,0.5); }
-.badge-humanBound   { background: rgba(140,100,50,0.3);  color: #ccaa77; border: 1px solid rgba(180,140,70,0.4); }
-.badge-animalBound  { background: rgba(40,120,40,0.3);   color: #88cc88; border: 1px solid rgba(60,160,60,0.4); }
-.badge-unknown      { background: rgba(10,10,10,0.8);    color: #666677; border: 1px solid rgba(80,80,100,0.3); }
-.name-common       { color: #88aacc; text-shadow: 0 0 10px rgba(102,153,204,0.3); }
-.name-uncommon     { color: #66cc88; text-shadow: 0 0 10px rgba(60,180,100,0.3); }
-.name-rare         { color: var(--rare-yellow); text-shadow: 0 0 12px rgba(255,220,60,0.35); }
-.name-corrupted    { color: var(--corrupt-purple-bright); text-shadow: 0 0 14px rgba(180,100,240,0.4); }
-.name-extremelyRare{ color: #e8a040; text-shadow: 0 0 12px rgba(220,140,40,0.35); }
-.name-mythical     { color: #ff6060; text-shadow: 0 0 18px rgba(220,50,50,0.5); }
-.name-legendary    { color: #dd88ff; text-shadow: 0 0 20px rgba(180,80,255,0.55); }
-.name-paradigm     { color: #44ccff; text-shadow: 0 0 22px rgba(40,200,255,0.5); }
-.name-nebulith     { color: #ffee44; text-shadow: 0 0 24px rgba(240,220,0,0.55); }
-.name-subumbral    { color: #ddddee; text-shadow: 0 0 30px rgba(220,220,255,0.4); }
-.name-faeBound     { color: #88ffbb; text-shadow: 0 0 20px rgba(80,255,150,0.5); }
-.name-lesserMage   { color: #ddaa44; text-shadow: 0 0 16px rgba(200,160,40,0.4); }
-.name-humanBound   { color: #ccaa77; text-shadow: 0 0 14px rgba(180,140,80,0.35); }
-.name-animalBound  { color: #88cc88; text-shadow: 0 0 14px rgba(80,180,80,0.35); }
-.name-unknown      { color: #666677; text-shadow: none; }
-/* Item name */
-  .item-name {
-    font-family: 'Cinzel', serif;
-    font-weight: 700;
-    font-size: clamp(16px, 2.5vw, 22px);
-    line-height: 1.2;
-    margin-bottom: 2px;
-    padding-right: 80px;
-  }
-.item-base-type {
-    font-family: 'IM Fell English', serif;
-    font-size: 15px;
-    color: var(--text-dim);
-    font-style: italic;
-    margin-bottom: 4px;
-  }
-.item-curse-type {
-    font-family: 'Cinzel', serif;
-    font-size: 12px;
-    color: rgba(90,63,30,0.8);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-  }
-/* Divider */
-  .item-divider {
-    height: 1px;
-    background: linear-gradient(to right, transparent, var(--border-color), transparent);
-    margin: 10px 0;
-  }
-.item-divider.gold {
-    background: linear-gradient(to right, transparent, var(--gold-dark), transparent);
-  }
-/* Properties */
-  .item-properties { margin: 10px 0; }
-.prop-line {
-    font-size: 15px;
-    line-height: 1.65;
-    padding: 1px 0;
-    display: flex;
-    gap: 6px;
-    align-items: flex-start;
-  }
-.prop-bullet {
-    color: var(--blood-light);
-    flex-shrink: 0;
-    margin-top: 2px;
-    font-size: 10px;
-  }
-.prop-positive { color: #88aacc; }
-.prop-negative { color: #cc5544; }
-.prop-neutral { color: var(--text-dim); }
-.prop-lore { color: var(--text-dim); font-style: italic; font-size: 12.5px; }
-/* Intensity bar */
-  .intensity-section {
-    margin-top: 12px;
-  }
-.intensity-label {
-    font-family: 'Cinzel', serif;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 5px;
-  }
-.intensity-bar-track {
-    height: 4px;
-    background: rgba(90,63,30,0.2);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-.intensity-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.6s ease;
-  }
-.intensity-low { background: linear-gradient(to right, #446688, #6699aa); }
-.intensity-mid { background: linear-gradient(to right, #886622, #ccaa33); }
-.intensity-high { background: linear-gradient(to right, #882222, #cc4422); }
-.intensity-extreme { background: linear-gradient(to right, #660088, #cc22cc); }
-/* Lore block */
-  .lore-block {
-    margin-top: 14px;
-    border-top: 1px solid rgba(90,63,30,0.2);
-    padding-top: 10px;
-    font-style: italic;
-    font-size: 14px;
-    color: rgba(160,136,90,0.7);
-    line-height: 1.6;
-    text-align: center;
-  }
-/* Section header inside card */
-  .section-head {
-    font-family: 'Cinzel', serif;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    margin: 12px 0 6px;
-    opacity: 0.7;
-  }
-/* Curse type tooltip */
-  .curse-type-tip {
-    cursor: help;
-    border-bottom: 1px dashed rgba(90,63,30,0.5);
-    transition: border-color 0.15s;
-    position: relative;
-  }
-.curse-type-tip:hover { border-color: var(--gold-dark); color: var(--text-main); }
-.ct-tooltip {
-    position: fixed;
-    z-index: 999;
-    max-width: 280px;
-    background: #1a100a;
-    border: 1px solid var(--border-bright);
-    border-radius: 2px;
-    padding: 10px 13px;
-    font-family: 'IM Fell English', serif;
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--text-main);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.7);
-  }
-.ct-tooltip.visible { opacity: 1; }
-.item-card.new-flash { animation: cardReveal 0.35s ease-out both, flashGold 0.8s ease-out 0.35s both; }
-.manual-item-card {
-    background: linear-gradient(170deg, #1e1208 0%, #160e06 60%, #1a1008 100%);
-    border: 1px solid var(--border-color);
-    border-radius: 2px;
-    padding: 20px 22px 18px;
-    position: relative;
-    animation: cardReveal 0.35s ease-out both;
-  }
-@keyframes cardReveal {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-@keyframes pulse {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
 /* Enriched Null Chest card data */
 .cc-curse-line { text-align:center; font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--text-dim); margin-bottom:8px; }
 .cc-penalty { font-size:12px; font-style:italic; color:#a06a4a; line-height:1.5; margin-top:5px; }
@@ -541,32 +607,31 @@ body::before {
 .cc-wrap:not(:has(.cc-title-banner)):not(:has(.cc-arrival-banner)) .item-card { border-radius:2px 2px 0 0; }
 
 
-/* ===== CENTERED SPRITE OVERRIDE (image centered in card) ===== */
+/* ===== CENTERED SPRITE OVERRIDE (graphic boxed + centered above text) ===== */
+/* Sprite/portrait boxes move from the top-right corner into normal flow, centered.
+   Text formatting is left untouched so it matches the public generator exactly. */
 .item-card { padding-right: 22px !important; padding-top: 20px !important; }
 .item-sprite-frame {
   position: relative !important;
   top: auto !important; right: auto !important; left: auto !important;
   transform: none !important;
-  margin: 0 auto 14px !important;
+  margin: 0 auto 16px !important;
   width: 180px !important; height: 180px !important;
 }
 .entity-portrait-frame {
   position: relative !important;
   top: auto !important; right: auto !important; left: auto !important;
   transform: none !important;
-  margin: 14px auto 8px !important;
+  margin: 16px auto 10px !important;
   width: 180px !important; height: 180px !important;
 }
 .entity-portrait-label {
   position: relative !important;
-  text-align: center;
-  left: auto !important; bottom: auto !important;
-  margin-top: 6px;
+  left: auto !important; right: auto !important; bottom: auto !important;
+  transform: none !important;
+  width: 100%; text-align: center; margin-top: 8px;
 }
 .item-card:has(.entity-portrait-frame) { min-height: 0 !important; }
-/* Center the header text under the centered sprite */
-.item-tier-badge { display:inline-block; }
-.item-name, .item-base-type, .item-curse-type { text-align:center; }
 
 </style>
 </head>
@@ -5215,6 +5280,30 @@ async function signOut(){ await db.auth.signOut(); window.location.href = 'accou
 document.getElementById('send-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeSendModal();
 });
+
+// Curse-type / activation mouseover tooltip (identical to public generator)
+(function(){
+  const tip = document.createElement('div');
+  tip.className = 'ct-tooltip';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('.curse-type-tip');
+    if (!el) return;
+    tip.textContent = el.dataset.tip;
+    tip.classList.add('visible');
+  });
+  document.addEventListener('mousemove', e => {
+    if (!tip.classList.contains('visible')) return;
+    const x = e.clientX + 14, y = e.clientY + 14;
+    const rect = tip.getBoundingClientRect();
+    tip.style.left = (x + 280 > window.innerWidth ? e.clientX - 294 : x) + 'px';
+    tip.style.top  = (y + rect.height > window.innerHeight ? e.clientY - rect.height - 8 : y) + 'px';
+  });
+  document.addEventListener('mouseout', e => {
+    if (!e.target.closest('.curse-type-tip')) return;
+    tip.classList.remove('visible');
+  });
+})();
 
 init();
 </script>
