@@ -497,6 +497,34 @@ body::before {
     0%,100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+
+/* ===== CENTERED SPRITE OVERRIDE (image centered in card) ===== */
+.item-card { padding-right: 22px !important; padding-top: 20px !important; }
+.item-sprite-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 0 auto 14px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 14px auto 8px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-label {
+  position: relative !important;
+  text-align: center;
+  left: auto !important; bottom: auto !important;
+  margin-top: 6px;
+}
+.item-card:has(.entity-portrait-frame) { min-height: 0 !important; }
+/* Center the header text under the centered sprite */
+.item-tier-badge { display:inline-block; }
+.item-name, .item-base-type, .item-curse-type { text-align:center; }
+
 </style>
 </head>
 <body>
@@ -4857,13 +4885,16 @@ function dbSnapshotToItem(snap) {
       _manualNotes: snap.notes || null
     };
     if (snap.bound && snap.bound_entity_name) {
-      item.boundEntity = { Name: snap.bound_entity_name, Description: snap.bound_entity_desc || '', Type: snap.bound_entity_type || '' };
+      item.boundEntity = { Name: snap.bound_entity_name, Description: snap.bound_entity_desc || '', Type: snap.bound_entity_type || '', 'Danger Level': snap.bound_danger_level || 0 };
     }
+    item.courtName = snap.court_name || null;
+    item.entityPortraitUid = snap.entity_portrait_uid || null;
+    if (typeof RARITY_CONFIG !== 'undefined' && RARITY_CONFIG[item.rarity]) item.cfg = RARITY_CONFIG[item.rarity];
     return item;
   }
 
   // Generated item: snapshot fields map almost 1:1
-  return {
+  const genItem = {
     archivalId: snap.archival_id || snap.uid_code,
     rarity: snap.rarity,
     baseType: snap.base_type,
@@ -4881,8 +4912,12 @@ function dbSnapshotToItem(snap) {
     boundEntity: snap.bound_entity || null,
     boundDesc: snap.bound_desc || null,
     courtName: snap.court_name || null,
-    imageUid: snap.image_uid || null
+    imageUid: snap.image_uid || null,
+    entityPortraitUid: snap.entity_portrait_uid || null
   };
+  // Attach cfg (contains boundType) so entity portraits regenerate correctly
+  if (typeof RARITY_CONFIG !== 'undefined' && RARITY_CONFIG[genItem.rarity]) genItem.cfg = RARITY_CONFIG[genItem.rarity];
+  return genItem;
 }
 
 function renderItem(share) {
@@ -5081,6 +5116,30 @@ function showError(title, body) {
       <div class="state-body">${esc(body)}</div>
     </div>`;
 }
+
+// Curse-type mouseover tooltip (matches public generator)
+(function(){
+  const tip = document.createElement('div');
+  tip.className = 'ct-tooltip';
+  document.body.appendChild(tip);
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest('.curse-type-tip');
+    if (!el) return;
+    tip.textContent = el.dataset.tip;
+    tip.classList.add('visible');
+  });
+  document.addEventListener('mousemove', e => {
+    if (!tip.classList.contains('visible')) return;
+    const x = e.clientX + 14, y = e.clientY + 14;
+    const rect = tip.getBoundingClientRect();
+    tip.style.left = (x + 280 > window.innerWidth ? e.clientX - 294 : x) + 'px';
+    tip.style.top  = (y + rect.height > window.innerHeight ? e.clientY - rect.height - 8 : y) + 'px';
+  });
+  document.addEventListener('mouseout', e => {
+    if (!e.target.closest('.curse-type-tip')) return;
+    tip.classList.remove('visible');
+  });
+})();
 
 // BOOT
 loadShare();
