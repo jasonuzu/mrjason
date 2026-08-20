@@ -206,7 +206,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 /* map window */
 .window{
   position:relative;border:1px solid rgba(192,154,91,.28);background:#050807;
-  aspect-ratio:16/10;overflow:hidden;min-height:560px;
+  /* Locked to the world's own proportions: WORLD_W 720 / WORLD_H 480 = 3/2.
+     The engine's fitScale() is max(w/720, h/480) — a COVER fit, so any frame
+     that isn't 3:2 gets cropped on its shorter axis. Do not add a min-height
+     here; it overrides the ratio and reintroduces the crop. */
+  aspect-ratio:3/2;overflow:hidden;
 }
 /* No filter here on purpose — the map must render exactly as it does
    at its own URL. Any tint added below would make the embed disagree
@@ -346,7 +350,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
   .rail nav{display:none}
   .hero{padding:48px 0 40px}
   .leaf{padding:26px 22px 30px}
-  .window{aspect-ratio:4/3}
+  /* 3/2 stays put on small screens too — 4/3 would crop the world's sides. */
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important;transition-duration:.01ms !important}
