@@ -245,8 +245,8 @@
     position: absolute;
     top: 54px;
     right: 14px;
-    width: 112px;
-    height: 112px;
+    width: 180px;
+    height: 180px;
     background: radial-gradient(circle at 35% 30%, #1a1208 0%, #0a0604 70%, #050302 100%);
     border: 1px solid rgba(90, 63, 30, 0.6);
     border-radius: 2px;
@@ -268,30 +268,35 @@
     pointer-events: none;
   }
   .item-sprite {
-    width: 96px;
-    height: 96px;
+    width: 160px;
+    height: 160px;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     -ms-interpolation-mode: nearest-neighbor;
   }
   /* Give cards extra right-padding so the name/content doesn't collide with the sprite */
   .item-card {
-    padding-right: 140px;
+    padding-right: 210px;
+    min-height: 210px;
+  }
+  /* Bound cards need room for both the item sprite and entity portrait stacked on the right */
+  .item-card:has(.entity-portrait-frame) {
+    min-height: 450px;
   }
   /* On narrow screens, drop the sprite under the content instead */
   @media (max-width: 520px) {
-    .item-card { padding-right: 22px; padding-top: 150px; }
+    .item-card { padding-right: 22px; padding-top: 220px; }
     .item-sprite-frame { top: 44px; right: auto; left: 50%; transform: translateX(-50%); }
-    .entity-portrait-frame { top: 168px; right: auto; left: 50%; transform: translateX(-50%); }
+    .entity-portrait-frame { top: 240px; right: auto; left: 50%; transform: translateX(-50%); }
   }
 
   /* Entity portrait frame — appears below item sprite on bound cards only */
   .entity-portrait-frame {
     position: absolute;
-    top: 174px;
+    top: 250px;
     right: 14px;
-    width: 112px;
-    height: 112px;
+    width: 180px;
+    height: 180px;
     background: radial-gradient(circle at 35% 30%, #0c1a10 0%, #040a06 70%, #020604 100%);
     border: 1px solid rgba(60, 140, 80, 0.5);
     border-radius: 2px;
@@ -315,8 +320,8 @@
     pointer-events: none;
   }
   .entity-portrait {
-    width: 88px;
-    height: 88px;
+    width: 160px;
+    height: 160px;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     -ms-interpolation-mode: nearest-neighbor;
@@ -5092,8 +5097,8 @@ function renderCard(item, isNew) {
 
     return `
       <div class="item-card ${cfg.tier}${isNew ? ' new-flash' : ''}">
-        <div class="item-sprite-frame"><canvas class="item-sprite" width="96" height="96"></canvas></div>
-        <div class="entity-portrait-frame"><canvas class="entity-portrait" width="88" height="88"></canvas><div class="entity-portrait-label">Bound Entity</div></div>
+        <div class="item-sprite-frame"><canvas class="item-sprite" width="256" height="256"></canvas></div>
+        <div class="entity-portrait-frame"><canvas class="entity-portrait" width="256" height="256"></canvas><div class="entity-portrait-label">Bound Entity</div></div>
         <span class="item-tier-badge ${cfg.badge}">${cfg.label}</span>
         <div class="item-name ${cfg.nameClass}">${item.archivalId}</div>
         <div class="item-base-type">${item.baseType}</div>
@@ -5137,7 +5142,7 @@ function renderCard(item, isNew) {
 
   return `
     <div class="item-card ${cfg.tier}${isNew ? ' new-flash' : ''}">
-      <div class="item-sprite-frame"><canvas class="item-sprite" width="96" height="96"></canvas></div>
+      <div class="item-sprite-frame"><canvas class="item-sprite" width="256" height="256"></canvas></div>
       <span class="item-tier-badge ${cfg.badge}">${cfg.label}</span>
       <div class="item-name ${cfg.nameClass}">${item.archivalId}</div>
       <div class="item-base-type">${item.baseType}</div>
@@ -5401,7 +5406,7 @@ function renderRetrievedCard(r) {
 
   return `
     <div class="item-card ${cfg.tier}" style="margin-bottom:16px;">
-      <div class="item-sprite-frame"><canvas class="item-sprite" width="96" height="96"></canvas></div>
+      <div class="item-sprite-frame"><canvas class="item-sprite" width="256" height="256"></canvas></div>
       <span class="item-tier-badge ${cfg.badge}">${cfg.label}</span>
       <div class="item-name ${cfg.nameClass}">${r.archival_id}</div>
       <div class="item-base-type">${r.base_type}</div>
