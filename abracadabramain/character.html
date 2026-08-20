@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Details — Abracadabra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --ink:#080A0A; --verdigris:#4E8D80; --gem:#7FE3D0; --brass:#C09A5B;
+  --vellum:#E4DAC2; --ash:#8C948F; --ash-dim:#5E6663;
+  --display:"IM Fell English SC",Georgia,serif;
+  --body:"EB Garamond",Georgia,serif;
+  --hand:"IM Fell English",Georgia,serif;
+  --code:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --rule:1px solid rgba(192,154,91,.22);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--vellum);font-family:var(--body);font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--gem);outline-offset:3px}
+
+.field{position:fixed;inset:0;z-index:0;pointer-events:none}
+.field.lamp{background:
+  radial-gradient(1000px 640px at 50% -8%, rgba(78,141,128,.17), transparent 62%),
+  radial-gradient(820px 560px at 88% 82%, rgba(138,95,58,.10), transparent 60%),
+  linear-gradient(180deg,#0B100F,#080A0A 45%,#050706)}
+.field.grain{opacity:.45;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E")}
+.field.vignette{box-shadow:inset 0 0 240px 80px rgba(0,0,0,.88)}
+
+.shell{position:relative;z-index:2;max-width:900px;margin:0 auto;padding:0 28px 90px}
+.rail{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:18px;
+  padding:14px 0 13px;border-bottom:var(--rule);
+  background:linear-gradient(180deg,rgba(6,8,8,.95),rgba(6,8,8,.55) 70%,transparent);backdrop-filter:blur(7px)}
+.mark{display:flex;align-items:center;gap:11px;font-family:var(--display);letter-spacing:.16em;font-size:14px;color:var(--ash)}
+.mark .sigil{width:19px;height:19px;color:var(--verdigris)}
+.mark b{color:var(--vellum);font-weight:400}
+.rail .right{display:flex;align-items:center;gap:22px}
+.rail .right a{font-family:var(--display);font-size:12.5px;letter-spacing:.2em;color:var(--ash);padding-bottom:3px;border-bottom:1px solid transparent;transition:.3s}
+.rail .right a:hover{color:var(--vellum);border-color:var(--verdigris)}
+.rail .right button{font-family:var(--display);font-size:12.5px;letter-spacing:.2em;color:var(--ash-dim);transition:.3s}
+.rail .right button:hover{color:#C97A62}
+
+.head{padding:64px 0 22px;text-align:center}
+.head .eyebrow{font-family:var(--display);font-size:11.5px;letter-spacing:.42em;color:var(--verdigris);margin-bottom:16px}
+.head h1{font-family:var(--display);font-weight:400;font-size:40px;letter-spacing:.14em;margin-bottom:10px}
+.head .owner{font-family:var(--hand);font-style:italic;font-size:19px;color:var(--ash)}
+.hr{height:1px;background:linear-gradient(90deg,transparent,rgba(192,154,91,.32),transparent);margin:26px 0 34px}
+
+.sheet{border:1px solid rgba(192,154,91,.2);background:linear-gradient(180deg,rgba(16,22,21,.88),rgba(8,11,11,.88));padding:44px 40px}
+.sheet .glyph{text-align:center;font-size:30px;color:var(--verdigris);opacity:.65;margin-bottom:20px}
+.sheet h2{font-family:var(--display);font-weight:400;font-size:21px;letter-spacing:.16em;text-align:center;margin-bottom:14px}
+.sheet p{font-family:var(--hand);font-style:italic;font-size:18px;color:var(--ash);text-align:center;max-width:540px;margin:0 auto 30px;line-height:1.7}
+
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;background:rgba(192,154,91,.16);border:1px solid rgba(192,154,91,.16)}
+.slot{background:#0B100F;padding:22px 20px}
+.slot .k{font-family:var(--display);font-size:10.5px;letter-spacing:.22em;color:var(--verdigris);margin-bottom:9px}
+.slot .v{font-family:var(--hand);font-size:19px;color:var(--ash-dim);font-style:italic}
+
+.acts{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+.btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--display);font-size:12px;letter-spacing:.19em;
+  padding:11px 22px;border:1px solid rgba(192,154,91,.42);color:var(--vellum);background:rgba(20,26,25,.6);transition:.35s}
+.btn:hover{border-color:var(--gem);box-shadow:0 0 26px -6px rgba(127,227,208,.45);background:rgba(30,44,41,.72)}
+.btn.solid{background:linear-gradient(180deg,rgba(78,141,128,.32),rgba(78,141,128,.14));border-color:rgba(127,227,208,.5)}
+
+@media (max-width:620px){
+  body{font-size:17px}.shell{padding:0 18px 70px}
+  .head{padding:44px 0 18px}.head h1{font-size:31px}
+  .sheet{padding:32px 22px}
+  .rail .right a{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div class="field lamp"></div>
+<div class="field grain"></div>
+<div class="field vignette"></div>
+
+<div class="shell">
+  <header class="rail">
+    <a class="mark" href="index.html">
+      <svg class="sigil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1">
+        <circle cx="12" cy="12" r="9.2"/><path d="M12 3.4 3.6 17h16.8L12 3.4Z"/><circle cx="12" cy="13.4" r="2.6"/>
+      </svg>
+      <span><b>Abracadabra</b> &nbsp;·&nbsp; the working codex</span>
+    </a>
+    <div class="right">
+      <a href="index.html">Return to the codex</a>
+      <a href="chest.html">Null Chest</a>
+      <button onclick="signOut()">Sign out</button>
+    </div>
+  </header>
+
+  <div class="head">
+    <div class="eyebrow">Bearer Record</div>
+    <h1>Character Details</h1>
+    <div class="owner" id="owner">—</div>
+  </div>
+  <div class="hr"></div>
+
+  <div class="sheet">
+    <div class="glyph">✦</div>
+    <h2>This page is still being written</h2>
+    <p>The bearer record isn't open yet. When it is, everything below will be filled
+       from your account — what you carry, what it has cost you so far, and how far
+       each affliction has progressed.</p>
+
+    <div class="slots">
+      <div class="slot"><div class="k">Bearer Name</div><div class="v" id="slotName">—</div></div>
+      <div class="slot"><div class="k">Afflictions</div><div class="v">Not yet recorded</div></div>
+      <div class="slot"><div class="k">Intensity</div><div class="v">Not yet recorded</div></div>
+      <div class="slot"><div class="k">Curse Architecture</div><div class="v">Not yet recorded</div></div>
+      <div class="slot"><div class="k">Standing Cost</div><div class="v">Not yet recorded</div></div>
+      <div class="slot"><div class="k">Relics Bound</div><div class="v" id="slotRelics">—</div></div>
+    </div>
+
+    <div class="acts">
+      <a class="btn solid" href="chest.html">Open your Null Chest</a>
+      <a class="btn" href="index.html">Back to the codex</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mhlwfevnjpezaaocbwwr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obHdmZXZuanBlemFhb2Nid3dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3OTA1NjcsImV4cCI6MjA5NjM2NjU2N30.pIpC9ZrNTd16_A0aLl6TPokhEshElq0dNrMNwyMEJg0';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function init(){
+  const { data: { session } } = await db.auth.getSession();
+  if (!session){
+    window.location.href = 'account.html?redirect=' + encodeURIComponent(window.location.href);
+    return;
+  }
+  const user = session.user;
+  let name = user.user_metadata?.display_name || user.email;
+  try {
+    const { data: prof } = await db.from('profiles').select('display_name').eq('id', user.id).single();
+    if (prof?.display_name) name = prof.display_name;
+  } catch(e){}
+
+  document.getElementById('owner').textContent = 'Kept for ' + name;
+  document.getElementById('slotName').textContent = name;
+
+  try {
+    const { data } = await db.rpc('get_my_collection');
+    if (data) document.getElementById('slotRelics').textContent =
+      data.length + (data.length === 1 ? ' relic' : ' relics');
+  } catch(e){}
+}
+
+async function signOut(){ await db.auth.signOut(); window.location.href = 'index.html'; }
+function esc(s){ if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+init();
+</script>
+</body>
+</html>
