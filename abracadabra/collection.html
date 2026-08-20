@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cursed Reliquary — My Collection</title>
+<title>Abracadabra — Null Chest</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -12,6 +12,7 @@
   --blood:#8b0000; --blood-light:#cc2200;
   --text-main:#e8d5a0; --text-dim:#a0885a; --text-bright:#f5e8c0;
   --set-green:#44bb44; --magic-blue:#6699cc;
+  --arrival:#7ad0ff; --arrival-glow:rgba(122,208,255,0.5);
   --border-color:#5a3f1e;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -23,7 +24,6 @@ body::before {
     radial-gradient(ellipse at 80% 70%, rgba(153,102,204,0.04) 0%, transparent 50%);
   pointer-events:none; z-index:0;
 }
-
 .nav-bar {
   display:flex; align-items:center; justify-content:space-between;
   padding:12px 24px; background:rgba(10,7,5,0.96);
@@ -37,32 +37,70 @@ body::before {
 }
 .nav-links a:hover, .nav-links button:hover { color:var(--gold-light); }
 .nav-links a.active { color:var(--gold); border-bottom:1px solid var(--gold-dark); }
-
 .page-wrap { position:relative; z-index:1; max-width:1000px; margin:0 auto; padding:32px 20px 80px; }
-
 .collection-header { text-align:center; margin-bottom:8px; }
 .collection-title { font-family:'Cinzel Decorative',serif; font-size:20px; letter-spacing:3px; color:var(--gold-light); text-transform:uppercase; }
 .collection-owner { font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; color:var(--text-dim); margin-top:8px; }
 .collection-count { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--gold-dark); text-transform:uppercase; margin-top:6px; }
-
-.divider-line { height:1px; background:linear-gradient(to right, transparent, var(--gold-dark), transparent); margin:24px 0 28px; opacity:0.5; }
-
+.divider-line { height:1px; background:linear-gradient(to right, transparent, var(--gold-dark), transparent); margin:24px 0 20px; opacity:0.5; }
+.chest-toolbar { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:24px; flex-wrap:wrap; }
+.toolbar-btn {
+  font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  padding:9px 18px; border-radius:2px; cursor:pointer; transition:all 0.15s;
+  background:transparent; border:1px solid var(--border-color); color:var(--text-dim);
+}
+.toolbar-btn:hover { border-color:var(--gold-dark); color:var(--gold); }
+.toolbar-btn.active { border-color:var(--gold); color:var(--gold); background:rgba(200,169,81,0.08); }
+.toolbar-btn.send { background:linear-gradient(180deg,#e0c060,#a07820); color:#0a0705; border:none; }
+.toolbar-btn.send:hover { background:linear-gradient(180deg,#f0d070,#b08830); }
+.toolbar-btn.send:disabled { opacity:0.35; cursor:default; pointer-events:none; }
+.toolbar-btn.ghost-cancel:hover { border-color:var(--blood-light); color:var(--blood-light); }
+.selection-count { font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--gold-light); }
 .state-msg { text-align:center; padding:60px 20px; }
 .state-deco { font-size:36px; color:var(--blood); opacity:0.5; margin-bottom:16px; }
 .state-title { font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; color:var(--gold-light); margin-bottom:10px; }
 .state-body { font-size:15px; color:var(--text-dim); font-style:italic; line-height:1.6; }
 .state-body a { color:var(--gold); }
-
 .collection-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; }
-
 .collect-card {
   background:linear-gradient(170deg, #1e1208 0%, #160e06 60%, #1a1008 100%);
   border:1px solid var(--border-color); border-radius:2px; padding:18px 20px 16px;
-  position:relative; transition:transform 0.15s, box-shadow 0.15s;
+  position:relative; transition:transform 0.15s, box-shadow 0.15s, border-color 0.2s, opacity 0.4s;
 }
 .collect-card:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(0,0,0,0.5); }
 .collect-card::before { content:''; position:absolute; inset:3px; border:1px solid rgba(90,63,30,0.2); pointer-events:none; }
-
+.collect-card.arrival {
+  border-color:var(--arrival);
+  box-shadow:0 0 22px var(--arrival-glow), inset 0 0 20px rgba(122,208,255,0.06);
+  animation:arrivalPulse 2s ease-in-out infinite;
+}
+.collect-card.arrival::before { border-color:rgba(122,208,255,0.35); }
+@keyframes arrivalPulse {
+  0%,100% { box-shadow:0 0 18px var(--arrival-glow), inset 0 0 16px rgba(122,208,255,0.05); }
+  50% { box-shadow:0 0 30px var(--arrival-glow), inset 0 0 24px rgba(122,208,255,0.1); }
+}
+.arrival-label {
+  display:block; text-align:center; font-family:'Cinzel',serif; font-size:9px;
+  letter-spacing:2px; text-transform:uppercase; color:var(--arrival);
+  margin-bottom:8px; text-shadow:0 0 8px var(--arrival-glow);
+}
+.collect-card.selectable { cursor:pointer; }
+.collect-card.selectable:hover { border-color:var(--gold-dark); }
+.collect-card.selected { border-color:var(--gold); box-shadow:0 0 18px rgba(200,169,81,0.35); }
+.collect-card.selected::after {
+  content:'✓'; position:absolute; top:10px; right:12px; z-index:3;
+  width:22px; height:22px; border-radius:50%;
+  background:linear-gradient(180deg,#e0c060,#a07820); color:#0a0705;
+  font-family:'Cinzel',serif; font-size:13px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 10px rgba(200,169,81,0.5);
+}
+.collect-card.sending { animation:sendAway 0.9s cubic-bezier(0.5,0,0.75,0) forwards; pointer-events:none; }
+@keyframes sendAway {
+  0%   { transform:translateY(0) scale(1); opacity:1; filter:brightness(1); }
+  30%  { transform:translateY(-6px) scale(1.03); opacity:1; filter:brightness(1.5) drop-shadow(0 0 12px var(--gold-light)); }
+  100% { transform:translateY(-60px) scale(0.6); opacity:0; filter:brightness(2.5) drop-shadow(0 0 20px var(--gold-light)); }
+}
 .cc-sprite-frame {
   width:80px; height:80px; margin:0 auto 12px;
   background:radial-gradient(circle at 50% 40%, rgba(40,28,16,0.9), rgba(12,8,5,0.95));
@@ -70,39 +108,109 @@ body::before {
   display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 14px rgba(0,0,0,0.6);
 }
 .cc-sprite-frame canvas { image-rendering:pixelated; width:64px; height:64px; }
-
 .cc-tier { display:block; text-align:center; font-family:'Cinzel',serif; font-size:8px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
 .cc-custom-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:var(--gold-light); text-align:center; line-height:1.2; margin-bottom:3px; }
 .cc-official { text-align:center; font-size:13px; color:var(--text-dim); font-style:italic; margin-bottom:2px; }
 .cc-base { text-align:center; font-size:12px; color:var(--text-dim); opacity:0.7; margin-bottom:10px; }
-
 .cc-divider { height:1px; background:rgba(90,63,30,0.3); margin:10px 0; }
-
 .cc-effect-name { font-family:'Cinzel',serif; font-size:10px; letter-spacing:1px; color:var(--gold); text-transform:uppercase; margin-bottom:4px; }
 .cc-effect-desc { font-size:13px; line-height:1.5; color:var(--text-main); margin-bottom:8px; }
-
 .cc-meta { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid rgba(90,63,30,0.25); }
 .cc-uid { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--gold-dark); }
 .cc-date { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 0.2s;
+}
+.modal-overlay.visible { opacity:1; pointer-events:auto; }
+.modal-box {
+  background:linear-gradient(145deg, #1e1208, #160e06);
+  border:1px solid var(--border-color); border-radius:2px;
+  padding:28px 32px; max-width:440px; width:92%; position:relative;
+}
+.modal-box::before { content:''; position:absolute; inset:3px; border:1px solid rgba(90,63,30,0.2); pointer-events:none; }
+.modal-title { font-family:'Cinzel',serif; font-size:14px; letter-spacing:2px; color:var(--gold-light); margin-bottom:8px; }
+.modal-sub { font-size:14px; color:var(--text-dim); font-style:italic; margin-bottom:20px; }
+.modal-sub strong { color:var(--gold); font-style:normal; }
+.modal-label { font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px; display:block; }
+.modal-input {
+  width:100%; background:#0d0906; border:1px solid var(--border-color);
+  color:var(--text-main); font-family:'IM Fell English',serif; font-size:15px;
+  padding:11px 14px; border-radius:2px; outline:none; margin-bottom:8px; transition:border-color 0.15s;
+}
+.modal-input:focus { border-color:var(--gold-dark); box-shadow:0 0 8px rgba(200,169,81,0.12); }
+.modal-input::placeholder { color:rgba(90,63,30,0.5); font-style:italic; }
+.send-items-preview { max-height:150px; overflow-y:auto; margin-bottom:16px; padding:10px 12px; background:rgba(90,63,30,0.06); border:1px solid rgba(90,63,30,0.2); border-radius:2px; }
+.send-item-line { font-size:13px; color:var(--text-main); padding:3px 0; display:flex; justify-content:space-between; gap:10px; }
+.send-item-line .sil-uid { font-family:'Cinzel',serif; font-size:9px; color:var(--gold-dark); letter-spacing:1px; white-space:nowrap; }
+.modal-status { padding:10px 14px; border-radius:2px; font-family:'Cinzel',serif; font-size:11px; letter-spacing:1px; text-align:center; margin-bottom:14px; display:none; }
+.modal-status.error { background:rgba(100,0,0,0.25); border:1px solid rgba(139,0,0,0.4); color:#ff6666; display:block; }
+.modal-status.info { background:rgba(40,60,100,0.2); border:1px solid rgba(102,153,204,0.3); color:#88bbee; display:block; }
+.modal-status.success { background:rgba(40,100,40,0.25); border:1px solid rgba(68,187,68,0.4); color:var(--set-green); display:block; }
+.modal-btns { display:flex; gap:12px; justify-content:flex-end; }
+.modal-btn { font-family:'Cinzel',serif; font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:11px 20px; border-radius:2px; cursor:pointer; transition:all 0.15s; }
+.modal-btn.cancel { background:transparent; border:1px solid var(--border-color); color:var(--text-dim); }
+.modal-btn.cancel:hover { border-color:var(--gold-dark); color:var(--gold); }
+.modal-btn.confirm { background:linear-gradient(180deg,#e0c060,#a07820); border:none; color:#0a0705; }
+.modal-btn.confirm:hover { background:linear-gradient(180deg,#f0d070,#b08830); }
+.modal-btn.confirm:disabled { opacity:0.4; cursor:default; }
+.confirm-step { display:none; }
+.confirm-step.active { display:block; }
+.send-flash {
+  position:fixed; inset:0; z-index:2000; pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, rgba(200,169,81,0.25), transparent 60%);
+  opacity:0;
+}
+.send-flash.fire { animation:sendFlash 1s ease-out forwards; }
+@keyframes sendFlash { 0%{opacity:0} 25%{opacity:1} 100%{opacity:0} }
 </style>
 </head>
 <body>
 
 <nav class="nav-bar">
-  <div class="nav-logo">☠ Cursed Reliquary</div>
+  <div class="nav-logo">☠ Abracadabra</div>
   <div class="nav-links">
     <a href="index.html">Generator</a>
-    <a href="collection.html" class="active">My Collection</a>
+    <a href="collection.html" class="active">Null Chest</a>
     <button onclick="signOut()">Sign Out</button>
   </div>
 </nav>
+
+<div class="send-flash" id="send-flash"></div>
 
 <div class="page-wrap">
   <div id="content">
     <div class="state-msg">
       <div class="state-deco">⚗</div>
-      <div class="state-title">Opening Your Reliquary…</div>
-      <div class="state-body">Retrieving your collected relics.</div>
+      <div class="state-title">Opening Your Null Chest…</div>
+      <div class="state-body">Retrieving your bound relics.</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="send-modal">
+  <div class="modal-box">
+    <div class="confirm-step active" id="step-target">
+      <div class="modal-title">☩ Send Relics</div>
+      <div class="modal-sub">Sending <strong id="send-count">0</strong> relic(s) from your Null Chest.</div>
+      <div class="send-items-preview" id="send-preview"></div>
+      <label class="modal-label">Recipient Username</label>
+      <input type="text" class="modal-input" id="target-username" placeholder="Exact Huldufólk username" maxlength="64" autocomplete="off" />
+      <div class="modal-status" id="send-status"></div>
+      <div class="modal-btns">
+        <button class="modal-btn cancel" onclick="closeSendModal()">Cancel</button>
+        <button class="modal-btn confirm" id="to-confirm-btn" onclick="goToConfirm()">Continue</button>
+      </div>
+    </div>
+    <div class="confirm-step" id="step-confirm">
+      <div class="modal-title">⚠ Confirm Transfer</div>
+      <div class="modal-sub">You are about to permanently send <strong id="confirm-count">0</strong> relic(s) to <strong id="confirm-target">—</strong>.<br>This removes them from your Null Chest.</div>
+      <div class="modal-status" id="confirm-status"></div>
+      <div class="modal-btns">
+        <button class="modal-btn cancel" onclick="backToTarget()">Back</button>
+        <button class="modal-btn confirm" id="do-send-btn" onclick="doSend()">Send Relics</button>
+      </div>
     </div>
   </div>
 </div>
@@ -125,10 +233,15 @@ const RARITY_CONFIG = {
 };
 const DOMAIN_LABELS = { S:'Somatic', C:'Cognitive', E:'Environmental', M:'Metaphysical', Somatic:'Somatic', Cognitive:'Cognitive', Environmental:'Environmental', Metaphysical:'Metaphysical' };
 
+let collectionData = [];
+let selectMode = false;
+let selectedUids = new Set();
+let hadArrivals = false;
+let myDisplayName = '';
+
 async function init() {
   const { data: { session } } = await db.auth.getSession();
   if (!session) {
-    // Not logged in — send to account page with redirect back here
     const redirect = encodeURIComponent(window.location.href);
     window.location.href = 'account.html?redirect=' + redirect;
     return;
@@ -138,68 +251,88 @@ async function init() {
 
 async function loadCollection() {
   const { data: { user } } = await db.auth.getUser();
-  let displayName = user.user_metadata?.display_name || 'Collector';
+  myDisplayName = user.user_metadata?.display_name || 'Collector';
   try {
     const { data: prof } = await db.from('profiles').select('display_name').eq('id', user.id).single();
-    if (prof?.display_name) displayName = prof.display_name;
+    if (prof?.display_name) myDisplayName = prof.display_name;
   } catch(e) {}
 
   try {
     const { data, error } = await db.rpc('get_my_collection');
     if (error) throw error;
+    collectionData = data || [];
 
-    if (!data || !data.length) {
+    if (!collectionData.length) {
       document.getElementById('content').innerHTML = `
         <div class="collection-header">
-          <div class="collection-title">My Collection</div>
-          <div class="collection-owner">${esc(displayName)}</div>
+          <div class="collection-title">Null Chest</div>
+          <div class="collection-owner">${esc(myDisplayName)}</div>
         </div>
         <div class="divider-line"></div>
         <div class="state-msg">
           <div class="state-deco">☒</div>
-          <div class="state-title">No Relics Collected Yet</div>
-          <div class="state-body">When someone shares a cursed item with you and you collect it,<br>it will appear here. <a href="index.html">Return to the generator.</a></div>
+          <div class="state-title">Your Null Chest Is Empty</div>
+          <div class="state-body">When someone shares a cursed item with you and you collect it,<br>or sends you one, it will appear here. <a href="index.html">Return to the generator.</a></div>
         </div>`;
       return;
     }
 
-    const cards = data.map(renderCollectionCard).join('');
-    document.getElementById('content').innerHTML = `
-      <div class="collection-header">
-        <div class="collection-title">My Collection</div>
-        <div class="collection-owner">${esc(displayName)}</div>
-        <div class="collection-count">${data.length} Relic${data.length !== 1 ? 's' : ''} Bound to Your Name</div>
-      </div>
-      <div class="divider-line"></div>
-      <div class="collection-grid">${cards}</div>`;
+    hadArrivals = collectionData.some(i => i.is_new_arrival);
+    renderChest();
 
-    // Paint sprites
-    requestAnimationFrame(() => {
-      data.forEach((item, i) => {
-        const canvas = document.getElementById('cc-sprite-' + i);
-        if (canvas) paintSprite(item.item_snapshot, canvas);
-      });
-    });
+    if (hadArrivals) {
+      setTimeout(async () => {
+        try { await db.rpc('mark_arrivals_seen'); } catch(e) {}
+      }, 2500);
+    }
   } catch(e) {
     document.getElementById('content').innerHTML = `
       <div class="state-msg">
         <div class="state-deco">✗</div>
-        <div class="state-title">Could Not Load Collection</div>
+        <div class="state-title">Could Not Open Null Chest</div>
         <div class="state-body">${esc(e.message || 'Unknown error')}</div>
       </div>`;
     console.error(e);
   }
 }
 
+function renderChest() {
+  const cards = collectionData.map((item, i) => renderCollectionCard(item, i)).join('');
+  const toolbar = selectMode ? `
+    <div class="chest-toolbar">
+      <span class="selection-count">${selectedUids.size} selected</span>
+      <button class="toolbar-btn send" id="open-send-btn" ${selectedUids.size===0?'disabled':''} onclick="openSendModal()">☩ Send Selected</button>
+      <button class="toolbar-btn ghost-cancel" onclick="exitSelectMode()">Cancel</button>
+    </div>` : `
+    <div class="chest-toolbar">
+      <button class="toolbar-btn" onclick="enterSelectMode()">Select &amp; Send Items</button>
+    </div>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="collection-header">
+      <div class="collection-title">Null Chest</div>
+      <div class="collection-owner">${esc(myDisplayName)}</div>
+      <div class="collection-count">${collectionData.length} Relic${collectionData.length !== 1 ? 's' : ''} Bound to Your Name</div>
+    </div>
+    <div class="divider-line"></div>
+    ${toolbar}
+    <div class="collection-grid">${cards}</div>`;
+
+  requestAnimationFrame(() => {
+    collectionData.forEach((item, i) => {
+      const canvas = document.getElementById('cc-sprite-' + i);
+      if (canvas) paintSprite(item.item_snapshot, canvas);
+    });
+  });
+}
+
 function renderCollectionCard(item, i) {
   const snap = item.item_snapshot || {};
   const cfg = RARITY_CONFIG[snap.rarity] || RARITY_CONFIG.common;
   const isManual = !!snap.item_name || !!snap.primary_effect_name;
-
   const officialName = item.official_name || snap.item_name || snap.base_type || item.copy_uid;
   const baseType = snap.base_type || '';
 
-  // Effect
   let effName='', effDesc='';
   if (isManual) {
     effName = snap.primary_effect_name || '';
@@ -210,11 +343,20 @@ function renderCollectionCard(item, i) {
   }
 
   const dateStr = new Date(item.collected_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-
   const hasTitle = item.custom_title && item.custom_title.trim();
+  const isArrival = item.is_new_arrival;
+  const isSelected = selectedUids.has(item.copy_uid);
+
+  const classes = ['collect-card'];
+  if (isArrival && !selectMode) classes.push('arrival');
+  if (selectMode) classes.push('selectable');
+  if (isSelected) classes.push('selected');
+
+  const clickAttr = selectMode ? `onclick="toggleSelect('${esc(item.copy_uid)}')"` : '';
 
   return `
-    <div class="collect-card">
+    <div class="${classes.join(' ')}" id="card-${i}" data-uid="${esc(item.copy_uid)}" ${clickAttr}>
+      ${(isArrival && !selectMode && item.received_from) ? `<span class="arrival-label">✦ Sent from ${esc(item.received_from)}</span>` : ''}
       <div class="cc-sprite-frame"><canvas id="cc-sprite-${i}" width="64" height="64"></canvas></div>
       <span class="cc-tier" style="color:${cfg.color};">${cfg.label}</span>
       ${hasTitle ? `<div class="cc-custom-title">${esc(item.custom_title)}</div><div class="cc-official">${esc(officialName)}</div>`
@@ -225,14 +367,112 @@ function renderCollectionCard(item, i) {
         <div class="cc-effect-desc">${esc(truncate(effDesc, 140))}</div>` : ''}
       <div class="cc-meta">
         <span class="cc-uid">${esc(item.copy_uid)}</span>
-        <span class="cc-date">Collected ${dateStr}</span>
+        <span class="cc-date">${item.received_from ? 'Received' : 'Collected'} ${dateStr}</span>
       </div>
     </div>`;
 }
 
-// Seeded placeholder sprite (same algorithm as collect.html)
+function enterSelectMode() { selectMode = true; selectedUids.clear(); renderChest(); }
+function exitSelectMode() { selectMode = false; selectedUids.clear(); renderChest(); }
+function toggleSelect(uid) {
+  if (selectedUids.has(uid)) selectedUids.delete(uid);
+  else selectedUids.add(uid);
+  renderChest();
+}
+
+function openSendModal() {
+  if (selectedUids.size === 0) return;
+  const uids = Array.from(selectedUids);
+  document.getElementById('send-count').textContent = uids.length;
+  const preview = uids.map(uid => {
+    const item = collectionData.find(c => c.copy_uid === uid);
+    const name = item ? (item.custom_title || item.official_name) : uid;
+    return `<div class="send-item-line"><span>${esc(name)}</span><span class="sil-uid">${esc(uid)}</span></div>`;
+  }).join('');
+  document.getElementById('send-preview').innerHTML = preview;
+  document.getElementById('step-target').classList.add('active');
+  document.getElementById('step-confirm').classList.remove('active');
+  document.getElementById('target-username').value = '';
+  clearStatus('send-status');
+  clearStatus('confirm-status');
+  document.getElementById('send-modal').classList.add('visible');
+  document.getElementById('target-username').focus();
+}
+
+function closeSendModal() { document.getElementById('send-modal').classList.remove('visible'); }
+
+async function goToConfirm() {
+  const target = document.getElementById('target-username').value.trim();
+  if (!target) { setStatus('send-status', 'error', 'Enter the recipient\'s username.'); return; }
+  const btn = document.getElementById('to-confirm-btn');
+  btn.disabled = true;
+  setStatus('send-status', 'info', 'Locating recipient…');
+  try {
+    const { data, error } = await db.from('profiles').select('display_name').ilike('display_name', target).limit(1);
+    if (error) throw error;
+    if (!data || !data.length) {
+      setStatus('send-status', 'error', 'No user found with that username.');
+      btn.disabled = false; return;
+    }
+    if (data[0].display_name.toLowerCase() === myDisplayName.toLowerCase()) {
+      setStatus('send-status', 'error', 'You cannot send items to yourself.');
+      btn.disabled = false; return;
+    }
+    document.getElementById('confirm-count').textContent = selectedUids.size;
+    document.getElementById('confirm-target').textContent = data[0].display_name;
+    document.getElementById('step-target').classList.remove('active');
+    document.getElementById('step-confirm').classList.add('active');
+    clearStatus('send-status');
+    btn.disabled = false;
+  } catch(e) {
+    setStatus('send-status', 'error', e.message || 'Could not verify recipient.');
+    btn.disabled = false;
+  }
+}
+
+function backToTarget() {
+  document.getElementById('step-confirm').classList.remove('active');
+  document.getElementById('step-target').classList.add('active');
+  clearStatus('confirm-status');
+}
+
+async function doSend() {
+  const target = document.getElementById('confirm-target').textContent;
+  const uids = Array.from(selectedUids);
+  const btn = document.getElementById('do-send-btn');
+  btn.disabled = true;
+  setStatus('confirm-status', 'info', 'Casting the sending…');
+  try {
+    const { data, error } = await db.rpc('transfer_items', { p_copy_uids: uids, p_target_name: target });
+    if (error) throw error;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (result.result_status === 'success') {
+      setStatus('confirm-status', 'success', result.result_message);
+      setTimeout(() => { closeSendModal(); playSendAnimation(uids); }, 500);
+    } else {
+      setStatus('confirm-status', 'error', result.result_message || 'Transfer failed.');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    setStatus('confirm-status', 'error', e.message || 'Transfer failed.');
+    btn.disabled = false;
+  }
+}
+
+function playSendAnimation(uids) {
+  const flash = document.getElementById('send-flash');
+  flash.classList.remove('fire'); void flash.offsetWidth; flash.classList.add('fire');
+  const cards = document.querySelectorAll('.collect-card');
+  cards.forEach(card => { if (uids.includes(card.dataset.uid)) card.classList.add('sending'); });
+  setTimeout(() => { selectMode = false; selectedUids.clear(); loadCollection(); }, 1100);
+}
+
+function setStatus(id, type, msg) { const el = document.getElementById(id); el.className = 'modal-status ' + type; el.textContent = msg; }
+function clearStatus(id) { const el = document.getElementById(id); el.className = 'modal-status'; el.textContent = ''; }
+
 function paintSprite(snap, canvas) {
   const ctx = canvas.getContext('2d');
+  snap = snap || {};
   const seedStr = (snap.image_uid || snap.archival_id || snap.uid_code || 'relic');
   let seed = 0;
   for (let i=0;i<seedStr.length;i++) seed = (seed*31 + seedStr.charCodeAt(i)) >>> 0;
@@ -258,11 +498,14 @@ function shadeColor(hex, factor){
   const b = Math.min(255, Math.round(parseInt(c.substr(4,2),16)*factor));
   return `rgb(${r},${g},${b})`;
 }
-
 function truncate(s, n){ s = s || ''; return s.length > n ? s.slice(0,n) + '…' : s; }
 function esc(s){ if(s==null)return ''; return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 async function signOut(){ await db.auth.signOut(); window.location.href = 'account.html'; }
+
+document.getElementById('send-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSendModal();
+});
 
 init();
 </script>
