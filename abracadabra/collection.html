@@ -497,6 +497,77 @@ body::before {
 .cc-intensity-fill { height:100%; border-radius:2px; transition:width 0.3s; opacity:0.8; }
 .cc-lore { margin-top:12px; padding:10px 12px; border-left:2px solid var(--gold-dark); background:rgba(90,63,30,0.08); font-size:12px; font-style:italic; color:var(--text-dim); line-height:1.55; }
 
+
+/* Null Chest wrapper around engine cards */
+.cc-wrap { position:relative; transition:transform 0.15s, box-shadow 0.15s; }
+.cc-wrap:hover { transform:translateY(-2px); }
+.cc-wrap.selectable { cursor:pointer; }
+.cc-wrap.selectable:hover .item-card { border-color:var(--gold-dark); }
+.cc-wrap.selected .item-card { border-color:var(--gold); box-shadow:0 0 18px rgba(200,169,81,0.35); }
+.cc-wrap.selected::after {
+  content:'✓'; position:absolute; top:12px; right:14px; z-index:5;
+  width:24px; height:24px; border-radius:50%;
+  background:linear-gradient(180deg,#e0c060,#a07820); color:#0a0705;
+  font-family:'Cinzel',serif; font-size:14px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 10px rgba(200,169,81,0.5);
+}
+.cc-wrap.arrival .item-card {
+  border-color:var(--arrival) !important;
+  box-shadow:0 0 22px var(--arrival-glow) !important;
+  animation:arrivalPulse 2s ease-in-out infinite;
+}
+.cc-title-banner {
+  text-align:center; font-family:'Cinzel',serif; font-size:13px; font-weight:700;
+  letter-spacing:1px; color:var(--gold-light); padding:8px 12px 6px;
+  background:rgba(200,169,81,0.08); border:1px solid rgba(200,169,81,0.25);
+  border-bottom:none; border-radius:2px 2px 0 0;
+}
+.cc-arrival-banner {
+  text-align:center; font-family:'Cinzel',serif; font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--arrival); padding:7px 12px;
+  background:rgba(122,208,255,0.08); border:1px solid rgba(122,208,255,0.3);
+  border-bottom:none; border-radius:2px 2px 0 0; text-shadow:0 0 8px var(--arrival-glow);
+}
+.cc-footer {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 16px; background:rgba(90,63,30,0.08);
+  border:1px solid var(--border-color); border-top:none; border-radius:0 0 2px 2px;
+}
+.cc-footer-uid { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--gold-dark); }
+.cc-footer-date { font-family:'Cinzel',serif; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+/* Make the engine card sit flush between banner and footer */
+.cc-wrap .item-card { border-radius:0; margin:0; }
+.cc-wrap:not(:has(.cc-title-banner)):not(:has(.cc-arrival-banner)) .item-card { border-radius:2px 2px 0 0; }
+
+
+/* ===== CENTERED SPRITE OVERRIDE (image centered in card) ===== */
+.item-card { padding-right: 22px !important; padding-top: 20px !important; }
+.item-sprite-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 0 auto 14px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-frame {
+  position: relative !important;
+  top: auto !important; right: auto !important; left: auto !important;
+  transform: none !important;
+  margin: 14px auto 8px !important;
+  width: 180px !important; height: 180px !important;
+}
+.entity-portrait-label {
+  position: relative !important;
+  text-align: center;
+  left: auto !important; bottom: auto !important;
+  margin-top: 6px;
+}
+.item-card:has(.entity-portrait-frame) { min-height: 0 !important; }
+/* Center the header text under the centered sprite */
+.item-tier-badge { display:inline-block; }
+.item-name, .item-base-type, .item-curse-type { text-align:center; }
+
 </style>
 </head>
 <body>
@@ -4886,13 +4957,16 @@ function dbSnapshotToItem(snap) {
       _manualNotes: snap.notes || null
     };
     if (snap.bound && snap.bound_entity_name) {
-      item.boundEntity = { Name: snap.bound_entity_name, Description: snap.bound_entity_desc || '', Type: snap.bound_entity_type || '' };
+      item.boundEntity = { Name: snap.bound_entity_name, Description: snap.bound_entity_desc || '', Type: snap.bound_entity_type || '', 'Danger Level': snap.bound_danger_level || 0 };
     }
+    item.courtName = snap.court_name || null;
+    item.entityPortraitUid = snap.entity_portrait_uid || null;
+    if (typeof RARITY_CONFIG !== 'undefined' && RARITY_CONFIG[item.rarity]) item.cfg = RARITY_CONFIG[item.rarity];
     return item;
   }
 
   // Generated item: snapshot fields map almost 1:1
-  return {
+  const genItem = {
     archivalId: snap.archival_id || snap.uid_code,
     rarity: snap.rarity,
     baseType: snap.base_type,
@@ -4910,8 +4984,12 @@ function dbSnapshotToItem(snap) {
     boundEntity: snap.bound_entity || null,
     boundDesc: snap.bound_desc || null,
     courtName: snap.court_name || null,
-    imageUid: snap.image_uid || null
+    imageUid: snap.image_uid || null,
+    entityPortraitUid: snap.entity_portrait_uid || null
   };
+  // Attach cfg (contains boundType) so entity portraits regenerate correctly
+  if (typeof RARITY_CONFIG !== 'undefined' && RARITY_CONFIG[genItem.rarity]) genItem.cfg = RARITY_CONFIG[genItem.rarity];
+  return genItem;
 }
 
 function renderChest() {
@@ -4937,12 +5015,24 @@ function renderChest() {
     <div class="collection-grid">${cards}</div>`;
 
   requestAnimationFrame(() => {
-    collectionData.forEach((item, i) => {
-      const canvas = document.getElementById('cc-sprite-' + i);
-      if (!canvas) return;
+    const wraps = document.querySelectorAll('.cc-wrap');
+    wraps.forEach((wrap, i) => {
+      const item = collectionData[i];
+      if (!item) return;
       const engineItem = dbSnapshotToItem(item.item_snapshot || {});
-      if (window.renderItemSprite) {
-        try { window.renderItemSprite(engineItem, canvas); } catch(e) {}
+      // Item sprite
+      const spriteCanvas = wrap.querySelector('.item-sprite');
+      if (spriteCanvas && window.renderItemSprite) {
+        try { window.renderItemSprite(engineItem, spriteCanvas); } catch(e) {}
+      }
+      // Bound entity portrait (2nd image)
+      const portrait = wrap.querySelector('.entity-portrait');
+      if (portrait && engineItem.bound && window.renderEntityPortraitForItem) {
+        try {
+          const info = window.renderEntityPortraitForItem(engineItem, portrait);
+          const label = portrait.parentElement.querySelector('.entity-portrait-label');
+          if (label && info) label.textContent = info.label || 'Bound Entity';
+        } catch(e) {}
       }
     });
   });
@@ -4950,87 +5040,44 @@ function renderChest() {
 
 function renderCollectionCard(item, i) {
   const snap = item.item_snapshot || {};
-  const cfg = RARITY_COLORS[snap.rarity] || RARITY_COLORS.common;
-  const isManual = !!snap.item_name || !!snap.primary_effect_name;
+  const engineItem = dbSnapshotToItem(snap);
   const officialName = item.official_name || snap.item_name || snap.base_type || item.copy_uid;
-  const baseType = snap.base_type || '';
-
-  let effName='', effDesc='', effPenalty='';
-  if (isManual) {
-    effName = snap.primary_effect_name || '';
-    effDesc = snap.primary_effect_desc || '';
-    effPenalty = snap.primary_effect_penalty || '';
-  } else if (snap.effects && snap.effects.length) {
-    effName = snap.effects[0].name || '';
-    effDesc = snap.effects[0].shortDesc || snap.effects[0].desc || '';
-    effPenalty = snap.effects[0].penalty || '';
-  }
-
-  // Curse type line
-  let curseLine = '';
-  if (isManual) {
-    curseLine = [snap.curse_type_label, snap.curse_type_subtype].filter(Boolean).join(' — ');
-  } else if (snap.curse_type) {
-    curseLine = [snap.curse_type.label, snap.curse_type.subtype].filter(Boolean).join(' — ');
-  }
-  const domainLabel = snap.domain ? (DOMAIN_MAP[snap.domain] || snap.domain) : '';
-
-  // Secondary effect
-  let secName='', secDesc='';
-  if (isManual && snap.secondary_effect_name) { secName = snap.secondary_effect_name; secDesc = snap.secondary_effect_desc || ''; }
-  else if (!isManual && snap.second_effect) { secName = snap.second_effect.name || ''; secDesc = snap.second_effect.shortDesc || snap.second_effect.desc || ''; }
-
-  // Bound entity
-  let boundName='', boundDesc='';
-  if (isManual && snap.bound && snap.bound_entity_name) { boundName = snap.bound_entity_name; boundDesc = snap.bound_entity_desc || ''; }
-  else if (!isManual && snap.bound && snap.bound_entity) { boundName = snap.bound_entity.Name || ''; boundDesc = snap.bound_entity.Description || ''; }
-
-  const intensity = snap.intensity ?? 0;
-  const TIER_LABELS = ['Trace','Mild','Moderate','Severe','Critical','Absolute'];
-  const TIER_VALS = ['I','II','III','IV','V','VI'];
-  const intensityPct = Math.round(((intensity + 1) / 6) * 100);
 
   const dateStr = new Date(item.collected_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
   const hasTitle = item.custom_title && item.custom_title.trim();
   const isArrival = item.is_new_arrival;
   const isSelected = selectedUids.has(item.copy_uid);
 
-  const classes = ['collect-card'];
-  if (isArrival && !selectMode) classes.push('arrival');
-  if (selectMode) classes.push('selectable');
-  if (isSelected) classes.push('selected');
+  // Render the FULL engine card (identical to the public generator, incl. bound entities + colors)
+  let engineCard = '';
+  try { engineCard = renderCard(engineItem, false); } catch(e) { console.warn('renderCard failed', e); }
+
+  // Wrapper classes for selection / arrival state
+  const wrapClasses = ['cc-wrap'];
+  if (isArrival && !selectMode) wrapClasses.push('arrival');
+  if (selectMode) wrapClasses.push('selectable');
+  if (isSelected) wrapClasses.push('selected');
 
   const clickAttr = selectMode ? `onclick="toggleSelect('${esc(item.copy_uid)}')"` : '';
 
+  // Custom-title banner + collection meta, layered on top of the engine card
+  const titleBanner = hasTitle
+    ? `<div class="cc-title-banner">✦ ${esc(item.custom_title)}</div>`
+    : '';
+  const arrivalBanner = (isArrival && !selectMode && item.received_from)
+    ? `<div class="cc-arrival-banner">✦ Sent from ${esc(item.received_from)}</div>`
+    : '';
+  const metaFooter = `<div class="cc-footer">
+      <span class="cc-footer-uid">${esc(item.copy_uid)}</span>
+      <span class="cc-footer-date">${item.received_from ? 'Received' : 'Collected'} ${dateStr}</span>
+    </div>`;
+
   return `
-    <div class="${classes.join(' ')}" id="card-${i}" data-uid="${esc(item.copy_uid)}" ${clickAttr}>
-      ${(isArrival && !selectMode && item.received_from) ? `<span class="arrival-label">✦ Sent from ${esc(item.received_from)}</span>` : ''}
-      <div class="cc-sprite-frame"><canvas id="cc-sprite-${i}" width="256" height="256"></canvas></div>
-      <span class="cc-tier" style="color:${cfg.color};">${cfg.label}</span>
-      ${hasTitle ? `<div class="cc-custom-title">${esc(item.custom_title)}</div><div class="cc-official">${esc(officialName)}</div>`
-                 : `<div class="cc-custom-title">${esc(officialName)}</div>`}
-      ${baseType ? `<div class="cc-base">${esc(baseType)}</div>` : ''}
-      ${curseLine ? `<div class="cc-curse-line">${esc(curseLine)}${domainLabel ? ' · ' + esc(domainLabel) + ' Domain' : ''}</div>` : ''}
-      ${effName ? `<div class="cc-divider"></div>
-        <div class="cc-effect-name">${domainLabel ? esc(domainLabel) + ' · ' : ''}${esc(effName)}</div>
-        <div class="cc-effect-desc">${esc(effDesc)}</div>
-        ${effPenalty ? `<div class="cc-penalty">⚠ ${esc(effPenalty)}</div>` : ''}` : ''}
-      ${secName ? `<div class="cc-divider"></div>
-        <div class="cc-effect-name" style="color:var(--corrupt-purple-bright,#bb88ee);">Secondary · ${esc(secName)}</div>
-        <div class="cc-effect-desc">${esc(secDesc)}</div>` : ''}
-      ${boundName ? `<div class="cc-divider"></div>
-        <div class="cc-effect-name" style="color:#88ffbb;">Bound Entity</div>
-        <div class="cc-custom-title" style="font-size:14px;color:#b8ffe0;text-align:left;">${esc(boundName)}</div>
-        <div class="cc-effect-desc" style="color:#aae8cc;font-style:italic;">${esc(boundDesc)}</div>` : ''}
-      <div class="cc-intensity">
-        <div class="cc-intensity-label"><span>Intensity — ${TIER_LABELS[intensity]||''}</span><span>${TIER_VALS[intensity]||''}</span></div>
-        <div class="cc-intensity-track"><div class="cc-intensity-fill" style="width:${intensityPct}%;background:${cfg.color};"></div></div>
-      </div>
-      ${snap.lore ? `<div class="cc-lore">${esc(snap.lore)}</div>` : ''}
-      <div class="cc-meta">
-        <span class="cc-uid">${esc(item.copy_uid)}</span>
-        <span class="cc-date">${item.received_from ? 'Received' : 'Collected'} ${dateStr}</span>
-      </div>
+    <div class="${wrapClasses.join(' ')}" id="card-${i}" data-uid="${esc(item.copy_uid)}" ${clickAttr}>
+      ${arrivalBanner}
+      ${titleBanner}
+      ${engineCard}
+      ${metaFooter}
     </div>`;
 }
 
