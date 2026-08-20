@@ -206,7 +206,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 /* map window */
 .window{
   position:relative;border:1px solid rgba(192,154,91,.28);background:#050807;
-  aspect-ratio:16/11;overflow:hidden;min-height:440px;
+  aspect-ratio:16/10;overflow:hidden;min-height:560px;
 }
 /* No filter here on purpose — the map must render exactly as it does
    at its own URL. Any tint added below would make the embed disagree
@@ -419,14 +419,14 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
         <span class="folio">Verso ii · live</span>
       </div>
       <div class="window">
-        <iframe src="https://jasonuzu.github.io/mrjason/abra/map.html"
+        <iframe src="world-public.html"
                 title="Abracadabra world map" loading="lazy" allowfullscreen></iframe>
         <div class="sheen"></div>
         <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
       </div>
       <div class="map-note">
-        <p>Drag to travel. Marked sites carry standing effects.</p>
-        <a href="https://jasonuzu.github.io/mrjason/abra/map.html" target="_blank" rel="noopener">Open full map ↗</a>
+        <p>Drag to travel, scroll to zoom. Enter a tile to stand in it.</p>
+        <a href="world-public.html" target="_blank" rel="noopener">Open full map ↗</a>
       </div>
     </div>
   </section>
