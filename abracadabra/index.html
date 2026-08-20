@@ -869,7 +869,9 @@
 /* ===== CENTERED SPRITE OVERRIDE (graphic boxed + centered above text) ===== */
 /* Sprite/portrait boxes move from the top-right corner into normal flow, centered.
    Text formatting is left untouched so it matches the public generator exactly. */
-.item-card { padding-right: 22px !important; padding-top: 20px !important; }
+.item-card { padding-right: 22px !important; padding-top: 46px !important; }
+/* keep the rarity label above the centred graphic box */
+.item-tier-badge { z-index: 3; }
 .item-sprite-frame {
   position: relative !important;
   top: auto !important; right: auto !important; left: auto !important;
