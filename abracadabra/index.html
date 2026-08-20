@@ -866,30 +866,31 @@
   .db-dot.online { background: var(--set-green); box-shadow: 0 0 6px rgba(68,187,68,0.5); }
   .db-dot.offline { background: var(--blood); }
 
-/* ===== CENTERED SPRITE OVERRIDE (image centered in card) ===== */
+/* ===== CENTERED SPRITE OVERRIDE (graphic boxed + centered above text) ===== */
+/* Sprite/portrait boxes move from the top-right corner into normal flow, centered.
+   Text formatting is left untouched so it matches the public generator exactly. */
 .item-card { padding-right: 22px !important; padding-top: 20px !important; }
 .item-sprite-frame {
   position: relative !important;
   top: auto !important; right: auto !important; left: auto !important;
   transform: none !important;
-  margin: 0 auto 14px !important;
+  margin: 0 auto 16px !important;
   width: 180px !important; height: 180px !important;
 }
 .entity-portrait-frame {
   position: relative !important;
   top: auto !important; right: auto !important; left: auto !important;
   transform: none !important;
-  margin: 14px auto 8px !important;
+  margin: 16px auto 10px !important;
   width: 180px !important; height: 180px !important;
 }
 .entity-portrait-label {
   position: relative !important;
-  text-align: center;
-  left: auto !important; bottom: auto !important;
-  margin-top: 6px;
+  left: auto !important; right: auto !important; bottom: auto !important;
+  transform: none !important;
+  width: 100%; text-align: center; margin-top: 8px;
 }
 .item-card:has(.entity-portrait-frame) { min-height: 0 !important; }
-.item-name, .item-base-type, .item-curse-type { text-align:center; }
 
 </style>
 </head>
