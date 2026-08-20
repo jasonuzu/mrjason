@@ -102,12 +102,12 @@ body::before {
   100% { transform:translateY(-60px) scale(0.6); opacity:0; filter:brightness(2.5) drop-shadow(0 0 20px var(--gold-light)); }
 }
 .cc-sprite-frame {
-  width:80px; height:80px; margin:0 auto 12px;
+  width:150px; height:150px; margin:0 auto 14px;
   background:radial-gradient(circle at 50% 40%, rgba(40,28,16,0.9), rgba(12,8,5,0.95));
   border:1px solid var(--border-color); border-radius:2px;
-  display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 14px rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 16px rgba(0,0,0,0.6);
 }
-.cc-sprite-frame canvas { image-rendering:pixelated; width:64px; height:64px; }
+.cc-sprite-frame canvas { image-rendering:pixelated; image-rendering:crisp-edges; width:128px; height:128px; }
 .cc-tier { display:block; text-align:center; font-family:'Cinzel',serif; font-size:8px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
 .cc-custom-title { font-family:'Cinzel',serif; font-size:16px; font-weight:700; color:var(--gold-light); text-align:center; line-height:1.2; margin-bottom:3px; }
 .cc-official { text-align:center; font-size:13px; color:var(--text-dim); font-style:italic; margin-bottom:2px; }
@@ -357,7 +357,7 @@ function renderCollectionCard(item, i) {
   return `
     <div class="${classes.join(' ')}" id="card-${i}" data-uid="${esc(item.copy_uid)}" ${clickAttr}>
       ${(isArrival && !selectMode && item.received_from) ? `<span class="arrival-label">✦ Sent from ${esc(item.received_from)}</span>` : ''}
-      <div class="cc-sprite-frame"><canvas id="cc-sprite-${i}" width="64" height="64"></canvas></div>
+      <div class="cc-sprite-frame"><canvas id="cc-sprite-${i}" width="256" height="256"></canvas></div>
       <span class="cc-tier" style="color:${cfg.color};">${cfg.label}</span>
       ${hasTitle ? `<div class="cc-custom-title">${esc(item.custom_title)}</div><div class="cc-official">${esc(officialName)}</div>`
                  : `<div class="cc-custom-title">${esc(officialName)}</div>`}
@@ -478,7 +478,7 @@ function paintSprite(snap, canvas) {
   for (let i=0;i<seedStr.length;i++) seed = (seed*31 + seedStr.charCodeAt(i)) >>> 0;
   function rng(){ seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; }
   const cfg = RARITY_CONFIG[snap.rarity] || RARITY_CONFIG.common;
-  const grid = 16, cell = 64/grid;
+  const grid = 16, cell = canvas.width/grid;
   ctx.clearRect(0,0,64,64);
   for (let y=0;y<grid;y++){
     for (let x=0;x<Math.ceil(grid/2);x++){
