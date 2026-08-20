@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cursed Reliquary — Collect Item</title>
+<title>Abracadabra — Huldufólk</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -179,7 +179,7 @@ body::before {
 <body>
 <div class="collect-wrap">
   <div class="brand">
-    <div class="brand-title">☠ Cursed Reliquary</div>
+    <div class="brand-title">☠ Abracadabra</div>
     <div class="brand-sub">A Relic Has Been Shared With You</div>
   </div>
 
@@ -481,7 +481,7 @@ async function collectItem(allowTitle) {
         ? `<strong>${esc(title)}</strong><br><span style="font-size:13px;color:var(--text-dim);">(${esc(officialName)})</span><br>now belongs to <strong>${esc(currentUserName)}</strong>.`
         : `<strong>${esc(officialName)}</strong><br>now belongs to <strong>${esc(currentUserName)}</strong>.`;
       uidEl.innerHTML = 'Your copy: ' + esc(result.result_copy_uid) +
-        '<br><br><a href="collection.html" style="color:var(--gold);font-family:\'Cinzel\',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">View My Collection →</a>';
+        '<br><br><a href="collection.html" style="color:var(--gold);font-family:\'Cinzel\',serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none;">View My Null Chest →</a>';
       panel.classList.add('visible');
     } else if (result.result_status === 'not_logged_in') {
       status.className = 'collect-status error';
