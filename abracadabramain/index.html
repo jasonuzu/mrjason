@@ -257,6 +257,44 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   100% { background-color: rgba(180,210,255,0.10); }
 }
 
+
+/* ---------- chronicle overlay ---------- */
+.chron-panel{
+  width:min(760px,100%);border:1px solid rgba(192,154,91,.34);
+  background:linear-gradient(180deg,#0F1514,#080B0B);
+  box-shadow:var(--shadow-deep);padding:34px 34px 30px;position:relative;
+  transform:translateY(14px) scale(.985);transition:.35s cubic-bezier(.2,.8,.2,1);
+}
+.scrim.open .chron-panel{transform:none}
+.chron-panel .x{position:absolute;top:12px;right:14px;color:var(--ash-dim);font-size:22px;line-height:1;padding:6px}
+.chron-panel .x:hover{color:var(--vellum)}
+.chron-kind{font-family:var(--display);font-size:10.5px;letter-spacing:.24em;color:var(--verdigris);margin-bottom:8px}
+.chron-title{font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:.12em;margin:0 0 20px;padding-right:26px}
+.chron-body{display:grid;grid-template-columns:1fr 250px;gap:28px;align-items:start}
+.chron-desc{font-family:var(--hand);font-size:18px;line-height:1.7;color:#CFC8B4;white-space:pre-wrap}
+.chron-photo{
+  width:100%;aspect-ratio:4/3;border:1px solid rgba(192,154,91,.3);
+  background:#050807 center/cover no-repeat;margin-bottom:14px;
+}
+.chron-photo.none{display:none}
+.chron-links{display:flex;flex-direction:column;gap:9px}
+.chron-link{
+  display:block;padding:11px 14px;text-align:center;
+  font-family:var(--display);font-size:11.5px;letter-spacing:.16em;
+  border:1px solid;transition:filter .3s, transform .3s, box-shadow .3s;
+}
+.chron-link:hover{transform:translateY(-2px);filter:brightness(1.22)}
+.chron-link.c0{background:rgba(78,141,128,.24);border-color:rgba(127,227,208,.55);color:#BFF6EA}
+.chron-link.c1{background:rgba(192,154,91,.22);border-color:rgba(224,192,120,.55);color:#F0DDAE}
+.chron-link.c2{background:rgba(124,101,151,.24);border-color:rgba(178,152,214,.55);color:#DCCCF2}
+.chron-link.c3{background:rgba(162,92,60,.24);border-color:rgba(214,138,100,.55);color:#F2CBB4}
+.index .draft{display:inline-block;margin-left:8px;font-family:var(--code);font-size:9px;letter-spacing:.14em;color:#E8C87A;vertical-align:middle}
+@media (max-width:620px){
+  .chron-body{grid-template-columns:1fr;gap:20px}
+  .chron-panel{padding:28px 20px 24px}
+  .chron-title{font-size:20px}
+}
+
 /* ---------- gates ---------- */
 .gates{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:26px}
 .gate{
@@ -670,6 +708,22 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
 
     <p class="note" id="switchNote">No account yet? Create one — it takes a moment.</p>
     <p class="note" style="margin-top:9px;opacity:.6"><a href="account.html" style="border-bottom:1px solid rgba(192,154,91,.3)">Open the full account page</a></p>
+  </div>
+</div>
+
+<!-- chronicle overlay -->
+<div class="scrim" id="chronScrim" role="dialog" aria-modal="true" aria-labelledby="chronTitle">
+  <div class="chron-panel">
+    <button class="x" id="chronClose" aria-label="Close">&times;</button>
+    <div class="chron-kind" id="chronKind"></div>
+    <h2 class="chron-title" id="chronTitle"></h2>
+    <div class="chron-body">
+      <div class="chron-desc" id="chronDesc"></div>
+      <div class="chron-side">
+        <div class="chron-photo" id="chronPhoto"></div>
+        <div class="chron-links" id="chronLinks"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -12935,32 +12989,6 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
 
 <script>
 /* ============================================================
-   ADMIN — story list.
-   Edit titles, links, and kind here. Later this can be served
-   from your admin panel; the page renders whatever is in STORIES.
-   ============================================================ */
-const STORIES = [
-  { title: "The Glass Beach Catastrophe", kind: "Recursive relic",   href: "#" },
-  { title: "Thalen and the Exile-Bound Coin", kind: "Exile-bound",   href: "#" },
-  { title: "Two Hundred Years, Two Names",  kind: "Neural dissonance", href: "#" },
-  { title: "The First Guard at Dawn",       kind: "Vacancy-bound",   href: "#" },
-  { title: "What the Null Chest Keeps",     kind: "Anchored",        href: "#" },
-  { title: "A Wall That Remembers",         kind: "Area curse",      href: "#" },
-  { title: "The Cartographer of Endless Roads", kind: "Geo-bound",   href: "#" }
-];
-
-const list = document.getElementById('storyIndex');
-list.innerHTML = STORIES.map((s, i) => `
-  <li><a href="${s.href}">
-    <span class="row">
-      <span class="t">${s.title}</span>
-      <span class="dots"></span>
-      <span class="no">${String(i + 1).padStart(2, '0')}</span>
-    </span>
-    <span class="kind">${s.kind}</span>
-  </a></li>`).join('');
-
-/* ============================================================
    Accounts — Supabase.
    Same project, same auth, and the same profiles/RPCs used by
    account.html, collect.html and the Null Chest. A session made
@@ -13153,6 +13181,101 @@ document.querySelectorAll('.gate[data-locked]').forEach(g => {
 db.auth.onAuthStateChange(() => { refresh(); });
 
 refresh();
+
+
+/* ============================================================
+   CHRONICLES — served from the database.
+   Rows are written by codex-admin.html. RLS decides visibility:
+   visitors get published rows, the admin also sees drafts.
+   ============================================================ */
+let CHRONICLES = [];
+
+async function loadChronicles(){
+  const list = $('storyIndex');
+  const foot = document.querySelector('.leaf.left .foot');
+  try {
+    const { data, error } = await db
+      .from('chronicles')
+      .select('id,title,kind,link_mode,direct_url,description,image_url,links,published,sort_order')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    CHRONICLES = data || [];
+  } catch (e) {
+    list.innerHTML = '';
+    if (foot) foot.textContent = 'The index could not be read just now.';
+    console.error('chronicles:', e);
+    return;
+  }
+
+  if (!CHRONICLES.length){
+    list.innerHTML = '';
+    if (foot) foot.textContent = 'Nothing has been copied out yet.';
+    return;
+  }
+  if (foot) foot.textContent = 'More is being copied out. Entries appear here as they are finished.';
+
+  list.innerHTML = CHRONICLES.map((c, i) => {
+    // Direct links stay real hrefs so middle-click and "open in new tab" work.
+    const href = (c.link_mode === 'direct' && c.direct_url) ? c.direct_url : '#';
+    const target = (c.link_mode === 'direct' && c.direct_url)
+      ? ' target="_blank" rel="noopener"' : '';
+    return `
+      <li><a href="${escapeAttr(href)}"${target} data-id="${escapeAttr(c.id)}">
+        <span class="row">
+          <span class="t">${escapeHtml(c.title)}${c.published ? '' : '<span class="draft">DRAFT</span>'}</span>
+          <span class="dots"></span>
+          <span class="no">${String(i + 1).padStart(2, '0')}</span>
+        </span>
+        ${c.kind ? `<span class="kind">${escapeHtml(c.kind)}</span>` : ''}
+      </a></li>`;
+  }).join('');
+
+  list.querySelectorAll('a[data-id]').forEach(a => {
+    a.addEventListener('click', e => {
+      const c = CHRONICLES.find(x => x.id === a.dataset.id);
+      if (!c) return;
+      if (c.link_mode === 'choices'){ e.preventDefault(); openChronicle(c); }
+      else if (!c.direct_url){ e.preventDefault(); }
+    });
+  });
+}
+
+function openChronicle(c){
+  $('chronKind').textContent  = c.kind || '';
+  $('chronTitle').textContent = c.title || '';
+  $('chronDesc').textContent  = c.description || '';
+
+  const photo = $('chronPhoto');
+  if (c.image_url){
+    photo.style.backgroundImage = `url("${String(c.image_url).replace(/"/g,'%22')}")`;
+    photo.classList.remove('none');
+  } else {
+    photo.style.backgroundImage = '';
+    photo.classList.add('none');
+  }
+
+  const links = Array.isArray(c.links) ? c.links.slice(0, 4) : [];
+  $('chronLinks').innerHTML = links.filter(l => l && l.url).map((l, i) => {
+    const colour = Number.isInteger(l.color) ? (l.color % 4) : (i % 4);
+    return `<a class="chron-link c${colour}" href="${escapeAttr(l.url)}"
+               target="_blank" rel="noopener">${escapeHtml(l.label || 'Open')}</a>`;
+  }).join('');
+
+  $('chronScrim').classList.add('open');
+  setTimeout(() => $('chronClose').focus(), 120);
+}
+
+function closeChronicle(){ $('chronScrim').classList.remove('open'); }
+$('chronClose').onclick = closeChronicle;
+$('chronScrim').onclick = e => { if (e.target === $('chronScrim')) closeChronicle(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeChronicle(); });
+
+function escapeAttr(s){ return escapeHtml(s); }
+
+loadChronicles();
+/* Drafts appear/disappear as the admin signs in or out. */
+db.auth.onAuthStateChange(() => { loadChronicles(); });
 
 /* ---------- drifting motes ---------- */
 (function(){
