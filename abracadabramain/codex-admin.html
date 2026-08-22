@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codex Admin — Abracadabra</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --ink:#080A0A; --verdigris:#4E8D80; --gem:#7FE3D0; --brass:#C09A5B;
+  --vellum:#E4DAC2; --ash:#8C948F; --ash-dim:#5E6663;
+  --danger:#B4553F; --good:#7FE3B0;
+  --display:"IM Fell English SC",Georgia,serif;
+  --body:"EB Garamond",Georgia,serif;
+  --hand:"IM Fell English",Georgia,serif;
+  --code:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --rule:1px solid rgba(192,154,91,.22);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink);color:var(--vellum);font-family:var(--body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--gem);outline-offset:3px}
+
+.field{position:fixed;inset:0;z-index:0;pointer-events:none}
+.field.lamp{background:
+  radial-gradient(1000px 640px at 50% -8%, rgba(78,141,128,.15), transparent 62%),
+  linear-gradient(180deg,#0B100F,#080A0A 45%,#050706)}
+.field.vignette{box-shadow:inset 0 0 240px 80px rgba(0,0,0,.88)}
+
+.shell{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:0 26px 80px}
+.rail{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 0 13px;border-bottom:var(--rule);background:rgba(6,8,8,.94);backdrop-filter:blur(7px)}
+.mark{display:flex;align-items:center;gap:10px;font-family:var(--display);letter-spacing:.16em;font-size:13.5px;color:var(--ash)}
+.mark b{color:var(--vellum);font-weight:400}
+.rail .right{display:flex;align-items:center;gap:20px}
+.rail .right a,.rail .right button{font-family:var(--display);font-size:12px;letter-spacing:.18em;color:var(--ash);transition:.3s}
+.rail .right a:hover{color:var(--vellum)}
+.rail .right button:hover{color:var(--danger)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--display);font-size:11.5px;
+  letter-spacing:.18em;padding:10px 18px;border:1px solid rgba(192,154,91,.42);color:var(--vellum);
+  background:rgba(20,26,25,.6);transition:.3s}
+.btn:hover:not([disabled]){border-color:var(--gem);background:rgba(30,44,41,.72)}
+.btn.solid{background:linear-gradient(180deg,rgba(78,141,128,.32),rgba(78,141,128,.14));border-color:rgba(127,227,208,.5)}
+.btn.danger{border-color:rgba(180,85,63,.5);color:#E2A791}
+.btn.danger:hover{background:rgba(180,85,63,.16);border-color:var(--danger)}
+.btn.small{padding:7px 13px;font-size:10.5px}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+
+/* login */
+.login{max-width:400px;margin:90px auto 0;border:1px solid rgba(192,154,91,.3);
+  background:linear-gradient(180deg,#0F1514,#080B0B);padding:34px}
+.login h1{font-family:var(--display);font-weight:400;font-size:21px;letter-spacing:.16em;text-align:center;margin-bottom:6px}
+.login .sub{text-align:center;font-family:var(--hand);font-style:italic;color:var(--ash);margin-bottom:24px}
+
+label{display:block;font-family:var(--display);font-size:10px;letter-spacing:.22em;color:var(--verdigris);margin-bottom:6px}
+input,textarea,select{width:100%;padding:11px 13px;font-family:var(--body);font-size:16px;color:var(--vellum);
+  background:rgba(5,8,8,.8);border:1px solid rgba(192,154,91,.24);transition:.3s;border-radius:0}
+textarea{font-family:var(--hand);min-height:150px;resize:vertical;line-height:1.6}
+input:focus,textarea:focus,select:focus{outline:0;border-color:var(--gem);box-shadow:0 0 20px -8px rgba(127,227,208,.6)}
+select{appearance:none;cursor:pointer}
+option{background:#0B100F}
+.f{margin-bottom:16px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.status{margin-top:14px;padding:10px 13px;font-size:15px;display:none}
+.status.show{display:block}
+.status.error{border-left:2px solid var(--danger);background:rgba(180,85,63,.1);color:#E2A791}
+.status.info{border-left:2px solid var(--verdigris);background:rgba(78,141,128,.1);color:#A9D8CD}
+.status.success{border-left:2px solid var(--good);background:rgba(127,227,176,.1);color:var(--good)}
+
+/* workspace */
+.head{padding:40px 0 16px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.head h1{font-family:var(--display);font-weight:400;font-size:29px;letter-spacing:.14em}
+.head .who{font-family:var(--hand);font-style:italic;color:var(--ash);font-size:16px}
+.hr{height:1px;background:linear-gradient(90deg,transparent,rgba(192,154,91,.3),transparent);margin:18px 0 26px}
+
+.rows{border:1px solid rgba(192,154,91,.18)}
+.rowitem{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:center;
+  padding:14px 16px;border-bottom:1px solid rgba(192,154,91,.12);transition:background .25s}
+.rowitem:last-child{border-bottom:0}
+.rowitem:hover{background:rgba(78,141,128,.06)}
+.rowitem .ord{font-family:var(--code);font-size:11px;color:var(--ash-dim);text-align:center}
+.rowitem .t{font-family:var(--hand);font-size:19px;color:#E4DAC2}
+.rowitem .m{font-family:var(--code);font-size:9.5px;letter-spacing:.14em;color:var(--ash-dim);margin-top:3px;text-transform:uppercase}
+.rowitem .acts{display:flex;gap:8px}
+.pill{display:inline-block;font-family:var(--code);font-size:9px;letter-spacing:.14em;padding:2px 7px;
+  border:1px solid rgba(192,154,91,.3);color:var(--ash-dim);margin-left:8px}
+.pill.draft{color:#E8C87A;border-color:rgba(232,200,122,.4)}
+.pill.live{color:var(--good);border-color:rgba(127,227,176,.35)}
+
+.empty{padding:60px 20px;text-align:center;font-family:var(--hand);font-style:italic;color:var(--ash);font-size:17px}
+
+/* editor */
+.editor{border:1px solid rgba(192,154,91,.24);background:linear-gradient(180deg,rgba(16,22,21,.9),rgba(8,11,11,.9));padding:28px;margin-bottom:26px}
+.editor h2{font-family:var(--display);font-weight:400;font-size:18px;letter-spacing:.16em;margin-bottom:20px}
+.linkrow{display:grid;grid-template-columns:1fr 1.4fr 120px 40px;gap:10px;align-items:center;margin-bottom:10px}
+.linkrow .sw{width:100%;height:38px;border:1px solid rgba(192,154,91,.3)}
+.sw.c0{background:rgba(78,141,128,.4)} .sw.c1{background:rgba(192,154,91,.4)}
+.sw.c2{background:rgba(124,101,151,.4)} .sw.c3{background:rgba(162,92,60,.4)}
+.hint{font-family:var(--hand);font-style:italic;font-size:15px;color:var(--ash-dim);margin-bottom:14px}
+.mode-only{display:none}.mode-only.on{display:block}
+.editor-acts{display:flex;gap:12px;margin-top:22px;flex-wrap:wrap}
+
+@media (max-width:700px){
+  .row2,.linkrow{grid-template-columns:1fr}
+  .rowitem{grid-template-columns:1fr;gap:10px}
+  .rowitem .acts{justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="field lamp"></div>
+<div class="field vignette"></div>
+
+<div class="shell">
+  <header class="rail">
+    <a class="mark" href="index.html"><span><b>Abracadabra</b> &nbsp;·&nbsp; codex admin</span></a>
+    <div class="right">
+      <a href="index.html">View the site</a>
+      <button id="outBtn" onclick="signOut()" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <!-- LOGIN -->
+  <div id="loginView">
+    <div class="login">
+      <h1>Keeper's Entrance</h1>
+      <p class="sub">This door is not for readers.</p>
+      <div class="f">
+        <label for="u">Username</label>
+        <input id="u" type="text" autocomplete="username" spellcheck="false" placeholder="username">
+      </div>
+      <div class="f">
+        <label for="p">Password</label>
+        <input id="p" type="password" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')doLogin()" placeholder="••••••••">
+      </div>
+      <button class="btn solid" style="width:100%;padding:12px" id="inBtn" onclick="doLogin()">Enter</button>
+      <div class="status" id="loginStatus"></div>
+    </div>
+  </div>
+
+  <!-- WORKSPACE -->
+  <div id="adminView" hidden>
+    <div class="head">
+      <div>
+        <h1>Chronicles</h1>
+        <div class="who" id="who">—</div>
+      </div>
+      <button class="btn solid" onclick="newPost()">+ New chronicle</button>
+    </div>
+    <div class="hr"></div>
+
+    <!-- editor -->
+    <div class="editor" id="editor" hidden>
+      <h2 id="editorTitle">New chronicle</h2>
+
+      <div class="row2">
+        <div class="f">
+          <label for="fTitle">Title</label>
+          <input id="fTitle" type="text" maxlength="160" placeholder="The Glass Beach Catastrophe">
+        </div>
+        <div class="f">
+          <label for="fKind">Kind <span style="text-transform:none;letter-spacing:0">(small line beneath)</span></label>
+          <input id="fKind" type="text" maxlength="80" placeholder="Recursive relic">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="f">
+          <label for="fOrder">Sort order <span style="text-transform:none;letter-spacing:0">(lower shows first)</span></label>
+          <input id="fOrder" type="number" value="0" step="1">
+        </div>
+        <div class="f">
+          <label for="fPublished">Visibility</label>
+          <select id="fPublished">
+            <option value="true">Published — visible to everyone</option>
+            <option value="false">Draft — only you can see it</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="f">
+        <label for="fMode">What happens when a reader clicks the title</label>
+        <select id="fMode" onchange="syncMode()">
+          <option value="direct">Go straight to one link</option>
+          <option value="choices">Open an overlay with up to 4 links</option>
+        </select>
+      </div>
+
+      <!-- DIRECT -->
+      <div class="mode-only" id="modeDirect">
+        <div class="f">
+          <label for="fDirect">Destination URL</label>
+          <input id="fDirect" type="url" placeholder="https://example.com/the-glass-beach">
+          <p class="hint" style="margin-top:8px">Opens in a new tab.</p>
+        </div>
+      </div>
+
+      <!-- CHOICES -->
+      <div class="mode-only" id="modeChoices">
+        <div class="f">
+          <label for="fDesc">Short description <span style="text-transform:none;letter-spacing:0">(left side of the overlay)</span></label>
+          <textarea id="fDesc" maxlength="900" placeholder="A few lines setting the scene…"></textarea>
+        </div>
+        <div class="f">
+          <label for="fImage">Photograph URL <span style="text-transform:none;letter-spacing:0">(top right)</span></label>
+          <input id="fImage" type="url" placeholder="https://…/image.jpg" oninput="previewImage()">
+          <div id="imgPreview" style="margin-top:10px"></div>
+        </div>
+        <label>Links — up to 4 buttons</label>
+        <p class="hint">Blank rows are ignored. Each button opens in a new tab.</p>
+        <div id="linkRows"></div>
+      </div>
+
+      <div class="status" id="editStatus"></div>
+      <div class="editor-acts">
+        <button class="btn solid" id="saveBtn" onclick="savePost()">Save chronicle</button>
+        <button class="btn" onclick="cancelEdit()">Cancel</button>
+        <button class="btn danger" id="delBtn" onclick="deletePost()" hidden>Delete</button>
+      </div>
+    </div>
+
+    <div id="listWrap"></div>
+    <div class="status" id="listStatus"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mhlwfevnjpezaaocbwwr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obHdmZXZuanBlemFhb2Nid3dyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3OTA1NjcsImV4cCI6MjA5NjM2NjU2N30.pIpC9ZrNTd16_A0aLl6TPokhEshElq0dNrMNwyMEJg0';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* The admin signs in with a username. Supabase Auth needs an email, so a
+   bare username is mapped onto this domain. Enter a full email instead and
+   it is used as-is — handy if you created the user with a real address. */
+const ADMIN_EMAIL_DOMAIN = 'abracadabra.local';
+
+const $ = id => document.getElementById(id);
+let posts = [];
+let editingId = null;
+
+function setStatus(id, type, msg){ const el = $(id); el.className = 'status show ' + type; el.textContent = msg; }
+function clearStatus(id){ const el = $(id); el.className = 'status'; el.textContent = ''; }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- auth ---------------- */
+async function doLogin(){
+  const raw = $('u').value.trim();
+  const password = $('p').value;
+  if (!raw || !password){ setStatus('loginStatus','error','Enter both fields.'); return; }
+  const email = raw.includes('@') ? raw : `${raw}@${ADMIN_EMAIL_DOMAIN}`;
+
+  const btn = $('inBtn'); btn.disabled = true; btn.textContent = 'Entering…';
+  clearStatus('loginStatus');
+  try {
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    await boot();
+  } catch(e){
+    setStatus('loginStatus','error', e.message || 'That did not work.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enter';
+  }
+}
+
+async function signOut(){ await db.auth.signOut(); location.reload(); }
+
+/* Admin status is decided by the database, not by this page. If is_admin()
+   is false every write is refused by RLS, so there is nothing to gain by
+   tampering with the JavaScript below. */
+async function isAdmin(){
+  try {
+    const { data, error } = await db.rpc('is_admin');
+    if (error) throw error;
+    return data === true;
+  } catch(e){ console.error(e); return false; }
+}
+
+async function boot(){
+  const { data:{ session } } = await db.auth.getSession();
+  if (!session){ $('loginView').hidden = false; $('adminView').hidden = true; $('outBtn').hidden = true; return; }
+
+  if (!await isAdmin()){
+    $('loginView').hidden = false; $('adminView').hidden = true;
+    setStatus('loginStatus','error','That account is signed in but is not a keeper.');
+    await db.auth.signOut();
+    return;
+  }
+
+  let name = session.user.user_metadata?.display_name || session.user.email;
+  try {
+    const { data: prof } = await db.from('profiles').select('display_name').eq('id', session.user.id).single();
+    if (prof?.display_name) name = prof.display_name;
+  } catch(e){}
+
+  $('who').textContent = 'Signed in as ' + name;
+  $('loginView').hidden = true;
+  $('adminView').hidden = false;
+  $('outBtn').hidden = false;
+  await loadPosts();
+}
+
+/* ---------------- list ---------------- */
+async function loadPosts(){
+  clearStatus('listStatus');
+  try {
+    const { data, error } = await db.from('chronicles').select('*')
+      .order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    if (error) throw error;
+    posts = data || [];
+    renderList();
+  } catch(e){
+    setStatus('listStatus','error','Could not load chronicles: ' + (e.message||e));
+  }
+}
+
+function renderList(){
+  if (!posts.length){
+    $('listWrap').innerHTML = '<div class="rows"><div class="empty">No chronicles yet. Create the first one.</div></div>';
+    return;
+  }
+  $('listWrap').innerHTML = '<div class="rows">' + posts.map((p,i) => {
+    const linkCount = Array.isArray(p.links) ? p.links.filter(l=>l&&l.url).length : 0;
+    const mode = p.link_mode === 'choices' ? `Overlay · ${linkCount} link${linkCount===1?'':'s'}` : 'Direct link';
+    return `
+    <div class="rowitem">
+      <div class="ord">${p.sort_order}</div>
+      <div>
+        <div class="t">${esc(p.title)}
+          <span class="pill ${p.published?'live':'draft'}">${p.published?'LIVE':'DRAFT'}</span>
+        </div>
+        <div class="m">${esc(p.kind||'—')} · ${mode}</div>
+      </div>
+      <div class="acts">
+        <button class="btn small" onclick="editPost('${p.id}')">Edit</button>
+        <button class="btn small danger" onclick="quickDelete('${p.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+/* ---------------- editor ---------------- */
+function blankLinkRows(links){
+  const rows = [];
+  for (let i = 0; i < 4; i++){
+    const l = (links && links[i]) || {};
+    rows.push(`
+      <div class="linkrow">
+        <input type="text" class="lk-label" maxlength="60" placeholder="Button ${i+1} label" value="${esc(l.label||'')}">
+        <input type="url"  class="lk-url" placeholder="https://…" value="${esc(l.url||'')}">
+        <select class="lk-color">
+          ${[0,1,2,3].map(c=>`<option value="${c}" ${Number(l.color??i)===c?'selected':''}>${['Verdigris','Brass','Plum','Rust'][c]}</option>`).join('')}
+        </select>
+        <div class="sw c${Number(l.color??i)}"></div>
+      </div>`);
+  }
+  return rows.join('');
+}
+
+function newPost(){
+  editingId = null;
+  $('editorTitle').textContent = 'New chronicle';
+  $('fTitle').value=''; $('fKind').value='';
+  $('fOrder').value = posts.length ? Math.max(...posts.map(p=>p.sort_order))+1 : 0;
+  $('fPublished').value='true'; $('fMode').value='direct';
+  $('fDirect').value=''; $('fDesc').value=''; $('fImage').value='';
+  $('linkRows').innerHTML = blankLinkRows([]);
+  $('imgPreview').innerHTML='';
+  $('delBtn').hidden = true;
+  clearStatus('editStatus'); syncMode(); wireSwatches();
+  $('editor').hidden = false;
+  $('editor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function editPost(id){
+  const p = posts.find(x=>x.id===id); if(!p) return;
+  editingId = id;
+  $('editorTitle').textContent = 'Editing chronicle';
+  $('fTitle').value=p.title||''; $('fKind').value=p.kind||'';
+  $('fOrder').value=p.sort_order??0; $('fPublished').value=String(!!p.published);
+  $('fMode').value=p.link_mode||'direct';
+  $('fDirect').value=p.direct_url||''; $('fDesc').value=p.description||''; $('fImage').value=p.image_url||'';
+  $('linkRows').innerHTML = blankLinkRows(Array.isArray(p.links)?p.links:[]);
+  $('delBtn').hidden = false;
+  clearStatus('editStatus'); syncMode(); previewImage(); wireSwatches();
+  $('editor').hidden = false;
+  $('editor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cancelEdit(){ $('editor').hidden = true; editingId = null; }
+
+function syncMode(){
+  const m = $('fMode').value;
+  $('modeDirect').classList.toggle('on', m==='direct');
+  $('modeChoices').classList.toggle('on', m==='choices');
+}
+
+function wireSwatches(){
+  document.querySelectorAll('.linkrow').forEach(row => {
+    const sel = row.querySelector('.lk-color'), sw = row.querySelector('.sw');
+    sel.onchange = () => { sw.className = 'sw c' + sel.value; };
+  });
+}
+
+function previewImage(){
+  const url = $('fImage').value.trim();
+  $('imgPreview').innerHTML = url
+    ? `<div style="width:180px;aspect-ratio:4/3;border:1px solid rgba(192,154,91,.3);
+         background:#050807 center/cover no-repeat;background-image:url('${esc(url)}')"></div>`
+    : '';
+}
+
+function collectLinks(){
+  const out = [];
+  document.querySelectorAll('.linkrow').forEach(row => {
+    const label = row.querySelector('.lk-label').value.trim();
+    const url   = row.querySelector('.lk-url').value.trim();
+    const color = Number(row.querySelector('.lk-color').value);
+    if (url) out.push({ label: label || 'Open', url, color });
+  });
+  return out.slice(0,4);
+}
+
+async function savePost(){
+  const title = $('fTitle').value.trim();
+  if (!title){ setStatus('editStatus','error','A chronicle needs a title.'); return; }
+
+  const mode = $('fMode').value;
+  const payload = {
+    title,
+    kind: $('fKind').value.trim() || null,
+    sort_order: parseInt($('fOrder').value, 10) || 0,
+    published: $('fPublished').value === 'true',
+    link_mode: mode,
+    direct_url: mode==='direct' ? ($('fDirect').value.trim() || null) : null,
+    description: mode==='choices' ? ($('fDesc').value.trim() || null) : null,
+    image_url:   mode==='choices' ? ($('fImage').value.trim() || null) : null,
+    links:       mode==='choices' ? collectLinks() : []
+  };
+
+  if (mode==='direct' && !payload.direct_url){
+    setStatus('editStatus','error','Add the destination URL, or switch to the overlay mode.'); return;
+  }
+  if (mode==='choices' && !payload.links.length){
+    setStatus('editStatus','error','Add at least one link, or switch to the direct mode.'); return;
+  }
+
+  const btn = $('saveBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+  setStatus('editStatus','info','Writing to the archive…');
+  try {
+    let error;
+    if (editingId){
+      ({ error } = await db.from('chronicles').update(payload).eq('id', editingId));
+    } else {
+      ({ error } = await db.from('chronicles').insert(payload));
+    }
+    if (error) throw error;
+    setStatus('editStatus','success','Saved.');
+    await loadPosts();
+    setTimeout(() => { cancelEdit(); }, 700);
+  } catch(e){
+    setStatus('editStatus','error', (e.message||'Save failed.') +
+      (String(e.message||'').match(/row-level|policy/i) ? ' — this account is not flagged as a keeper.' : ''));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save chronicle';
+  }
+}
+
+async function deletePost(){
+  if (!editingId) return;
+  const p = posts.find(x=>x.id===editingId);
+  if (!confirm(`Delete "${p?.title||'this chronicle'}" permanently? This cannot be undone.`)) return;
+  try {
+    const { error } = await db.from('chronicles').delete().eq('id', editingId);
+    if (error) throw error;
+    cancelEdit();
+    await loadPosts();
+  } catch(e){ setStatus('editStatus','error', e.message||'Delete failed.'); }
+}
+
+async function quickDelete(id){
+  const p = posts.find(x=>x.id===id);
+  if (!confirm(`Delete "${p?.title||'this chronicle'}" permanently? This cannot be undone.`)) return;
+  try {
+    const { error } = await db.from('chronicles').delete().eq('id', id);
+    if (error) throw error;
+    await loadPosts();
+  } catch(e){ setStatus('listStatus','error', e.message||'Delete failed.'); }
+}
+
+boot();
+</script>
+</body>
+</html>
