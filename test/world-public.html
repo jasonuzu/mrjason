@@ -75,17 +75,17 @@
     <div id="infoBody"></div>
     <div id="editControls" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
       <div style="font-weight:500;margin-bottom:6px;font-size:11px;opacity:0.8;">Edit (logged in)</div>
-      <input id="editName" placeholder="Name (e.g. Lucan's Rest)" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box;">
-      <select id="editKind" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box;">
-        <option value="city">City</option>
-        <option value="town">Town</option>
-        <option value="village">Village</option>
-        <option value="landmark">Landmark</option>
-      </select>
-      <textarea id="editNotes" placeholder="Notes…" style="width:100%;height:48px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;margin-bottom:6px;box-sizing:border-box;resize:vertical;"></textarea>
-      <div style="display:flex;gap:6px;">
-        <button id="saveEdit" style="flex:1;background:#3b6db8;border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Save</button>
-        <button id="deleteEdit" style="background:rgba(180,50,50,0.4);border:1px solid rgba(255,100,100,0.3);color:#ffd0d0;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Delete</button>
+      <div id="placeEditBlock" style="display:none;margin-bottom:8px;">
+        <div id="placeEditWhat" style="font-size:11px;margin-bottom:5px;opacity:0.85;"></div>
+        <input id="editName" placeholder="Name" style="width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;margin-bottom:5px;box-sizing:border-box;">
+        <textarea id="editNotes" placeholder="Notes…" style="width:100%;height:44px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 8px;border-radius:6px;font-size:12px;margin-bottom:5px;box-sizing:border-box;resize:vertical;"></textarea>
+        <div style="display:flex;gap:6px;">
+          <button id="saveEdit" style="flex:1;background:#3b6db8;border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Save changes</button>
+          <button id="deleteEdit" style="background:rgba(180,50,50,0.4);border:1px solid rgba(255,100,100,0.3);color:#ffd0d0;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Delete</button>
+        </div>
+      </div>
+      <div id="placeEditHint" style="font-size:10px;opacity:0.5;margin-bottom:8px;line-height:1.45;">
+        No place here. Use <b>📍 Add place</b> in the editor to create one.
       </div>
       <!-- Custom event for this tile -->
       <div style="margin-top:10px;padding-top:10px;border-top:1px dashed rgba(255,255,255,0.1);">
@@ -3013,6 +3013,187 @@
     };
   }
 
+  // ============ SUPER WEATHER ============
+  // Weather the admin paints onto a region by hand. Ordinary weather is
+  // simulated from physics; these are authored, and they only ever appear
+  // inside the area drawn for them.
+  //
+  // Rather than 56 bespoke renderers, each type declares an animation FAMILY
+  // plus parameters. That keeps every type visually distinct while the drawing
+  // code stays small enough to run at full frame rate.
+  //
+  // Families:
+  //   fall     — particles descending (shards, embers, petals, spores…)
+  //   rise     — the same, inverted
+  //   streak   — horizontal wind lines
+  //   tint     — a wash of colour over everything
+  //   pulse    — rhythmic flashes
+  //   shimmer  — heat-haze distortion bands
+  //   spiral   — slow rotation
+  //   fracture — jagged shifting shards of sky
+  //   voidsky  — draining darkness
+  //   swarm    — drifting motes with erratic paths
+  const SUPER_WEATHER = [
+    // --- Magical Storms ---
+    {id:'shardstorm',  label:'Shardstorm',      cat:'Magical Storms', fam:'fall',   col:'#bfe4ff', col2:'#7fa8c8', rate:220, speed:34, size:7, shape:'shard', desc:'Rain that falls as sharp crystalline shards.'},
+    {id:'emberRain',   label:'Ember Rain',      cat:'Magical Storms', fam:'fall',   col:'#ffb060', col2:'#ff6020', rate:150, speed:9,  size:3, shape:'glow', desc:'Glowing embers that do not burn.'},
+    {id:'memoryRain',  label:'Memory Rain',     cat:'Magical Storms', fam:'fall',   col:'#cfd8ff', col2:'#9098d8', rate:170, speed:16, size:4, shape:'streak', desc:'Rain carrying fragments of memory.'},
+    {id:'silentStorm', label:'Silent Storm',    cat:'Magical Storms', fam:'pulse',  col:'#e8f0ff', col2:'#7080a0', rate:0,   speed:0,  size:0, quiet:true, desc:'Lightning in complete silence.'},
+    {id:'colorstorm',  label:'Colorstorm',      cat:'Magical Storms', fam:'tint',   col:'#40c0ff', col2:'#ff4080', rate:0,   speed:0,  size:0, cycle:true, desc:'The world washed in a single unnatural colour.'},
+    {id:'reverseStorm',label:'Reverse Storm',   cat:'Magical Storms', fam:'rise',   col:'#a0d8ff', col2:'#6090c0', rate:180, speed:22, size:5, shape:'streak', desc:'Rain falls upward; the Veil is thinning.'},
+    {id:'soulstorm',   label:'Soulstorm',       cat:'Magical Storms', fam:'voidsky',col:'#403858', col2:'#201828', rate:60,  speed:6,  size:9, desc:'A tempest that batters the spirit, not the body.'},
+    {id:'echoStorm',   label:'Echo Storm',      cat:'Magical Storms', fam:'pulse',  col:'#c8d8f0', col2:'#8090b0', rate:0,   speed:0,  size:0, echo:true, desc:'The same thunderclap, over and over.'},
+
+    // --- Unnatural Skies ---
+    {id:'mirrorSky',   label:'Mirror Sky',      cat:'Unnatural Skies', fam:'shimmer', col:'#b8d8f0', col2:'#88a8c8', rate:0, speed:3, size:0, desc:'The sky reflects the ground below.'},
+    {id:'burningSky',  label:'Burning Sky',     cat:'Unnatural Skies', fam:'tint',    col:'#ff7030', col2:'#ffc040', rate:0, speed:2, size:0, roll:true, desc:'Rolling waves of red and gold overhead.'},
+    {id:'glassSky',    label:'Glass Sky',       cat:'Unnatural Skies', fam:'swarm',   col:'#ffffff', col2:'#a0c0ff', rate:120, speed:2, size:2, stars:true, desc:'Transparent sky revealing the void beyond.'},
+    {id:'fracturedSky',label:'Fractured Sky',   cat:'Unnatural Skies', fam:'fracture',col:'#d0e0f8', col2:'#607090', rate:0, speed:1, size:0, desc:'The sky splits like a broken mirror.'},
+    {id:'invertedSky', label:'Inverted Sky',    cat:'Unnatural Skies', fam:'shimmer', col:'#a8c8e8', col2:'#788ca8', rate:0, speed:2, size:0, invert:true, desc:'Earth and sky exchange places.'},
+    {id:'emptySky',    label:'Empty Sky',       cat:'Unnatural Skies', fam:'voidsky', col:'#585868', col2:'#303040', rate:0, speed:0, size:0, flat:true, desc:'No clouds, no sun, no stars. Nothing.'},
+    {id:'wovenSky',    label:'Woven Sky',       cat:'Unnatural Skies', fam:'streak',  col:'#e0d0b0', col2:'#a89878', rate:90, speed:4, size:2, weave:true, desc:'A sky made of threads, like a tapestry.'},
+    {id:'spiralSky',   label:'Spiral Sky',      cat:'Unnatural Skies', fam:'spiral',  col:'#c0d0f0', col2:'#7080a8', rate:140, speed:5, size:3, desc:'A vast hypnotic rotation overhead.'},
+
+    // --- Strange Winds ---
+    {id:'whisperwind', label:'Whisperwind',     cat:'Strange Winds', fam:'streak', col:'#d8d0e8', col2:'#9088a8', rate:110, speed:20, size:3, desc:'A wind that carries voices.'},
+    {id:'gravityWind', label:'Gravity Wind',    cat:'Strange Winds', fam:'rise',   col:'#c8c0d8', col2:'#8880a0', rate:130, speed:26, size:4, heavy:true, desc:'A wind that lifts or crushes.'},
+    {id:'timeWind',    label:'Time Wind',       cat:'Strange Winds', fam:'shimmer',col:'#e0d8a0', col2:'#a09850', rate:0, speed:8, size:0, desc:'Minutes stretch into hours.'},
+    {id:'scentwind',   label:'Scentwind',       cat:'Strange Winds', fam:'streak', col:'#d8e8c8', col2:'#98a888', rate:70,  speed:14, size:3, soft:true, desc:'Carries the scent of distant places.'},
+    {id:'silenceWind', label:'Silence Wind',    cat:'Strange Winds', fam:'streak', col:'#c0c0c8', col2:'#808088', rate:60,  speed:16, size:2, quiet:true, desc:'Moves without a sound.'},
+    {id:'poisonWind',  label:'Poison Wind',     cat:'Strange Winds', fam:'streak', col:'#a8c860', col2:'#607830', rate:150, speed:12, size:6, murk:true, desc:'A faint toxic mist on the air.'},
+    {id:'songwind',    label:'Songwind',        cat:'Strange Winds', fam:'streak', col:'#ffd8f0', col2:'#c090c0', rate:100, speed:15, size:3, notes:true, desc:'A haunting melody that draws you off the path.'},
+    {id:'fadingWind',  label:'Fading Wind',     cat:'Strange Winds', fam:'tint',   col:'#b0b0b0', col2:'#888888', rate:0, speed:0, size:0, drain:true, desc:'Colours fade and memories dim.'},
+
+    // --- Temperature Anomalies ---
+    {id:'burningFrost',label:'Burning Frost',   cat:'Temperature', fam:'fall',    col:'#ffffff', col2:'#ffa0a0', rate:160, speed:11, size:3, desc:'A frost so cold it burns.'},
+    {id:'witheringHeat',label:'Withering Heat', cat:'Temperature', fam:'shimmer', col:'#e8c890', col2:'#a08850', rate:0, speed:6, size:0, desc:'Heat that drains the life from the land.'},
+    {id:'ghostFrost',  label:'Ghost Frost',     cat:'Temperature', fam:'tint',    col:'#c8d8e8', col2:'#7888a0', rate:0, speed:0, size:0, desc:'The spirit feels cold; the body does not.'},
+    {id:'boilingFog',  label:'Boiling Fog',     cat:'Temperature', fam:'swarm',   col:'#f0e0d0', col2:'#c0a090', rate:90, speed:4, size:16, desc:'Scalding fog that makes breathing hard.'},
+    {id:'crystalCold', label:'Crystal Cold',    cat:'Temperature', fam:'swarm',   col:'#e0f8ff', col2:'#a0d0e8', rate:200, speed:2, size:2, sparkle:true, desc:'Air turned to floating crystal.'},
+    {id:'shimmerHeat', label:'Shimmering Heat', cat:'Temperature', fam:'shimmer', col:'#ffe0a0', col2:'#c09850', rate:0, speed:10, size:0, desc:'Mirages that warp the world.'},
+    {id:'shadowFrost', label:'Shadow Frost',    cat:'Temperature', fam:'tint',    col:'#404850', col2:'#202830', rate:0, speed:0, size:0, desc:'Shadows turn brittle and shatter.'},
+    {id:'warmRain',    label:'Warm Rain',       cat:'Temperature', fam:'fall',    col:'#e8d8c0', col2:'#b8a888', rate:140, speed:13, size:4, shape:'streak', desc:'Rain as warm as bathwater, and drowsy-making.'},
+
+    // --- Unstable & Chaotic ---
+    {id:'stormOfChange',label:'Storm of Change',cat:'Chaotic', fam:'swarm',   col:'#a0ffc0', col2:'#ff90d0', rate:150, speed:9,  size:5, chaos:true, desc:'Leaves become birds; rocks become insects.'},
+    {id:'chaosStorm',  label:'Chaos Storm',     cat:'Chaotic', fam:'swarm',   col:'#ff80ff', col2:'#80ffff', rate:200, speed:16, size:5, chaos:true, desc:'Fire falls upward; lightning freezes midair.'},
+    {id:'wildMagic',   label:'Wild Magic Storm',cat:'Chaotic', fam:'pulse',   col:'#e0a0ff', col2:'#8040c0', rate:120, speed:12, size:4, chaos:true, desc:'Spells backfire and enchantments fail.'},
+    {id:'veilStorm',   label:'Veil Storm',      cat:'Chaotic', fam:'fracture',col:'#c8a0ff', col2:'#6040a0', rate:0, speed:2, size:0, desc:'The Veil thins; the Court may pass through.'},
+    {id:'dreamstorm',  label:'Dreamstorm',      cat:'Chaotic', fam:'swarm',   col:'#c0b0ff', col2:'#8070c0', rate:130, speed:5,  size:9, soft:true, desc:'Dreams bleed into waking.'},
+    {id:'leystoneStorm',label:'Leystone Storm', cat:'Chaotic', fam:'pulse',   col:'#80ffd0', col2:'#20a080', rate:150, speed:14, size:4, desc:'Raw unstable energy from a leystone.'},
+    {id:'riftStorm',   label:'Rift Storm',      cat:'Chaotic', fam:'fracture',col:'#ff90c0', col2:'#a03060', rate:0, speed:3, size:0, desc:'Temporary rifts to other worlds.'},
+    {id:'silentTempest',label:'Silent Tempest', cat:'Chaotic', fam:'fall',    col:'#a0b8d0', col2:'#607890', rate:260, speed:30, size:5, shape:'streak', quiet:true, desc:'A violent storm with no sound at all.'},
+
+    // --- Biological & Organic ---
+    {id:'sporefall',   label:'Sporefall',       cat:'Organic', fam:'fall', col:'#c0ff90', col2:'#70b040', rate:180, speed:3, size:3, shape:'glow', drift:true, desc:'Glowing spores settling on everything.'},
+    {id:'featherfall', label:'Featherfall',     cat:'Organic', fam:'fall', col:'#ffe0f0', col2:'#c0a0d0', rate:120, speed:3, size:6, shape:'feather', drift:true, desc:'Soft colourful feathers from nowhere.'},
+    {id:'blossomWind', label:'Blossom Wind',    cat:'Organic', fam:'fall', col:'#ffc0d8', col2:'#e88ab0', rate:150, speed:6, size:5, shape:'petal', drift:true, desc:'Petals that bloom where they land.'},
+    {id:'insectStorm', label:'Insect Storm',    cat:'Organic', fam:'swarm',col:'#e0ff80', col2:'#90c040', rate:260, speed:14, size:2, sparkle:true, desc:'Glowing insects thick enough to blot the sun.'},
+    {id:'seedRain',    label:'Seed Rain',       cat:'Organic', fam:'fall', col:'#d8c890', col2:'#a08850', rate:140, speed:12, size:3, shape:'seed', desc:'Rain that seeds impossible places.'},
+    {id:'bloodRain',   label:'Blood Rain',      cat:'Organic', fam:'fall', col:'#c02030', col2:'#600810', rate:200, speed:20, size:4, shape:'streak', desc:'Red rain smelling faintly of iron.'},
+    {id:'glowfall',    label:'Glowfall',        cat:'Organic', fam:'fall', col:'#a0ffe0', col2:'#40c0a0', rate:170, speed:5, size:4, shape:'glow', desc:'Faintly glowing rain or snow.'},
+    {id:'webfall',     label:'Webfall',         cat:'Organic', fam:'fall', col:'#f0f0e8', col2:'#c0c0b8', rate:130, speed:4, size:9, shape:'thread', drift:true, desc:'Fine silken threads clinging to everything.'},
+
+    // --- Celestial & Cosmic ---
+    {id:'starfall',    label:'Starfall',        cat:'Celestial', fam:'fall',   col:'#ffffe0', col2:'#ffc040', rate:60,  speed:44, size:8, shape:'star', desc:'Meteors that strike the ground as crystal.'},
+    {id:'eclipseWind', label:'Lunar Eclipse Wind',cat:'Celestial', fam:'streak',col:'#b0a0c0', col2:'#605070', rate:100, speed:13, size:4, desc:'The breath of a sleeping moon god.'},
+    {id:'solarStorm',  label:'Solar Storm',     cat:'Celestial', fam:'pulse',  col:'#fff0a0', col2:'#ffa020', rate:180, speed:18, size:5, desc:'Light and energy that disrupts all magic.'},
+    {id:'auroraStorm', label:'Aurora Storm',    cat:'Celestial', fam:'tint',   col:'#40ffb0', col2:'#a040ff', rate:0, speed:3, size:0, aurora:true, desc:'An aurora fierce enough to cast shadows.'},
+    {id:'shootingStars',label:'Shooting Star Rain',cat:'Celestial', fam:'fall',col:'#ffffff', col2:'#a0c0ff', rate:40, speed:52, size:12, shape:'star', desc:'Streaks of light with lingering trails.'},
+    {id:'voidStorm',   label:'Void Storm',      cat:'Celestial', fam:'voidsky',col:'#101018', col2:'#000004', rate:40, speed:4, size:12, desc:'The stars themselves swallowed.'},
+    {id:'cometWind',   label:'Comet Wind',      cat:'Celestial', fam:'streak', col:'#c0e8ff', col2:'#6098c0', rate:90, speed:24, size:5, desc:'A metallic wind that stirs the tides.'},
+    {id:'nebulaFog',   label:'Nebula Fog',      cat:'Celestial', fam:'swarm',  col:'#ff80c0', col2:'#6080ff', rate:110, speed:3, size:20, soft:true, desc:'Fog glowing with the colours of a nebula.'},
+  ];
+  const SUPER_BY_ID = {};
+  for(const w of SUPER_WEATHER) SUPER_BY_ID[w.id] = w;
+  const SUPER_CATS = [];
+  for(const w of SUPER_WEATHER) if(!SUPER_CATS.includes(w.cat)) SUPER_CATS.push(w.cat);
+
+  // ---------- Weather zones ----------
+  // Regions the admin has painted, each with a weather assigned. Stored on the
+  // same coarse grid the fog uses, so it costs almost nothing.
+  // A 1-tile grid. The fog uses 4 because it is always painted in broad
+  // sweeps, but weather regions need to be placeable precisely — a few tiles
+  // around a single mountain, say — so this resolves to the tile itself.
+  const WZ_CELL = 1;
+  const WZ_W = Math.ceil(WORLD_W / WZ_CELL);
+  const WZ_H = Math.ceil(WORLD_H / WZ_CELL);
+  // 0 = no zone; otherwise an index into userData.weatherZones, plus one
+  const wzMask = new Uint8Array(WZ_W * WZ_H);
+  // Set whenever the mask changes, so the baked render canvases rebuild.
+  // Declared here because paintWeatherZone() (above the renderer) sets it.
+  let wzCanvasStale = true;
+  function wzMarkStale(){ wzCanvasStale = true; }
+  const WZ_KEY = 'pixelworld:weatherzones';
+  let wzDirty = false;
+
+  function weatherZones(){
+    userData.weatherZones = userData.weatherZones || [];
+    return userData.weatherZones;
+  }
+  // A distinct hue per region, so overlapping work stays legible while editing
+  function zoneColor(idx){
+    const h = (idx * 67) % 360;
+    return `hsl(${h}, 75%, 62%)`;
+  }
+  function zoneAtTile(tx, ty){
+    const cx = Math.floor(tx / WZ_CELL), cy = Math.floor(ty / WZ_CELL);
+    if(cx<0||cx>=WZ_W||cy<0||cy>=WZ_H) return null;
+    const v = wzMask[cy*WZ_W + cx];
+    if(!v) return null;
+    return weatherZones()[v-1] || null;
+  }
+  function paintWeatherZone(tx, ty, radiusTiles, zoneIdx){
+    // radiusTiles is now literal: 1 paints a single tile, 2 paints a 3-tile
+    // disc, and so on. No rounding up to a coarse grid.
+    const r = Math.max(0, Math.round(radiusTiles) - 1);
+    const cx = Math.floor(tx / WZ_CELL), cy = Math.floor(ty / WZ_CELL);
+    for(let dy=-r; dy<=r; dy++){
+      for(let dx=-r; dx<=r; dx++){
+        if(r > 0 && dx*dx + dy*dy > r*r + r) continue;
+        const nx = cx+dx, ny = cy+dy;
+        if(nx<0||nx>=WZ_W||ny<0||ny>=WZ_H) continue;
+        wzMask[ny*WZ_W + nx] = zoneIdx;
+      }
+    }
+    wzDirty = true;
+    wzMarkStale();
+  }
+  function encodeWZ(){
+    const runs = [];
+    let cur = wzMask[0], len = 1;
+    for(let i=1;i<wzMask.length;i++){
+      if(wzMask[i] === cur) len++;
+      else { runs.push(len + '.' + cur); cur = wzMask[i]; len = 1; }
+    }
+    runs.push(len + '.' + cur);
+    return runs.join(',');
+  }
+  function decodeWZ(str){
+    if(!str) return;
+    let idx = 0;
+    for(const run of str.split(',')){
+      const dot = run.indexOf('.');
+      if(dot < 0) continue;
+      const len = parseInt(run.slice(0,dot),10);
+      const v   = parseInt(run.slice(dot+1),10);
+      for(let i=0;i<len && idx<wzMask.length;i++) wzMask[idx++] = v;
+    }
+    wzMarkStale();
+  }
+  async function loadWeatherZones(){
+    try{
+      const r = await Store.get(WZ_KEY, true);
+      if(r && r.value) decodeWZ(r.value);
+    }catch(e){}
+  }
+  async function saveWeatherZones(){
+    try{
+      await Store.set(WZ_KEY, encodeWZ(), true);
+      wzDirty = false;
+    }catch(e){ console.warn('weather zone save failed', e); }
+  }
+
   // ---------- Localised weather anomalies ----------
   // Two places on the map do not obey the global circulation. Both are strictly
   // bounded: step outside the radius and normal weather resumes immediately.
@@ -3030,6 +3211,10 @@
 
   // ---------- Turning the physics into a named weather state ----------
   function weatherFromClimate(c, x, y, day, period){
+    // A painted weather zone overrides everything — this is authored weather,
+    // and it applies strictly inside the region drawn for it.
+    const wz = zoneAtTile(x, y);
+    if(wz && wz.kind) return wz.kind;
     // Authored micro-climates take precedence over the global model
     const anom = anomalyAt(x, y);
     if(anom){
@@ -3297,6 +3482,9 @@
     customSettlements: [], customLandmarks: [], customRivers: [], customRoads: [], customTrade: [], customFerries: [],
     customEvents: [],
     thalenPath: {points: [], note: ''},   // the wanderer's route; last point = where he is now
+    customPlaceTypes: [],                // place types the user invented
+    weatherZones: [],                    // authored weather regions
+    hidden: {},                          // generated features the admin removed
     edits: {},
     frozenWorldMs: null,    // if non-null, time is paused at this ms-since-epoch
     timeOffsetMs: 0          // applied to live Date.now() when frozenWorldMs is null
@@ -3317,11 +3505,15 @@
       userData.customFerries = userData.customFerries || [];
       userData.customEvents = userData.customEvents || [];
       userData.thalenPath = userData.thalenPath || {points: [], note: ''};
+      userData.customPlaceTypes = userData.customPlaceTypes || [];
+      userData.weatherZones = userData.weatherZones || [];
+      userData.hidden = userData.hidden || {};
       if(typeof userData.frozenWorldMs === 'undefined') userData.frozenWorldMs = null;
       if(typeof userData.timeOffsetMs === 'undefined') userData.timeOffsetMs = 0;
     }
   }catch(e){ /* first time, no data */ }
   await loadFog();
+  await loadWeatherZones();
   async function saveUserData(){
     try{ await Store.set(STORAGE_KEY, JSON.stringify(userData), true); }catch(e){ console.warn('save failed',e); }
   }
@@ -5212,7 +5404,9 @@
       ctx.strokeStyle = rgbStr(applyLighting([90,158,200]));
       ctx.lineWidth = Math.max(1, view.scale*0.25);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for(const riv of rivers){
+      for(let _ri=0;_ri<rivers.length;_ri++){
+        if(isHidden('rivers', _ri)) continue;
+        const riv = rivers[_ri];
         const draw = riv.smooth || riv;
         if(draw.length<3) continue;
         ctx.beginPath();
@@ -5355,7 +5549,9 @@
       ctx.strokeStyle = rgbStr(applyLighting([150,120,80]));
       ctx.lineWidth = Math.max(1, view.scale*0.18);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      for(const rd of roads){
+      for(let _rdi=0;_rdi<roads.length;_rdi++){
+        if(isHidden('roads', _rdi)) continue;
+        const rd = roads[_rdi];
         const draw = rd.smooth || rd.path;
         ctx.beginPath();
         for(let i=0;i<draw.length;i++){
@@ -5384,7 +5580,9 @@
       ctx.lineWidth = Math.max(1, view.scale*0.15);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.setLineDash([Math.max(3,view.scale*0.6), Math.max(3,view.scale*0.4)]);
-      for(const t of trade){
+      for(let _ti=0;_ti<trade.length;_ti++){
+        if(isHidden('trade', _ti)) continue;
+        const t = trade[_ti];
         const draw = t.smooth || t.path;
         ctx.beginPath();
         for(let i=0;i<draw.length;i++){
@@ -5431,7 +5629,9 @@
       ctx.lineWidth = Math.max(1, view.scale*0.13);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.setLineDash([Math.max(3, view.scale*0.45), Math.max(2, view.scale*0.30)]);
-      for(const f of ferries){
+      for(let _fi=0;_fi<ferries.length;_fi++){
+        if(isHidden('ferries', _fi)) continue;
+        const f = ferries[_fi];
         const draw = f.smooth || f.path;
         ctx.beginPath();
         for(let i=0;i<draw.length;i++){
@@ -5550,16 +5750,18 @@
       const allLandmarks = landmarks.concat(userData.customLandmarks||[]);
       for(const lm of allLandmarks){
         const [px,py] = worldToScreen(lm.x+0.5, lm.y+0.5);
-        let col='#e040c8', sym='✦';
-        if(lm.kind==='volcano'){col='#e85a2a'; sym='▲';}
-        else if(lm.kind==='volcano_active'){col='#ff6a20'; sym='🌋';}
+        // Every place type carries its own icon and colour, so the map reads
+        // at a glance. The hand-authored world features keep their bespoke
+        // symbols; everything else comes from the shared taxonomy.
+        let col, sym;
+        if(lm.kind==='volcano_active'){col='#ff6a20'; sym='🌋';}
         else if(lm.kind==='peak'){col='#cfe4ff'; sym='⛰';}
         else if(lm.kind==='whirlpool'){col='#5fd8e0'; sym='🌀';}
         else if(lm.kind==='anomaly'){col='#9a7ad0'; sym='◈';}
-        else if(lm.kind==='hotspring'){col='#ff9090'; sym='∿';}
-        else if(lm.kind==='waterfall'){col='#60d0f0'; sym='≋';}
-        else if(lm.kind==='magic'){col='#d090ff'; sym='✦';}
-        else if(lm.kind==='ruins'){col='#a89070'; sym='⚷';}
+        else {
+          const pt = placeType(lm.kind);
+          col = pt.col; sym = pt.icon;
+        }
 
         // ---- The Maw: an animated whirlpool carved into the sea ----
         if(lm.kind==='whirlpool'){
@@ -5882,6 +6084,11 @@
       drawWeather(W, H);
     }
 
+    // Authored weather regions draw at EVERY zoom — they are hand-placed
+    // content, not an atmospheric flourish, so they must be visible whenever
+    // you can see the land they cover.
+    drawWeatherZones(W, H);
+
     // ---- The Path of Thalen ----
     // A luminous violet thread tracing where the wanderer has been, ending in
     // a pulsing mark at wherever he currently stands.
@@ -6183,6 +6390,515 @@
     }
   }
 
+  // ============ SUPER WEATHER ANIMATION ============
+  // One parameterised renderer covering every authored weather type. Each
+  // family handles a whole class of effect; the per-type parameters make them
+  // read as distinct phenomena. Drawn clipped to the zone's own region so the
+  // effect never spills onto surrounding land.
+  function hexRGB(h){
+    h = h.replace('#','');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  function drawSuperWeather(c, W, H, spec, t, opts){
+    opts = opts || {};
+    const a = opts.alpha == null ? 1 : opts.alpha;
+    const scale = opts.scale || 1;          // shrink particles inside a tile view
+    const c1 = hexRGB(spec.col), c2 = hexRGB(spec.col2 || spec.col);
+    const rnd = (n)=>{ const x = Math.sin(n*127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+
+    switch(spec.fam){
+
+      case 'fall':
+      case 'rise': {
+        const up = spec.fam === 'rise' ? -1 : 1;
+        const n = Math.round(spec.rate * (opts.density || 1));
+        const sp = spec.speed * scale;
+        const sz = spec.size * scale;
+        c.save();
+        for(let i=0;i<n;i++){
+          const r1 = rnd(i), r2 = rnd(i+1000), r3 = rnd(i+2000);
+          const drift = spec.drift ? Math.sin(t*0.7 + i)*W*0.02 : 0;
+          const x = ((r1*W + drift + t*sp*0.35*(r3-0.5)) % W + W) % W;
+          const prog = ((r2 + t*sp/(H||1)) % 1);
+          const y = up > 0 ? prog*H : H - prog*H;
+          const fade = spec.shape === 'star' ? 1 : (0.55 + 0.45*Math.sin(prog*Math.PI));
+          const col = r3 > 0.5 ? c1 : c2;
+          c.globalAlpha = a * fade * 0.9;
+          switch(spec.shape){
+            case 'shard': {
+              c.strokeStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+              c.lineWidth = Math.max(1, sz*0.22);
+              c.beginPath(); c.moveTo(x, y); c.lineTo(x + sz*0.35, y + up*sz*1.8); c.stroke();
+              break;
+            }
+            case 'glow': {
+              const g = c.createRadialGradient(x, y, 0, x, y, sz*2.2);
+              g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${(a*fade).toFixed(3)})`);
+              g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+              c.fillStyle = g;
+              c.beginPath(); c.arc(x, y, sz*2.2, 0, 6.283); c.fill();
+              break;
+            }
+            case 'star': {
+              c.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${(a*fade).toFixed(3)})`;
+              c.lineWidth = Math.max(1, sz*0.16);
+              c.lineCap = 'round';
+              c.beginPath(); c.moveTo(x, y); c.lineTo(x - sz*0.5, y - up*sz*3.2); c.stroke();
+              c.fillStyle = `rgba(255,255,255,${(a*fade).toFixed(3)})`;
+              c.beginPath(); c.arc(x, y, Math.max(1, sz*0.18), 0, 6.283); c.fill();
+              break;
+            }
+            case 'feather': case 'petal': {
+              c.save(); c.translate(x, y); c.rotate(Math.sin(t*1.1 + i)*1.4);
+              c.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(a*fade).toFixed(3)})`;
+              c.beginPath(); c.ellipse(0, 0, sz*0.55, sz*0.22, 0, 0, 6.283); c.fill();
+              c.restore();
+              break;
+            }
+            case 'thread': {
+              c.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${(a*fade*0.7).toFixed(3)})`;
+              c.lineWidth = 1;
+              c.beginPath(); c.moveTo(x, y);
+              c.quadraticCurveTo(x + sz*0.4, y + up*sz*0.9, x - sz*0.2, y + up*sz*1.9);
+              c.stroke();
+              break;
+            }
+            case 'seed': {
+              c.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${(a*fade).toFixed(3)})`;
+              c.beginPath(); c.ellipse(x, y, sz*0.28, sz*0.5, 0.5, 0, 6.283); c.fill();
+              break;
+            }
+            default: {   // streak
+              c.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${(a*fade).toFixed(3)})`;
+              c.lineWidth = Math.max(1, sz*0.2);
+              c.beginPath(); c.moveTo(x, y); c.lineTo(x - sz*0.25, y + up*sz*2.4); c.stroke();
+            }
+          }
+        }
+        c.restore();
+        break;
+      }
+
+      case 'streak': {
+        const n = Math.round(spec.rate * (opts.density || 1));
+        c.save();
+        c.lineCap = 'round';
+        for(let i=0;i<n;i++){
+          const r1 = rnd(i), r2 = rnd(i+700);
+          const y = r1 * H;
+          const len = (spec.size*scale) * (6 + r2*12);
+          const x = ((r2*W + t*spec.speed*scale*(0.6 + r1*0.8)) % (W+len)) - len;
+          const col = r1 > 0.5 ? c1 : c2;
+          const wob = spec.weave ? 0 : Math.sin(t*1.4 + i)*H*0.012;
+          c.globalAlpha = a * (0.20 + r2*0.45);
+          c.strokeStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+          c.lineWidth = Math.max(1, spec.size*scale*0.5);
+          c.beginPath();
+          c.moveTo(x, y + wob);
+          c.quadraticCurveTo(x + len*0.5, y + wob + (spec.soft?Math.sin(t+i)*6:0), x + len, y + wob);
+          c.stroke();
+          if(spec.notes && r1 > 0.86){
+            c.globalAlpha = a * 0.75;
+            c.fillStyle = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+            c.font = `${Math.max(9, spec.size*scale*3)}px serif`;
+            c.fillText('♪', x + len*0.5, y + wob - 4);
+          }
+        }
+        if(spec.weave){
+          // Cross-threads, so it reads as woven rather than blown
+          for(let i=0;i<Math.round(n*0.6);i++){
+            const r1 = rnd(i+5000);
+            const x = r1*W;
+            c.globalAlpha = a*0.18;
+            c.strokeStyle = `rgb(${c2[0]},${c2[1]},${c2[2]})`;
+            c.lineWidth = 1;
+            c.beginPath(); c.moveTo(x, 0); c.lineTo(x + Math.sin(t*0.3)*20, H); c.stroke();
+          }
+        }
+        if(spec.murk){
+          c.globalAlpha = a*0.16;
+          c.fillStyle = `rgb(${c2[0]},${c2[1]},${c2[2]})`;
+          c.fillRect(0,0,W,H);
+        }
+        c.restore();
+        break;
+      }
+
+      case 'tint': {
+        c.save();
+        let col = c1;
+        if(spec.cycle){
+          // Slowly cycles between the two colours
+          const k = 0.5 + 0.5*Math.sin(t*0.25);
+          col = [c1[0]*(1-k)+c2[0]*k, c1[1]*(1-k)+c2[1]*k, c1[2]*(1-k)+c2[2]*k];
+        }
+        c.globalAlpha = a * (spec.drain ? 0.30 : 0.28);
+        c.fillStyle = `rgb(${col[0]|0},${col[1]|0},${col[2]|0})`;
+        c.fillRect(0,0,W,H);
+        if(spec.roll){
+          // Rolling waves of colour across the sky
+          for(let i=0;i<5;i++){
+            const y = ((t*spec.speed*8 + i*H/5) % (H*1.4)) - H*0.2;
+            const g = c.createLinearGradient(0, y-H*0.16, 0, y+H*0.16);
+            g.addColorStop(0, `rgba(${c2[0]},${c2[1]},${c2[2]},0)`);
+            g.addColorStop(0.5, `rgba(${c2[0]},${c2[1]},${c2[2]},${(a*0.30).toFixed(3)})`);
+            g.addColorStop(1, `rgba(${c2[0]},${c2[1]},${c2[2]},0)`);
+            c.fillStyle = g;
+            c.fillRect(0, y-H*0.16, W, H*0.32);
+          }
+        }
+        if(spec.aurora){
+          for(let i=0;i<4;i++){
+            const ph = t*0.4 + i*1.6;
+            const g = c.createLinearGradient(0, 0, 0, H);
+            const cc = i%2 ? c1 : c2;
+            g.addColorStop(0, `rgba(${cc[0]},${cc[1]},${cc[2]},0)`);
+            g.addColorStop(0.35 + 0.12*Math.sin(ph), `rgba(${cc[0]},${cc[1]},${cc[2]},${(a*0.34).toFixed(3)})`);
+            g.addColorStop(1, `rgba(${cc[0]},${cc[1]},${cc[2]},0)`);
+            c.fillStyle = g;
+            c.save();
+            c.translate(Math.sin(ph)*W*0.12, 0);
+            c.fillRect(0,0,W,H);
+            c.restore();
+          }
+        }
+        if(spec.drain){
+          c.globalCompositeOperation = 'saturation';
+          c.fillStyle = '#808080';
+          c.globalAlpha = a*0.6;
+          c.fillRect(0,0,W,H);
+          c.globalCompositeOperation = 'source-over';
+        }
+        c.restore();
+        break;
+      }
+
+      case 'pulse': {
+        // Rhythmic flashes; echo types repeat on a strict beat
+        const period = spec.echo ? 1.6 : (2.4 + (spec.chaos?0:1.4));
+        const ph = (t % period) / period;
+        if(ph < 0.13){
+          const f = 1 - ph/0.13;
+          c.save();
+          c.globalAlpha = a * f * 0.42;
+          c.fillStyle = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+          c.fillRect(0,0,W,H);
+          // A bolt, drawn identically each cycle for echo storms
+          const seed = spec.echo ? 1 : Math.floor(t/period);
+          let bx = rnd(seed)*W, by = 0;
+          c.strokeStyle = `rgba(255,255,255,${(a*f).toFixed(3)})`;
+          c.lineWidth = Math.max(1.5, 2.4*scale);
+          c.lineCap='round'; c.lineJoin='round';
+          c.shadowColor = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+          c.shadowBlur = 16;
+          c.beginPath(); c.moveTo(bx, by);
+          for(let k=1;k<=9;k++){
+            bx += (rnd(seed*13+k)-0.5)*W*0.14;
+            by += H/9;
+            c.lineTo(bx, by);
+          }
+          c.stroke();
+          c.restore();
+        }
+        if(spec.rate){
+          // Sparks riding the discharge
+          c.save();
+          for(let i=0;i<spec.rate*(opts.density||1)*0.3;i++){
+            const r1=rnd(i+90), r2=rnd(i+91);
+            c.globalAlpha = a*0.5*(0.4+0.6*Math.sin(t*3+i));
+            c.fillStyle = `rgb(${c2[0]},${c2[1]},${c2[2]})`;
+            c.fillRect(r1*W, ((r2 + t*spec.speed/H)%1)*H, 2*scale, 2*scale);
+          }
+          c.restore();
+        }
+        break;
+      }
+
+      case 'shimmer': {
+        // Horizontal bands sliding over one another — reads as heat haze,
+        // mirrored sky, or time distorting, depending on the colours.
+        c.save();
+        const bands = 14;
+        for(let i=0;i<bands;i++){
+          const y = (i/bands)*H;
+          const off = Math.sin(t*spec.speed*0.35 + i*0.9) * W * 0.018;
+          const col = i%2 ? c1 : c2;
+          c.globalAlpha = a * 0.13;
+          c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+          c.fillRect(off, y, W, H/bands + 1);
+        }
+        if(spec.invert){
+          c.globalAlpha = a*0.20;
+          const g = c.createLinearGradient(0,0,0,H);
+          g.addColorStop(0, `rgb(${c2[0]},${c2[1]},${c2[2]})`);
+          g.addColorStop(1, `rgb(${c1[0]},${c1[1]},${c1[2]})`);
+          c.fillStyle = g; c.fillRect(0,0,W,H);
+        }
+        c.restore();
+        break;
+      }
+
+      case 'spiral': {
+        c.save();
+        c.translate(W/2, H/2);
+        c.rotate(t*spec.speed*0.06);
+        const arms = 5;
+        for(let arm=0; arm<arms; arm++){
+          c.globalAlpha = a*0.22;
+          c.strokeStyle = `rgb(${arm%2?c1[0]:c2[0]},${arm%2?c1[1]:c2[1]},${arm%2?c1[2]:c2[2]})`;
+          c.lineWidth = Math.max(1, spec.size*scale);
+          c.beginPath();
+          const R = Math.max(W,H);
+          for(let k=0;k<=60;k++){
+            const p = k/60;
+            const rr = p*R*0.8;
+            const ang = arm*(6.283/arms) + p*3.4;
+            const xx = Math.cos(ang)*rr, yy = Math.sin(ang)*rr*0.8;
+            k ? c.lineTo(xx,yy) : c.moveTo(xx,yy);
+          }
+          c.stroke();
+        }
+        // Motes carried around the spiral
+        for(let i=0;i<spec.rate*(opts.density||1)*0.25;i++){
+          const r1=rnd(i+300);
+          const rr = r1*Math.max(W,H)*0.45;
+          const ang = t*spec.speed*0.06 + r1*6.283 + rr*0.01;
+          c.globalAlpha = a*0.5;
+          c.fillStyle = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+          c.fillRect(Math.cos(ang)*rr, Math.sin(ang)*rr*0.8, 2*scale, 2*scale);
+        }
+        c.restore();
+        break;
+      }
+
+      case 'fracture': {
+        // Jagged plates of sky, drifting apart to show what lies between
+        c.save();
+        const plates = 9;
+        for(let i=0;i<plates;i++){
+          const r1 = rnd(i), r2 = rnd(i+50), r3 = rnd(i+90);
+          const cx = r1*W, cy = r2*H;
+          const drift = Math.sin(t*spec.speed*0.3 + i)*W*0.012;
+          c.globalAlpha = a*0.22;
+          c.fillStyle = `rgb(${i%2?c1[0]:c2[0]},${i%2?c1[1]:c2[1]},${i%2?c1[2]:c2[2]})`;
+          c.beginPath();
+          const R = Math.min(W,H)*(0.10 + r3*0.16);
+          for(let k=0;k<6;k++){
+            const ang = k*(6.283/6) + r1*3;
+            const rr = R*(0.6 + rnd(i*7+k)*0.7);
+            const xx = cx + drift + Math.cos(ang)*rr;
+            const yy = cy + Math.sin(ang)*rr;
+            k ? c.lineTo(xx,yy) : c.moveTo(xx,yy);
+          }
+          c.closePath(); c.fill();
+          // The bright seam where the plate has pulled away
+          c.globalAlpha = a*0.5;
+          c.strokeStyle = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+          c.lineWidth = Math.max(1, 1.6*scale);
+          c.stroke();
+        }
+        c.restore();
+        break;
+      }
+
+      case 'voidsky': {
+        c.save();
+        c.globalAlpha = a*(spec.flat ? 0.62 : 0.5);
+        c.fillStyle = `rgb(${c1[0]},${c1[1]},${c1[2]})`;
+        c.fillRect(0,0,W,H);
+        if(!spec.flat){
+          // Slow roiling darkness
+          for(let i=0;i<Math.round(spec.rate*(opts.density||1)*0.4);i++){
+            const r1=rnd(i), r2=rnd(i+400), r3=rnd(i+800);
+            const x = ((r1*W + Math.sin(t*0.2+i)*W*0.05) % W + W) % W;
+            const y = ((r2*H + t*spec.speed*0.6) % H + H) % H;
+            const rad = spec.size*scale*(2 + r3*4);
+            const g = c.createRadialGradient(x,y,0,x,y,rad);
+            g.addColorStop(0, `rgba(${c2[0]},${c2[1]},${c2[2]},${(a*0.5).toFixed(3)})`);
+            g.addColorStop(1, `rgba(${c2[0]},${c2[1]},${c2[2]},0)`);
+            c.fillStyle = g;
+            c.beginPath(); c.arc(x,y,rad,0,6.283); c.fill();
+          }
+        }
+        c.restore();
+        break;
+      }
+
+      case 'swarm': {
+        const n = Math.round(spec.rate * (opts.density || 1));
+        c.save();
+        for(let i=0;i<n;i++){
+          const r1=rnd(i), r2=rnd(i+600), r3=rnd(i+1200);
+          // Erratic wandering rather than a straight fall
+          const x = ((r1*W + Math.sin(t*spec.speed*0.12 + i*1.7)*W*0.08 + t*spec.speed*0.6*(r3-0.5)) % W + W) % W;
+          const y = ((r2*H + Math.cos(t*spec.speed*0.10 + i*2.3)*H*0.08 + t*spec.speed*0.35) % H + H) % H;
+          const sz = spec.size*scale*(0.5 + r3);
+          const col = spec.chaos
+            ? [ (c1[0]*(1-r3)+c2[0]*r3)|0, (c1[1]*(1-r3)+c2[1]*r3)|0, (c1[2]*(1-r3)+c2[2]*r3)|0 ]
+            : (r3>0.5 ? c1 : c2);
+          if(spec.soft || sz > 6){
+            const g = c.createRadialGradient(x,y,0,x,y,sz);
+            g.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${(a*0.34).toFixed(3)})`);
+            g.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+            c.fillStyle = g;
+            c.beginPath(); c.arc(x,y,sz,0,6.283); c.fill();
+          } else {
+            const tw = spec.sparkle ? (0.35 + 0.65*Math.abs(Math.sin(t*3 + i*1.3))) : 1;
+            c.globalAlpha = a * 0.75 * tw;
+            c.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+            c.fillRect(x, y, Math.max(1,sz), Math.max(1,sz));
+          }
+        }
+        if(spec.stars){
+          // A field of distant stars behind the transparent sky
+          c.globalAlpha = a*0.85;
+          c.fillStyle = '#ffffff';
+          for(let i=0;i<90;i++){
+            const r1=rnd(i+2000), r2=rnd(i+3000);
+            const tw = 0.4 + 0.6*Math.abs(Math.sin(t*1.6 + i));
+            c.globalAlpha = a*tw*0.8;
+            c.fillRect(r1*W, r2*H, 1.4*scale, 1.4*scale);
+          }
+        }
+        c.restore();
+        break;
+      }
+    }
+  }
+
+  // Paint each weather zone's animation, clipped to the cells it covers, so an
+  // authored storm never bleeds beyond the region drawn for it.
+  // ---------- Weather zone rendering ----------
+  // At 1-tile resolution a region can cover tens of thousands of cells, so
+  // per-cell canvas calls are out of the question. Instead the mask is baked
+  // once into a 1px-per-tile offscreen image and reused: it serves both as the
+  // colour tint and as the clipping stencil for the animation.
+  const wzCv = document.createElement('canvas');
+  wzCv.width = WORLD_W; wzCv.height = WORLD_H;
+  const wzCtx = wzCv.getContext('2d');
+  // A scratch buffer the size of the viewport, for compositing animations
+  const wzFx = document.createElement('canvas');
+  const wzFxCtx = wzFx.getContext('2d');
+
+  // Per-zone stencils, so each region's animation can be clipped separately
+  const wzStencils = new Map();
+  function rebuildWzCanvases(){
+    const img = wzCtx.createImageData(WORLD_W, WORLD_H);
+    const d = img.data;
+    // Cache parsed colours per zone index
+    const cols = {};
+    for(let i=0;i<wzMask.length;i++){
+      const v = wzMask[i];
+      if(!v) continue;
+      if(!cols[v]){
+        // hsl -> rgb, matching zoneColor()
+        const h = ((v * 67) % 360) / 360, sat = 0.75, li = 0.62;
+        const q = li < 0.5 ? li*(1+sat) : li+sat-li*sat;
+        const pp = 2*li - q;
+        const hk = (t)=>{ t=(t+1)%1;
+          if(t < 1/6) return pp + (q-pp)*6*t;
+          if(t < 1/2) return q;
+          if(t < 2/3) return pp + (q-pp)*(2/3-t)*6;
+          return pp; };
+        cols[v] = [hk(h+1/3)*255, hk(h)*255, hk(h-1/3)*255];
+      }
+      const c = cols[v], o = i*4;
+      d[o] = c[0]; d[o+1] = c[1]; d[o+2] = c[2]; d[o+3] = 255;
+    }
+    wzCtx.putImageData(img, 0, 0);
+
+    // One stencil per zone (white where the zone is, transparent elsewhere)
+    wzStencils.clear();
+    const present = new Set();
+    for(const v of wzMask) if(v) present.add(v);
+    for(const v of present){
+      const sc = document.createElement('canvas');
+      sc.width = WORLD_W; sc.height = WORLD_H;
+      const sctx = sc.getContext('2d');
+      const simg = sctx.createImageData(WORLD_W, WORLD_H);
+      const sd = simg.data;
+      for(let i=0;i<wzMask.length;i++){
+        if(wzMask[i] !== v) continue;
+        const o = i*4;
+        sd[o] = sd[o+1] = sd[o+2] = 255; sd[o+3] = 255;
+      }
+      sctx.putImageData(simg, 0, 0);
+      wzStencils.set(v, sc);
+    }
+    wzCanvasStale = false;
+  }
+
+  function drawWeatherZones(W, H){
+    const zones = weatherZones();
+    const editing = isLoggedIn && editor.tool === 'weather';
+    if(!zones.length && !editing) return;
+    if(wzCanvasStale) rebuildWzCanvases();
+    const t = performance.now()/1000;
+
+    // Where the world sits on screen, in one step — no per-cell maths
+    const [ox, oy] = worldToScreen(0, 0);
+    const dw = WORLD_W * view.scale, dh = WORLD_H * view.scale;
+
+    if(wzFx.width !== Math.ceil(W) || wzFx.height !== Math.ceil(H)){
+      wzFx.width = Math.ceil(W); wzFx.height = Math.ceil(H);
+    }
+
+    // ---- Animations, one pass per zone, stencilled to its own area ----
+    for(const [v, stencil] of wzStencils){
+      const zone = zones[v-1];
+      if(!zone || !zone.kind) continue;
+      const spec = SUPER_BY_ID[zone.kind];
+      if(!spec) continue;              // ordinary weather: the normal engine has it
+      wzFxCtx.clearRect(0, 0, W, H);
+      drawSuperWeather(wzFxCtx, W, H, spec, t,
+                       {alpha: zone.intensity == null ? 1 : zone.intensity});
+      // Keep only the pixels inside this zone
+      wzFxCtx.save();
+      wzFxCtx.globalCompositeOperation = 'destination-in';
+      wzFxCtx.imageSmoothingEnabled = false;
+      wzFxCtx.drawImage(stencil, ox, oy, dw, dh);
+      wzFxCtx.restore();
+      ctx.drawImage(wzFx, 0, 0);
+    }
+
+    // ---- Editing overlay: tint, outline, brush ----
+    if(!editing) return;
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(wzCv, ox, oy, dw, dh);
+    ctx.restore();
+
+    // Highlight the region being worked on
+    const active = editor.weatherZoneIdx;
+    const activeStencil = wzStencils.get(active);
+    if(activeStencil){
+      ctx.save();
+      ctx.globalAlpha = 0.34 + 0.14*Math.sin(t*2.4);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(activeStencil, ox, oy, dw, dh);
+      ctx.restore();
+    }
+
+    // Brush preview
+    if(editor.hoverTile && active){
+      const rTiles = parseInt(document.getElementById('wzBrush').value, 10) || 10;
+      const [hx, hy] = worldToScreen(editor.hoverTile[0]+0.5, editor.hoverTile[1]+0.5);
+      const R = Math.max(3, rTiles*view.scale);
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = editor.wzErasing ? '#ff8080' : zoneColor(active);
+      ctx.beginPath(); ctx.arc(hx, hy, R, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = editor.wzErasing ? '#ff9090' : '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,4]);
+      ctx.beginPath(); ctx.arc(hx, hy, R, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }
+
   function drawWeather(W,H){
     const w = world.weather;
     if(w==='clear') return;
@@ -6314,6 +7030,7 @@
 
   // ============ INTERACTION ============
   let dragging = false, dragStart=null, dragOrigin=null, didDrag=false, mouseDownAt=0, activePointerId=null;
+  let painting = false;   // a brush tool is mid-stroke
 
   // Hard reset: clear dragging state any time we detect the mouse is moving
   // without a button held. This is a safety net — without it, a missed mouseup
@@ -6329,8 +7046,37 @@
     }
   }
 
+  // True when the active tool paints with a brush rather than selecting. These
+  // tools need drag-to-paint, so the drag must NOT be interpreted as a pan.
+  function isBrushTool(){
+    if(!isLoggedIn) return false;
+    if(editor.tool === 'fogclear' || editor.tool === 'fogadd') return true;
+    if(editor.tool === 'weather' && editor.weatherZoneIdx) return true;
+    return false;
+  }
+
   cv.addEventListener('pointerdown', (e)=>{
     if(e.button !== 0 && e.pointerType === 'mouse') return;   // ignore right/middle clicks
+
+    // Brush tools take the gesture entirely: the first dab happens here, and
+    // subsequent movement keeps painting instead of panning the map.
+    if(isBrushTool()){
+      painting = true;
+      dragging = false;
+      activePointerId = e.pointerId;
+      cv.style.cursor = 'crosshair';
+      try { cv.setPointerCapture(e.pointerId); } catch(_) {}
+      const r = root.getBoundingClientRect();
+      const [wx, wy] = screenToWorld(e.clientX - r.left, e.clientY - r.top);
+      const tx = Math.floor(wx), ty = Math.floor(wy);
+      if(tx>=0 && tx<WORLD_W && ty>=0 && ty<WORLD_H){
+        applyBrushAt(tx, ty);
+        editor.hoverTile = [tx, ty];
+        draw();
+      }
+      return;
+    }
+
     dragging = true;
     didDrag = false;
     dragStart = [e.clientX, e.clientY];
@@ -6342,6 +7088,31 @@
     // come to us regardless of what's under the cursor.
     try { cv.setPointerCapture(e.pointerId); } catch(_) {}
   });
+
+  // One place that knows what each brush does, so down/move share behaviour
+  function applyBrushAt(tx, ty){
+    if(editor.tool === 'fogclear' || editor.tool === 'fogadd'){
+      const r = parseInt(document.getElementById('fogBrush').value, 10) || 6;
+      paintFog(tx, ty, r, editor.tool === 'fogadd');
+    } else if(editor.tool === 'weather' && editor.weatherZoneIdx){
+      const r = parseInt(document.getElementById('wzBrush').value, 10) || 10;
+      paintWeatherZone(tx, ty, r, editor.wzErasing ? 0 : editor.weatherZoneIdx);
+      wzUpdateStatus();
+    }
+  }
+  function wzUpdateStatus(){
+    const el = document.getElementById('wzStatus');
+    if(!el) return;
+    const idx = editor.weatherZoneIdx;
+    if(!idx){ el.textContent = 'Create a region first.'; return; }
+    let cells = 0;
+    for(const v of wzMask) if(v === idx) cells++;
+    const tiles = cells * WZ_CELL * WZ_CELL;
+    const km = tiles * KM_PER_TILE * KM_PER_TILE;
+    el.textContent = cells
+      ? `${tiles.toLocaleString()} tiles · ${km.toLocaleString()} km²`
+      : 'Empty — drag on the map to paint this region.';
+  }
 
   function endPointer(e){
     if(!dragging || (activePointerId !== null && e.pointerId !== activePointerId)) {
@@ -6373,11 +7144,13 @@
       }
     }
     dragging = false;
+    painting = false;
     activePointerId = null;
-    cv.style.cursor = 'grab';
+    cv.style.cursor = isBrushTool() ? 'crosshair' : 'grab';
     try { cv.releasePointerCapture(e.pointerId); } catch(_) {}
-    // Commit a fog brush stroke once the button is released
+    // Commit brush strokes once the button is released
     if(fogDirty && isLoggedIn) saveFog();
+    if(wzDirty && isLoggedIn) saveWeatherZones();
   }
 
   cv.addEventListener('pointerup', endPointer);
@@ -6398,23 +7171,20 @@
   cv.addEventListener('pointermove', (e)=>{
     ensureNotStuck(e);
     // update hover tile for ghost-line preview in drawing modes
-    const fogBrushing = isLoggedIn && (editor.tool === 'fogclear' || editor.tool === 'fogadd');
-    if(isLoggedIn && (editor.drawing || fogBrushing)){
+    if(isLoggedIn && (editor.drawing || isBrushTool())){
       const r = root.getBoundingClientRect();
       const sx = e.clientX - r.left, sy = e.clientY - r.top;
       const [wx,wy] = screenToWorld(sx,sy);
       const tx = Math.floor(wx), ty = Math.floor(wy);
       if(tx>=0 && tx<WORLD_W && ty>=0 && ty<WORLD_H){
         const cur = editor.hoverTile;
-        if(!cur || cur[0]!==tx || cur[1]!==ty){
-          editor.hoverTile = [tx,ty];
-          // Held button + fog brush = paint continuously, like any paint tool
-          if(fogBrushing && dragging && e.buttons === 1){
-            const rad = parseInt(document.getElementById('fogBrush').value, 10) || 6;
-            paintFog(tx, ty, rad, editor.tool === 'fogadd');
-          }
-          draw();
-        }
+        const moved = !cur || cur[0]!==tx || cur[1]!==ty;
+        // Always refresh the hover so the brush circle follows the cursor,
+        // even when no button is held.
+        if(moved) editor.hoverTile = [tx,ty];
+        // Mid-stroke: keep painting as the cursor sweeps across tiles
+        if(painting && e.buttons === 1 && moved) applyBrushAt(tx, ty);
+        if(moved) draw();
       }
     }
     if(!dragging) return;
@@ -6584,8 +7354,20 @@
   function handleTileClick(tx, ty){
     if(isLoggedIn && editor.tool !== 'select'){
       switch(editor.tool){
-        case 'settle': addSettlementAt(tx, ty); return;
+        case 'place':  addLandmarkAt(tx, ty);   return;
+        // Old tool names, kept so nothing breaks if one is still referenced
+        case 'settle':
         case 'poi':    addLandmarkAt(tx, ty);   return;
+        case 'weather': {
+          if(!editor.weatherZoneIdx){
+            document.getElementById('wzStatus').textContent = 'Create a region first (+ New region).';
+            return;
+          }
+          const r = parseInt(document.getElementById('wzBrush').value, 10) || 10;
+          paintWeatherZone(tx, ty, r, editor.wzErasing ? 0 : editor.weatherZoneIdx);
+          draw();
+          return;
+        }
         case 'fogclear':
         case 'fogadd': {
           const r = parseInt(document.getElementById('fogBrush').value, 10) || 6;
@@ -6596,6 +7378,9 @@
         case 'thalen':
           // Each click extends Thalen's route; the final point is where he is
           userData.thalenPath = userData.thalenPath || {points: [], note: ''};
+      userData.customPlaceTypes = userData.customPlaceTypes || [];
+      userData.weatherZones = userData.weatherZones || [];
+      userData.hidden = userData.hidden || {};
           userData.thalenPath.points.push([tx, ty]);
           saveUserData();
           updateThalenStatus();
@@ -6675,41 +7460,217 @@
     draw();
   }
 
-  function addSettlementAt(tx, ty){
-    editor.pendingPoint = {x:tx, y:ty, kind:'settlement'};
-    editor.hoverTile = null;
-    populatePointPanel('settlement');
-    view.selected = {x:tx, y:ty};
-    document.getElementById('infoPanel').style.display = 'none';
-    draw();
+  // Both former tools now funnel through the one place system
+  function addSettlementAt(tx, ty){ addLandmarkAt(tx, ty); }
+
+  // ============ PLACE TYPES ============
+  // One taxonomy for every named place on the map. Previously settlements and
+  // landmarks were separate systems with overlapping options, and the tile
+  // info panel had a third mini-editor that could also create them — three
+  // ways to do the same thing. This table is now the single source of truth.
+  //
+  // Each entry: id, label, icon, colour, and a footprint hint used for scale.
+  const PLACE_TYPES = [
+    // --- Settlements ---
+    {id:'city',        label:"City",              icon:'🏰', col:'#ffd98a', cat:'Settlements', size:3},
+    {id:'town',        label:"Town",              icon:'🏘', col:'#e8c48a', cat:'Settlements', size:2},
+    {id:'village',     label:"Village",           icon:'🏠', col:'#cbb98f', cat:'Settlements', size:1},
+    {id:'hamlet',      label:"Hamlet",            icon:'🛖', col:'#c4b092', cat:'Settlements', size:1},
+    {id:'fortress',    label:"Fortress",          icon:'🛡', col:'#b8c4d8', cat:'Settlements', size:2},
+    {id:'monastery',   label:"Monastery",         icon:'⛪', col:'#e0d4b8', cat:'Settlements', size:1},
+    {id:'outpost',     label:"Outpost",           icon:'⚑', col:'#c2a878', cat:'Settlements', size:1},
+    {id:'nomadcamp',   label:"Nomad Camp",        icon:'⛺', col:'#d8b888', cat:'Settlements', size:1},
+    {id:'refuge',      label:"Refuge",            icon:'🕯', col:'#d0c0a0', cat:'Settlements', size:1},
+
+    // --- Towers ---
+    {id:'towerN',      label:"Northern Tower",    icon:'🗼', col:'#a8c8e8', cat:'Towers', size:1},
+    {id:'towerS',      label:"Southern Tower",    icon:'🗼', col:'#e8b8a8', cat:'Towers', size:1},
+    {id:'towerE',      label:"Eastern Tower",     icon:'🗼', col:'#e8dca8', cat:'Towers', size:1},
+    {id:'towerW',      label:"Western Tower",     icon:'🗼', col:'#c8a8e8', cat:'Towers', size:1},
+    {id:'towerRuins',  label:"Tower Ruins",       icon:'🏚', col:'#9a9088', cat:'Towers', size:1},
+
+    // --- Ruins & Remnants ---
+    {id:'ruins',       label:"Ancient Ruins",     icon:'🏛', col:'#a89070', cat:'Ruins', size:2},
+    {id:'ruinFort',    label:"Abandoned Fortress",icon:'🏯', col:'#98928a', cat:'Ruins', size:2},
+    {id:'crumbTower',  label:"Crumbled Tower",    icon:'🗿', col:'#9a9088', cat:'Ruins', size:1},
+    {id:'sunkenCity',  label:"Sunken City",       icon:'🌊', col:'#7ab0c8', cat:'Ruins', size:2},
+    {id:'buriedTemple',label:"Buried Temple",     icon:'⛩', col:'#b09878', cat:'Ruins', size:1},
+    {id:'brokenBridge',label:"Collapsed Bridge",  icon:'🌉', col:'#9c9488', cat:'Ruins', size:1},
+    {id:'shrineFallen',label:"Desecrated Shrine", icon:'⛧', col:'#b08890', cat:'Ruins', size:1},
+    {id:'crypt',       label:"Forgotten Crypt",   icon:'⚰', col:'#8c8490', cat:'Ruins', size:1},
+    {id:'petrifiedGrv',label:"Petrified Grove",   icon:'🪨', col:'#a8a098', cat:'Ruins', size:1},
+
+    // --- Natural Wonders ---
+    {id:'volcano',     label:"Volcano",           icon:'🌋', col:'#e85a2a', cat:'Natural', size:2},
+    {id:'hotspring',   label:"Hotsprings",        icon:'♨', col:'#8ad8d0', cat:'Natural', size:1},
+    {id:'waterfall',   label:"Waterfall",         icon:'💧', col:'#60d0f0', cat:'Natural', size:1},
+    {id:'cave',        label:"Cave System",       icon:'🕳', col:'#8a8078', cat:'Natural', size:1},
+    {id:'cliffs',      label:"Cliffs",            icon:'🧗', col:'#a09488', cat:'Natural', size:1},
+    {id:'canyon',      label:"Canyon",            icon:'🏜', col:'#c8a878', cat:'Natural', size:2},
+    {id:'glacier',     label:"Glacier",           icon:'🧊', col:'#bfe4ff', cat:'Natural', size:2},
+    {id:'pass',        label:"Mountain Pass",     icon:'⛰', col:'#cfe4ff', cat:'Natural', size:1},
+    {id:'floatingIsle',label:"Floating Isles",    icon:'☁', col:'#d0d8f0', cat:'Natural', size:2},
+    {id:'crater',      label:"Meteor Crater",     icon:'☄', col:'#b09080', cat:'Natural', size:2},
+
+    // --- Forests & Wilderness ---
+    {id:'ancientForest',label:"Ancient Forest",   icon:'🌲', col:'#5aa870', cat:'Wilderness', size:2},
+    {id:'darkWood',    label:"Dark Wood",         icon:'🌑', col:'#4a6850', cat:'Wilderness', size:2},
+    {id:'marsh',       label:"Swamp / Marsh",     icon:'🐊', col:'#7a8a58', cat:'Wilderness', size:2},
+    {id:'jungleLm',    label:"Jungle",            icon:'🌴', col:'#4ab070', cat:'Wilderness', size:2},
+    {id:'plains',      label:"Plains / Steppe",   icon:'🌾', col:'#c8c078', cat:'Wilderness', size:2},
+    {id:'desertLm',    label:"Desert",            icon:'🏜', col:'#e0c890', cat:'Wilderness', size:2},
+    {id:'tundraLm',    label:"Tundra",            icon:'❄', col:'#d0e0e8', cat:'Wilderness', size:2},
+    {id:'fairyGrove',  label:"Fairy Grove",       icon:'🍄', col:'#e0a0d0', cat:'Wilderness', size:1},
+    {id:'corruptForest',label:"Corrupted Forest", icon:'🥀', col:'#8a6888', cat:'Wilderness', size:2},
+
+    // --- Bodies of Water ---
+    {id:'lake',        label:"Lake",              icon:'🏞', col:'#6ab0e0', cat:'Water', size:2},
+    {id:'riverLm',     label:"River",             icon:'〰', col:'#7ac0e8', cat:'Water', size:1},
+    {id:'sea',         label:"Sea / Ocean",       icon:'🌊', col:'#5090c8', cat:'Water', size:3},
+    {id:'bay',         label:"Bay / Cove",        icon:'⚓', col:'#78b8d8', cat:'Water', size:1},
+    {id:'fjord',       label:"Fjord",             icon:'🏔', col:'#90c0d8', cat:'Water', size:2},
+    {id:'undRiver',    label:"Underground River", icon:'🕳', col:'#6898b8', cat:'Water', size:1},
+    {id:'mirrorLake',  label:"Mirror Lake",       icon:'🪞', col:'#a8d8f0', cat:'Water', size:1},
+    {id:'whisperRiver',label:"Whispering River",  icon:'💭', col:'#88c8e0', cat:'Water', size:1},
+
+    // --- Magical & Mystical ---
+    {id:'fairyRing',   label:"Fairy Ring",        icon:'🍄', col:'#e8a8e0', cat:'Mystical', size:1},
+    {id:'leyLine',     label:"Ley Line Junction", icon:'✳', col:'#c8a0ff', cat:'Mystical', size:1},
+    {id:'portal',      label:"Portal / Rift",     icon:'🌀', col:'#a878ff', cat:'Mystical', size:1},
+    {id:'sacredGrove', label:"Sacred Grove",      icon:'🌳', col:'#88d8a0', cat:'Mystical', size:1},
+    {id:'standingStones',label:"Standing Stones", icon:'🗿', col:'#b8b0a8', cat:'Mystical', size:1},
+    {id:'enchSpring',  label:"Enchanted Spring",  icon:'⛲', col:'#90e0d8', cat:'Mystical', size:1},
+    {id:'crystalCave', label:"Crystal Cave",      icon:'💎', col:'#a0e0ff', cat:'Mystical', size:1},
+    {id:'dreamPool',   label:"Dreaming Pool",     icon:'🔮', col:'#c0a8f0', cat:'Mystical', size:1},
+    {id:'oracle',      label:"Oracle's Seat",     icon:'👁', col:'#e0c8f8', cat:'Mystical', size:1},
+    {id:'barrow',      label:"Barrow Mound",      icon:'⚱', col:'#a09098', cat:'Mystical', size:1},
+    {id:'magic',       label:"Magic Anomaly",     icon:'✦', col:'#d090ff', cat:'Mystical', size:1},
+
+    // --- Dangerous ---
+    {id:'dragonLair',  label:"Dragon's Lair",     icon:'🐉', col:'#e05858', cat:'Dangerous', size:2},
+    {id:'banditCamp',  label:"Bandit Camp",       icon:'🗡', col:'#c08858', cat:'Dangerous', size:1},
+    {id:'hauntedRuin', label:"Haunted Ruin",      icon:'👻', col:'#c8c0e0', cat:'Dangerous', size:1},
+    {id:'cursedGround',label:"Cursed Ground",     icon:'☠', col:'#8a7888', cat:'Dangerous', size:2},
+    {id:'monsterDen',  label:"Monster Den",       icon:'🐾', col:'#b07868', cat:'Dangerous', size:1},
+    {id:'quicksand',   label:"Quicksand Bog",     icon:'⚠', col:'#b0a070', cat:'Dangerous', size:1},
+    {id:'avalanche',   label:"Avalanche Zone",    icon:'🏔', col:'#d8e8f0', cat:'Dangerous', size:2},
+    {id:'shadowPass',  label:"Shadow Pass",       icon:'🌑', col:'#7a7488', cat:'Dangerous', size:1},
+    {id:'trollBridge', label:"Troll Bridge",      icon:'🌉', col:'#a08868', cat:'Dangerous', size:1},
+
+    // --- Travel & Navigation ---
+    {id:'crossroads',  label:"Crossroads",        icon:'✜', col:'#d8c8a8', cat:'Travel', size:1},
+    {id:'waystation',  label:"Waystation / Inn",  icon:'🍺', col:'#e0b878', cat:'Travel', size:1},
+    {id:'lighthouse',  label:"Lighthouse",        icon:'🗼', col:'#ffe8a0', cat:'Travel', size:1},
+    {id:'watchtower',  label:"Watchtower",        icon:'🔭', col:'#b8c8d8', cat:'Travel', size:1},
+    {id:'borderGate',  label:"Border Gate",       icon:'🚪', col:'#c0b098', cat:'Travel', size:1},
+    {id:'stoneBridge', label:"Stone Bridge",      icon:'🌉', col:'#b0a898', cat:'Travel', size:1},
+    {id:'ferryCross',  label:"Ferry Crossing",    icon:'⛴', col:'#88c0e0', cat:'Travel', size:1},
+    {id:'pilgrimPath', label:"Pilgrim's Path",    icon:'🥾', col:'#c8b090', cat:'Travel', size:1},
+
+    // --- Other ---
+    {id:'landmark',    label:"Landmark (generic)",icon:'✦', col:'#e040c8', cat:'Other', size:1},
+  ];
+  const PLACE_BY_ID = {};
+  for(const t of PLACE_TYPES) PLACE_BY_ID[t.id] = t;
+  const PLACE_CATS = [];
+  for(const t of PLACE_TYPES) if(!PLACE_CATS.includes(t.cat)) PLACE_CATS.push(t.cat);
+
+  // Types the user has invented themselves, kept alongside the built-ins
+  function customPlaceTypes(){
+    userData.customPlaceTypes = userData.customPlaceTypes || [];
+    return userData.customPlaceTypes;
   }
+  function placeType(id){
+    return PLACE_BY_ID[id]
+        || customPlaceTypes().find(t=>t.id===id)
+        || {id, label:id, icon:'✦', col:'#e040c8', cat:'Custom', size:1};
+  }
+  // Settlement types keep the detailed pixel-art buildings; everything else
+  // renders as an icon marker.
+  const SETTLEMENT_KINDS = new Set(['city','town','village','hamlet','fortress','monastery','outpost','nomadcamp','refuge']);
 
   function addLandmarkAt(tx, ty){
-    editor.pendingPoint = {x:tx, y:ty, kind:'landmark'};
+    editor.pendingPoint = {x:tx, y:ty};
     editor.hoverTile = null;
-    populatePointPanel('landmark');
+    populatePointPanel();
     view.selected = {x:tx, y:ty};
     document.getElementById('infoPanel').style.display = 'none';
     draw();
   }
 
-  function populatePointPanel(category){
+  // Fill the type dropdown for the chosen category, then refresh the preview
+  function populateKindOptions(cat, selectId){
+    const kindSel = document.getElementById('pointKind');
+    const list = cat === 'Custom'
+      ? customPlaceTypes()
+      : PLACE_TYPES.filter(t=>t.cat === cat);
+    kindSel.innerHTML = list.map(t=>
+      `<option value="${t.id}">${t.icon}  ${t.label}</option>`).join('')
+      || '<option value="">— none yet —</option>';
+    if(selectId && list.some(t=>t.id===selectId)) kindSel.value = selectId;
+    updatePointPreview();
+  }
+  function updatePointPreview(){
+    const box = document.getElementById('pointPreview');
+    if(!box) return;
+    const t = placeType(document.getElementById('pointKind').value);
+    box.innerHTML =
+      `<span style="font-size:16px;line-height:1;">${t.icon}</span>` +
+      `<span style="width:11px;height:11px;border-radius:50%;background:${t.col};flex:none;"></span>` +
+      `<span style="opacity:0.8;">${t.label}</span>` +
+      (SETTLEMENT_KINDS.has(t.id)
+        ? '<span style="margin-left:auto;opacity:0.5;font-size:9px;">drawn as buildings</span>'
+        : '<span style="margin-left:auto;opacity:0.5;font-size:9px;">icon marker</span>');
+  }
+
+  function populatePointPanel(preselect){
     const panel = document.getElementById('pointPanel');
     const status = document.getElementById('pointStatus');
-    const kindSel = document.getElementById('pointKind');
+    const catSel = document.getElementById('pointCat');
     const nameInp = document.getElementById('pointName');
     document.getElementById('drawPanel').style.display = 'none';
     panel.style.display = 'block';
     nameInp.value = '';
-    if(category === 'settlement'){
-      status.textContent = `New settlement at (${editor.pendingPoint.x}, ${editor.pendingPoint.y})`;
-      kindSel.innerHTML = '<option value="city">City</option><option value="town" selected>Town</option><option value="village">Village</option>';
-    } else {
-      status.textContent = `New landmark at (${editor.pendingPoint.x}, ${editor.pendingPoint.y})`;
-      kindSel.innerHTML = '<option value="ruins" selected>Ruins</option><option value="volcano">Volcano</option><option value="hotspring">Hot springs</option><option value="waterfall">Waterfall</option><option value="magic">Magic anomaly</option>';
-    }
+    document.getElementById('pointNotes').value = '';
+    status.textContent = `New place at (${editor.pendingPoint.x}, ${editor.pendingPoint.y})`;
+
+    // Category list, with the user's own types last if they have any
+    const cats = PLACE_CATS.slice();
+    if(customPlaceTypes().length) cats.push('Custom');
+    const keepCat = catSel.value && cats.includes(catSel.value) ? catSel.value : 'Settlements';
+    catSel.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+    catSel.value = keepCat;
+    populateKindOptions(keepCat, preselect);
     nameInp.focus();
   }
+
+  document.getElementById('pointCat').addEventListener('change', (e)=>{
+    populateKindOptions(e.target.value);
+  });
+  document.getElementById('pointKind').addEventListener('change', updatePointPreview);
+  document.getElementById('newTypeAdd').onclick = ()=>{
+    const label = (document.getElementById('newTypeLabel').value || '').trim();
+    if(!label){
+      const el = document.getElementById('newTypeLabel');
+      el.style.borderColor = '#e85a5a';
+      setTimeout(()=>{ el.style.borderColor=''; }, 900);
+      return;
+    }
+    const icon = (document.getElementById('newTypeIcon').value || '✦').trim() || '✦';
+    const col  = document.getElementById('newTypeColor').value;
+    const id   = 'ct_' + label.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,24) + '_' + Date.now().toString(36).slice(-4);
+    customPlaceTypes().push({id, label, icon, col, cat:'Custom', size:1, userMade:true});
+    saveUserData();
+    // Jump straight to it so it can be used immediately
+    document.getElementById('newTypeLabel').value = '';
+    document.getElementById('newTypeIcon').value = '';
+    const catSel = document.getElementById('pointCat');
+    if(![...catSel.options].some(o=>o.value==='Custom')){
+      catSel.insertAdjacentHTML('beforeend', '<option value="Custom">Custom</option>');
+    }
+    catSel.value = 'Custom';
+    populateKindOptions('Custom', id);
+  };
 
   function savePendingPoint(){
     if(!editor.pendingPoint) return;
@@ -6722,11 +7683,15 @@
       return;
     }
     const kind = document.getElementById('pointKind').value;
-    const {x, y, kind:cat} = editor.pendingPoint;
-    if(cat === 'settlement'){
-      userData.customSettlements.push({x, y, name, kind, tag:'', notes:'', id:nextId(), custom:true});
+    if(!kind) return;
+    const notes = (document.getElementById('pointNotes').value || '').trim();
+    const {x, y} = editor.pendingPoint;
+    // Settlement kinds keep the detailed building artwork; everything else is
+    // stored as a landmark and drawn as an icon marker.
+    if(SETTLEMENT_KINDS.has(kind)){
+      userData.customSettlements.push({x, y, name, kind, tag:'', notes, id:nextId(), custom:true});
     } else {
-      userData.customLandmarks.push({x, y, name, kind, notes:'', id:nextId(), custom:true});
+      userData.customLandmarks.push({x, y, name, kind, notes, id:nextId(), custom:true});
     }
     editor.pendingPoint = null;
     document.getElementById('pointPanel').style.display = 'none';
@@ -6741,6 +7706,26 @@
     editor.pendingPoint = null;
     document.getElementById('pointPanel').style.display = 'none';
     updateDrawHint();
+    draw();
+  }
+
+  // The generated rivers, roads, trade routes and ferries can't simply be
+  // deleted from their arrays — the world regenerates them on every load. So
+  // instead we record which ones the admin has removed, and skip those when
+  // drawing. The suppression list is tiny (just indices) and reversible.
+  function hiddenSet(kind){
+    userData.hidden = userData.hidden || {};
+    userData.hidden[kind] = userData.hidden[kind] || [];
+    return userData.hidden[kind];
+  }
+  function isHidden(kind, idx){ return hiddenSet(kind).includes(idx); }
+  function hideFeature(kind, idx){
+    const set = hiddenSet(kind);
+    if(!set.includes(idx)) set.push(idx);
+  }
+  function restoreAllHidden(){
+    userData.hidden = {};
+    saveUserData();
     draw();
   }
 
@@ -6768,6 +7753,37 @@
       userData.customFerries.length
     );
     removed = before - after;
+
+    // Nothing of the user's own here? Then look at the generated features and
+    // suppress whichever one passes through this tile.
+    if(removed === 0){
+      const near = (pts)=>{
+        for(const pt of pts){
+          const px = pt[0] !== undefined ? pt[0] : pt.x;
+          const py = pt[1] !== undefined ? pt[1] : pt.y;
+          if(Math.abs(px-tx)<=1 && Math.abs(py-ty)<=1) return true;
+        }
+        return false;
+      };
+      const sources = [
+        ['rivers',     rivers,      r=>r.points || r.path || []],
+        ['roads',      roads,       r=>r.points || r.path || r],
+        ['trade',      trade,   r=>r.points || r.path || r],
+        ['ferries',    ferries, r=>r.points || r.path || r],
+        ['shipping',   (typeof shipping !== 'undefined' ? shipping : []), r=>r.points || r.path || r]
+      ];
+      for(const [kind, arr, getPts] of sources){
+        if(!arr) continue;
+        for(let i=0;i<arr.length;i++){
+          if(isHidden(kind, i)) continue;
+          const pts = getPts(arr[i]);
+          if(!pts || !pts.length) continue;
+          if(near(pts)){ hideFeature(kind, i); removed++; break; }
+        }
+        if(removed) break;
+      }
+    }
+
     if(removed) saveUserData();
     view.selected = {x:tx, y:ty};
     showInfo(tx, ty);
@@ -6805,8 +7821,10 @@
       // Generic hint for current tool
       const hints = {
         'select': 'Click any tile to inspect or edit it.',
-        'settle': 'Click on land to place a new settlement.',
-        'poi':    'Click anywhere to place a landmark / POI.',
+        'place':  'Click any tile to add a place — settlement, ruin, wonder, anything.',
+        'weather':'Create a region, then paint where that weather applies.',
+        'settle': 'Click any tile to add a place.',
+        'poi':    'Click any tile to add a place.',
         'river':  'Click to start drawing a river. Each click adds a point.',
         'road':   'Click to start drawing a road. Each click adds a point.',
         'trade':  'Click to start drawing a trade route. Each click adds a point.',
@@ -6817,6 +7835,12 @@
   }
 
   function setTool(t){
+    // The weather panel only makes sense while its tool is active
+    const wp = document.getElementById('weatherPanel');
+    if(wp){
+      wp.style.display = (t === 'weather') ? 'block' : 'none';
+      if(t === 'weather'){ wzRefreshSelect(); wzSetMode(false); wzUpdateStatus(); }
+    }
     editor.tool = t;
     // cancel any in-progress drawing if switching tools
     if(t !== editor.drawing?.kind){
@@ -7070,9 +8094,25 @@
     const editBlock = document.getElementById('editControls');
     if(isLoggedIn){
       editBlock.style.display='block';
-      document.getElementById('editName').value = (feat && feat.kind==='settlement') ? feat.data.name : '';
-      document.getElementById('editKind').value = feat && feat.kind==='settlement'? feat.data.kind : 'village';
-      document.getElementById('editNotes').value = (feat && feat.kind==='settlement' && feat.data.notes) || customNote || '';
+      // Only offer editing when a place actually exists on this tile
+      const here = placeAt(tx, ty);
+      const blk = document.getElementById('placeEditBlock');
+      const hint = document.getElementById('placeEditHint');
+      if(here){
+        const pt = placeType(here.rec.kind);
+        blk.style.display = 'block';
+        hint.style.display = 'none';
+        document.getElementById('placeEditWhat').innerHTML =
+          `<span style="font-size:15px;">${pt.icon}</span> ` +
+          `<b>${escapeHTML(here.rec.name || '')}</b> ` +
+          `<span style="opacity:0.6;">· ${pt.label}</span>` +
+          (here.builtIn ? ' <span style="opacity:0.45;font-size:10px;">(original world)</span>' : '');
+        document.getElementById('editName').value = here.rec.name || '';
+        document.getElementById('editNotes').value = here.rec.notes || '';
+      } else {
+        blk.style.display = 'none';
+        hint.style.display = 'block';
+      }
       // Pre-fill the custom-event fields if this tile already has one attached
       const existingCe = (userData.customEvents||[]).find(ce => ce.x === tx && ce.y === ty);
       document.getElementById('ceText').value = existingCe ? existingCe.text : '';
@@ -8415,6 +9455,22 @@
 
     c.save();
     c.beginPath(); c.rect(ox, oy, side, side); c.clip();
+
+    // Authored weather takes over completely inside its own region
+    const superSpec = SUPER_BY_ID[w];
+    if(superSpec){
+      const zone = zoneAtTile(tileView.tx, tileView.ty);
+      c.save();
+      c.translate(ox, oy);
+      drawSuperWeather(c, side, side, superSpec, t, {
+        alpha: zone && zone.intensity != null ? zone.intensity : 1,
+        scale: Math.max(0.5, Math.min(2.2, side/420)),
+        density: 0.55                      // fewer particles at this scale
+      });
+      c.restore();
+      c.restore();
+      return;
+    }
 
     if(w === 'rain' || w === 'storm' || w === 'severe'){
       const n = w === 'severe' ? 340 : w === 'storm' ? 220 : 130;
@@ -10728,7 +11784,7 @@
     const bundle = { version: 1, exported: new Date().toISOString(), keys: {} };
 
     // Everything that lives under a known key
-    const fixed = [STORAGE_KEY, FOG_KEY, LAYERS_KEY, SPRITE_LIB_KEY];
+    const fixed = [STORAGE_KEY, FOG_KEY, LAYERS_KEY, SPRITE_LIB_KEY, WZ_KEY];
     for(const k of fixed){
       try{
         const r = await Store.get(k, true);
@@ -10809,6 +11865,151 @@
       if(status){ status.textContent = 'Import failed: ' + (err.message||err); status.style.color = '#ffb0b0'; }
     }
   }
+
+  // ============ WEATHER REGION TOOL ============
+  editor.weatherZoneIdx = 0;      // 1-based index into weatherZones()
+  editor.wzErasing = false;
+
+  function wzRefreshSelect(){
+    const sel = document.getElementById('wzSelect');
+    const zones = weatherZones();
+    sel.innerHTML = zones.length
+      ? zones.map((z,i)=>`<option value="${i+1}">${i+1}. ${z.name || 'Unnamed'}</option>`).join('')
+      : '<option value="0">— no regions yet —</option>';
+    if(editor.weatherZoneIdx) sel.value = String(editor.weatherZoneIdx);
+    wzRefreshFields();
+  }
+  function wzCurrent(){
+    const zones = weatherZones();
+    return editor.weatherZoneIdx ? zones[editor.weatherZoneIdx-1] : null;
+  }
+  function wzRefreshFields(){
+    const z = wzCurrent();
+    const catSel  = document.getElementById('wzCat');
+    const kindSel = document.getElementById('wzKind');
+    // Categories: the ordinary weather first, then the authored kinds
+    if(!catSel.options.length){
+      catSel.innerHTML = ['Ordinary weather', ...SUPER_CATS]
+        .map(c=>`<option value="${c}">${c}</option>`).join('');
+    }
+    if(z){
+      document.getElementById('wzName').value = z.name || '';
+      const spec = SUPER_BY_ID[z.kind];
+      catSel.value = spec ? spec.cat : 'Ordinary weather';
+      document.getElementById('wzIntensity').value = Math.round((z.intensity==null?1:z.intensity)*100);
+      document.getElementById('wzIntensityLabel').textContent =
+        Math.round((z.intensity==null?1:z.intensity)*100) + '%';
+    }
+    wzPopulateKinds(catSel.value, z ? z.kind : null);
+  }
+  function wzPopulateKinds(cat, selectId){
+    const kindSel = document.getElementById('wzKind');
+    let list;
+    if(cat === 'Ordinary weather'){
+      list = [
+        {id:'clear',label:'Clear'},{id:'cloudy',label:'Cloudy'},{id:'rain',label:'Rain'},
+        {id:'storm',label:'Thunderstorm'},{id:'severe',label:'Severe storm'},
+        {id:'snow',label:'Snow'},{id:'blizzard',label:'Blizzard'},
+        {id:'fog',label:'Fog'},{id:'sandstorm',label:'Sandstorm'}
+      ];
+    } else {
+      list = SUPER_WEATHER.filter(w=>w.cat===cat);
+    }
+    kindSel.innerHTML = list.map(w=>`<option value="${w.id}">${w.label}</option>`).join('');
+    if(selectId && list.some(w=>w.id===selectId)) kindSel.value = selectId;
+    wzShowDesc();
+  }
+  function wzShowDesc(){
+    const spec = SUPER_BY_ID[document.getElementById('wzKind').value];
+    document.getElementById('wzDesc').textContent = spec ? spec.desc : 'Standard simulated weather, locked to this region.';
+  }
+  function wzApplyToZone(){
+    const z = wzCurrent();
+    if(!z) return;
+    z.name = document.getElementById('wzName').value.trim() || z.name;
+    z.kind = document.getElementById('wzKind').value;
+    z.intensity = parseInt(document.getElementById('wzIntensity').value,10)/100;
+    saveUserData();
+    draw();
+  }
+
+  document.getElementById('wzNew').onclick = ()=>{
+    const zones = weatherZones();
+    if(zones.length >= 200){ alert('That is a lot of weather regions — 200 is the limit.'); return; }
+    zones.push({name:`Region ${zones.length+1}`, kind:'shardstorm', intensity:1});
+    editor.weatherZoneIdx = zones.length;
+    saveUserData();
+    wzRefreshSelect();
+    wzUpdateStatus();
+  };
+  document.getElementById('wzDelete').onclick = async ()=>{
+    const idx = editor.weatherZoneIdx;
+    const z = wzCurrent();
+    if(!z) return;
+    if(!confirm(`Delete "${z.name}" and clear its painted area?`)) return;
+    // Clear its cells, then renumber anything above it
+    for(let i=0;i<wzMask.length;i++){
+      if(wzMask[i] === idx) wzMask[i] = 0;
+      else if(wzMask[i] > idx) wzMask[i]--;
+    }
+    wzMarkStale();
+    weatherZones().splice(idx-1, 1);
+    editor.weatherZoneIdx = Math.min(idx, weatherZones().length);
+    await saveUserData();
+    await saveWeatherZones();
+    wzRefreshSelect();
+    draw();
+  };
+  document.getElementById('wzSelect').addEventListener('change', (e)=>{
+    editor.weatherZoneIdx = parseInt(e.target.value,10) || 0;
+    wzRefreshFields();
+    wzUpdateStatus();
+    draw();
+  });
+  document.getElementById('wzCat').addEventListener('change', (e)=>{
+    wzPopulateKinds(e.target.value);
+    wzApplyToZone();
+  });
+  document.getElementById('wzKind').addEventListener('change', ()=>{ wzShowDesc(); wzApplyToZone(); });
+  document.getElementById('wzName').addEventListener('input', ()=>{
+    const z = wzCurrent();
+    if(z){ z.name = document.getElementById('wzName').value; wzRefreshSelectLabelOnly(); }
+  });
+  function wzRefreshSelectLabelOnly(){
+    const sel = document.getElementById('wzSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const z = wzCurrent();
+    if(opt && z) opt.textContent = `${editor.weatherZoneIdx}. ${z.name || 'Unnamed'}`;
+  }
+  document.getElementById('wzIntensity').addEventListener('input', (e)=>{
+    document.getElementById('wzIntensityLabel').textContent = e.target.value + '%';
+    wzApplyToZone();
+  });
+  document.getElementById('wzBrush').addEventListener('input', (e)=>{
+    document.getElementById('wzBrushLabel').textContent = e.target.value + ' tiles';
+  });
+  function wzSetMode(erasing){
+    editor.wzErasing = erasing;
+    document.getElementById('wzPaintMode').style.background = erasing ? 'rgba(40,55,80,0.6)' : 'rgba(70,90,140,0.7)';
+    document.getElementById('wzEraseMode').style.background = erasing ? 'rgba(70,90,140,0.7)' : 'rgba(40,55,80,0.6)';
+  }
+  document.getElementById('wzClearArea').onclick = async ()=>{
+    const idx = editor.weatherZoneIdx;
+    if(!idx) return;
+    const z = wzCurrent();
+    if(!confirm(`Clear the painted area for "${z ? z.name : 'this region'}"? The region itself is kept.`)) return;
+    for(let i=0;i<wzMask.length;i++) if(wzMask[i] === idx) wzMask[i] = 0;
+    wzMarkStale();
+    await saveWeatherZones();
+    wzUpdateStatus();
+    draw();
+  };
+  document.getElementById('wzPaintMode').onclick = ()=> wzSetMode(false);
+  document.getElementById('wzEraseMode').onclick = ()=> wzSetMode(true);
+  document.getElementById('restoreHidden').onclick = ()=>{
+    if(!confirm('Bring back every river, road, trade route and ferry you have erased?')) return;
+    restoreAllHidden();
+  };
 
   // ---- Editor panel show / hide ----
   // The editor covers a good part of the map, which gets in the way while
@@ -10993,39 +12194,43 @@
     }
   }
   // Save edit
+  // This panel now only EDITS a place that already exists here. Creating one
+  // is solely the job of the "Add place" tool, so there is one way to do it.
+  function placeAt(x, y){
+    const cs = (userData.customSettlements||[]).find(s=>s.x===x && s.y===y);
+    if(cs) return {rec: cs, list: 'customSettlements', builtIn: false};
+    const cl = (userData.customLandmarks||[]).find(l=>l.x===x && l.y===y);
+    if(cl) return {rec: cl, list: 'customLandmarks', builtIn: false};
+    const bs = settlements.find(s=>Math.abs(s.x-x)<=1 && Math.abs(s.y-y)<=1);
+    if(bs) return {rec: bs, list: null, builtIn: true};
+    const bl = landmarks.find(l=>Math.abs(l.x-x)<=1 && Math.abs(l.y-y)<=1);
+    if(bl) return {rec: bl, list: null, builtIn: true};
+    return null;
+  }
+
   document.getElementById('saveEdit').onclick = async ()=>{
     if(!view.selected || !isLoggedIn) return;
     const {x,y} = view.selected;
+    const found = placeAt(x, y);
+    if(!found) return;
     const name = document.getElementById('editName').value.trim();
-    const kind = document.getElementById('editKind').value;
     const notes = document.getElementById('editNotes').value.trim();
-    // Find existing
-    const all = settlements.concat(userData.customSettlements||[]);
-    const existing = all.find(s=>Math.abs(s.x-x)<=1 && Math.abs(s.y-y)<=1);
-    if(existing && settlements.includes(existing)){
-      // editing built-in — store override
-      existing.notes = notes;
-      if(name) existing.name = name;
-      existing.kind = kind;
-    } else if(name){
-      // custom
-      const cs = userData.customSettlements || (userData.customSettlements=[]);
-      const found = cs.find(s=>s.x===x&&s.y===y);
-      if(found){ found.name=name; found.kind=kind; found.notes=notes; }
-      else cs.push({x,y,name,kind,notes,tag:'',custom:true});
-    } else {
-      // pure note
-      userData.edits[`${x},${y}`] = notes;
-    }
+    if(name) found.rec.name = name;
+    found.rec.notes = notes;
     await saveUserData();
     showInfo(x,y); draw();
   };
   document.getElementById('deleteEdit').onclick = async ()=>{
     if(!view.selected || !isLoggedIn) return;
     const {x,y} = view.selected;
-    if(userData.customSettlements){
-      userData.customSettlements = userData.customSettlements.filter(s=>!(s.x===x&&s.y===y));
+    const found = placeAt(x, y);
+    if(!found) return;
+    if(found.builtIn){
+      alert('This is part of the original world and cannot be deleted. You can rename it or add notes instead.');
+      return;
     }
+    if(!confirm(`Delete "${found.rec.name}"?`)) return;
+    userData[found.list] = userData[found.list].filter(r=>r !== found.rec);
     delete userData.edits[`${x},${y}`];
     await saveUserData();
     showInfo(x,y); draw();
@@ -11170,8 +12375,11 @@
       // Drifting fog and Thalen's beacon both need a steady frame rate
       const fogVisible = layers.fog;
       const thalenVisible = layers.thalen && userData.thalenPath && userData.thalenPath.points.length > 0;
+      // Authored weather regions animate continuously
+      const wzActive = weatherZones().length > 0;
       const needAnim = inCloudRange || animatedWeather || layers.economy
-                    || pulsingSelection || nearLiveFeature || fogVisible || thalenVisible;
+                    || pulsingSelection || nearLiveFeature || fogVisible || thalenVisible
+                    || wzActive;
       // Refresh often enough that the terminator glides rather than steps
       const needLight = minChanged || (now - lastDrawAt > 1500);
       if(needAnim){
