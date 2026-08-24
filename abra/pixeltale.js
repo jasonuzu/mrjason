@@ -96,6 +96,23 @@ function detectEncoder(){
   });
 }
 
+/* A GIF with more than one Graphic Control Extension block has more than one
+   frame. Cheap to check and avoids treating still GIFs as animated. */
+async function isAnimatedGif(blob){
+  if(!/gif/i.test(blob.type||'') && !/\.gif$/i.test(blob.name||'')) return false;
+  try{
+    var buf = new Uint8Array(await blob.arrayBuffer());
+    var frames = 0;
+    for(var i=0;i<buf.length-3;i++){
+      if(buf[i]===0x00 && buf[i+1]===0x21 && buf[i+2]===0xF9 && buf[i+3]===0x04){
+        frames++;
+        if(frames>1) return true;
+      }
+    }
+    return false;
+  }catch(e){ return true; }   // if unsure, treat as animated and keep it intact
+}
+
 function extFor(mime){
   if (mime === 'image/webp') return 'webp';
   if (mime === 'image/png')  return 'png';
@@ -140,14 +157,14 @@ function canvasToBlob(c, mime, q){
 /* Returns { full:Blob, thumb:Blob|null, w, h, mime } */
 async function compressImage(file){
   var mime = await detectEncoder();
-  var isAnimated = /gif/i.test(file.type);
+  var isAnimated = await isAnimatedGif(file);
 
   // Small files (typically pixel art / sprites) are stored byte-for-byte.
   // Re-encoding them would only add artifacts and rarely saves anything.
   if (file.size <= PASSTHRU_BYTES || isAnimated) {
     var dims = { w:0, h:0 };
     try { var b0 = await loadBitmap(file); dims.w = b0.width||b0.naturalWidth; dims.h = b0.height||b0.naturalHeight; if(b0.close) b0.close(); } catch(e){}
-    return { full:file, thumb:null, w:dims.w, h:dims.h, mime:file.type||'image/png', passthrough:true };
+    return { full:file, thumb:null, w:dims.w, h:dims.h, mime:file.type||'image/png', passthrough:true, animated:isAnimated };
   }
 
   var bmp = await loadBitmap(file);
@@ -165,7 +182,7 @@ async function compressImage(file){
   }
   if (bmp.close) bmp.close();
 
-  return { full:full, thumb:thumb, w:big.w, h:big.h, mime:passthrough ? (file.type||mime) : mime, passthrough:passthrough };
+  return { full:full, thumb:thumb, w:big.w, h:big.h, mime:passthrough ? (file.type||mime) : mime, passthrough:passthrough, animated:false };
 }
 
 async function sha256Hex(blob){
@@ -215,9 +232,10 @@ async function mapLimit(arr, limit, fn){
    DOM REFS
    ========================================================================== */
 var customImg=null, customName='', imgSeq=0, toastTimer=null;
+var customIsDom=false;
 var selectedLine = -1;
 
-var stageEl=$('#stage'), bgCanvasEl=$('#bgCanvas'), bctx=bgCanvasEl.getContext('2d'), statusBar=$('#statusBar');
+var stageEl=$('#stage'), bgImgEl=$('#bgImage'), bgCanvasEl=$('#bgCanvas'), bctx=bgCanvasEl.getContext('2d'), statusBar=$('#statusBar');
 var progressEl=$('#progress');
 var lightFx=$('#lightFx'), scanFx=$('#scanFx');
 var picWindow=$('#picWindow'), storyPic=$('#storyPic'), dialogText=$('#dialogText'), cursorEl=$('#cursor');
@@ -252,6 +270,9 @@ function markBgDirty(){ bgDirty = true; }
 function frame(ts){
   requestAnimationFrame(frame);
   if (document.hidden || showOver) return;
+  // An animated background is a live element; the canvas underneath it is
+  // cleared once and then left alone so nothing shows through transparency.
+  if (customIsDom) { if (bgDirty) { bctx.clearRect(0,0,W,H); bgDirty = false; } return; }
   var isStatic = !!customImg;
   if (isStatic && !bgDirty) return;
   if (!isStatic && ts - lastDraw < FRAME_MS) return;
@@ -340,11 +361,30 @@ function updateBgUI(){
 
 /* Custom backgrounds now live in the image library, which means they get
    uploaded and saved like everything else instead of vanishing on reload. */
+function clearBgLayer(){
+  bgImgEl.classList.remove('on');
+  bgImgEl.removeAttribute('src');
+  customIsDom=false;
+}
+
 function setCustomBg(imgId){
   state.customBg = imgId || null;
-  if(!imgId){ customImg=null; customName=''; markBgDirty(); return; }
+  if(!imgId){ clearBgLayer(); customImg=null; customName=''; markBgDirty(); return; }
   var rec = imgById(imgId);
-  if(!rec){ state.customBg=null; customImg=null; return; }
+  if(!rec){ state.customBg=null; clearBgLayer(); customImg=null; return; }
+
+  var animated = rec.animated || /\.gif(\?|$)/i.test(rec.url||'');
+  if(animated){
+    // Straight into the DOM, where the browser animates it for us.
+    customIsDom = true;
+    bgImgEl.classList.toggle('px', state.pixelate);
+    bgImgEl.onload = function(){ customImg=bgImgEl; customName=rec.name; bgImgEl.classList.add('on'); markBgDirty(); updateBgUI(); };
+    bgImgEl.onerror = function(){ clearBgLayer(); toast('THAT BACKGROUND IMAGE WOULD NOT LOAD'); };
+    bgImgEl.src = rec.url;
+    return;
+  }
+
+  clearBgLayer();
   var nm=new Image();
   nm.crossOrigin='anonymous';
   nm.onload=function(){ customImg=nm; customName=rec.name; markBgDirty(); updateBgUI(); };
@@ -362,11 +402,23 @@ $('#bgUploadBtn').addEventListener('click',function(){$('#bgFileInput').click();
 $('#bgFileInput').addEventListener('change',async function(e){
   var f=e.target.files[0]; e.target.value='';
   if(!f)return;
+  setProgress('READING');
   var rec = await addImageFile(f);
-  if(rec) setCustomBg(rec.id);
+  setProgress('');
+  if(!rec)return;
+  setCustomBg(rec.id);
+  renderImages();
+  if(rec.animated){
+    toast('ANIMATED BACKGROUND ADDED'+(rec.bytes>3*1024*1024?' - '+fmtBytes(rec.bytes)+' IS LARGE, IT MAY BE SLOW TO LOAD':''));
+  }
+  uploadPending();
 });
 $('#bgClearBtn').addEventListener('click',function(){ setCustomBg(null); updateBgUI(); });
-$('#pixelChk').addEventListener('change',function(e){state.pixelate=e.target.checked;markBgDirty();});
+$('#pixelChk').addEventListener('change',function(e){
+  state.pixelate=e.target.checked;
+  bgImgEl.classList.toggle('px',state.pixelate);
+  markBgDirty();
+});
 
 /* ==========================================================================
    IMAGE LIBRARY
@@ -398,7 +450,7 @@ async function addImageFile(f){
     thumbUrl: out.thumb ? URL.createObjectURL(out.thumb) : null,
     fullBlob: out.full, thumbBlob: out.thumb,
     w: out.w, h: out.h, bytes: out.full.size, origBytes: f.size,
-    remote: null, uploading: false, local: true
+    remote: null, uploading: false, local: true, animated: !!out.animated
   };
   state.images.push(rec); reindexImages();
   return rec;
@@ -1250,7 +1302,7 @@ function imagesAsUrls(){
   var im={};
   for(var i=0;i<state.images.length;i++){
     var r=state.images[i];
-    im[r.id]={ name:r.name, url:r.url, thumb:r.thumbUrl||null, w:r.w||0, h:r.h||0 };
+    im[r.id]={ name:r.name, url:r.url, thumb:r.thumbUrl||null, w:r.w||0, h:r.h||0, anim:!!r.animated };
   }
   return im;
 }
@@ -1272,13 +1324,13 @@ $('#saveBtn').addEventListener('click',async function(){
     for(var i=0;i<state.images.length;i++){
       var r=state.images[i];
       if(r.remote||/^https?:/.test(r.url||'')){
-        im[r.id]={name:r.name,url:r.url,thumb:r.thumbUrl||null,w:r.w,h:r.h};
+        im[r.id]={name:r.name,url:r.url,thumb:r.thumbUrl||null,w:r.w,h:r.h,anim:!!r.animated};
       } else if(r.fullBlob){
         // Not uploaded yet, so embed it -- but the compressed version, which is
         // a fraction of what the old export produced.
-        im[r.id]={name:r.name,data:await blobToDataUrl(r.fullBlob),w:r.w,h:r.h};
+        im[r.id]={name:r.name,data:await blobToDataUrl(r.fullBlob),w:r.w,h:r.h,anim:!!r.animated};
       } else if(/^data:/.test(r.url||'')){
-        im[r.id]={name:r.name,data:r.url,w:r.w,h:r.h};
+        im[r.id]={name:r.name,data:r.url,w:r.w,h:r.h,anim:!!r.animated};
       }
     }
     var payload=serialize(im);
@@ -1338,7 +1390,7 @@ function loadStateFromData(d){
         fullBlob:null, thumbBlob:null, w:src.w||0, h:src.h||0,
         bytes:0, origBytes:0,
         remote: /^https?:/.test(url) ? {url:url,thumb:src.thumb||null} : null,
-        uploading:false, local:false
+        uploading:false, local:false, animated: !!src.anim || /\.gif(\?|$)/i.test(url)
       });
     }
   }
@@ -1359,7 +1411,7 @@ function loadStateFromData(d){
   if(state.music){ audio.src=state.music.url; audio.volume=state.volume; $('#musicName').textContent='[MUSIC] '+String(state.music.name).slice(0,20); }
   else { audio.removeAttribute('src'); $('#musicName').textContent='NO TRACK'; }
 
-  customImg=null; customName=''; selectedLine=-1;
+  clearBgLayer(); customImg=null; customName=''; selectedLine=-1;
   state.customBg = d.customBg || null;
   if(state.customBg) setCustomBg(state.customBg);
 
