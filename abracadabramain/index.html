@@ -257,7 +257,6 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   100% { background-color: rgba(180,210,255,0.10); }
 }
 
-
 /* ---------- chronicle overlay ---------- */
 .chron-panel{
   width:min(760px,100%);border:1px solid rgba(192,154,91,.34);
@@ -524,6 +523,19 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
 
     <!-- ============ ANIMATION BUILDER ============ -->
     
+
+    <!-- ============ MATERIAL BROWSER ============ -->
+    <div id="matBrowser" style="position:absolute;inset:0;display:none;z-index:58;background:rgba(6,10,20,0.94);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+      <div style="background:#111a2c;border:1px solid rgba(255,255,255,0.14);border-radius:12px;padding:14px;width:min(780px,92%);max-height:88%;display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="font-size:13px;font-weight:500;color:#e8eef7;">Materials</span>
+          <input id="matSearch" placeholder="Search…" style="flex:1;background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.15);color:#e8eef7;padding:6px 9px;border-radius:6px;font-size:12px;">
+          <button id="matBrowserClose" style="background:rgba(40,55,80,0.7);border:1px solid rgba(255,255,255,0.12);color:#e8eef7;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;">Done</button>
+        </div>
+        <div id="matBrowserBody" style="overflow-y:auto;flex:1;padding-right:4px;"></div>
+        <div id="matBrowserStatus" style="font-size:10px;opacity:0.6;margin-top:8px;min-height:13px;"></div>
+      </div>
+    </div>
 
     <!-- Message popup shown when a tile with a message is clicked -->
     <div id="tileMessage" style="position:absolute;left:50%;bottom:64px;transform:translateX(-50%);display:none;z-index:40;min-width:280px;max-width:560px;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);border:2px solid rgba(255,232,90,0.55);border-radius:10px;padding:14px 18px;color:#e8eef7;font-size:14px;line-height:1.55;box-shadow:0 6px 28px rgba(0,0,0,0.6);cursor:pointer;">
@@ -8843,6 +8855,142 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     {id:'purple',    label:'Purple',      color:[124,76,164],  tex:'flat',   cat:'Colour'},
     {id:'magenta',   label:'Magenta',     color:[190,74,148],  tex:'flat',   cat:'Colour'},
     {id:'pink',      label:'Pink',        color:[232,150,168], tex:'flat',   cat:'Colour'},
+
+    // ============ EXTENDED LIBRARY ============
+    // Everything below appears under "More materials". Grouped so a builder
+    // can find what they need: interiors, roofing, paths, farmland, and so on.
+
+    // --- Ground, extended ---
+    {id:'lushgrass', label:'Lush grass',   color:[86,168,74],   tex:'grain',  cat:'Ground'},
+    {id:'sparsegrass',label:'Sparse grass',color:[146,158,96],  tex:'grain',  cat:'Ground'},
+    {id:'meadow',    label:'Meadow',       color:[128,176,92],  tex:'grain',  cat:'Ground'},
+    {id:'heather',   label:'Heather',      color:[142,110,148], tex:'rough',  cat:'Ground'},
+    {id:'fern',      label:'Ferns',        color:[70,120,74],   tex:'rough',  cat:'Ground'},
+    {id:'reedbed',   label:'Reed bed',     color:[130,150,92],  tex:'thatch', cat:'Ground'},
+    {id:'silt',      label:'Silt',         color:[150,134,110], tex:'grain',  cat:'Ground'},
+    {id:'claysoil',  label:'Clay soil',    color:[156,110,84],  tex:'rough',  cat:'Ground'},
+    {id:'tilled',    label:'Tilled earth', color:[110,82,58],   tex:'plank',  cat:'Ground'},
+    {id:'furrows',   label:'Crop furrows', color:[132,144,74],  tex:'plank',  cat:'Ground'},
+    {id:'wheatfield',label:'Wheat field',  color:[206,182,96],  tex:'thatch', cat:'Ground'},
+    {id:'vineyard',  label:'Vineyard',     color:[96,118,72],   tex:'herring',cat:'Ground'},
+    {id:'shingleBch',label:'Shingle beach',color:[168,158,144], tex:'cobble', cat:'Ground'},
+    {id:'mudflat',   label:'Mud flat',     color:[118,104,88],  tex:'crack',  cat:'Ground'},
+    {id:'saltflat',  label:'Salt flat',    color:[228,224,216], tex:'crack',  cat:'Ground'},
+    {id:'permafrost',label:'Permafrost',   color:[186,196,204], tex:'crack',  cat:'Ground'},
+    {id:'slush',     label:'Slush',        color:[198,208,218], tex:'rough',  cat:'Ground'},
+    {id:'packedSnow',label:'Packed snow',  color:[222,230,240], tex:'rough',  cat:'Ground'},
+    {id:'blackice',  label:'Black ice',    color:[92,110,126],  tex:'gloss',  cat:'Ground'},
+    {id:'shallowWtr',label:'Shallow water',color:[104,164,198], tex:'gloss',  cat:'Ground'},
+    {id:'murkyWtr',  label:'Murky water',  color:[74,96,84],    tex:'gloss',  cat:'Ground'},
+    {id:'emberbed',  label:'Ember bed',    color:[152,60,34],   tex:'crack',  cat:'Ground'},
+    {id:'cinders',   label:'Cinders',      color:[76,66,62],    tex:'grain',  cat:'Ground'},
+    {id:'pumice',    label:'Pumice',       color:[142,134,128], tex:'rough',  cat:'Ground'},
+
+    // --- Stone, extended ---
+    {id:'ashlar',    label:'Ashlar',       color:[176,170,158], tex:'brick',  cat:'Stone'},
+    {id:'roughstone',label:'Rough stone',  color:[122,116,108], tex:'cobble', cat:'Stone'},
+    {id:'fieldstone',label:'Fieldstone',   color:[140,130,116], tex:'cobble', cat:'Stone'},
+    {id:'flint',     label:'Flint',        color:[74,78,82],    tex:'rough',  cat:'Stone'},
+    {id:'chalk',     label:'Chalk',        color:[238,236,226], tex:'rough',  cat:'Stone'},
+    {id:'basalt',    label:'Basalt',       color:[58,56,62],    tex:'log',    cat:'Stone'},
+    {id:'schist',    label:'Schist',       color:[104,102,114], tex:'plank',  cat:'Stone'},
+    {id:'quartzite', label:'Quartzite',    color:[214,206,198], tex:'marble', cat:'Stone'},
+    {id:'greenmarb', label:'Green marble', color:[92,124,102],  tex:'marble', cat:'Stone'},
+    {id:'rosemarb',  label:'Rose marble',  color:[218,186,182], tex:'marble', cat:'Stone'},
+    {id:'mosaicStn', label:'Stone mosaic', color:[150,142,126], tex:'tile',   cat:'Stone'},
+    {id:'cracktile', label:'Cracked tile', color:[168,158,146], tex:'crack',  cat:'Stone'},
+    {id:'mossystone',label:'Mossy stone',  color:[110,124,96],  tex:'cobble', cat:'Stone'},
+    {id:'sootstone', label:'Soot-stained', color:[78,74,72],    tex:'rough',  cat:'Stone'},
+    {id:'sandbrick', label:'Sand brick',   color:[212,184,138], tex:'brick',  cat:'Stone'},
+    {id:'redbrick',  label:'Red brick',    color:[172,88,64],   tex:'brick',  cat:'Stone'},
+    {id:'darkbrick', label:'Dark brick',   color:[92,64,58],    tex:'brick',  cat:'Stone'},
+    {id:'whitebrick',label:'White brick',  color:[224,218,208], tex:'brick',  cat:'Stone'},
+    {id:'rubblewall',label:'Rubble wall',  color:[128,120,110], tex:'cobble', cat:'Stone'},
+    {id:'gravepath', label:'Grave path',   color:[136,132,124], tex:'tile',   cat:'Stone'},
+
+    // --- Wood, extended ---
+    {id:'oakplank',  label:'Oak plank',    color:[164,124,76],  tex:'plank',  cat:'Wood'},
+    {id:'pineplank', label:'Pine plank',   color:[204,172,120], tex:'plank',  cat:'Wood'},
+    {id:'ebony',     label:'Ebony',        color:[54,42,38],    tex:'plank',  cat:'Wood'},
+    {id:'driftwoodM',label:'Driftwood',    color:[158,148,132], tex:'plank',  cat:'Wood'},
+    {id:'charredWd', label:'Charred wood', color:[62,50,44],    tex:'plank',  cat:'Wood'},
+    {id:'rottedWd',  label:'Rotted wood',  color:[96,92,66],    tex:'rough',  cat:'Wood'},
+    {id:'wickerM',   label:'Wicker',       color:[186,152,98],  tex:'weave',  cat:'Wood'},
+    {id:'bamboo',    label:'Bamboo',       color:[178,190,110], tex:'log',    cat:'Wood'},
+    {id:'timberFrm', label:'Timber frame', color:[188,172,146], tex:'herring',cat:'Wood'},
+    {id:'palisade',  label:'Palisade',     color:[128,98,62],   tex:'log',    cat:'Wood'},
+    {id:'slateRoof', label:'Slate roof',   color:[82,88,98],    tex:'shingle',cat:'Wood'},
+    {id:'copperRoof',label:'Copper roof',  color:[104,158,138], tex:'shingle',cat:'Wood'},
+    {id:'strawRoof', label:'Straw roof',   color:[212,186,116], tex:'thatch', cat:'Wood'},
+    {id:'mossRoof',  label:'Mossy roof',   color:[104,126,88],  tex:'shingle',cat:'Wood'},
+
+    // --- Crafted, extended ---
+    {id:'blackiron', label:'Black iron',   color:[62,62,68],    tex:'metal',  cat:'Crafted'},
+    {id:'brass',     label:'Brass',        color:[194,158,86],  tex:'metal',  cat:'Crafted'},
+    {id:'pewter',    label:'Pewter',       color:[142,144,148], tex:'metal',  cat:'Crafted'},
+    {id:'goldleaf',  label:'Gold leaf',    color:[230,198,102], tex:'gloss',  cat:'Crafted'},
+    {id:'rustplate', label:'Rusted plate', color:[128,74,48],   tex:'metal',  cat:'Crafted'},
+    {id:'chainmail', label:'Chainmail',    color:[150,154,162], tex:'scale',  cat:'Crafted'},
+    {id:'stainglass',label:'Stained glass',color:[110,84,168],  tex:'tile',   cat:'Crafted'},
+    {id:'frostglass',label:'Frosted glass',color:[204,222,230], tex:'gloss',  cat:'Crafted'},
+    {id:'porcelain', label:'Porcelain',    color:[238,236,232], tex:'gloss',  cat:'Crafted'},
+    {id:'blueTile',  label:'Blue tile',    color:[70,116,168],  tex:'tile',   cat:'Crafted'},
+    {id:'greenTile', label:'Green tile',   color:[74,140,116],  tex:'tile',   cat:'Crafted'},
+    {id:'redcarpet', label:'Red carpet',   color:[132,44,48],   tex:'weave',  cat:'Crafted'},
+    {id:'bluecarpet',label:'Blue carpet',  color:[52,72,124],   tex:'weave',  cat:'Crafted'},
+    {id:'tapestry',  label:'Tapestry',     color:[142,96,110],  tex:'weave',  cat:'Crafted'},
+    {id:'burlap',    label:'Burlap',       color:[170,146,108], tex:'weave',  cat:'Crafted'},
+    {id:'silk',      label:'Silk',         color:[228,206,220], tex:'gloss',  cat:'Crafted'},
+    {id:'furM',      label:'Fur',          color:[142,114,86],  tex:'rough',  cat:'Crafted'},
+    {id:'hide',      label:'Hide',         color:[168,140,108], tex:'rough',  cat:'Crafted'},
+    {id:'parchment', label:'Parchment',    color:[224,208,174], tex:'grain',  cat:'Crafted'},
+    {id:'wax',       label:'Wax',          color:[232,220,186], tex:'gloss',  cat:'Crafted'},
+    {id:'amber',     label:'Amber',        color:[212,146,50],  tex:'gloss',  cat:'Crafted'},
+    {id:'jade',      label:'Jade',         color:[96,168,138],  tex:'marble', cat:'Crafted'},
+    {id:'amethyst',  label:'Amethyst',     color:[146,106,196], tex:'gloss',  cat:'Crafted'},
+    {id:'ruby',      label:'Ruby',         color:[178,42,62],   tex:'gloss',  cat:'Crafted'},
+    {id:'sapphire',  label:'Sapphire',     color:[52,88,178],   tex:'gloss',  cat:'Crafted'},
+    {id:'pearl',     label:'Pearl',        color:[238,232,226], tex:'gloss',  cat:'Crafted'},
+    {id:'boneTile',  label:'Bone tile',    color:[220,212,192], tex:'tile',   cat:'Crafted'},
+    {id:'runestone', label:'Runestone',    color:[118,124,140], tex:'crack',  cat:'Crafted'},
+
+    // --- Arcane: for magical and otherworldly places ---
+    {id:'voidM',     label:'Void',         color:[16,14,26],    tex:'flat',   cat:'Arcane'},
+    {id:'starfield', label:'Starfield',    color:[26,28,54],    tex:'grain',  cat:'Arcane'},
+    {id:'nebulaM',   label:'Nebula',       color:[110,64,144],  tex:'marble', cat:'Arcane'},
+    {id:'aether',    label:'Aether',       color:[142,196,222], tex:'gloss',  cat:'Arcane'},
+    {id:'spiritfire',label:'Spirit fire',  color:[110,214,196], tex:'crack',  cat:'Arcane'},
+    {id:'hellfire',  label:'Hellfire',     color:[196,54,28],   tex:'crack',  cat:'Arcane'},
+    {id:'corruption',label:'Corruption',   color:[92,54,96],    tex:'rough',  cat:'Arcane'},
+    {id:'blight',    label:'Blight',       color:[104,110,58],  tex:'rough',  cat:'Arcane'},
+    {id:'glyphstone',label:'Glyph stone',  color:[128,116,148], tex:'tile',   cat:'Arcane'},
+    {id:'leycrystal',label:'Ley crystal',  color:[126,208,234], tex:'gloss',  cat:'Arcane'},
+    {id:'soulglass', label:'Soul glass',   color:[186,196,232], tex:'gloss',  cat:'Arcane'},
+    {id:'shadowM',   label:'Shadow',       color:[40,38,52],    tex:'rough',  cat:'Arcane'},
+    {id:'moonstone', label:'Moonstone',    color:[212,220,238], tex:'marble', cat:'Arcane'},
+    {id:'sunstone',  label:'Sunstone',     color:[238,186,86],  tex:'marble', cat:'Arcane'},
+    {id:'bloodstone',label:'Bloodstone',   color:[124,36,44],   tex:'marble', cat:'Arcane'},
+    {id:'fairydust', label:'Fairy dust',   color:[240,190,226], tex:'grain',  cat:'Arcane'},
+
+    // --- Colour, extended ---
+    {id:'cream',     label:'Cream',        color:[240,232,208], tex:'flat',   cat:'Colour'},
+    {id:'beige',     label:'Beige',        color:[214,198,168], tex:'flat',   cat:'Colour'},
+    {id:'olive',     label:'Olive',        color:[124,124,66],  tex:'flat',   cat:'Colour'},
+    {id:'forestcol', label:'Forest',       color:[38,84,52],    tex:'flat',   cat:'Colour'},
+    {id:'mint',      label:'Mint',         color:[148,216,182], tex:'flat',   cat:'Colour'},
+    {id:'aqua',      label:'Aqua',         color:[110,206,196], tex:'flat',   cat:'Colour'},
+    {id:'skyblue',   label:'Sky blue',     color:[132,186,232], tex:'flat',   cat:'Colour'},
+    {id:'indigo',    label:'Indigo',       color:[70,62,140],   tex:'flat',   cat:'Colour'},
+    {id:'lavender',  label:'Lavender',     color:[190,172,222], tex:'flat',   cat:'Colour'},
+    {id:'plum',      label:'Plum',         color:[112,54,88],   tex:'flat',   cat:'Colour'},
+    {id:'maroon',    label:'Maroon',       color:[112,38,44],   tex:'flat',   cat:'Colour'},
+    {id:'rust',      label:'Rust',         color:[164,84,44],   tex:'flat',   cat:'Colour'},
+    {id:'ochre',     label:'Ochre',        color:[190,142,60],  tex:'flat',   cat:'Colour'},
+    {id:'mustard',   label:'Mustard',      color:[206,172,58],  tex:'flat',   cat:'Colour'},
+    {id:'slatecol',  label:'Slate',        color:[92,102,114],  tex:'flat',   cat:'Colour'},
+    {id:'ash2',      label:'Ash grey',     color:[158,156,152], tex:'flat',   cat:'Colour'},
+    {id:'coal',      label:'Coal',         color:[42,40,44],    tex:'flat',   cat:'Colour'},
+    {id:'ivory',     label:'Ivory',        color:[246,242,230], tex:'flat',   cat:'Colour'},
   ];
   const MATERIAL_BY_ID = {};
   for(const m of MATERIALS) MATERIAL_BY_ID[m.id] = m;
@@ -8904,6 +9052,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     grab: null,           // {x0,y0,x1,y1} region marquee for saving as a sprite
     grabDrag: null,
     recentCustom: [],     // recently used custom colours, most recent first
+    recentMaterials: [],  // recently used materials, most recent first
     shapeStart: null,     // anchor cell while dragging a shape
     shapeEnd: null,
     lastDab: null,        // last painted cell, anchor for shift-line strokes
@@ -9159,7 +9308,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
       total += len;
     }
     if(total === 0) return {x: pts[0][0], y: pts[0][1]};
-    const speed = inst.speed || 4;
+    const speed = inst.speed || 2;
     let dist = nowSec * speed;
     const mode = inst.pathMode || 'loop';
     if(mode === 'loop'){
@@ -10208,6 +10357,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     highlightTool();
     highlightShape();
     renderRecentCustom();
+    buildRecentRow();
     updateGrabInfo();
     syncSizeUI();
     syncCellPanel();
@@ -10241,32 +10391,145 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
   }
 
   // ---- Material palette UI ----
+  // Render a material's actual appearance into a small canvas, so a swatch
+  // shows brick courses, plank grain, marbling and so on rather than a flat
+  // colour. Cached, since the same swatch is reused every time the palette
+  // is rebuilt.
+  const swatchCache = new Map();
+  function materialSwatch(mat, px){
+    px = px || 26;
+    const key = mat.id + '@' + px;
+    if(swatchCache.has(key)) return swatchCache.get(key);
+    const cv2 = document.createElement('canvas');
+    cv2.width = px; cv2.height = px;
+    const c2 = cv2.getContext('2d');
+    // Draw at the same cell scale the tile view uses, so the texture reads
+    // at a comparable density, then tile it to fill the swatch.
+    const cell = Math.max(8, px / 2);
+    const wasBypass = lightingBypass;
+    lightingBypass = true;                 // true colours, not time-of-day tint
+    try{
+      for(let y=0; y<px; y+=cell){
+        for(let x=0; x<px; x+=cell){
+          const seed = (((x*73856093) ^ (y*19349663) ^ mat.id.length*2654435761) >>> 0);
+          shadeCell(c2, mat, x, y, cell, seed);
+        }
+      }
+    } finally { lightingBypass = wasBypass; }
+    const url = cv2.toDataURL();
+    swatchCache.set(key, url);
+    return url;
+  }
+
+  // Make one swatch button
+  function makeMatButton(m, size){
+    const b = document.createElement('button');
+    b.className = 'matbtn';
+    b.dataset.mat = m.id;
+    b.title = `${m.label} · ${m.tex}`;
+    b.style.cssText = `height:${size||24}px;border-radius:4px;cursor:pointer;` +
+      `border:2px solid transparent;padding:0;overflow:hidden;` +
+      `background-image:url(${materialSwatch(m, 30)});background-size:cover;` +
+      `background-color:rgb(${m.color[0]},${m.color[1]},${m.color[2]});`;
+    b.onclick = ()=>{
+      tileView.material = m.id;
+      tileView.tool = 'paint';
+      rememberRecentMaterial(m.id);
+      highlightMaterial(); highlightTool();
+    };
+    return b;
+  }
+
+  // A short history of what you've actually been using, pinned to the top
+  function rememberRecentMaterial(id){
+    tileView.recentMaterials = [id, ...(tileView.recentMaterials||[]).filter(x=>x!==id)].slice(0, 10);
+    buildRecentRow();
+  }
+  function buildRecentRow(){
+    const box = document.getElementById('materialRecent');
+    if(!box) return;
+    const list = (tileView.recentMaterials||[]).map(id=>lookupMaterial(id)).filter(Boolean);
+    box.innerHTML = '';
+    if(!list.length){ box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    const head = document.createElement('div');
+    head.textContent = 'Recent';
+    head.style.cssText = 'font-size:10px;opacity:0.55;margin:0 0 3px;letter-spacing:0.4px;text-transform:uppercase;';
+    box.appendChild(head);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:3px;';
+    for(const m of list) row.appendChild(makeMatButton(m, 24));
+    box.appendChild(row);
+    highlightMaterial();
+  }
+
+  // The compact palette in the toolbar shows a curated starter set; the rest
+  // live behind "More materials" so the sidebar stays usable.
+  const QUICK_MATERIALS = [
+    'grass','darkgrass','dirt','mud','sand','stone','cobble','brick','plank','thatch',
+    'snow','ice','water','moss','gravel','ashlar','oakplank','slateRoof','iron','glass',
+    'black','white','brown','green','blue','red','yellow','grey'
+  ];
   function buildMaterialGrid(){
     const grid = document.getElementById('materialGrid');
     if(grid.childElementCount) { highlightMaterial(); return; }
-    // Group swatches under collapsible category headings so the (now long)
-    // library stays browsable in the narrow toolbar.
-    for(const cat of MATERIAL_CATS){
-      const head = document.createElement('div');
-      head.textContent = cat;
-      head.style.cssText = 'font-size:10px;opacity:0.55;margin:6px 0 3px;letter-spacing:0.4px;text-transform:uppercase;';
-      grid.appendChild(head);
-      const row = document.createElement('div');
-      row.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:3px;';
-      for(const m of MATERIALS.filter(mm=>mm.cat===cat)){
-        const b = document.createElement('button');
-        b.className = 'matbtn';
-        b.dataset.mat = m.id;
-        b.title = `${m.label} (${m.tex})`;
-        b.style.cssText = `height:22px;border-radius:4px;cursor:pointer;border:2px solid transparent;background:rgb(${m.color[0]},${m.color[1]},${m.color[2]});`;
-        b.onclick = ()=>{ tileView.material = m.id; tileView.tool = 'paint'; highlightMaterial(); highlightTool(); };
-        row.appendChild(b);
-      }
-      grid.appendChild(row);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:grid;grid-template-columns:repeat(5,1fr);gap:3px;';
+    for(const id of QUICK_MATERIALS){
+      const m = MATERIAL_BY_ID[id];
+      if(m) row.appendChild(makeMatButton(m, 24));
     }
+    grid.appendChild(row);
+    buildRecentRow();
+    highlightMaterial();
+  }
+
+  // ---- The full library browser ----
+  let matBrowserBuilt = false;
+  function buildMaterialBrowser(){
+    const body = document.getElementById('matBrowserBody');
+    if(matBrowserBuilt){ highlightMaterial(); return; }
+    body.innerHTML = '';
+    for(const cat of MATERIAL_CATS){
+      const list = MATERIALS.filter(m=>m.cat===cat);
+      if(!list.length) continue;
+      const head = document.createElement('div');
+      head.textContent = `${cat}  ·  ${list.length}`;
+      head.style.cssText = 'font-size:11px;opacity:0.6;margin:12px 0 5px;letter-spacing:0.5px;text-transform:uppercase;';
+      body.appendChild(head);
+      const grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;';
+      for(const m of list){
+        const cell = document.createElement('button');
+        cell.className = 'matbtn';
+        cell.dataset.mat = m.id;
+        cell.title = `${m.label} · ${m.tex}`;
+        cell.style.cssText = 'display:flex;flex-direction:column;gap:3px;align-items:stretch;' +
+          'background:rgba(255,255,255,0.04);border:2px solid transparent;border-radius:6px;' +
+          'padding:4px;cursor:pointer;color:#cdd5e0;';
+        const sw = document.createElement('div');
+        sw.style.cssText = `height:40px;border-radius:4px;background-image:url(${materialSwatch(m, 48)});` +
+          `background-size:cover;border:1px solid rgba(0,0,0,0.35);`;
+        const lbl = document.createElement('div');
+        lbl.textContent = m.label;
+        lbl.style.cssText = 'font-size:9px;line-height:1.2;text-align:center;opacity:0.85;';
+        cell.appendChild(sw); cell.appendChild(lbl);
+        cell.onclick = ()=>{
+          tileView.material = m.id;
+          tileView.tool = 'paint';
+          rememberRecentMaterial(m.id);
+          highlightMaterial(); highlightTool();
+          document.getElementById('matBrowserStatus').textContent = `Selected: ${m.label}`;
+        };
+        grid.appendChild(cell);
+      }
+      body.appendChild(grid);
+    }
+    matBrowserBuilt = true;
     highlightMaterial();
   }
   function highlightMaterial(){
+    // Covers the quick palette, the recents row and the full browser at once
     document.querySelectorAll('.matbtn').forEach(b=>{
       b.style.borderColor = b.dataset.mat === tileView.material ? '#ffe85a' : 'transparent';
     });
@@ -10502,7 +10765,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
         if(inst){
           inst.path = inst.path || [[inst.x, inst.y]];
           inst.path.push([p.sx, p.sy]);
-          inst.speed    = inst.speed    || parseInt(document.getElementById('pathSpeed').value, 10) || 4;
+          inst.speed    = inst.speed    || sliderToSpeed(parseInt(document.getElementById('pathSpeed').value, 10));
           inst.pathMode = inst.pathMode || document.getElementById('pathMode').value;
           tileView.dirty = true;
           syncPathPanel();
@@ -10818,7 +11081,8 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
         const rec = {s:p.sid, x:Math.round(p.x), y:Math.round(p.y), z:p.size};
         if(p.path && p.path.length >= 2){
           rec.p = p.path.map(pt=>[Math.round(pt[0]), Math.round(pt[1])]);
-          rec.v = p.speed || 4;
+          // Speeds can be fractional (a very slow walk), so keep 3 decimals
+          rec.v = Math.round((p.speed || 2) * 1000) / 1000;
           rec.m = p.pathMode || 'loop';
         }
         return rec;
@@ -10879,7 +11143,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
             const inst = {sid: rec.s, x: rec.x, y: rec.y, size: rec.z};
             if(rec.p && rec.p.length >= 2){
               inst.path = rec.p;
-              inst.speed = rec.v || 4;
+              inst.speed = rec.v || 2;
               inst.pathMode = rec.m || 'loop';
             }
             tileView.placed.push(inst);
@@ -11130,7 +11394,10 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
       const b = document.createElement('button');
       const id = 'custom:' + c.hex + (c.tex && c.tex !== 'flat' ? ':' + c.tex : '');
       b.title = '#' + c.hex + ' · ' + c.tex;
-      b.style.cssText = `height:18px;border-radius:3px;cursor:pointer;border:2px solid ${tileView.material===id?'#ffe85a':'transparent'};background:#${c.hex};`;
+      const cm = customMaterial(c.hex, c.tex);
+      b.style.cssText = `height:20px;border-radius:3px;cursor:pointer;padding:0;` +
+        `border:2px solid ${tileView.material===id?'#ffe85a':'transparent'};` +
+        `background-image:url(${materialSwatch(cm, 24)});background-size:cover;background-color:#${c.hex};`;
       b.onclick = ()=>{
         customMaterial(c.hex, c.tex);
         tileView.material = id;
@@ -11269,6 +11536,51 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     document.getElementById('grabName').value = '';
   };
 
+  // ---- Material browser ----
+  document.getElementById('matMoreBtn').onclick = ()=>{
+    buildMaterialBrowser();
+    document.getElementById('matBrowser').style.display = 'flex';
+    document.getElementById('matSearch').value = '';
+    matFilter('');
+    document.getElementById('matSearch').focus();
+  };
+  document.getElementById('matBrowserClose').onclick = ()=>{
+    document.getElementById('matBrowser').style.display = 'none';
+  };
+  function matFilter(q){
+    q = (q||'').trim().toLowerCase();
+    const body = document.getElementById('matBrowserBody');
+    let shown = 0;
+    // Walk heading / grid pairs so an empty category hides its heading too
+    const kids = [...body.children];
+    for(let i=0;i<kids.length;i+=2){
+      const head = kids[i], grid = kids[i+1];
+      if(!grid) break;
+      let visible = 0;
+      for(const cell of grid.children){
+        const m = lookupMaterial(cell.dataset.mat);
+        const hit = !q || (m && (m.label.toLowerCase().includes(q) || m.tex.includes(q) || m.cat.toLowerCase().includes(q)));
+        cell.style.display = hit ? 'flex' : 'none';
+        if(hit){ visible++; shown++; }
+      }
+      head.style.display = visible ? 'block' : 'none';
+      grid.style.display = visible ? 'grid' : 'none';
+    }
+    document.getElementById('matBrowserStatus').textContent =
+      q ? `${shown} material${shown===1?'':'s'} match "${q}"` : `${MATERIALS.length} materials`;
+  }
+  document.getElementById('matSearch').addEventListener('input', (e)=> matFilter(e.target.value));
+  // Escape closes the browser before anything else handles the key
+  window.addEventListener('keydown', (e)=>{
+    if(e.key !== 'Escape') return;
+    const b = document.getElementById('matBrowser');
+    if(b.style.display !== 'none'){
+      b.style.display = 'none';
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+
   // Shape picker for the tile painter
   function highlightShape(){
     document.querySelectorAll('.tshape').forEach(b=>{
@@ -11390,6 +11702,7 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     grab: null,           // {x0,y0,x1,y1} region marquee for saving as a sprite
     grabDrag: null,
     recentCustom: [],     // recently used custom colours, most recent first
+    recentMaterials: [],  // recently used materials, most recent first
     shapeStart: null,     // anchor while dragging a shape
     shapeEnd: null,
     lastDab: null,        // anchor for shift-line strokes
@@ -12311,17 +12624,59 @@ input:focus{outline:0;border-color:var(--gem);box-shadow:0 0 22px -8px rgba(127,
     const n = (inst.path || []).length;
     info.textContent = `"${entry ? entry.name : 'sprite'}" — ${n} waypoint${n===1?'':'s'}. Click cells to extend the path.`;
     controls.style.display = 'block';
-    const sp = inst.speed || 4;
-    document.getElementById('pathSpeed').value = sp;
-    document.getElementById('pathSpeedLabel').textContent = sp + ' cells/s';
+    const sp = inst.speed || 2;
+    document.getElementById('pathSpeed').value = speedToSlider(sp);
+    refreshPathSpeedUI(sp);
     document.getElementById('pathMode').value = inst.pathMode || 'loop';
   }
 
-  document.getElementById('pathSpeed').addEventListener('input', (e)=>{
-    const v = parseInt(e.target.value, 10);
-    document.getElementById('pathSpeedLabel').textContent = v + ' cells/s';
+  // The slider is exponential. A linear 1-40 range could not go slower than
+  // roughly a minute to cross a tile, which is still a brisk walk. This maps
+  // slider 0-100 onto 0.02 - 40 cells/second, so the bottom of the range is a
+  // sprite that takes well over an hour to cross a single tile.
+  const PATH_SPEED_MIN = 0.02, PATH_SPEED_MAX = 40;
+  function sliderToSpeed(pos){
+    return PATH_SPEED_MIN * Math.pow(PATH_SPEED_MAX/PATH_SPEED_MIN, pos/100);
+  }
+  function speedToSlider(sp){
+    sp = Math.max(PATH_SPEED_MIN, Math.min(PATH_SPEED_MAX, sp || 2));
+    return Math.round(100 * Math.log(sp/PATH_SPEED_MIN) / Math.log(PATH_SPEED_MAX/PATH_SPEED_MIN));
+  }
+  function formatDuration(sec){
+    if(sec < 90) return sec.toFixed(sec < 10 ? 1 : 0) + ' sec';
+    if(sec < 5400) return (sec/60).toFixed(sec < 600 ? 1 : 0) + ' min';
+    return (sec/3600).toFixed(1) + ' hours';
+  }
+  function describePathSpeed(sp){
+    // Two useful readings: the raw rate, and how long a full lap takes
+    const rate = sp >= 1 ? sp.toFixed(sp < 10 ? 1 : 0) + ' cells/s'
+               : sp >= 0.1 ? '1 cell per ' + (1/sp).toFixed(1) + 's'
+               : '1 cell per ' + formatDuration(1/sp);
+    let detail = '';
     const inst = tileView.placed[tileView.pathTarget];
-    if(inst){ inst.speed = v; tileView.dirty = true; }
+    if(inst && inst.path && inst.path.length >= 2){
+      let total = 0;
+      for(let i=1;i<inst.path.length;i++){
+        const dx = inst.path[i][0]-inst.path[i-1][0];
+        const dy = inst.path[i][1]-inst.path[i-1][1];
+        total += Math.sqrt(dx*dx + dy*dy);
+      }
+      if(total > 0) detail = `Full route (${total.toFixed(0)} cells) takes ${formatDuration(total/sp)}.`;
+    }
+    if(!detail) detail = `Crossing the tile would take ${formatDuration(SUB_GRID/sp)}.`;
+    return {rate, detail};
+  }
+  function refreshPathSpeedUI(sp){
+    const d = describePathSpeed(sp);
+    document.getElementById('pathSpeedLabel').textContent = d.rate;
+    document.getElementById('pathSpeedDetail').textContent = d.detail;
+  }
+
+  document.getElementById('pathSpeed').addEventListener('input', (e)=>{
+    const sp = sliderToSpeed(parseInt(e.target.value, 10));
+    const inst = tileView.placed[tileView.pathTarget];
+    if(inst){ inst.speed = sp; tileView.dirty = true; }
+    refreshPathSpeedUI(sp);
   });
   document.getElementById('pathMode').addEventListener('change', (e)=>{
     const inst = tileView.placed[tileView.pathTarget];
