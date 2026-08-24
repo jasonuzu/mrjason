@@ -27,6 +27,11 @@ main{display:grid;grid-template-columns:1fr 400px;gap:18px;padding:18px;max-widt
 #progress{display:none;color:#ffcc33;border:1px solid #ffcc33;padding:2px 6px}
 #stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden;cursor:pointer}
 #bgCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+/* Animated backgrounds render as a real element. A canvas only ever holds
+   one frame of a GIF, so anything drawn there is frozen by definition. */
+#bgImage{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+#bgImage.on{display:block}
+#bgImage.px{image-rendering:pixelated}
 #lightFx{position:absolute;inset:0;pointer-events:none;z-index:3}
 #scanFx{position:absolute;inset:0;pointer-events:none;z-index:4;opacity:.5;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 4px)}
 .fx-night{background:rgba(16,26,120,.42)}.fx-dusk{background:rgba(255,110,30,.22)}
@@ -206,6 +211,7 @@ html.viewer #viewerGate{display:flex}
   <div id="stageCol">
     <div id="stage" class="pbox">
       <canvas id="bgCanvas" width="320" height="180"></canvas>
+      <img id="bgImage" alt="">
       <div id="lightFx"></div><div id="scanFx"></div>
       <div id="transOverlay"><div id="transFade"></div><div id="transSlide"></div><div id="transIris"></div></div>
       <div id="sceneUI"><div id="picWindow"><img id="storyPic" alt=""></div><div id="dialogWrap"><div id="dialogInner"><span id="dialogText"></span><span id="cursor" style="visibility:hidden">&#9660;</span></div></div></div>
