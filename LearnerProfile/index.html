@@ -242,6 +242,13 @@
   .obs-field label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
   .match-note { font-size: 12.5px; padding: 10px 12px; border-radius: 6px; margin-top: 10px; }
 
+  .class-del-btn { color: var(--ink-faint); }
+  .class-del-btn:hover { color: var(--red); background: var(--red-bg); border-color: var(--red); }
+  .btn-danger-solid {
+    background: #b23a34; color: #fff; border: none; padding: 7px 14px; border-radius: 6px;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn-danger-solid:hover { background: #8f2d28; }
   .grade-options { display: flex; gap: 8px; flex-wrap: wrap; }
   .grade-opt {
     min-width: 52px; text-align: center; padding: 10px 8px; border: 2px solid var(--rule);
@@ -3216,6 +3223,7 @@ function renderDashboard(){
         <option value="__new__">+ New class…</option>
       </select>
       <button class="btn-clear" onclick="App.clearSelection()">Deselect all</button>
+      <button class="btn-danger-solid" onclick="App.confirmDeleteSelected()">🗑 Delete selected</button>
     </div>
   ` : ''}`;
 }
@@ -3235,7 +3243,8 @@ function renderClassGroup(g, selectMode){
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
-        ${(!g.isUnassigned && !selectMode) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();App.openClassOverview('${escapeAttr(g.name)}')">Overview →</button>` : ''}
+        ${(!g.isUnassigned && !selectMode) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();App.openClassOverview('${escapeAttr(g.name)}')">Overview →</button>
+        <button class="btn btn-ghost btn-sm class-del-btn" title="Delete this class" onclick="event.stopPropagation();App.confirmDeleteClass('${escapeAttr(g.name)}')">🗑</button>` : ''}
       </div>
     </div>
     ${open ? g.students.map(rec => renderRecordCard(rec, selectMode)).join('') : ''}
@@ -7599,6 +7608,80 @@ const App = {
     rec.className = target;
     saveStudent(rec);
     render(); // full re-render OK — regrouping the dashboard is the whole point
+  },
+
+  // Deleting a whole class removes every student record in it, so this asks
+  // twice: once for intent, once with the exact count spelled out.
+  async confirmDeleteClass(className){
+    const inClass = state.students.filter(s => (s.className||'') === className);
+    if(!inClass.length){
+      alert('There are no student records in ' + className + '.');
+      return;
+    }
+    const names = inClass.map(s => s.name).filter(Boolean);
+    const preview = names.slice(0, 8).join(', ') + (names.length > 8 ? ', and ' + (names.length - 8) + ' more' : '');
+
+    if(!confirm(
+      'Delete the class "' + className + '"?\n\n' +
+      'This permanently deletes ' + inClass.length + ' student record' + (inClass.length===1?'':'s') + ':\n' +
+      preview + '\n\n' +
+      'Their assessments, notes, posts and gradebook entries go with them. This cannot be undone.'
+    )) return;
+
+    if(!confirm(
+      'Last check — really delete ' + inClass.length + ' record' + (inClass.length===1?'':'s') + ' in "' + className + '"?\n\n' +
+      'There is no way to get them back.\n\n' +
+      'Click OK to delete, or Cancel to stop.'
+    )) return;
+
+    const ids = inClass.map(s => s.id);
+    state.students = state.students.filter(s => !ids.includes(s.id));
+    if(state.expandedClasses) state.expandedClasses.delete(className);
+    ids.forEach(id => deleteStudentRecord(id));
+
+    // remove the class registry entry too, so the name stops appearing
+    try{
+      const entry = loadClassRegistry()[className];
+      if(entry){
+        local.del('classreg:' + entry.classId);
+        if(db.isConnected()){
+          db.client.from('classes').delete().eq('class_id', entry.classId).then(({error}) => {
+            if(error) console.error('Class delete sync error:', error.message);
+          });
+        }
+      }
+    }catch(e){ console.error('Class registry cleanup failed:', e); }
+
+    App.goDashboard();
+    alert('Deleted ' + ids.length + ' record' + (ids.length===1?'':'s') + ' from "' + className + '".');
+  },
+
+  // Bulk delete from the selection toolbar — also double-confirmed.
+  async confirmDeleteSelected(){
+    const ids = Array.from(state.selectedIds || []);
+    if(!ids.length){ alert('No students selected.'); return; }
+    const recs = state.students.filter(s => ids.includes(s.id));
+    const names = recs.map(s => s.name).filter(Boolean);
+    const preview = names.slice(0, 8).join(', ') + (names.length > 8 ? ', and ' + (names.length - 8) + ' more' : '');
+
+    if(!confirm(
+      'Delete ' + ids.length + ' selected student record' + (ids.length===1?'':'s') + '?\n\n' +
+      preview + '\n\n' +
+      'Their assessments, notes, posts and gradebook entries go with them. This cannot be undone.'
+    )) return;
+
+    if(!confirm(
+      'Last check — really delete ' + ids.length + ' record' + (ids.length===1?'':'s') + '?\n\n' +
+      'There is no way to get them back.\n\n' +
+      'Click OK to delete, or Cancel to stop.'
+    )) return;
+
+    state.students = state.students.filter(s => !ids.includes(s.id));
+    ids.forEach(id => deleteStudentRecord(id));
+    state.selectedIds = new Set();
+    state.selectMode = false;
+    App.goDashboard();
+    alert('Deleted ' + ids.length + ' record' + (ids.length===1?'':'s') + '.');
   },
 
   confirmDelete(id){
