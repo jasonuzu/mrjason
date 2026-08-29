@@ -242,6 +242,20 @@
   .obs-field label { font-size: 12px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
   .match-note { font-size: 12.5px; padding: 10px 12px; border-radius: 6px; margin-top: 10px; }
 
+  .grade-options { display: flex; gap: 8px; flex-wrap: wrap; }
+  .grade-opt {
+    min-width: 52px; text-align: center; padding: 10px 8px; border: 2px solid var(--rule);
+    border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 15px; color: var(--ink);
+    background: var(--paper); user-select: none;
+  }
+  .grade-opt:hover { border-color: var(--accent); }
+  .grade-opt.selected { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+  .class-caret {
+    display:inline-block; transition: transform 0.15s; color: var(--ink-faint);
+    font-size: 13px; flex-shrink: 0; margin-right: 4px;
+  }
+  .class-caret.open { transform: rotate(90deg); }
+  .class-group-header { display: flex; align-items: center; gap: 8px; }
   .brand-company {
     display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 1.4px;
     text-transform: uppercase; color: var(--accent); line-height: 1; margin-bottom: 3px;
@@ -3174,7 +3188,7 @@ function renderDashboard(){
   <div class="wrap" style="${selectMode && selectedCount > 0 ? 'padding-bottom:100px;' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:16px;flex-wrap:wrap;">
       <div>
-        <h1 style="font-size:24px;">Student Records</h1>
+        <h1 style="font-size:24px;">Class Records</h1>
         <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;">${students.length} record${students.length===1?'':'s'} across ${classNames.length} class${classNames.length===1?'':'es'}${groups.__unassigned__ ? ' + unassigned' : ''}</p>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -3207,18 +3221,24 @@ function renderDashboard(){
 }
 
 function renderClassGroup(g, selectMode){
-  const clickable = !g.isUnassigned && !selectMode;
   const allInGroup = g.students.every(s => state.selectedIds && state.selectedIds.has(s.id));
+  // Classes start collapsed so the page opens as a short list of classes
+  // rather than every student at once. Selecting always expands.
+  const open = selectMode || (state.expandedClasses && state.expandedClasses.has(g.name));
   return `
   <div class="class-group">
-    <div class="class-group-header ${clickable?'clickable':''}" ${clickable?`onclick="App.openClassOverview('${escapeAttr(g.name)}')"`:''}>
-      <div>
+    <div class="class-group-header clickable" onclick="App.toggleClassExpanded('${escapeAttr(g.name)}')">
+      <span class="class-caret ${open?'open':''}">▸</span>
+      <div style="flex:1;">
         <div class="class-group-name" style="${g.isUnassigned ? 'color:var(--ink-faint);font-style:italic;' : ''}">${escapeHtml(g.name)}${selectMode ? `<span class="select-all-link" onclick="event.stopPropagation();App.toggleSelectGroup('${escapeAttr(g.name)}', ${g.isUnassigned})">${allInGroup ? 'Deselect all' : 'Select all'}</span>` : ''}</div>
-        ${clickable ? '<div class="class-group-hint">View class overview →</div>' : ''}
+        <div class="class-group-hint">${open ? 'Click to collapse' : 'Click to show students'}</div>
       </div>
-      <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
+        ${(!g.isUnassigned && !selectMode) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();App.openClassOverview('${escapeAttr(g.name)}')">Overview →</button>` : ''}
+      </div>
     </div>
-    ${g.students.map(rec => renderRecordCard(rec, selectMode)).join('')}
+    ${open ? g.students.map(rec => renderRecordCard(rec, selectMode)).join('') : ''}
   </div>`;
 }
 
@@ -5940,6 +5960,16 @@ function renderBulkImport(){
     </div>
 
     <div class="field-group">
+      <label class="field-label">Grade</label>
+      <div class="grade-options">
+        ${[5,6,7,8,9,10].map(gr => `
+          <div class="grade-opt ${state.bulkGrade===gr?'selected':''}" onclick="App.updateBulkGrade(${gr})">${gr}</div>
+        `).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--ink-faint);margin-top:6px;">Choosing a grade sets the matching assessment level below. You can still change the level if your school groups grades differently.</div>
+    </div>
+
+    <div class="field-group">
       <label class="field-label">Assessment level</label>
       <div class="level-options">
         ${Object.values(LEVEL_META).map(lvl => `
@@ -7139,7 +7169,15 @@ const App = {
   },
 
   updateBulkClassName(val){ state.bulkClassName = val; },
-  updateBulkLevel(val){ state.bulkLevel = val; },
+  updateBulkLevel(val){ state.bulkLevel = val; render({preserveScroll:true}); },
+
+  updateBulkGrade(grade){
+    state.bulkGrade = grade;
+    // Selecting a grade sets the level that covers it; the teacher can still
+    // override the level below if their school groups grades differently.
+    state.bulkLevel = (grade <= 6) ? 'primary' : (grade <= 8) ? 'junior' : 'senior';
+    render({preserveScroll:true});
+  },
   updateBulkText(val){ state.bulkText = val; },
 
   previewBulkImport(){
@@ -7631,6 +7669,13 @@ const App = {
     if(target){ App.openGradebook(target); return; }
     App.goDashboard();
     setTimeout(() => alert('You teach several classes — open a class first, then its gradebook.'), 60);
+  },
+
+  toggleClassExpanded(className){
+    if(!state.expandedClasses) state.expandedClasses = new Set();
+    if(state.expandedClasses.has(className)) state.expandedClasses.delete(className);
+    else state.expandedClasses.add(className);
+    render({preserveScroll:true});
   },
 
   openClassOverview(className){
