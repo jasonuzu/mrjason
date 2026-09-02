@@ -561,6 +561,54 @@
             white-space: nowrap;
         }
 
+        /* ── Groups fullscreen (for displaying to the class) ── */
+        body.groups-fullscreen #groups-panel {
+            position: fixed; inset: 0; width: 100vw; height: 100vh;
+            z-index: 2500; border-left: none; box-shadow: none;
+            background: #f8fafc;
+        }
+        body.groups-fullscreen #groups-header {
+            padding: 18px 28px; background: #2c3e50; border-bottom: none;
+            flex-direction: row; align-items: center; gap: 18px;
+        }
+        body.groups-fullscreen #groups-header h3 { font-size: 1.9rem; color: #fff; }
+        body.groups-fullscreen #groups-header-actions { width: auto; margin-left: auto; }
+        body.groups-fullscreen #groups-header button {
+            font-size: 0.95rem; padding: 10px 18px; flex: 0 0 auto;
+        }
+        /* Cards tile across the screen instead of stacking in a narrow column */
+        body.groups-fullscreen #groups-list {
+            padding: 24px; display: grid; gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+            align-content: start;
+        }
+        body.groups-fullscreen .group-card { margin-bottom: 0; border-width: 3px; }
+        body.groups-fullscreen .group-card-header { padding: 12px 14px; }
+        body.groups-fullscreen .group-card-header .grp-name { font-size: 1.35rem; }
+        body.groups-fullscreen .group-card-header .grp-total { font-size: 1.05rem; padding: 4px 12px; }
+        body.groups-fullscreen .group-members { padding: 12px; }
+        body.groups-fullscreen .group-member {
+            font-size: 1.3rem; padding: 11px 14px; margin-bottom: 8px;
+        }
+        body.groups-fullscreen .group-member .m-pts { font-size: 1.25rem; min-width: 46px; }
+        body.groups-fullscreen .group-member .m-pt-btn { font-size: 1rem; padding: 4px 10px; }
+        body.groups-fullscreen #groups-list-empty { font-size: 1.2rem; padding: 40px; }
+        /* The colour picker is noise on a projector; the +/- point buttons stay,
+           since awarding while the class watches is the point of this view. */
+        body.groups-fullscreen .group-card-header input[type=color] { display: none; }
+        /* Unassigned students run the full width beneath the group tiles */
+        body.groups-fullscreen .unassigned-header,
+        body.groups-fullscreen #unassigned-list { grid-column: 1 / -1; }
+        body.groups-fullscreen .unassigned-header { font-size: 1.1rem; margin-top: 8px; }
+        body.groups-fullscreen #unassigned-list {
+            display: grid; gap: 8px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        }
+        #groups-fs-btn { font-size: 0.74rem; }
+        body.groups-fullscreen #groups-fs-btn {
+            background: #fff; color: #2c3e50; font-weight: 700;
+        }
+
         /* ── Classroom Rules ── */
         #rules-overlay {
             position: fixed; inset: 0; background: rgba(15,23,42,0.6);
@@ -2445,6 +2493,7 @@
                         <button onclick="pickRandomGroup()" title="Pick one group at random">🎲 Random</button>
                         <button onclick="openAutoSortModal()" title="Randomly distribute all students into groups">⚡ Auto-Sort</button>
                         <button onclick="createGroup()" title="Create an empty group">+ New</button>
+                        <button id="groups-fs-btn" onclick="toggleGroupsFullscreen()" title="Show the groups full screen so the class can read them">⛶ Full Screen</button>
                     </div>
                 </div>
                 <div id="groups-list"></div>
@@ -7128,6 +7177,36 @@
         // it at once. Groups with no members are skipped; during a lesson,
         // absent students are excluded from the award (as with random picks).
         var groupPickTimeout = null;
+
+        // ── Groups fullscreen ──
+        // Blows the groups panel up to the whole window so students at the back
+        // can read it. Uses a body class rather than a separate view, so the same
+        // cards stay live — points and drag-and-drop keep working.
+        var groupsFullscreen = false;
+
+        function toggleGroupsFullscreen() {
+            groupsFullscreen = !groupsFullscreen;
+            document.body.classList.toggle('groups-fullscreen', groupsFullscreen);
+            var btn = document.getElementById('groups-fs-btn');
+            if (btn) {
+                btn.innerHTML = groupsFullscreen ? '\u2715 Exit Full Screen' : '\u26F6 Full Screen';
+                btn.title = groupsFullscreen
+                    ? 'Return to the normal side panel'
+                    : 'Show the groups full screen so the class can read them';
+            }
+            if (groupsFullscreen) {
+                document.addEventListener('keydown', groupsFsEscHandler);
+            } else {
+                document.removeEventListener('keydown', groupsFsEscHandler);
+            }
+            logEvent('groups_fullscreen', { on: groupsFullscreen });
+            renderGroupsPanel();
+        }
+
+        function groupsFsEscHandler(e) {
+            // Escape is the reflex for leaving anything fullscreen
+            if (e.key === 'Escape' && groupsFullscreen) toggleGroupsFullscreen();
+        }
 
         function pickRandomGroup() {
             var groups = (liveState.groups || []).filter(function(g) { return g.members.length > 0; });
