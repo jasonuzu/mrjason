@@ -2468,8 +2468,6 @@ function DesktopStepsTable({
     }
   }, /*#__PURE__*/React.createElement(Th, null), /*#__PURE__*/React.createElement(Th, null, "#"), /*#__PURE__*/React.createElement(Th, null, "Step Name"), /*#__PURE__*/React.createElement(Th, null, "Interaction"), /*#__PURE__*/React.createElement(Th, null, "Description"), showDifferentiation && /*#__PURE__*/React.createElement(Th, null, "Differentiation"), showBlooms && /*#__PURE__*/React.createElement(Th, null, "Bloom's"), /*#__PURE__*/React.createElement(Th, null, "Min"), /*#__PURE__*/React.createElement(Th, null))), /*#__PURE__*/React.createElement("tbody", null, steps.map((s, i) => /*#__PURE__*/React.createElement("tr", {
     key: s.id,
-    draggable: true,
-    onDragStart: () => setDraggedId(s.id),
     onDragOver: e => {
       e.preventDefault();
       setDragOverId(s.id);
@@ -2481,21 +2479,23 @@ function DesktopStepsTable({
       setDraggedId(null);
       setDragOverId(null);
     },
+    style: {
+      borderBottom: "1px solid rgba(58, 30, 12, 0.2)",
+      background: dragOverId === s.id ? "rgba(160, 82, 45, 0.15)" : "transparent",
+      opacity: draggedId === s.id ? 0.4 : 1
+    }
+  }, /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("div", {
+    draggable: true,
+    onDragStart: () => setDraggedId(s.id),
     onDragEnd: () => {
       setDraggedId(null);
       setDragOverId(null);
     },
-    style: {
-      borderBottom: "1px solid rgba(58, 30, 12, 0.2)",
-      background: dragOverId === s.id ? "rgba(160, 82, 45, 0.15)" : "transparent",
-      opacity: draggedId === s.id ? 0.4 : 1,
-      cursor: "grab"
-    }
-  }, /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("div", {
     className: "drag-handle no-print",
     style: {
       color: "#a0522d",
-      cursor: "grab"
+      cursor: "grab",
+      padding: "4px"
     },
     title: "Drag to reorder"
   }, /*#__PURE__*/React.createElement(GripVertical, {
@@ -2508,24 +2508,37 @@ function DesktopStepsTable({
     placeholder: "Step name",
     className: "w-full bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic",
     style: {
-      fontFamily: "Georgia, serif"
-    }
+      fontFamily: "Georgia, serif",
+      cursor: "text"
+    },
+    onMouseDown: e => e.stopPropagation()
   })), /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement("select", {
     value: s.interaction,
     onChange: e => updateStep(s.id, "interaction", e.target.value),
     className: "bg-transparent outline-none border-b border-transparent focus:border-amber-900/50 italic cursor-pointer no-print-arrow",
     style: {
       fontFamily: "Georgia, serif"
-    }
+    },
+    onMouseDown: e => e.stopPropagation()
   }, INTERACTION_TYPES.map(t => /*#__PURE__*/React.createElement("option", {
     key: t,
     value: t
-  }, t)))), /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement(ExpandableField, {
+  }, t)))), /*#__PURE__*/React.createElement(Td, {
+    onMouseDown: e => e.stopPropagation(),
+    style: {
+      cursor: "text"
+    }
+  }, /*#__PURE__*/React.createElement(ExpandableField, {
     value: s.description,
     onChange: v => updateStep(s.id, "description", v),
     placeholder: "What happens?",
     forceExpand: allExpanded
-  })), showDifferentiation && /*#__PURE__*/React.createElement(Td, null, /*#__PURE__*/React.createElement(ExpandableField, {
+  })), showDifferentiation && /*#__PURE__*/React.createElement(Td, {
+    onMouseDown: e => e.stopPropagation(),
+    style: {
+      cursor: "text"
+    }
+  }, /*#__PURE__*/React.createElement(ExpandableField, {
     value: s.differentiation || "",
     onChange: v => updateStep(s.id, "differentiation", v),
     placeholder: "Adaptations...",
@@ -2650,6 +2663,8 @@ function ExpandableField({
     onChange: e => onChange(e.target.value),
     placeholder: placeholder,
     rows: 3,
+    draggable: false,
+    onMouseDown: e => e.stopPropagation(),
     className: "w-full italic resize-y",
     style: {
       fontFamily: "Georgia, serif",
@@ -2662,7 +2677,8 @@ function ExpandableField({
       outline: "none",
       minHeight: "5.5em",
       boxSizing: "border-box",
-      display: "block"
+      display: "block",
+      cursor: "text"
     },
     onFocus: e => e.target.style.borderColor = "#a0522d",
     onBlur: e => e.target.style.borderColor = "rgba(58, 30, 12, 0.25)"
