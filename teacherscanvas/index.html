@@ -12,6 +12,7 @@
 
 
 
+
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
@@ -288,6 +289,7 @@ table { border-collapse: collapse; }
     border-top: 0.5pt solid #ccc;
   }
 }
+
 
 
 
@@ -1610,11 +1612,10 @@ function TeachersToolkitApp({
       return;
     }
     const stepsHTML = lesson.steps.map((s, i) => {
-      const diffCell = s.differentiation ? '<td style="padding:8px 6px;border:1px solid #ccc;vertical-align:top;font-style:italic;font-size:9pt;width:18%">' + esc(s.differentiation) + '</td>' : '<td style="padding:8px 6px;border:1px solid #ccc;vertical-align:top;font-style:italic;font-size:9pt;color:#999;width:18%"></td>';
-      return '<tr>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-weight:bold;width:4%">' + (i + 1) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;font-weight:bold;width:14%">' + esc(s.name) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;width:8%">' + esc(s.interaction) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;font-style:italic;width:36%">' + esc(s.description) + '</td>' + diffCell + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-size:9pt;width:8%">' + (s.bloom || '') + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-weight:bold;width:5%">' + (s.time || '') + '</td>' + '</tr>';
+      return '<tr>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-weight:bold;width:4%">' + (i + 1) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;font-weight:bold;width:16%">' + esc(s.name) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;width:10%">' + esc(s.interaction) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;font-style:italic;width:52%">' + esc(s.description) + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-size:9pt;width:10%">' + (s.bloom || '') + '</td>' + '<td style="padding:8px 6px;border:1px solid #ccc;text-align:center;font-weight:bold;width:8%">' + (s.time || '') + '</td>' + '</tr>';
     }).join('');
     const metaHTML = [m.title ? '<div style="font-size:20pt;font-weight:bold;margin-bottom:6pt;font-family:Georgia,serif">' + esc(m.title) + '</div>' : '', '<div style="display:flex;gap:24pt;flex-wrap:wrap;margin-bottom:8pt;font-size:10pt;font-style:italic">', m.date ? '<span>Date: ' + esc(m.date) + '</span>' : '', m.classGroup ? '<span>Class: ' + esc(m.classGroup) + '</span>' : '', m.level ? '<span>Level: ' + esc(m.level) + '</span>' : '', '</div>', m.aim ? '<div style="margin-bottom:6pt;font-size:10pt"><strong>Aim:</strong> <em>' + esc(m.aim) + '</em></div>' : '', m.materials ? '<div style="margin-bottom:10pt;font-size:10pt"><strong>Materials:</strong> <em>' + esc(m.materials) + '</em></div>' : ''].join('');
-    const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>' + '<title>' + esc(m.title || lesson.name || 'Lesson Plan') + '</title>' + '<style>body{font-family:Georgia,serif;color:#000;padding:20pt 24pt;margin:0}' + 'table{width:100%;border-collapse:collapse;margin-top:10pt}' + 'thead th{background:#fff;color:#000;padding:8px 6px;border:1px solid #999;border-bottom:2px solid #333;' + 'font-variant:small-caps;letter-spacing:0.05em;font-weight:700;font-size:9pt;text-align:left}' + 'tfoot td{padding:8px 6px;border:1px solid #ccc;font-weight:bold}' + '@media print{body{padding:10pt 12pt}}</style>' + '</head><body>' + metaHTML + '<table>' + '<thead><tr>' + '<th style="width:4%">#</th>' + '<th style="width:14%">Step Name</th>' + '<th style="width:8%">Interaction</th>' + '<th style="width:36%">Description</th>' + '<th style="width:18%">Differentiation</th>' + '<th style="width:8%">Bloom\'s</th>' + '<th style="width:5%">Min</th>' + '</tr></thead>' + '<tbody>' + stepsHTML + '</tbody>' + '<tfoot><tr>' + '<td colspan="6" style="text-align:right;border:1px solid #ccc">Total Lesson Time</td>' + '<td style="text-align:center;border:1px solid #ccc;font-size:14pt">' + totalTime + '</td>' + '</tr></tfoot>' + '</table>' + '<div style="text-align:center;margin-top:20pt;font-size:8pt;font-style:italic;color:#999">' + 'Designed by Mr. Jason J. Ault &middot; 2026</div>' + '</body></html>';
+    const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/>' + '<title>' + esc(m.title || lesson.name || 'Lesson Plan') + '</title>' + '<style>body{font-family:Georgia,serif;color:#000;padding:20pt 24pt;margin:0}' + 'table{width:100%;border-collapse:collapse;margin-top:10pt}' + 'thead th{background:#fff;color:#000;padding:8px 6px;border:1px solid #999;border-bottom:2px solid #333;' + 'font-variant:small-caps;letter-spacing:0.05em;font-weight:700;font-size:9pt;text-align:left}' + 'tfoot td{padding:8px 6px;border:1px solid #ccc;font-weight:bold}' + '@media print{body{padding:10pt 12pt}}</style>' + '</head><body>' + metaHTML + '<table>' + '<thead><tr>' + '<th style="width:4%">#</th>' + '<th style="width:16%">Step Name</th>' + '<th style="width:10%">Interaction</th>' + '<th style="width:52%">Description</th>' + '<th style="width:10%">Bloom\'s</th>' + '<th style="width:8%">Min</th>' + '</tr></thead>' + '<tbody>' + stepsHTML + '</tbody>' + '<tfoot><tr>' + '<td colspan="5" style="text-align:right;border:1px solid #ccc">Total Lesson Time</td>' + '<td style="text-align:center;border:1px solid #ccc;font-size:14pt">' + totalTime + '</td>' + '</tr></tfoot>' + '</table>' + '<div style="text-align:center;margin-top:20pt;font-size:8pt;font-style:italic;color:#999">' + 'Designed by Mr. Jason J. Ault &middot; 2026</div>' + '</body></html>';
     printWin.document.write(html);
     printWin.document.close();
     printWin.focus();
@@ -2626,19 +2627,20 @@ function ExpandableField({
 }) {
   const ref = useRef(null);
 
-  // Only resize on value change if there's actual content change (not on focus)
+  // Auto-resize height to fit content. Only touch height when it actually
+  // needs to change, and NEVER touch selection - that was interfering with clicks.
   useEffect(() => {
     if (ref.current) {
       const el = ref.current;
-      // Save cursor position
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      // Resize
+      const currentHeight = el.offsetHeight;
+      // Measure needed height by temporarily setting to auto
       el.style.height = 'auto';
-      el.style.height = Math.max(el.scrollHeight, 90) + 'px';
-      // Restore cursor position (in case any React re-render shifted it)
-      if (document.activeElement === el) {
-        el.setSelectionRange(start, end);
+      const needed = Math.max(el.scrollHeight, 90);
+      // Only actually change the height if it's different, to avoid layout thrash
+      if (Math.abs(currentHeight - needed) > 1) {
+        el.style.height = needed + 'px';
+      } else {
+        el.style.height = currentHeight + 'px';
       }
     }
   }, [value]);
