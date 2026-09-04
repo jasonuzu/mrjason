@@ -561,6 +561,40 @@
             white-space: nowrap;
         }
 
+        /* ── Shift-click desk selection ── */
+        .live-student.desk-selected {
+            outline: 3px solid #7c3aed;
+            outline-offset: 2px;
+            box-shadow: 0 0 14px rgba(124,58,237,0.55);
+        }
+        .live-student.desk-selected::after {
+            content: '\2713';
+            position: absolute; top: -8px; left: -8px;
+            width: 19px; height: 19px; border-radius: 50%;
+            background: #7c3aed; color: #fff; font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        #desk-select-bar {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            padding: 9px 16px; background: #4c1d95; color: #fff;
+            font-size: 0.88rem; font-weight: 600;
+        }
+        #desk-select-bar .dsb-count { font-weight: 800; }
+        #desk-select-bar .dsb-names {
+            flex: 1; font-weight: 400; font-size: 0.8rem; opacity: 0.85;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #desk-select-bar select, #desk-select-bar button {
+            font-family: inherit; font-size: 0.8rem; padding: 6px 12px;
+            border-radius: 5px; border: none; cursor: pointer;
+        }
+        #desk-select-bar select { background: #fff; color: #2c3e50; }
+        #desk-select-bar .dsb-go { background: #22c55e; color: #fff; font-weight: 700; }
+        #desk-select-bar .dsb-go:hover { background: #16a34a; }
+        #desk-select-bar .dsb-clear { background: rgba(255,255,255,0.18); color: #fff; }
+        #desk-select-bar .dsb-clear:hover { background: rgba(255,255,255,0.3); }
+
         /* ── Groups fullscreen (for displaying to the class) ── */
         body.groups-fullscreen #groups-panel {
             position: fixed; inset: 0; width: 100vw; height: 100vh;
@@ -2478,6 +2512,8 @@
                     <div id="call-lists-container"></div>
                 </div>
             </div>
+
+            <div id="desk-select-bar" style="display:none;"></div>
 
             <div id="events-banner" style="display:none;"></div>
 
@@ -4727,6 +4763,7 @@
         function renderLiveView() {
             renderBanners();
             renderEventsBanner();
+            renderDeskSelectionBar();
             var wrap = document.getElementById('live-canvas-wrap');
             var liveCanvas = document.getElementById('live-canvas');
             var data = getStudentsFromDesigner();
@@ -4799,11 +4836,19 @@
                         roleDotsHtml(itemRoles) +
                         (noteCount > 0 ? '<span class="stu-note-badge">📝' + noteCount + '</span>' : '');
                     el.onclick = (function(n) {
-                        return function() {
+                        return function(ev) {
+                            // Shift-click builds a selection to drop into a group,
+                            // instead of opening that student's profile.
+                            if (ev && ev.shiftKey) {
+                                ev.preventDefault();
+                                toggleDeskSelection(n);
+                                return;
+                            }
                             if (isInAttendanceMode()) cycleAttendance(n);
                             else checkLessonWarning(function() { openStudentModalPlain(n); });
                         };
                     })(name);
+                    if (selectedDesks.has(name)) el.classList.add('desk-selected');
                 } else if (item.type === 'line') {
                     el.style.backgroundColor = item.color || '#334155';
                 } else if (item.type === 'label') {
@@ -7177,6 +7222,110 @@
         // it at once. Groups with no members are skipped; during a lesson,
         // absent students are excluded from the award (as with random picks).
         var groupPickTimeout = null;
+
+        // ══════════════════════════════════════════════════════
+        // SHIFT-CLICK DESK SELECTION → assign straight to a group
+        // Deliberately session-only (not saved): it's a scratch selection you
+        // build and spend in a few seconds, not something to restore later.
+        // ══════════════════════════════════════════════════════
+        var selectedDesks = new Set();
+
+        function toggleDeskSelection(name) {
+            if (selectedDesks.has(name)) selectedDesks.delete(name);
+            else selectedDesks.add(name);
+            renderDeskSelectionBar();
+            paintDeskSelection();
+        }
+
+        function clearDeskSelection() {
+            selectedDesks.clear();
+            renderDeskSelectionBar();
+            paintDeskSelection();
+        }
+
+        // Update the outlines in place — a full re-render would be wasteful and
+        // would interrupt any animation running on the canvas.
+        function paintDeskSelection() {
+            document.querySelectorAll('#live-canvas .live-student').forEach(function(el) {
+                var n = el.getAttribute('data-name');
+                el.classList.toggle('desk-selected', !!n && selectedDesks.has(n));
+            });
+        }
+
+        function renderDeskSelectionBar() {
+            var bar = document.getElementById('desk-select-bar');
+            if (!bar) return;
+            if (!selectedDesks.size) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+
+            var names = Array.from(selectedDesks);
+            var groups = liveState.groups || [];
+            var opts = groups.map(function(g) {
+                return '<option value="' + escapeAttr(g.id) + '">' + escapeHtml(g.name) + '</option>';
+            }).join('');
+
+            bar.innerHTML =
+                '<span class="dsb-count">' + names.length + ' selected</span>' +
+                '<span class="dsb-names">' + escapeHtml(names.join(', ')) + '</span>' +
+                (groups.length
+                    ? '<select id="dsb-group-select">' + opts + '</select>' +
+                      '<button class="dsb-go" onclick="assignSelectedToGroup()">\u2192 Add to group</button>'
+                    : '<span style="font-size:0.8rem;opacity:0.85;">No groups yet \u2014</span>') +
+                '<button class="dsb-go" onclick="assignSelectedToNewGroup()">+ New group from these</button>' +
+                '<button class="dsb-clear" onclick="clearDeskSelection()">\u2715 Clear</button>';
+            bar.style.display = 'flex';
+        }
+
+        function assignSelectedToGroup() {
+            var sel = document.getElementById('dsb-group-select');
+            if (!sel) return;
+            var g = (liveState.groups || []).find(function(x) { return x.id === sel.value; });
+            if (!g) return;
+            var added = 0;
+            selectedDesks.forEach(function(n) {
+                // A student belongs to one group at a time, so pull them out of
+                // whichever group they were in first.
+                (liveState.groups || []).forEach(function(other) {
+                    var i = other.members.indexOf(n);
+                    if (i !== -1) other.members.splice(i, 1);
+                });
+                g.members.push(n);
+                added++;
+            });
+            logEvent('group_assign_shiftclick', { group: g.name, count: added });
+            saveLiveState();
+            clearDeskSelection();
+            renderLiveView();
+            renderGroupsPanel();
+        }
+
+        function assignSelectedToNewGroup() {
+            if (!selectedDesks.size) return;
+            var name = prompt('Name for the new group:',
+                              'Group ' + ((liveState.groups || []).length + 1));
+            if (name === null) return;
+            name = name.trim() || ('Group ' + ((liveState.groups || []).length + 1));
+            var palette = ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#0d9488', '#db2777', '#475569'];
+            var g = {
+                id: 'g_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                name: name,
+                color: palette[(liveState.groups || []).length % palette.length],
+                members: []
+            };
+            selectedDesks.forEach(function(n) {
+                (liveState.groups || []).forEach(function(other) {
+                    var i = other.members.indexOf(n);
+                    if (i !== -1) other.members.splice(i, 1);
+                });
+                g.members.push(n);
+            });
+            liveState.groups = liveState.groups || [];
+            liveState.groups.push(g);
+            logEvent('group_created_shiftclick', { name: name, count: g.members.length });
+            saveLiveState();
+            clearDeskSelection();
+            renderLiveView();
+            renderGroupsPanel();
+        }
 
         // ── Groups fullscreen ──
         // Blows the groups panel up to the whole window so students at the back
