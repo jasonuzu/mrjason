@@ -1146,10 +1146,10 @@
    ══════════════════════════════════════════════════════════════ */
 
 const LEVEL_META = {
-  primary: { key:'primary', label:'Primary', grades:'Grades 5–6', ageMin:10, ageMax:12,
+  primary: { key:'primary', label:'Primary', grades:'Grade 5', ageMin:10, ageMax:11,
     color:'#2B7A5F', light:'#E8F5EE', mid:'#B8DFC9',
     scale:['Not like me','Sometimes','Very like me'] },
-  junior: { key:'junior', label:'Junior High', grades:'Grades 7–8', ageMin:12, ageMax:14,
+  junior: { key:'junior', label:'Junior High', grades:'Grades 6–8', ageMin:11, ageMax:14,
     color:'#2D5FA6', light:'#E8EFF8', mid:'#B3CCE8',
     scale:['Strongly Disagree','Disagree','Agree','Strongly Agree'] },
   senior: { key:'senior', label:'Senior High', grades:'Grades 9–10', ageMin:14, ageMax:16,
@@ -2957,8 +2957,9 @@ function uid(){ return 's_' + Date.now().toString(36) + '_' + Math.random().toSt
 function suggestLevel(age){
   age = Number(age);
   if(!age) return null;
-  if(age <= 11) return 'primary';
-  if(age <= 13) return 'junior';
+  // Grades 6-8 are Junior High here, so 11-14 year olds get the junior form
+  if(age <= 10) return 'primary';
+  if(age <= 14) return 'junior';
   return 'senior';
 }
 
@@ -3561,7 +3562,11 @@ function renderReport(){
     </div>
 
     <div class="report-header">
-      <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}</div>
+      <div class="report-eyebrow" style="color:${lvl.color};">${lvl.label} · ${lvl.grades}
+        <button class="btn btn-ghost btn-sm no-print" style="margin-left:8px;font-size:11px;padding:2px 8px;"
+          title="Change which assessment version this student uses"
+          onclick="App.changeAssessmentLevel('${escapeAttr(rec.id)}')">change</button>
+      </div>
       <h1 class="report-title">Learner Profile — <span id="rp-title-name">${escapeHtml(rec.name)}</span><span id="rp-title-cname">${rec.chineseName ? ' <span style="font-weight:400;color:var(--ink-soft);">(' + escapeHtml(rec.chineseName) + ')</span>' : ''}</span></h1>
       <div class="report-meta">${(function(){
         const parts = [];
@@ -7184,7 +7189,7 @@ const App = {
     state.bulkGrade = grade;
     // Selecting a grade sets the level that covers it; the teacher can still
     // override the level below if their school groups grades differently.
-    state.bulkLevel = (grade <= 6) ? 'primary' : (grade <= 8) ? 'junior' : 'senior';
+    state.bulkLevel = (grade <= 5) ? 'primary' : (grade <= 8) ? 'junior' : 'senior';
     render({preserveScroll:true});
   },
   updateBulkText(val){ state.bulkText = val; },
@@ -7612,6 +7617,47 @@ const App = {
 
   // Deleting a whole class removes every student record in it, so this asks
   // twice: once for intent, once with the exact count spelled out.
+  // Lets a record be moved onto a different assessment version — needed when a
+  // student was imported at the wrong level and the answer scale doesn't match
+  // the paper form they filled in.
+  changeAssessmentLevel(id){
+    const rec = state.students.find(s => s.id === id);
+    if(!rec) return;
+    const keys = Object.keys(LEVEL_META);
+    const menu = keys.map((k, i) => {
+      const L = LEVEL_META[k];
+      return '  ' + (i+1) + '. ' + L.label + ' (' + L.grades + ') \u2014 ' + L.scale.length + '-point scale' +
+             (rec.level === k ? '   \u2190 current' : '');
+    }).join('\n');
+
+    const pick = prompt(
+      'Assessment version for ' + rec.name + '\n\n' +
+      'This sets the answer options shown when entering their responses, so it should match\n' +
+      'the paper form they completed.\n\n' + menu + '\n\nEnter 1-' + keys.length + ':',
+      String((keys.indexOf(rec.level) + 1) || 2)
+    );
+    if(pick === null) return;
+    const idx = parseInt(pick, 10) - 1;
+    if(!(idx >= 0 && idx < keys.length)) return;
+    const newLevel = keys[idx];
+    if(newLevel === rec.level) return;
+
+    const answered = Object.keys(rec.answers || {}).length;
+    if(answered && !confirm(
+      'Switching from ' + LEVEL_META[rec.level].label + ' to ' + LEVEL_META[newLevel].label +
+      ' changes the questions and the answer scale.\n\n' + answered + ' existing answer' +
+      (answered===1?'':'s') + ' will be cleared, because they were given against a different ' +
+      'set of questions.\n\nContinue?'
+    )) return;
+
+    rec.level = newLevel;
+    rec.answers = {};
+    saveStudent(rec);
+    render();
+    alert(rec.name + ' is now on the ' + LEVEL_META[newLevel].label + ' version (' +
+          LEVEL_META[newLevel].scale.join(' / ') + ').');
+  },
+
   async confirmDeleteClass(className){
     const inClass = state.students.filter(s => (s.className||'') === className);
     if(!inClass.length){
