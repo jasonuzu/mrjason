@@ -5389,6 +5389,7 @@ function renderClassOverview(){
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
       <button class="btn btn-primary" onclick="App.openGradebook('${escapeAttr(className)}')">📖 Gradebook</button>
       <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
+      <button class="btn btn-ghost" title="Change which assessment version this whole class uses" onclick="App.changeClassAssessmentLevel('${escapeAttr(className)}')">🎚 Change Assessment Level</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
 
@@ -7620,6 +7621,75 @@ const App = {
   // Lets a record be moved onto a different assessment version — needed when a
   // student was imported at the wrong level and the answer scale doesn't match
   // the paper form they filled in.
+  // Move a whole class onto a different assessment version in one step. Answers
+  // already recorded against the old version have to go, since the two versions
+  // ask different questions — so this is spelled out and double-confirmed.
+  changeClassAssessmentLevel(className){
+    const inClass = state.students.filter(s => (s.className||'') === className);
+    if(!inClass.length){ alert('There are no students in ' + className + '.'); return; }
+
+    const keys = Object.keys(LEVEL_META);
+    // show what the class currently uses, which may be a mix
+    const counts = {};
+    inClass.forEach(s => { counts[s.level] = (counts[s.level]||0) + 1; });
+    const current = Object.keys(counts)
+      .map(k => (LEVEL_META[k] ? LEVEL_META[k].label : k) + ' \u00d7' + counts[k]).join(', ');
+
+    const menu = keys.map((k, i) => {
+      const L = LEVEL_META[k];
+      return '  ' + (i+1) + '. ' + L.label + ' (' + L.grades + ') \u2014 ' +
+             L.scale.length + '-point scale: ' + L.scale.join(' / ');
+    }).join('\n');
+
+    const pick = prompt(
+      'Assessment version for the whole of ' + className + '\n\n' +
+      'Currently: ' + current + '\n\n' +
+      'This sets the questions and answer options for every student in the class, so it\n' +
+      'should match the paper form they completed.\n\n' + menu + '\n\nEnter 1-' + keys.length + ':',
+      ''
+    );
+    if(pick === null) return;
+    const idx = parseInt(pick, 10) - 1;
+    if(!(idx >= 0 && idx < keys.length)) return;
+    const newLevel = keys[idx];
+
+    const changing = inClass.filter(s => s.level !== newLevel);
+    if(!changing.length){
+      alert('Every student in ' + className + ' is already on the ' + LEVEL_META[newLevel].label + ' version.');
+      return;
+    }
+    const withAnswers = changing.filter(s => Object.keys(s.answers||{}).length);
+
+    if(!confirm(
+      'Move ' + changing.length + ' student' + (changing.length===1?'':'s') + ' in ' + className +
+      ' to the ' + LEVEL_META[newLevel].label + ' version?\n\n' +
+      'Answer options will become: ' + LEVEL_META[newLevel].scale.join(' / ') +
+      (withAnswers.length
+        ? '\n\n\u26a0 ' + withAnswers.length + ' student' + (withAnswers.length===1?'':'s') +
+          ' already have answers recorded. Those answers will be cleared, because the two\n' +
+          'versions ask different questions.'
+        : '\n\nNo answers have been recorded yet, so nothing will be lost.')
+    )) return;
+
+    if(withAnswers.length && !confirm(
+      'Last check \u2014 this clears recorded answers for ' + withAnswers.length + ' student' +
+      (withAnswers.length===1?'':'s') + ':\n' +
+      withAnswers.slice(0,8).map(s => s.name).join(', ') +
+      (withAnswers.length > 8 ? ', and ' + (withAnswers.length-8) + ' more' : '') +
+      '\n\nThere is no way to get those answers back.\n\nClick OK to proceed.'
+    )) return;
+
+    changing.forEach(rec => {
+      rec.level = newLevel;
+      rec.answers = {};
+      saveStudent(rec);
+    });
+    render();
+    alert('Moved ' + changing.length + ' student' + (changing.length===1?'':'s') + ' in ' + className +
+          ' to the ' + LEVEL_META[newLevel].label + ' version.\n\n' +
+          'Answer options are now: ' + LEVEL_META[newLevel].scale.join(' / '));
+  },
+
   changeAssessmentLevel(id){
     const rec = state.students.find(s => s.id === id);
     if(!rec) return;
