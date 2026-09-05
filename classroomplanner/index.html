@@ -561,6 +561,38 @@
             white-space: nowrap;
         }
 
+        /* ── Live fullscreen (for projecting to a TV) ── */
+        #live-fs-btn {
+            padding: 7px 13px; font-size: 0.82rem; border: 1px solid #cbd5e0;
+            background: #fff; color: #2c3e50; border-radius: 6px; cursor: pointer;
+            font-family: inherit; white-space: nowrap; flex-shrink: 0;
+        }
+        #live-fs-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+        /* Hide everything that isn't the room itself */
+        body.live-fullscreen #tab-bar,
+        body.live-fullscreen #action-bar,
+        body.live-fullscreen #groups-panel,
+        body.live-fullscreen #left-panel { display: none !important; }
+        body.live-fullscreen #live-header {
+            padding: 8px 18px; background: #1e293b; border-bottom: none;
+        }
+        body.live-fullscreen #live-header #class-name-input {
+            background: transparent; color: #fff; border-color: #475569; font-size: 1.15rem;
+        }
+        body.live-fullscreen #live-header #live-clock { background: #334155; color: #e2e8f0; }
+        body.live-fullscreen #live-header #live-clock .clock-date { color: #94a3b8; }
+        body.live-fullscreen #live-fs-btn { background: #f8fafc; font-weight: 700; }
+        body.live-fullscreen #live-canvas-wrap {
+            padding: 0; overflow: hidden; background: #0f172a;
+        }
+        /* The canvas is a fixed 1000x700, so it is scaled up to fill the screen
+           rather than simply revealed — that is what makes the desks readable
+           from the back of a room. */
+        body.live-fullscreen #live-canvas {
+            transform-origin: center center;
+            box-shadow: 0 0 60px rgba(0,0,0,0.5);
+        }
+
         /* ── Shift-click desk selection ── */
         .live-student.desk-selected {
             outline: 3px solid #7c3aed;
@@ -2480,6 +2512,7 @@
                 <span>Groups: <strong id="stat-groups">0</strong></span>
                 <span id="stat-lesson-wrap" style="display:none;">Lesson: <strong id="stat-lesson">—</strong></span>
             </div>
+            <button id="live-fs-btn" onclick="toggleLiveFullscreen()" title="Fill the screen — best for projecting to a TV">⛶ Full Screen</button>
             <div id="live-clock" title="System time">--:--</div>
         </div>
 
@@ -4764,6 +4797,7 @@
             renderBanners();
             renderEventsBanner();
             renderDeskSelectionBar();
+            setTimeout(fitLiveCanvas, 0);
             var wrap = document.getElementById('live-canvas-wrap');
             var liveCanvas = document.getElementById('live-canvas');
             var data = getStudentsFromDesigner();
@@ -7222,6 +7256,78 @@
         // it at once. Groups with no members are skipped; during a lesson,
         // absent students are excluded from the award (as with random picks).
         var groupPickTimeout = null;
+
+        // ══════════════════════════════════════════════════════
+        // LIVE FULLSCREEN — for projecting the room to a TV
+        // The layout is a fixed 1000x700 canvas, so filling the screen is not
+        // enough on its own; the canvas is scaled up to whatever space is going,
+        // which is what actually makes the desks readable from the back.
+        // ══════════════════════════════════════════════════════
+        var liveFullscreen = false;
+
+        function toggleLiveFullscreen() {
+            liveFullscreen = !liveFullscreen;
+            document.body.classList.toggle('live-fullscreen', liveFullscreen);
+
+            var btn = document.getElementById('live-fs-btn');
+            if (btn) {
+                btn.innerHTML = liveFullscreen ? '\u2715 Exit Full Screen' : '\u26F6 Full Screen';
+                btn.title = liveFullscreen ? 'Back to the normal view'
+                                           : 'Fill the screen \u2014 best for projecting to a TV';
+            }
+
+            if (liveFullscreen) {
+                // Ask the browser for true fullscreen too, so the tab bar and OS
+                // chrome go as well. Harmless if the browser refuses.
+                var el = document.documentElement;
+                var req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+                if (req) { try { req.call(el); } catch (e) {} }
+                window.addEventListener('resize', fitLiveCanvas);
+                document.addEventListener('keydown', liveFsEscHandler);
+            } else {
+                if (document.fullscreenElement || document.webkitFullscreenElement) {
+                    var exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+                    if (exit) { try { exit.call(document); } catch (e) {} }
+                }
+                window.removeEventListener('resize', fitLiveCanvas);
+                document.removeEventListener('keydown', liveFsEscHandler);
+            }
+
+            fitLiveCanvas();
+            logEvent('live_fullscreen', { on: liveFullscreen });
+        }
+
+        // Scale the canvas to the largest size that still fits, keeping its
+        // proportions so the seating plan is not distorted.
+        function fitLiveCanvas() {
+            var canvas = document.getElementById('live-canvas');
+            var wrap = document.getElementById('live-canvas-wrap');
+            if (!canvas || !wrap) return;
+
+            if (!liveFullscreen) { canvas.style.transform = ''; return; }
+
+            var natW = 1000, natH = 700;
+            var padding = 24;   // a little breathing room at the edges
+            var availW = wrap.clientWidth - padding;
+            var availH = wrap.clientHeight - padding;
+            if (availW <= 0 || availH <= 0) return;
+
+            var scale = Math.min(availW / natW, availH / natH);
+            // Never shrink below the normal size — a small window should scroll,
+            // not render the desks smaller than they already were.
+            if (scale < 1) scale = 1;
+            canvas.style.transform = 'scale(' + scale.toFixed(3) + ')';
+        }
+
+        function liveFsEscHandler(e) {
+            if (e.key === 'Escape' && liveFullscreen) toggleLiveFullscreen();
+        }
+
+        // If the user leaves browser fullscreen by another route (F11, the OS),
+        // drop our own fullscreen too so the two never disagree.
+        document.addEventListener('fullscreenchange', function() {
+            if (!document.fullscreenElement && liveFullscreen) toggleLiveFullscreen();
+        });
 
         // ══════════════════════════════════════════════════════
         // SHIFT-CLICK DESK SELECTION → assign straight to a group
