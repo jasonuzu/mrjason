@@ -568,11 +568,50 @@
             font-family: inherit; white-space: nowrap; flex-shrink: 0;
         }
         #live-fs-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
-        /* Hide everything that isn't the room itself */
+        /* Hide the chrome that has no place on a TV */
         body.live-fullscreen #tab-bar,
-        body.live-fullscreen #action-bar,
-        body.live-fullscreen #groups-panel,
         body.live-fullscreen #left-panel { display: none !important; }
+
+        /* The groups panel and the action bar slide out of view instead of being
+           removed, so they can be summoned back by moving the mouse to the edge. */
+        body.live-fullscreen #groups-panel {
+            position: fixed; top: 0; right: 0; height: 100vh; width: 340px;
+            transform: translateX(100%);
+            transition: transform 0.22s ease;
+            z-index: 2400;
+            box-shadow: -6px 0 24px rgba(0,0,0,0.35);
+        }
+        body.live-fullscreen.reveal-groups #groups-panel { transform: translateX(0); }
+
+        body.live-fullscreen #action-bar {
+            position: fixed; left: 0; right: 0; bottom: 0;
+            transform: translateY(100%);
+            transition: transform 0.22s ease;
+            z-index: 2400;
+            box-shadow: 0 -6px 24px rgba(0,0,0,0.35);
+        }
+        body.live-fullscreen.reveal-actions #action-bar { transform: translateY(0); }
+
+        /* Invisible strips along the edges that bring the panels back */
+        .fs-edge { position: fixed; z-index: 2390; display: none; }
+        body.live-fullscreen .fs-edge { display: block; }
+        #fs-edge-right { top: 0; right: 0; width: 26px; height: 100vh; }
+        #fs-edge-bottom { left: 0; right: 0; bottom: 0; height: 26px; }
+        /* A faint handle so it is discoverable rather than a hidden trick */
+        body.live-fullscreen #fs-edge-right::after,
+        body.live-fullscreen #fs-edge-bottom::after {
+            content: ''; position: absolute; background: rgba(255,255,255,0.28);
+            border-radius: 4px; transition: background 0.2s;
+        }
+        body.live-fullscreen #fs-edge-right::after {
+            top: 50%; right: 5px; width: 4px; height: 60px; transform: translateY(-50%);
+        }
+        body.live-fullscreen #fs-edge-bottom::after {
+            left: 50%; bottom: 5px; height: 4px; width: 60px; transform: translateX(-50%);
+        }
+        body.live-fullscreen .fs-edge:hover::after { background: rgba(255,255,255,0.6); }
+        body.live-fullscreen.reveal-groups #fs-edge-right::after,
+        body.live-fullscreen.reveal-actions #fs-edge-bottom::after { opacity: 0; }
         body.live-fullscreen #live-header {
             padding: 8px 18px; background: #1e293b; border-bottom: none;
         }
@@ -2568,6 +2607,9 @@
                 <div id="groups-list"></div>
             </div>
         </div>
+
+        <div id="fs-edge-right" class="fs-edge"></div>
+        <div id="fs-edge-bottom" class="fs-edge"></div>
 
         <div id="action-bar">
             <div class="ab-group" style="position:relative;">
@@ -7293,6 +7335,10 @@
                 document.removeEventListener('keydown', liveFsEscHandler);
             }
 
+            if (!liveFullscreen) {
+                document.body.classList.remove('reveal-groups');
+                document.body.classList.remove('reveal-actions');
+            }
             fitLiveCanvas();
             logEvent('live_fullscreen', { on: liveFullscreen });
         }
@@ -7322,6 +7368,56 @@
         function liveFsEscHandler(e) {
             if (e.key === 'Escape' && liveFullscreen) toggleLiveFullscreen();
         }
+
+        // ── Edge reveal ──
+        // In fullscreen the groups panel and action bar slide off screen. Moving
+        // the mouse to the right or bottom edge brings them back; they retract
+        // once the mouse leaves, unless a menu from the bar is still open.
+        var fsHideTimers = { groups: null, actions: null };
+
+        function fsReveal(which) {
+            if (!liveFullscreen) return;
+            var cls = which === 'groups' ? 'reveal-groups' : 'reveal-actions';
+            if (fsHideTimers[which]) { clearTimeout(fsHideTimers[which]); fsHideTimers[which] = null; }
+            document.body.classList.add(cls);
+        }
+
+        function fsHide(which) {
+            if (!liveFullscreen) return;
+            // A short delay stops the panel flickering away while the mouse
+            // travels across the gap between the edge strip and the panel.
+            if (fsHideTimers[which]) clearTimeout(fsHideTimers[which]);
+            fsHideTimers[which] = setTimeout(function() {
+                // Don't retract the bar while one of its popup menus is open
+                if (which === 'actions' && AB_MENU_IDS.some(function(id) {
+                    var el = document.getElementById(id);
+                    return el && el.classList.contains('show');
+                })) return;
+                var menu = document.getElementById('class-tools-menu');
+                if (which === 'actions' && menu && menu.classList.contains('show')) return;
+                document.body.classList.remove(which === 'groups' ? 'reveal-groups' : 'reveal-actions');
+            }, 350);
+        }
+
+        function setupFsEdges() {
+            var pairs = [
+                ['fs-edge-right', 'groups-panel', 'groups'],
+                ['fs-edge-bottom', 'action-bar', 'actions'],
+            ];
+            pairs.forEach(function(p) {
+                var edge = document.getElementById(p[0]);
+                var panel = document.getElementById(p[1]);
+                if (edge) {
+                    edge.addEventListener('mouseenter', function() { fsReveal(p[2]); });
+                    edge.addEventListener('mouseleave', function() { fsHide(p[2]); });
+                }
+                if (panel) {
+                    panel.addEventListener('mouseenter', function() { fsReveal(p[2]); });
+                    panel.addEventListener('mouseleave', function() { fsHide(p[2]); });
+                }
+            });
+        }
+        setupFsEdges();
 
         // If the user leaves browser fullscreen by another route (F11, the OS),
         // drop our own fullscreen too so the two never disagree.
