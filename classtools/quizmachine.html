@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Miraculous Quiz Machine</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;overflow:hidden;background:#05010f;
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;color:#eaeaff;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ============ SETUP SCREEN ============ */
+  #setup{
+    position:fixed;inset:0;overflow-y:auto;z-index:200;padding:40px 18px 140px;
+    background:
+      radial-gradient(circle at 15% 8%, #1e1148 0%, transparent 55%),
+      radial-gradient(circle at 85% 92%, #3a0b4a 0%, transparent 55%),
+      #05010f;
+  }
+  .wrap{max-width:860px;margin:0 auto;}
+
+  .brand{display:flex;align-items:center;gap:16px;margin-bottom:6px;animation:brandIn .7s cubic-bezier(.2,1.2,.4,1) both;}
+  @keyframes brandIn{from{opacity:0;transform:translateY(-14px) scale(.96);}to{opacity:1;transform:none;}}
+
+  .badge{
+    flex:none;width:64px;height:64px;border-radius:20px;
+    display:grid;place-items:center;font-size:34px;
+    background:linear-gradient(135deg,#7c5cff,#ff2d95 45%,#ffb347);
+    box-shadow:0 0 40px rgba(255,45,149,.65), 0 8px 26px rgba(0,0,0,.55);
+    animation:badgePulse 3s ease-in-out infinite;
+    border:2px solid rgba(255,255,255,.35);
+    text-shadow:0 0 18px rgba(255,255,255,.9);
+  }
+  @keyframes badgePulse{
+    0%,100%{box-shadow:0 0 34px rgba(255,45,149,.6), 0 8px 26px rgba(0,0,0,.55);}
+    50%{box-shadow:0 0 66px rgba(124,92,255,.9), 0 8px 26px rgba(0,0,0,.55);}
+  }
+
+  h1{
+    font-size:clamp(25px,4.9vw,45px);margin:0;font-weight:900;letter-spacing:-1.2px;
+    line-height:1.05;
+    background:linear-gradient(90deg,#7c5cff,#ff2d95,#ffb347,#22e39a,#00d4ff,#7c5cff);
+    background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shimmer 8s linear infinite;
+  }
+  @keyframes shimmer{to{background-position:300% 0;}}
+
+  .spectrum{
+    height:5px;border-radius:3px;margin:11px 0 9px;max-width:380px;
+    background:linear-gradient(90deg,
+      #7c5cff 0%,
+      #ff2d95 20%,
+      #ffb347 40%,
+      #22e39a 60%,
+      #00d4ff 80%,
+      #7c5cff 100%);
+    background-size:200% 100%;
+    box-shadow:0 0 26px rgba(255,45,149,.55);
+    animation:spectrumFlow 6s linear infinite;
+  }
+  @keyframes spectrumFlow{to{background-position:200% 0;}}
+
+  .tagline{
+    font-size:13px;font-weight:800;letter-spacing:2.6px;text-transform:uppercase;
+    opacity:.5;margin-top:2px;
+  }
+
+  .sub{opacity:.65;margin:20px 0 24px;font-size:15px;line-height:1.65;}
+
+  .countBar{
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(124,92,255,.45);
+    border-radius:18px;padding:16px 20px;margin-bottom:24px;
+    box-shadow:0 0 34px rgba(124,92,255,.22), inset 0 0 24px rgba(124,92,255,.10);
+    backdrop-filter:blur(8px);
+  }
+  .countBar label{font-weight:800;font-size:15px;letter-spacing:.3px;}
+  .count-ctrl{
+    display:flex;align-items:center;gap:6px;
+    background:rgba(0,0,0,.45);
+    border:1px solid rgba(255,255,255,.16);
+    border-radius:14px;padding:5px;
+  }
+  .step{
+    width:40px;height:40px;border-radius:10px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,#7c5cff,#ff2d95);color:#fff;
+    font-size:22px;font-weight:900;line-height:1;display:grid;place-items:center;
+    font-family:inherit;transition:.15s;
+  }
+  .step:hover{filter:brightness(1.25);transform:translateY(-1px);}
+  .step:active{transform:scale(.93);}
+  .step:disabled{opacity:.3;cursor:not-allowed;transform:none;filter:none;}
+  #qCount{
+    width:78px;height:40px;text-align:center;font-size:20px;font-weight:900;
+    background:transparent;border:none;color:#fff;outline:none;
+    font-family:inherit;
+    -moz-appearance:textfield;
+  }
+  #qCount::-webkit-outer-spin-button,
+  #qCount::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .countHint{font-size:13px;opacity:.5;}
+
+  .qcard{
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:18px;padding:18px;margin-bottom:16px;
+    backdrop-filter:blur(8px);
+    box-shadow:0 8px 40px rgba(0,0,0,.4);
+    animation:cardIn .28s ease-out;
+  }
+  @keyframes cardIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+  .qhead{display:flex;gap:10px;align-items:center;margin-bottom:14px;}
+  .qnum{
+    flex:none;font-weight:900;font-size:13px;letter-spacing:1px;
+    background:linear-gradient(135deg,#7c5cff,#ff2d95);
+    padding:7px 11px;border-radius:9px;color:#fff;
+  }
+  .optrow{display:flex;gap:10px;align-items:center;margin-bottom:8px;}
+  .optrow .dot{
+    flex:none;width:34px;text-align:center;font-size:12px;font-weight:800;
+    opacity:.4;letter-spacing:.5px;
+  }
+  input[type=text]{
+    background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14);
+    border-radius:11px;padding:11px 13px;color:#fff;font-size:15px;
+    width:100%;outline:none;font-family:inherit;transition:.18s;
+  }
+  input[type=text]::placeholder{color:rgba(255,255,255,.28);}
+  input[type=text]:focus{border-color:#7c5cff;box-shadow:0 0 0 3px rgba(124,92,255,.28);background:rgba(0,0,0,.6);}
+  input[type=radio]{
+    width:22px;height:22px;flex:none;cursor:pointer;accent-color:#ff2d95;
+  }
+  .del,.delopt,.addopt{
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+    color:#fff;border-radius:10px;padding:9px 12px;font-size:14px;font-weight:700;
+    cursor:pointer;flex:none;transition:.15s;font-family:inherit;
+  }
+  .del:hover,.delopt:hover{background:rgba(255,60,60,.35);border-color:rgba(255,80,80,.6);}
+  .addopt{width:100%;margin-top:4px;opacity:.7;font-size:13px;}
+  .addopt:hover{opacity:1;background:rgba(124,92,255,.35);}
+
+  .toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px;}
+  .btn{
+    border:none;border-radius:14px;padding:15px 24px;font-size:15px;font-weight:800;
+    cursor:pointer;font-family:inherit;transition:.18s;color:#fff;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);
+  }
+  .btn:hover{background:rgba(255,255,255,.16);transform:translateY(-1px);}
+  .btn.share{
+    background:rgba(34,227,154,.14);
+    border-color:rgba(34,227,154,.45);
+    color:#b6ffdf;
+  }
+  .btn.share:hover{background:rgba(34,227,154,.26);border-color:rgba(34,227,154,.7);}
+  .btn.load{
+    background:rgba(0,212,255,.14);
+    border-color:rgba(0,212,255,.45);
+    color:#c2f0ff;
+  }
+  .btn.load:hover{background:rgba(0,212,255,.26);border-color:rgba(0,212,255,.7);}
+  .btn.primary{
+    background:linear-gradient(135deg,#7c5cff,#ff2d95 55%,#ffb347);
+    border:none;font-size:18px;padding:18px 40px;letter-spacing:.5px;
+    box-shadow:0 0 40px rgba(255,45,149,.5),0 10px 30px rgba(0,0,0,.5);
+  }
+  .btn.primary:hover{box-shadow:0 0 66px rgba(255,45,149,.85),0 10px 34px rgba(0,0,0,.5);transform:translateY(-2px) scale(1.02);}
+  .hint{font-size:13px;opacity:.45;margin-top:10px;}
+
+  /* ---------- DRAG & DROP OVERLAY ---------- */
+  #dropZone{
+    position:fixed;inset:0;z-index:260;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(5,1,15,.78);
+    backdrop-filter:blur(8px);
+    pointer-events:none;
+  }
+  #dropZone.on{display:flex;}
+  .dropBox{
+    padding:52px 72px;border-radius:28px;
+    border:4px dashed rgba(124,92,255,.85);
+    background:rgba(124,92,255,.10);
+    box-shadow:0 0 70px rgba(124,92,255,.55), inset 0 0 50px rgba(255,45,149,.15);
+    text-align:center;
+    animation:dropPulse 1.4s ease-in-out infinite;
+  }
+  @keyframes dropPulse{
+    0%,100%{box-shadow:0 0 55px rgba(124,92,255,.45), inset 0 0 44px rgba(255,45,149,.12);}
+    50%{box-shadow:0 0 90px rgba(255,45,149,.7), inset 0 0 60px rgba(124,92,255,.25);}
+  }
+  .dropBox .ico{font-size:58px;line-height:1;margin-bottom:12px;}
+  .dropBox .lbl{
+    font-size:22px;font-weight:900;letter-spacing:-.4px;
+    background:linear-gradient(90deg,#7c5cff,#ff2d95,#ffb347);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .dropBox .sub2{font-size:14px;opacity:.6;margin-top:8px;}
+
+  /* ---------- SAVE TOAST ---------- */
+  #saveToast{
+    position:fixed;bottom:26px;left:50%;
+    transform:translateX(-50%) translateY(18px);
+    z-index:300;padding:11px 22px;border-radius:999px;
+    background:rgba(34,227,154,.16);
+    border:1px solid rgba(34,227,154,.55);
+    color:#b6ffdf;font-size:13.5px;font-weight:800;letter-spacing:.4px;
+    opacity:0;pointer-events:none;
+    transition:opacity .28s ease-out, transform .28s cubic-bezier(.2,1.4,.4,1);
+    backdrop-filter:blur(12px);
+    box-shadow:0 0 26px rgba(34,227,154,.35), 0 8px 24px rgba(0,0,0,.5);
+    white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;
+  }
+  #saveToast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+  #saveToast.warn{
+    background:rgba(255,179,71,.16);
+    border-color:rgba(255,179,71,.55);
+    color:#ffe1b0;
+    box-shadow:0 0 26px rgba(255,179,71,.35), 0 8px 24px rgba(0,0,0,.5);
+  }
+  #saveToast.err{
+    background:rgba(255,92,92,.16);
+    border-color:rgba(255,92,92,.55);
+    color:#ffc4c4;
+    box-shadow:0 0 26px rgba(255,92,92,.35), 0 8px 24px rgba(0,0,0,.5);
+  }
+
+  /* ============ GAME ============ */
+  #game{position:fixed;inset:0;display:none;}
+  #game.on{display:block;}
+
+  #world{
+    position:absolute;inset:0;transform-origin:50% 50%;will-change:transform;
+    background:radial-gradient(circle at 50% 45%, #180d33 0%, #0a0418 45%, #05010f 100%);
+    overflow:hidden;
+  }
+
+  #hud{
+    position:absolute;top:18px;left:50%;transform:translateX(-50%);
+    z-index:6;display:flex;flex-direction:column;align-items:center;gap:9px;
+    max-width:94vw;pointer-events:none;
+  }
+  #progressPill{
+    padding:6px 16px;border-radius:999px;
+    font-size:12px;font-weight:900;letter-spacing:2px;text-transform:uppercase;
+    background:rgba(255,45,149,.16);
+    border:1px solid rgba(255,45,149,.55);
+    color:#ffbfe2;
+    box-shadow:0 0 22px rgba(255,45,149,.35);
+    white-space:nowrap;
+  }
+  #questionBar{
+    padding:14px 30px;border-radius:999px;
+    background:rgba(12,4,30,.82);
+    border:1px solid rgba(124,92,255,.55);
+    box-shadow:0 0 34px rgba(124,92,255,.5), inset 0 0 24px rgba(255,45,149,.15);
+    font-size:clamp(15px,2.3vw,25px);font-weight:800;text-align:center;
+    backdrop-filter:blur(10px);line-height:1.3;
+  }
+
+  #boxes{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    top:170px;
+    z-index:4;
+    display:flex;
+    flex-direction:column;
+    gap:0;
+    overflow:hidden;
+  }
+
+  #boxes .row{
+    flex:1 1 0;
+    display:flex;
+    min-height:0;
+    gap:0;
+  }
+
+  .box{
+    position:relative;
+    flex:1 1 0;
+    min-width:0;
+    min-height:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+    overflow:hidden;
+    border:2px solid rgba(255,255,255,.16);
+    color:#fff;
+    font-weight:900;
+    text-align:center;
+    text-shadow:0 2px 10px rgba(0,0,0,.6);
+    cursor:pointer;
+    user-select:none;
+    box-shadow: inset 0 0 70px rgba(0,0,0,.30);
+    transition: filter .15s;
+    animation: boxIn .35s ease-out both;
+  }
+  @keyframes boxIn{from{opacity:0;}to{opacity:1;}}
+
+  .box span{
+    display:block;
+    max-width:100%;
+    line-height:1.15;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
+
+  .box:hover{ filter:brightness(1.22) saturate(1.15); }
+  .box:active{ filter:brightness(1.55); }
+
+  .box.wrong{
+    animation: wrongShake .55s cubic-bezier(.36,.07,.19,.97) both;
+    box-shadow: inset 0 0 70px rgba(0,0,0,.30), inset 0 0 0 4px rgba(255,255,255,.85);
+  }
+  @keyframes wrongShake{
+    0%  {transform:translate(0,0);                     filter:brightness(2.4);}
+    15% {transform:translate(-7px,0) rotate(-1deg);}
+    30% {transform:translate(7px,0) rotate(1deg);}
+    45% {transform:translate(-5px,0) rotate(-.6deg);}
+    60% {transform:translate(5px,0) rotate(.6deg);}
+    75% {transform:translate(-2px,0);                  filter:brightness(.65) saturate(2);}
+    100%{transform:translate(0,0);                     filter:none;}
+  }
+
+  #fx{position:fixed;inset:0;z-index:50;pointer-events:none;}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:55;}
+
+  #nextBar{
+    position:fixed;left:50%;bottom:38px;transform:translateX(-50%);
+    z-index:70;display:none;
+  }
+  #nextBar.on{display:block;animation:popIn .35s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes popIn{from{opacity:0;transform:translateX(-50%) scale(.7);}to{opacity:1;transform:translateX(-50%) scale(1);}}
+</style>
+</head>
+<body>
+
+<!-- ================= SETUP ================= -->
+<div id="setup">
+  <div class="wrap">
+
+    <div class="brand">
+      <div class="badge">✨</div>
+      <div>
+        <h1>The Miraculous Quiz Machine</h1>
+        <div class="spectrum"></div>
+        <div class="tagline">Answer right &amp; blow up the world</div>
+      </div>
+    </div>
+
+    <p class="sub">
+      Choose how many questions you want, write them below, and mark the correct answer
+      with the <strong>radio button</strong>. Your quiz saves automatically in this browser.
+      Hit <strong>START QUIZ</strong> and the answers will fill the screen as a wall of colorful
+      tiles — click the right one to set off the fireworks.
+    </p>
+
+    <div class="countBar">
+      <label for="qCount">Number of questions</label>
+      <div class="count-ctrl">
+        <button class="step" id="qMinus" type="button" title="Fewer questions">−</button>
+        <input type="number" id="qCount" min="0" max="50" step="1" value="4" inputmode="numeric">
+        <button class="step" id="qPlus" type="button" title="More questions">+</button>
+      </div>
+      <span class="countHint">0 – 50</span>
+    </div>
+
+    <div id="questions"></div>
+
+    <div class="toolbar">
+      <button class="btn" id="addQ">+ Add question</button>
+      <button class="btn" id="sampleBtn">↺ Load sample questions</button>
+      <button class="btn" id="clearBtn">🗑 Clear saved quiz</button>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn share" id="downloadBtn">⬇ Download quiz</button>
+      <button class="btn load"  id="loadBtn">📂 Load quiz</button>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn primary" id="startBtn">🚀 START QUIZ</button>
+    </div>
+    <p class="hint">
+      Quiz auto-saves in this browser. Use <strong>Download quiz</strong> to share the file —
+      friends can drop it anywhere on this page to load it. 🎆
+    </p>
+  </div>
+</div>
+
+<!-- ================= DRAG & DROP OVERLAY ================= -->
+<div id="dropZone">
+  <div class="dropBox">
+    <div class="ico">📂</div>
+    <div class="lbl">Drop quiz file to load</div>
+    <div class="sub2">Release your .json file anywhere</div>
+  </div>
+</div>
+
+<!-- ================= GAME ================= -->
+<div id="game">
+  <div id="world">
+    <div id="hud">
+      <div id="progressPill">Question 1 of 4</div>
+      <div id="questionBar"><span id="qText"></span></div>
+    </div>
+    <div id="boxes"></div>
+  </div>
+  <canvas id="fx"></canvas>
+  <div id="flash"></div>
+  <div id="nextBar"><button class="btn primary" id="nextBtn">Next →</button></div>
+</div>
+
+<!-- ================= SAVE TOAST ================= -->
+<div id="saveToast">✓ Quiz saved</div>
+
+<script>
+/* =========================================================
+   PERSISTENCE — save the quiz in the browser
+   ========================================================= */
+const STORAGE_KEY  = 'miraculous-quiz-machine-v1';
+const FILE_FORMAT  = 'miraculous-quiz-machine';
+const FILE_VERSION = 1;
+
+let saveTimer  = null;
+let toastTimer = null;
+let lastToast  = 0;
+let storageOK  = true;
+
+const saveToastEl = document.getElementById('saveToast');
+
+function loadQuiz(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw === null) return null;
+    const parsed = JSON.parse(raw);
+    if(!Array.isArray(parsed)) return null;
+
+    return parsed
+      .filter(q => q && typeof q.q === 'string' && Array.isArray(q.options))
+      .map(q => ({
+        q: q.q,
+        options: q.options
+          .filter(o => o && typeof o.t === 'string')
+          .map(o => ({ t: o.t, c: !!o.c }))
+      }));
+  }catch(e){
+    return null;
+  }
+}
+
+function doSave(){
+  saveTimer = null;
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+    flashSaved('✓ Quiz saved');
+  }catch(e){
+    if(storageOK){
+      storageOK = false;
+      flashSaved('⚠ Storage blocked — quiz not saved', true, 'warn');
+    }
+  }
+}
+
+function persist(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 350);
+}
+
+/* Show a toast. kind = '', 'warn' or 'err'. `force` bypasses cooldown. */
+function flashSaved(text, force, kind){
+  const now = Date.now();
+  if(!force && now - lastToast < 1200) return;
+  lastToast = now;
+
+  clearTimeout(toastTimer);
+  saveToastEl.textContent = text || '✓ Quiz saved';
+  saveToastEl.classList.remove('warn','err');
+  if(kind === 'warn') saveToastEl.classList.add('warn');
+  if(kind === 'err')  saveToastEl.classList.add('err');
+  saveToastEl.classList.add('on');
+
+  toastTimer = setTimeout(() => saveToastEl.classList.remove('on'), 1700);
+}
+
+function flushSave(){
+  if(saveTimer){
+    clearTimeout(saveTimer);
+    doSave();
+  }
+}
+window.addEventListener('beforeunload', flushSave);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden') flushSave();
+});
+
+/* =========================================================
+   DOWNLOAD & LOAD  —  share the quiz as a .json file
+   ========================================================= */
+
+/* Strip empties and package the quiz in a portable wrapper. */
+function buildExportPayload(){
+  return {
+    app: FILE_FORMAT,
+    version: FILE_VERSION,
+    exported: new Date().toISOString(),
+    questions: questions.map(q => ({
+      q: q.q,
+      options: q.options.map(o => ({ t: o.t, c: !!o.c }))
+    }))
+  };
+}
+
+function downloadQuiz(){
+  const hasContent = questions.some(q =>
+    q.q.trim().length > 0 &&
+    q.options.some(o => o.t.trim().length > 0)
+  );
+
+  if(!hasContent){
+    flashSaved('⚠ Nothing to download yet', true, 'warn');
+    return;
+  }
+
+  let blob, url;
+  try{
+    blob = new Blob(
+      [JSON.stringify(buildExportPayload(), null, 2)],
+      { type: 'application/json' }
+    );
+    url = URL.createObjectURL(blob);
+  }catch(e){
+    flashSaved('⚠ Could not create the file', true, 'err');
+    return;
+  }
+
+  const stamp = new Date().toISOString().slice(0,10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'miraculous-quiz-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  flashSaved('⬇ Quiz downloaded — share the file!', true);
+}
+
+/* Validate + clean an incoming file. Returns an array or null. */
+function parseQuizPayload(text){
+  let parsed;
+  try{ parsed = JSON.parse(text); }
+  catch(e){ return null; }
+
+  /* Accept the wrapper object, or a bare array of questions. */
+  let list = null;
+  if(parsed && Array.isArray(parsed.questions)) list = parsed.questions;
+  else if(Array.isArray(parsed))                list = parsed;
+
+  if(!list) return null;
+
+  const cleaned = list
+    .filter(q => q && typeof q.q === 'string' && Array.isArray(q.options))
+    .map(q => ({
+      q: q.q,
+      options: q.options
+        .filter(o => o && typeof o.t === 'string')
+        .map(o => ({ t: o.t, c: !!o.c }))
+    }))
+    .filter(q => q.q.trim().length > 0 && q.options.length >= 2);
+
+  return cleaned;
+}
+
+function applyLoadedQuiz(list, sourceLabel){
+  questions = list;
+  renderSetup();
+  syncCountInput();
+  persist();
+
+  const sc = document.getElementById('setup');
+  sc.scrollTo({ top: 0, behavior: 'smooth' });
+
+  flashSaved('📂 Loaded ' + list.length + ' question' +
+             (list.length === 1 ? '' : 's') +
+             (sourceLabel ? ' from ' + sourceLabel : ''), true);
+}
+
+/* Read a File and try to import it. */
+function handleQuizFile(file){
+  if(!file){
+    flashSaved('⚠ No file selected', true, 'warn');
+    return;
+  }
+
+  const name = file.name || 'file';
+  const looksJson = /\.json$/i.test(name) ||
+                    file.type === 'application/json' ||
+                    file.type === 'text/plain' ||
+                    file.type === '';
+
+  if(!looksJson){
+    flashSaved('⚠ Please choose a .json quiz file', true, 'warn');
+    return;
+  }
+
+  if(file.size > 4 * 1024 * 1024){
+    flashSaved('⚠ That file is too large', true, 'warn');
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    const list = parseQuizPayload(String(reader.result));
+    if(!list){
+      flashSaved('⚠ That file is not a valid quiz', true, 'err');
+      return;
+    }
+    if(list.length === 0){
+      flashSaved('⚠ That file has no usable questions', true, 'warn');
+      return;
+    }
+
+    const existing = questions.some(q =>
+      q.q.trim().length > 0 ||
+      q.options.some(o => o.t.trim().length > 0)
+    );
+
+    if(existing && !confirm(
+      'Replace your current quiz with "' + name + '"?\n\n' +
+      'This will overwrite what is in the editor right now.'
+    )) return;
+
+    applyLoadedQuiz(list, name);
+  };
+
+  reader.onerror = () => {
+    flashSaved('⚠ Could not read that file', true, 'err');
+  };
+
+  reader.readAsText(file);
+}
+
+/* ---- wire up the buttons ---- */
+document.getElementById('downloadBtn').addEventListener('click', downloadQuiz);
+
+const fileInput = document.getElementById('fileInput');
+
+document.getElementById('loadBtn').addEventListener('click', () => {
+  fileInput.value = '';           // allow re-picking the same file
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files && fileInput.files[0];
+  if(file) handleQuizFile(file);
+});
+
+/* ---- drag & drop anywhere on the page ---- */
+const dropZone = document.getElementById('dropZone');
+let dragDepth = 0;
+
+function hasFiles(e){
+  const dt = e.dataTransfer;
+  if(!dt) return false;
+  if(dt.types){
+    for(let i = 0; i < dt.types.length; i++){
+      if(dt.types[i] === 'Files') return true;
+    }
+  }
+  return false;
+}
+
+window.addEventListener('dragenter', (e) => {
+  if(!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  dropZone.classList.add('on');
+});
+
+window.addEventListener('dragover', (e) => {
+  if(!hasFiles(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+
+window.addEventListener('dragleave', (e) => {
+  if(!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if(dragDepth === 0) dropZone.classList.remove('on');
+});
+
+window.addEventListener('drop', (e) => {
+  if(!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  dropZone.classList.remove('on');
+
+  /* Don't hijack drops while the quiz is running. */
+  if(gameEl.classList.contains('on')){
+    flashSaved('⚠ Exit the quiz first to load a file', true, 'warn');
+    return;
+  }
+
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  handleQuizFile(file);
+});
+
+/* =========================================================
+   AUDIO ENGINE
+   ========================================================= */
+let actx = null, master = null, noiseBuf = null;
+
+function initAudio(){
+  if(!actx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+    master = actx.createGain();
+    master.gain.value = 0.5;
+    master.connect(actx.destination);
+  }
+  if(actx.state === 'suspended') actx.resume();
+}
+
+function getNoise(){
+  if(!noiseBuf){
+    const len = Math.floor(actx.sampleRate * 2);
+    noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i] = Math.random()*2 - 1;
+  }
+  return noiseBuf;
+}
+
+function playBigBoom(){
+  if(!actx) return;
+  const t = actx.currentTime;
+
+  const src = actx.createBufferSource();
+  src.buffer = getNoise(); src.loop = true;
+  const lp = actx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(2400, t);
+  lp.frequency.exponentialRampToValueAtTime(55, t + 2.4);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(1.0, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 2.8);
+  src.connect(lp); lp.connect(g); g.connect(master);
+  src.start(t); src.stop(t + 2.9);
+
+  const o = actx.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(190, t);
+  o.frequency.exponentialRampToValueAtTime(26, t + 1.5);
+  const og = actx.createGain();
+  og.gain.setValueAtTime(1.0, t);
+  og.gain.exponentialRampToValueAtTime(0.001, t + 1.7);
+  o.connect(og); og.connect(master);
+  o.start(t); o.stop(t + 1.8);
+
+  const c = actx.createBufferSource();
+  c.buffer = getNoise(); c.loop = true;
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.7;
+  const cg = actx.createGain();
+  cg.gain.setValueAtTime(0.65, t);
+  cg.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  c.connect(bp); bp.connect(cg); cg.connect(master);
+  c.start(t); c.stop(t + 0.55);
+}
+
+function playPop(vol){
+  if(!actx) return;
+  vol = vol === undefined ? 0.3 : vol;
+  const t = actx.currentTime;
+  const src = actx.createBufferSource();
+  src.buffer = getNoise(); src.loop = true;
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 700 + Math.random() * 2600;
+  bp.Q.value = 0.85;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(t); src.stop(t + 0.32);
+}
+
+function playLaunch(){
+  if(!actx) return;
+  const t = actx.currentTime;
+  const src = actx.createBufferSource();
+  src.buffer = getNoise(); src.loop = true;
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass'; bp.Q.value = 3.5;
+  bp.frequency.setValueAtTime(350, t);
+  bp.frequency.exponentialRampToValueAtTime(2400, t + 0.55);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.11, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(t); src.stop(t + 0.65);
+}
+
+function playWrong(){
+  if(!actx) return;
+  const t = actx.currentTime;
+  const o = actx.createOscillator();
+  o.type = 'square';
+  o.frequency.setValueAtTime(240, t);
+  o.frequency.exponentialRampToValueAtTime(65, t + 0.38);
+  const f = actx.createBiquadFilter();
+  f.type = 'lowpass'; f.frequency.value = 1100;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+  o.connect(f); f.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.45);
+}
+
+/* =========================================================
+   SETUP UI
+   ========================================================= */
+const MIN_Q = 0;
+const MAX_Q = 50;
+
+let questions = [];
+let data = [];
+
+const countInput = document.getElementById('qCount');
+const minusBtn   = document.getElementById('qMinus');
+const plusBtn    = document.getElementById('qPlus');
+
+function el(tag, cls){ const e = document.createElement(tag); if(cls) e.className = cls; return e; }
+
+function blankQuestion(){
+  return { q:'', options:[
+    {t:'', c:true },
+    {t:'', c:false},
+    {t:'', c:false},
+    {t:'', c:false}
+  ]};
+}
+
+function sampleQuestions(){
+  return [
+    { q:'What is the capital of Australia?', options:[
+      {t:'Sydney', c:false},{t:'Canberra', c:true},{t:'Melbourne', c:false},{t:'Perth', c:false}]},
+    { q:'Which planet is known as the Red Planet?', options:[
+      {t:'Venus', c:false},{t:'Jupiter', c:false},{t:'Mars', c:true},{t:'Mercury', c:false}]},
+    { q:'What is 7 × 8?', options:[
+      {t:'54', c:false},{t:'56', c:true},{t:'64', c:false},{t:'48', c:false}]},
+    { q:'Which of these is NOT a programming language?', options:[
+      {t:'Python', c:false},{t:'Rust', c:false},{t:'HTML', c:true},{t:'Kotlin', c:false}]}
+  ];
+}
+
+function syncCountInput(){
+  countInput.value = questions.length;
+  minusBtn.disabled = questions.length <= MIN_Q;
+  plusBtn.disabled  = questions.length >= MAX_Q;
+}
+
+function setQuestionCount(n){
+  n = Math.round(Number(n));
+  if(!isFinite(n)) n = questions.length;
+  n = Math.max(MIN_Q, Math.min(MAX_Q, n));
+
+  while(questions.length < n) questions.push(blankQuestion());
+  while(questions.length > n) questions.pop();
+
+  renderSetup();
+  syncCountInput();
+  persist();
+}
+
+function renderSetup(){
+  const wrap = document.getElementById('questions');
+  wrap.innerHTML = '';
+
+  if(questions.length === 0){
+    const empty = el('div','qcard');
+    empty.style.textAlign = 'center';
+    empty.style.opacity = '.6';
+    empty.innerHTML = 'No questions yet — set a number above or hit <strong>+ Add question</strong>.';
+    wrap.append(empty);
+    return;
+  }
+
+  questions.forEach((q, qi) => {
+    const card = el('div','qcard');
+
+    const head = el('div','qhead');
+    const num  = el('span','qnum');
+    num.textContent = 'Q' + (qi+1);
+
+    const qin = document.createElement('input');
+    qin.type = 'text';
+    qin.className = 'qtext';
+    qin.placeholder = 'Type your question…';
+    qin.value = q.q;
+    qin.addEventListener('input', () => { q.q = qin.value; persist(); });
+
+    const del = el('button','del');
+    del.type = 'button';
+    del.textContent = '✕';
+    del.title = 'Delete question';
+    del.addEventListener('click', () => {
+      questions.splice(qi,1);
+      renderSetup();
+      syncCountInput();
+      persist();
+    });
+
+    head.append(num, qin, del);
+    card.append(head);
+
+    const opts = el('div','opts');
+    const letters = ['A','B','C','D','E','F','G','H'];
+
+    q.options.forEach((o, oi) => {
+      const row = el('div','optrow');
+
+      const letter = el('span','dot');
+      letter.textContent = letters[oi] || (oi+1);
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'correct-' + qi;
+      radio.checked = o.c;
+      radio.title = 'Mark as correct answer';
+      radio.addEventListener('change', () => {
+        q.options.forEach((oo,i) => oo.c = (i === oi));
+        persist();
+      });
+
+      const tin = document.createElement('input');
+      tin.type = 'text';
+      tin.placeholder = 'Answer ' + (letters[oi] || (oi+1));
+      tin.value = o.t;
+      tin.addEventListener('input', () => { o.t = tin.value; persist(); });
+
+      const delo = el('button','delopt');
+      delo.type = 'button';
+      delo.textContent = '✕';
+      delo.title = 'Remove answer';
+      delo.addEventListener('click', (e) => {
+        e.preventDefault();
+        q.options.splice(oi,1);
+        if(!q.options.some(x => x.c) && q.options[0]) q.options[0].c = true;
+        renderSetup();
+        persist();
+      });
+
+      row.append(letter, radio, tin, delo);
+      opts.append(row);
+    });
+
+    const addOpt = el('button','addopt');
+    addOpt.type = 'button';
+    addOpt.textContent = '+ add another answer';
+    addOpt.addEventListener('click', () => {
+      q.options.push({ t:'', c:false });
+      renderSetup();
+      persist();
+    });
+    opts.append(addOpt);
+
+    card.append(opts);
+    wrap.append(card);
+  });
+}
+
+countInput.addEventListener('change', () => {
+  setQuestionCount(countInput.value);
+});
+countInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); countInput.blur(); }
+});
+
+minusBtn.addEventListener('click', () => setQuestionCount(questions.length - 1));
+plusBtn.addEventListener('click',  () => setQuestionCount(questions.length + 1));
+
+document.getElementById('addQ').addEventListener('click', () => {
+  if(questions.length >= MAX_Q) return;
+  questions.push(blankQuestion());
+  renderSetup();
+  syncCountInput();
+  persist();
+  const sc = document.getElementById('setup');
+  sc.scrollTo({ top: sc.scrollHeight, behavior:'smooth' });
+});
+
+document.getElementById('sampleBtn').addEventListener('click', () => {
+  if(!confirm('Replace the current quiz with sample questions?')) return;
+  questions = sampleQuestions();
+  renderSetup();
+  syncCountInput();
+  persist();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if(!confirm('Clear the saved quiz? This cannot be undone.')) return;
+  try{ localStorage.setItem(STORAGE_KEY, '[]'); }catch(e){}
+  questions = [];
+  renderSetup();
+  syncCountInput();
+  flashSaved('🗑 Saved quiz cleared', true);
+});
+
+/* =========================================================
+   GAME STATE
+   ========================================================= */
+const gameEl   = document.getElementById('game');
+const worldEl  = document.getElementById('world');
+const boxesEl  = document.getElementById('boxes');
+const hudEl    = document.getElementById('hud');
+const qTextEl  = document.getElementById('qText');
+const progEl   = document.getElementById('progressPill');
+const nextBar  = document.getElementById('nextBar');
+const nextBtn  = document.getElementById('nextBtn');
+
+const cv  = document.getElementById('fx');
+const ctx = cv.getContext('2d');
+
+let W = window.innerWidth, H = window.innerHeight;
+let state = { qi: 0, boxes: [], answered: false };
+let chaos = 0, worldAngle = 0;
+let rocketTimer = null;
+
+/* =========================================================
+   COLOR PALETTE
+   ========================================================= */
+const PALETTE = [
+  ['#8B5CFF','#4A2DFF'],
+  ['#FF2D95','#B3125F'],
+  ['#00D4FF','#0066E0'],
+  ['#FFB347','#F2700A'],
+  ['#22E39A','#00915C'],
+  ['#FF5C5C','#A81212'],
+  ['#FFD166','#D99A00'],
+  ['#B06BFF','#6200D9'],
+  ['#2EE6D6','#0A8F98'],
+  ['#FF4FD8','#8A00A8'],
+  ['#5BC8FF','#2A2AD1'],
+  ['#FF8A3D','#C41E1E'],
+  ['#7CFF6B','#1E9E2E'],
+  ['#6FA8FF','#2536A8'],
+  ['#FF7A9C','#B01050'],
+  ['#C8FF4D','#7A9E00']
+];
+
+function makeColors(n){
+  const list = PALETTE.slice();
+  while(list.length < n){
+    const hue = (list.length * 47) % 360;
+    list.push([
+      'hsl(' + hue + ' 92% 62%)',
+      'hsl(' + ((hue + 32) % 360) + ' 88% 42%)'
+    ]);
+  }
+  for(let i = list.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list.slice(0, n);
+}
+
+/* =========================================================
+   CANVAS SIZING
+   ========================================================= */
+function resizeCanvas(){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width  = Math.floor(W * dpr);
+  cv.height = Math.floor(H * dpr);
+  cv.style.width  = W + 'px';
+  cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if(gameEl.classList.contains('on') && !state.answered) layoutBoxes();
+});
+
+/* =========================================================
+   PARTICLE / FIREWORK SYSTEM
+   ========================================================= */
+const particles = [];
+const rockets   = [];
+const MAX_PARTICLES = 5200;
+
+function spawnBurst(x, y, count, hue, speed){
+  speed = speed || 280;
+  if(particles.length > MAX_PARTICLES){
+    count = Math.max(4, Math.floor(count * 0.15));
+  }
+  for(let i=0;i<count;i++){
+    const a = Math.random() * Math.PI * 2;
+    const s = speed * (0.2 + Math.random() * 1.05);
+    const dur = 0.85 + Math.random() * 1.25;
+    const vx = Math.cos(a) * s;
+    const vy = Math.sin(a) * s;
+    particles.push({
+      x, y,
+      px: x - vx * 0.016,
+      py: y - vy * 0.016,
+      vx, vy,
+      life: 1,
+      dur,
+      hue: hue + (Math.random() * 60 - 30),
+      size: 1 + Math.random() * 2.4
+    });
+  }
+}
+
+function launchRocket(){
+  const x = 40 + Math.random() * (W - 80);
+  const y = H + 8;
+  const targetY = 40 + Math.random() * (H * 0.58);
+  const dist = Math.max(60, y - targetY);
+  const vy = -Math.sqrt(2 * 520 * dist);
+  rockets.push({
+    x, y, px:x, py:y,
+    vx: (Math.random()*2 - 1) * 60,
+    vy,
+    hue: Math.random() * 360,
+    count: 34 + Math.floor(Math.random() * 26)
+  });
+  if(Math.random() < 0.35) playLaunch();
+}
+
+function updateFX(dt){
+  for(let i = rockets.length - 1; i >= 0; i--){
+    const r = rockets[i];
+    r.px = r.x; r.py = r.y;
+    r.vy += 520 * dt;
+    r.x  += r.vx * dt;
+    r.y  += r.vy * dt;
+
+    if(r.vy >= 0){
+      rockets.splice(i, 1);
+      spawnBurst(r.x, r.y, r.count, r.hue, 200 + Math.random() * 220);
+      if(Math.random() < 0.55) playPop(0.22 + Math.random() * 0.18);
+    }
+  }
+
+  const drag = Math.pow(0.30, dt);
+  for(let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
+    p.px = p.x; p.py = p.y;
+    p.vx *= drag;
+    p.vy *= drag;
+    p.vy += 95 * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt / p.dur;
+    if(p.life <= 0 || p.y > H + 120){
+      particles.splice(i, 1);
+    }
+  }
+}
+
+function drawFX(){
+  ctx.clearRect(0, 0, W, H);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+
+  for(let i=0;i<particles.length;i++){
+    const p = particles[i];
+    const a = p.life < 0 ? 0 : (p.life > 1 ? 1 : p.life);
+    ctx.strokeStyle = 'hsla(' + (p.hue|0) + ',100%,' + (52 + a*32) + '%,' + a + ')';
+    ctx.lineWidth = p.size * (0.35 + a * 0.95);
+    ctx.beginPath();
+    ctx.moveTo(p.px, p.py);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+
+  for(let i=0;i<rockets.length;i++){
+    const r = rockets[i];
+    ctx.strokeStyle = 'hsla(' + (r.hue|0) + ',100%,82%,0.95)';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(r.px, r.py);
+    ctx.lineTo(r.x, r.y);
+    ctx.stroke();
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/* =========================================================
+   EXPLOSION
+   ========================================================= */
+function flashScreen(){
+  const f = document.getElementById('flash');
+  f.style.transition = 'none';
+  f.style.opacity = '0.95';
+  requestAnimationFrame(() => {
+    f.style.transition = 'opacity .95s ease-out';
+    f.style.opacity = '0';
+  });
+}
+
+function explode(x, y){
+  chaos = 1;
+  flashScreen();
+  playBigBoom();
+
+  spawnBurst(x, y, 320, Math.random()*360, 720);
+  spawnBurst(x, y, 220, Math.random()*360, 380);
+  spawnBurst(x, y, 160, Math.random()*360, 180);
+
+  clearInterval(rocketTimer);
+  const t0 = performance.now();
+  rocketTimer = setInterval(() => {
+    if(performance.now() - t0 > 4200){
+      clearInterval(rocketTimer);
+      return;
+    }
+    launchRocket();
+    if(Math.random() < 0.55) launchRocket();
+  }, 62);
+
+  for(let i=0;i<7;i++){
+    setTimeout(() => {
+      spawnBurst(
+        Math.random() * W,
+        Math.random() * H * 0.7,
+        90 + Math.floor(Math.random()*90),
+        Math.random()*360,
+        340
+      );
+      playPop(0.28);
+    }, 120 + i * 380);
+  }
+}
+
+/* =========================================================
+   TILE LAYOUT
+   ========================================================= */
+function computeGrid(n, w, h){
+  let best = { cols: 1, rows: n, score: -Infinity };
+  for(let cols = 1; cols <= n; cols++){
+    const rows = Math.ceil(n / cols);
+    const cw = w / cols, ch = h / rows;
+    const ratio = Math.min(cw, ch) / Math.max(cw, ch);
+    const rem = n % cols;
+    const imbalance = rem === 0 ? 0 : (cols - rem) / cols;
+    const score = ratio - imbalance * 0.6;
+    if(score > best.score + 1e-9){
+      best = { cols, rows, score };
+    }
+  }
+  return best;
+}
+
+function fitText(span, box){
+  const padW = 26, padH = 26;
+  const maxW = box.clientWidth  - padW;
+  const maxH = box.clientHeight - padH;
+  if(maxW <= 0 || maxH <= 0) return;
+
+  let lo = 9, hi = 84;
+  for(let i = 0; i < 9; i++){
+    const mid = (lo + hi) / 2;
+    span.style.fontSize = mid + 'px';
+    const r = span.getBoundingClientRect();
+    if(r.width > maxW || r.height > maxH) hi = mid;
+    else lo = mid;
+  }
+  span.style.fontSize = Math.max(9, lo - 0.5) + 'px';
+}
+
+function layoutBoxes(){
+  if(state.answered || !state.boxes.length) return;
+  const n = state.boxes.length;
+
+  const hudBottom = hudEl.getBoundingClientRect().bottom;
+  const top = Math.min(hudBottom + 14, Math.max(110, H - 120));
+  boxesEl.style.top = top + 'px';
+
+  const availW = W;
+  const availH = Math.max(90, H - top);
+
+  const grid = computeGrid(n, availW, availH);
+
+  boxesEl.innerHTML = '';
+  let idx = 0;
+  for(let r = 0; r < grid.rows; r++){
+    const row = document.createElement('div');
+    row.className = 'row';
+    const count = Math.min(grid.cols, n - idx);
+    for(let c = 0; c < count; c++){
+      row.appendChild(state.boxes[idx++].el);
+    }
+    boxesEl.appendChild(row);
+  }
+
+  requestAnimationFrame(() => {
+    state.boxes.forEach(b => {
+      const span = b.el.firstElementChild;
+      if(span) fitText(span, b.el);
+    });
+  });
+}
+
+/* =========================================================
+   QUESTION LOADING
+   ========================================================= */
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function loadQuestion(idx){
+  state.qi = idx;
+  state.answered = false;
+  state.boxes = [];
+  boxesEl.innerHTML = '';
+
+  chaos = 0;
+  worldAngle = 0;
+
+  const q = data[idx];
+  qTextEl.textContent = q.q;
+  progEl.textContent = 'Question ' + (idx + 1) + ' of ' + data.length;
+
+  const opts = shuffle(q.options.filter(o => o.t.trim() !== ''));
+  const colors = makeColors(opts.length);
+
+  opts.forEach((o, i) => {
+    const boxEl = document.createElement('div');
+    boxEl.className = 'box';
+
+    const span = document.createElement('span');
+    span.textContent = o.t;
+    boxEl.appendChild(span);
+
+    const [c1, c2] = colors[i];
+    boxEl.style.background = 'linear-gradient(150deg, ' + c1 + ' 0%, ' + c2 + ' 100%)';
+    boxEl.style.animationDelay = (i * 45) + 'ms';
+
+    const b = { el: boxEl, correct: !!o.c, dead: false };
+
+    boxEl.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      onBoxClick(b);
+    });
+
+    state.boxes.push(b);
+  });
+
+  layoutBoxes();
+}
+
+function blastBoxes(){
+  state.boxes.forEach(b => {
+    if(b.dead) return;
+    b.dead = true;
+    b.el.style.transition = 'opacity .9s ease-out, filter .9s ease-out';
+    b.el.style.opacity = '0';
+    b.el.style.filter = 'brightness(3) blur(5px)';
+    b.el.style.pointerEvents = 'none';
+    setTimeout(() => b.el.remove(), 1000);
+  });
+}
+
+/* =========================================================
+   CLICK HANDLING
+   ========================================================= */
+function onBoxClick(b){
+  if(state.answered) return;
+
+  const r = b.el.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+
+  if(b.correct){
+    state.answered = true;
+
+    b.dead = true;
+    b.el.style.transition = 'opacity .25s ease-out';
+    b.el.style.opacity = '0';
+    b.el.style.pointerEvents = 'none';
+    setTimeout(() => b.el.remove(), 280);
+
+    explode(cx, cy);
+    blastBoxes();
+
+    setTimeout(showNext, 4200);
+  } else {
+    playWrong();
+    b.el.classList.remove('wrong');
+    void b.el.offsetWidth;
+    b.el.classList.add('wrong');
+
+    spawnBurst(cx, cy, 26, 0, 130);
+  }
+}
+
+function showNext(){
+  nextBtn.textContent = (state.qi < data.length - 1)
+    ? 'Next Question →'
+    : '↻ Play Again';
+  nextBar.classList.add('on');
+}
+
+nextBtn.addEventListener('click', () => {
+  nextBar.classList.remove('on');
+  clearInterval(rocketTimer);
+
+  particles.length = 0;
+  rockets.length = 0;
+  ctx.clearRect(0, 0, W, H);
+
+  if(state.qi < data.length - 1){
+    loadQuestion(state.qi + 1);
+  } else {
+    loadQuestion(0);
+  }
+});
+
+/* =========================================================
+   WORLD TRANSFORM
+   ========================================================= */
+const TWO_PI = Math.PI * 2;
+
+function updateWorld(dt){
+  if(chaos > 0){
+    chaos = Math.max(0, chaos - dt / 3.6);
+    worldAngle += 17 * chaos * dt;
+  } else if(worldAngle > 0.02){
+    const target = Math.round(worldAngle / TWO_PI) * TWO_PI;
+    worldAngle += (target - worldAngle) * Math.min(1, dt * 8);
+    if(Math.abs(target - worldAngle) < 0.003) worldAngle = 0;
+  } else {
+    worldAngle = 0;
+  }
+
+  const shake = 26 * chaos;
+  const sx = (Math.random() * 2 - 1) * shake;
+  const sy = (Math.random() * 2 - 1) * shake;
+  const sc = 1 + 0.12 * chaos;
+
+  worldEl.style.transform =
+    'translate(' + sx.toFixed(2) + 'px,' + sy.toFixed(2) + 'px) ' +
+    'rotate(' + worldAngle.toFixed(4) + 'rad) ' +
+    'scale(' + sc.toFixed(3) + ')';
+}
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+let lastT = 0, rafStarted = false;
+
+function loop(now){
+  const dt = Math.min(0.05, lastT ? (now - lastT) / 1000 : 0.016);
+  lastT = now;
+
+  updateWorld(dt);
+  updateFX(dt);
+  drawFX();
+
+  requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   START
+   ========================================================= */
+document.getElementById('startBtn').addEventListener('click', () => {
+  const clean = questions
+    .map(q => ({
+      q: q.q.trim(),
+      options: q.options.filter(o => o.t.trim() !== '')
+    }))
+    .filter(q => q.q.length > 0 && q.options.length >= 2);
+
+  if(clean.length === 0){
+    alert('Please add at least one question with two or more answers.');
+    return;
+  }
+
+  clean.forEach(q => {
+    if(!q.options.some(o => o.c)) q.options[0].c = true;
+  });
+
+  data = clean;
+
+  initAudio();
+
+  document.getElementById('setup').style.display = 'none';
+  gameEl.classList.add('on');
+  saveToastEl.classList.remove('on');
+  dropZone.classList.remove('on');
+
+  resizeCanvas();
+  chaos = 0;
+  worldAngle = 0;
+  particles.length = 0;
+  rockets.length = 0;
+
+  loadQuestion(0);
+
+  if(!rafStarted){
+    rafStarted = true;
+    lastT = 0;
+    requestAnimationFrame(loop);
+  }
+});
+
+/* =========================================================
+   BOOT — restore saved quiz, or fall back to samples
+   ========================================================= */
+(function boot(){
+  const restored = loadQuiz();
+
+  if(restored){
+    questions = restored;
+  } else {
+    questions = sampleQuestions();
+  }
+
+  renderSetup();
+  syncCountInput();
+  resizeCanvas();
+
+  if(restored && restored.length > 0){
+    setTimeout(() => flashSaved('✓ Saved quiz restored', true), 450);
+  }
+})();
+</script>
+</body>
+</html>
