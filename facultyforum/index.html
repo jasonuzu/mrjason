@@ -175,6 +175,11 @@
     flex:none;
   }
   .cd-note{ text-align:center; color:var(--jade); font-size:14px; margin:26px 0 0; min-height:20px; }
+  .blurb{
+    font-family:var(--serif); font-weight:300; font-size:16.5px; line-height:1.72;
+    color:var(--muted); max-width:58ch; margin:30px auto 0; text-align:center;
+    white-space:pre-line;
+  }
 
   /* ---------- poster ---------- */
   .poster{
@@ -414,6 +419,7 @@
   .panel p.sub{ color:var(--muted); font-size:13.5px; margin:0 0 22px; }
   .field{ margin-bottom:16px; }
   .field label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; }
+  .field textarea{ min-height:96px; resize:vertical; line-height:1.55; }
   .field input, .field textarea{
     width:100%; background:var(--ground); border:1px solid var(--line); border-radius:var(--r);
     color:var(--chalk); font-family:var(--sans); font-size:14.5px; padding:10px 12px;
@@ -484,6 +490,7 @@
 
     <div class="countdown" id="countdown" aria-live="off"></div>
     <p class="cd-note" id="cdNote"></p>
+    <p class="blurb" id="sessionBlurb" hidden></p>
 
     <figure class="poster" id="posterWrap" hidden>
       <button class="frame" id="posterFrame" type="button" aria-label="View the session poster full size">
@@ -532,7 +539,7 @@ var POSTER_BUCKET = "forum-posters";
 (function(){
   "use strict";
 
-  var DEFAULTS = { title:"", startsAt:"", location:"", speakerSlots:0, memberSlots:20, passcode:"", posterId:"" };
+  var DEFAULTS = { title:"", startsAt:"", location:"", speakerSlots:0, memberSlots:20, passcode:"", posterId:"", blurb:"" };
   var state = {
     cfg: Object.assign({}, DEFAULTS),
     cfgExists: false,
@@ -640,6 +647,9 @@ var POSTER_BUCKET = "forum-posters";
       w.textContent = "Date to be confirmed";
     }
     $("sessionWhere").textContent = state.cfg.location || "";
+    var bl = $("sessionBlurb");
+    bl.textContent = state.cfg.blurb || "";
+    bl.hidden = !state.cfg.blurb;
     renderPoster();
   }
 
@@ -946,6 +956,18 @@ var POSTER_BUCKET = "forum-posters";
     return { wrap: wrap, input: inp };
   }
 
+  function area(label, id, value, attrs){
+    var wrap = document.createElement("div");
+    wrap.className = "field";
+    var l = document.createElement("label");
+    l.textContent = label; l.htmlFor = id;
+    var ta = document.createElement("textarea");
+    ta.id = id; ta.value = value == null ? "" : value;
+    if (attrs) Object.keys(attrs).forEach(function(k){ ta.setAttribute(k, attrs[k]); });
+    wrap.appendChild(l); wrap.appendChild(ta);
+    return { wrap: wrap, input: ta };
+  }
+
   function adminEntry(){
     if (!state.db){ toast("Still connecting to the database. Try again in a second."); return; }
     if (state.adminMode){ adminPanel(); return; }
@@ -1002,12 +1024,17 @@ var POSTER_BUCKET = "forum-posters";
       var title = field("Session title", "f_title", "text", state.cfg.title, { maxlength: 90, placeholder: "e.g. Assessing criterion C across MYP phases" });
       var when  = field("Starts (date and time)", "f_when", "datetime-local", toLocalInput(state.cfg.startsAt));
       var where = field("Room or location (optional)", "f_where", "text", state.cfg.location, { maxlength: 70, placeholder: "e.g. Library seminar room" });
+      var blurb = area("What this session is about", "f_blurb", state.cfg.blurb, {
+        maxlength: 420,
+        placeholder: "A short paragraph so people know what they're signing up for \u2014 the question on the table, what to bring, who it's for."
+      });
       var row = document.createElement("div"); row.className = "row2";
       var spk = field("Featured speaker spots (0–3)", "f_spk", "number", state.cfg.speakerSlots, { min: 0, max: 3, step: 1 });
       var mem = field("Discussion seats", "f_mem", "number", state.cfg.memberSlots, { min: 1, max: 40, step: 1 });
       row.appendChild(spk.wrap); row.appendChild(mem.wrap);
 
-      p.appendChild(title.wrap); p.appendChild(when.wrap); p.appendChild(where.wrap); p.appendChild(row);
+      p.appendChild(title.wrap); p.appendChild(when.wrap); p.appendChild(where.wrap);
+      p.appendChild(blurb.wrap); p.appendChild(row);
 
       /* featured poster */
       var pendingPoster = state.cfg.posterId || "";
@@ -1087,6 +1114,7 @@ var POSTER_BUCKET = "forum-posters";
           title: title.input.value.trim(),
           startsAt: iso,
           location: where.input.value.trim(),
+          blurb: blurb.input.value.trim(),
           speakerSlots: Math.max(0, Math.min(3, parseInt(spk.input.value, 10) || 0)),
           memberSlots: Math.max(1, Math.min(40, parseInt(mem.input.value, 10) || 20)),
           posterId: pendingPoster
