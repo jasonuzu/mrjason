@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Junior High School Faculty Forum</title>
+<!-- Supabase edition — run faculty-forum-setup.sql first -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    --ground:#0E1614;
+    --board:#152220;
+    --board-2:#1A2926;
+    --line:#253732;
+    --line-soft:#1F302C;
+    --chalk:#E9E7DF;
+    --muted:#8FA69E;
+    --muted-2:#6C837C;
+    --brass:#D2A857;
+    --brass-dim:#8C7038;
+    --jade:#7FB8AC;
+    --danger:#D98A78;
+    --serif:"Spectral", Georgia, "Times New Roman", serif;
+    --sans:"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --r:3px;
+    box-sizing:border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html{ scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *,*::before,*::after{ box-sizing:inherit; }
+
+  body{
+    margin:0;
+    background:var(--ground);
+    color:var(--chalk);
+    font-family:var(--sans);
+    font-weight:300;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.55;
+    min-height:100%;
+  }
+  /* light falling into the hall */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:
+      radial-gradient(86% 46% at 50% -8%, rgba(210,168,87,.17), transparent 56%),
+      radial-gradient(64% 34% at 18% 26%, rgba(210,168,87,.075), transparent 62%),
+      radial-gradient(70% 40% at 86% 62%, rgba(127,184,172,.075), transparent 64%),
+      radial-gradient(76% 44% at 50% 106%, rgba(127,184,172,.06), transparent 62%),
+      radial-gradient(132% 104% at 50% 42%, transparent 38%, rgba(0,0,0,.5) 100%);
+    pointer-events:none; z-index:0;
+  }
+  /* slate grain */
+  body::after{
+    content:"";
+    position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.5;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.055'/></svg>");
+    mix-blend-mode:overlay;
+  }
+  .wrap{ position:relative; z-index:2; max-width:1080px; margin:0 auto; padding:0 20px 96px; }
+
+  /* slim bar that takes over once the hero scrolls away */
+  .railbar{
+    position:fixed; left:0; right:0; top:0; z-index:40;
+    padding-top:env(safe-area-inset-top,0px);
+    background:rgba(14,22,20,.82); backdrop-filter:blur(14px) saturate(120%);
+    border-bottom:1px solid var(--line-soft);
+    transform:translateY(-105%); transition:transform .5s cubic-bezier(.22,.8,.3,1);
+  }
+  .railbar.show{ transform:translateY(0); }
+  .railbar .inner{
+    max-width:1080px; margin:0 auto; padding:11px 20px;
+    display:flex; align-items:center; gap:18px;
+  }
+  .railbar .rb-title{
+    font-family:var(--serif); font-size:15.5px; color:var(--chalk);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;
+  }
+  .railbar .rb-cd{
+    font-family:var(--serif); font-size:15px; color:var(--brass);
+    font-variant-numeric:tabular-nums; white-space:nowrap; flex:none;
+  }
+  .railbar .rb-go{
+    flex:none; border:1px solid var(--brass-dim); background:rgba(210,168,87,.1);
+    color:var(--brass); font-size:12.5px; padding:6px 13px; border-radius:var(--r);
+    cursor:pointer; transition:background .22s ease;
+  }
+  .railbar .rb-go:hover{ background:rgba(210,168,87,.2); }
+  @media (max-width:520px){ .railbar .rb-cd{ display:none; } }
+
+  a{ color:inherit; }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--brass); outline-offset:3px; }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; padding:22px 0 0;
+  }
+  .mark{ display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12.5px; letter-spacing:.02em; }
+  .mark .dot{ width:7px; height:7px; border-radius:50%; background:var(--brass); box-shadow:0 0 0 4px rgba(210,168,87,.12); }
+  .ghost{
+    background:transparent; border:1px solid var(--line); color:var(--muted);
+    padding:7px 14px; border-radius:var(--r); font-size:13px; cursor:pointer;
+    transition:border-color .22s ease, color .22s ease, background .22s ease;
+  }
+  .ghost:hover{ border-color:var(--brass-dim); color:var(--chalk); background:rgba(210,168,87,.06); }
+
+  /* ---------- masthead ---------- */
+  header.hero{ text-align:center; padding:64px 0 6px; }
+  .plaque{
+    display:flex; align-items:center; gap:clamp(12px,3vw,26px);
+    justify-content:center; max-width:820px; margin:0 auto;
+  }
+  .plaque i{ flex:1; height:1px; background:linear-gradient(90deg,transparent,var(--line)); }
+  .plaque i:last-child{ background:linear-gradient(270deg,transparent,var(--line)); }
+  .masthead{
+    font-family:var(--serif); font-weight:400; font-size:clamp(16px,2.9vw,25px);
+    letter-spacing:.14em; line-height:1.4; margin:0; color:var(--muted);
+    text-transform:none; white-space:nowrap;
+  }
+  @media (max-width:620px){ .masthead{ white-space:normal; letter-spacing:.09em; } .plaque i{ display:none; } }
+  .session-title{
+    font-family:var(--serif); font-weight:300; font-size:clamp(32px,6.4vw,62px);
+    line-height:1.1; margin:30px auto 0; max-width:17ch; color:var(--chalk);
+    letter-spacing:-.012em;
+    text-shadow:0 1px 0 rgba(0,0,0,.5);
+  }
+  .session-title.empty{ color:var(--muted-2); font-style:italic; font-size:clamp(26px,4.8vw,42px); }
+  .session-when{
+    margin:22px 0 0; color:var(--chalk); font-size:15px; font-weight:400; letter-spacing:.005em;
+  }
+  .session-where{ margin:5px 0 0; color:var(--muted-2); font-size:13.5px; }
+
+  /* ---------- countdown ---------- */
+  .countdown{
+    display:flex; justify-content:center; align-items:stretch;
+    margin:46px auto 0; max-width:620px;
+    border-top:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft);
+    padding:26px 0 22px;
+    background:linear-gradient(180deg, rgba(210,168,87,.035), transparent 72%);
+  }
+  .unit{ flex:1; min-width:0; text-align:center; padding:0 6px; }
+  .digits{
+    font-family:var(--serif); font-weight:300; font-size:clamp(40px,8.4vw,72px);
+    line-height:1; color:var(--brass); font-variant-numeric:tabular-nums;
+    display:block; overflow:hidden; letter-spacing:-.02em;
+    text-shadow:0 0 34px rgba(210,168,87,.18);
+  }
+  .digits span{ display:inline-block; }
+  .digits.roll span{ animation:roll .42s cubic-bezier(.22,.8,.3,1); }
+  @keyframes roll{
+    0%{ transform:translateY(58%); opacity:0; }
+    100%{ transform:translateY(0); opacity:1; }
+  }
+  .unit small{
+    display:block; margin-top:13px; font-size:11.5px; color:var(--muted-2);
+    letter-spacing:.14em; font-weight:400;
+  }
+  .countdown .sep{
+    width:1px; align-self:stretch; margin:4px 0;
+    background:linear-gradient(180deg,transparent,var(--line-soft) 22%,var(--line-soft) 78%,transparent);
+    flex:none;
+  }
+  .cd-note{ text-align:center; color:var(--jade); font-size:14px; margin:26px 0 0; min-height:20px; }
+
+  /* ---------- poster ---------- */
+  .poster{
+    margin:52px auto 0; max-width:560px; padding:0; perspective:1100px;
+    opacity:0; animation:rise .8s cubic-bezier(.22,.8,.3,1) .5s forwards;
+  }
+  .poster button.frame{
+    display:block; width:100%; padding:10px; cursor:zoom-in; border-radius:4px;
+    background:linear-gradient(180deg, var(--board-2), var(--board));
+    border:1px solid var(--line);
+    box-shadow:0 18px 44px -28px rgba(0,0,0,.95);
+    transform-style:preserve-3d; will-change:transform;
+    transition:border-color .3s ease, transform .45s cubic-bezier(.22,.8,.3,1), box-shadow .45s ease;
+    position:relative; overflow:hidden;
+  }
+  .poster button.frame::after{
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:0;
+    background:linear-gradient(105deg, transparent 38%, rgba(233,231,223,.11) 50%, transparent 62%);
+    transition:opacity .4s ease;
+  }
+  .poster button.frame:hover{
+    border-color:var(--brass-dim);
+    box-shadow:0 30px 60px -30px rgba(0,0,0,1);
+  }
+  .poster button.frame:hover::after{ opacity:1; }
+  .poster img{ display:block; width:100%; height:auto; border-radius:2px; }
+  .poster figcaption{ margin-top:12px; text-align:center; font-size:12px; color:var(--muted-2); }
+
+  .lightbox{
+    position:fixed; inset:0; z-index:70; background:rgba(5,9,8,.9);
+    display:flex; align-items:center; justify-content:center; padding:5vh 18px;
+    cursor:zoom-out; animation:fade .25s ease;
+  }
+  .lightbox img{
+    max-width:min(940px,94vw); max-height:88vh; width:auto; height:auto;
+    border:1px solid var(--line); border-radius:3px; animation:pop .32s cubic-bezier(.22,.8,.3,1);
+  }
+
+  .poster-tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .thumb{
+    width:62px; height:62px; object-fit:cover; border:1px solid var(--line); border-radius:2px; flex:none;
+  }
+  .filebtn{
+    border:1px dashed var(--line); background:transparent; color:var(--muted);
+    padding:9px 14px; border-radius:var(--r); font-size:13px; cursor:pointer;
+    transition:border-color .2s ease, color .2s ease;
+  }
+  .filebtn:hover{ border-color:var(--brass-dim); color:var(--brass); }
+
+  /* ---------- sections ---------- */
+  section{ margin-top:74px; }
+  .sec-head{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .sec-head h2{
+    font-family:var(--serif); font-weight:400; font-size:23px; margin:0; letter-spacing:.005em;
+  }
+  .tally{
+    font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums;
+    display:flex; align-items:center; gap:12px;
+  }
+  .meter{
+    width:96px; height:2px; background:var(--line-soft); border-radius:2px; overflow:hidden; flex:none;
+  }
+  .meter i{
+    display:block; height:100%; width:0; background:var(--brass);
+    transition:width .6s cubic-bezier(.22,.8,.3,1);
+  }
+  .hair{
+    height:1px; background:var(--line-soft); margin:16px 0 22px;
+    transform:scaleX(0); transform-origin:left;
+    transition:transform 1.1s cubic-bezier(.22,.8,.3,1);
+  }
+  .hair.drawn{ transform:scaleX(1); }
+  .lede{ color:var(--muted); font-size:14px; margin:-6px 0 24px; max-width:62ch; }
+  .stage{
+    display:flex; align-items:center; gap:14px; margin:0 0 20px;
+    color:var(--muted-2); font-family:var(--serif); font-style:italic; font-size:12.5px;
+  }
+  .stage::before, .stage::after{ content:""; height:1px; flex:1; background:var(--line-soft); }
+
+  /* ---------- seats ---------- */
+  .grid{ display:grid; gap:12px; }
+  .grid.members{ grid-template-columns:repeat(auto-fill,minmax(196px,1fr)); }
+  .grid.speakers{ grid-template-columns:repeat(auto-fit,minmax(248px,1fr)); }
+
+  .seat{
+    position:relative; text-align:left; width:100%; overflow:hidden;
+    background:linear-gradient(180deg, var(--board-2), var(--board));
+    border:1px solid var(--line-soft); border-radius:var(--r);
+    padding:16px 16px 15px 17px; min-height:84px; color:var(--chalk);
+    display:flex; flex-direction:column; justify-content:center; gap:6px;
+    cursor:default; font:inherit;
+    box-shadow:0 10px 26px -24px rgba(0,0,0,.9);
+    transition:border-color .25s ease, background .25s ease, transform .25s ease;
+  }
+  /* torchlight following the cursor across a seat */
+  .seat::after{
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:0;
+    background:radial-gradient(210px circle at var(--mx,50%) var(--my,50%), rgba(210,168,87,.26), rgba(210,168,87,.08) 40%, transparent 66%);
+    transition:opacity .12s linear;
+  }
+  .seat.lit::after{ opacity:1; }
+  .seat.lit{ border-color:rgba(210,168,87,.42); }
+  .grid.speakers .seat::after{
+    background:radial-gradient(250px circle at var(--mx,50%) var(--my,50%), rgba(127,184,172,.26), rgba(127,184,172,.08) 40%, transparent 66%);
+  }
+  .grid.speakers .seat.lit{ border-color:rgba(127,184,172,.42); }
+  .seat.open.lit{ border-color:var(--brass); color:var(--brass); }
+
+  .seat.taken::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:2px;
+    background:linear-gradient(180deg,var(--brass),rgba(210,168,87,.15));
+  }
+  .grid.speakers .seat{ min-height:130px; padding:22px 22px 22px 24px; }
+  .grid.speakers .seat.taken::before{ background:linear-gradient(180deg,var(--jade),rgba(127,184,172,.12)); }
+
+  .seat .idx{
+    position:absolute; top:10px; right:12px; font-size:10.5px; color:var(--muted-2);
+    font-variant-numeric:tabular-nums; opacity:.6;
+  }
+  .seat .who{ display:flex; align-items:center; gap:11px; }
+  .seat .mono{
+    flex:none; width:29px; height:29px; border-radius:50%;
+    border:1px solid rgba(210,168,87,.35); color:var(--brass);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--serif); font-size:12.5px; letter-spacing:.02em;
+    background:rgba(210,168,87,.07);
+  }
+  .grid.speakers .seat .mono{
+    width:36px; height:36px; font-size:14.5px;
+    border-color:rgba(127,184,172,.35); color:var(--jade); background:rgba(127,184,172,.07);
+  }
+  .seat .name{
+    font-family:var(--serif); font-size:18px; font-weight:400; line-height:1.3;
+    overflow-wrap:anywhere; position:relative; display:inline-block;
+  }
+  .grid.speakers .seat .name{ font-size:24px; }
+  .seat .role{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--jade); }
+  .seat .meta{ font-size:11.5px; color:var(--muted-2); }
+
+  .seat.open{
+    background:transparent; border-style:dashed; border-color:var(--line);
+    cursor:pointer; align-items:center; justify-content:center; flex-direction:row; gap:9px;
+    color:var(--muted-2);
+  }
+  .seat.open .plus{
+    width:17px; height:17px; position:relative; flex:none;
+    transition:transform .3s cubic-bezier(.22,.8,.3,1);
+  }
+  .seat.open .plus::before,.seat.open .plus::after{
+    content:""; position:absolute; background:currentColor; border-radius:1px;
+  }
+  .seat.open .plus::before{ left:50%; top:0; width:1.5px; height:100%; transform:translateX(-50%); }
+  .seat.open .plus::after{ top:50%; left:0; height:1.5px; width:100%; transform:translateY(-50%); }
+  .seat.open .label{ font-size:13.5px; }
+  .seat.open:hover, .seat.open:focus-visible{
+    border-color:var(--brass-dim); color:var(--brass); background:rgba(210,168,87,.045);
+  }
+  .seat.open:hover .plus{ transform:rotate(90deg); }
+  .seat.open:active{ transform:scale(.988); }
+
+  .seat.taken:hover{ border-color:var(--line); }
+  .seat.mine{ border-color:var(--brass-dim); }
+  .seat .release{
+    position:absolute; bottom:9px; right:10px; background:none; border:0; cursor:pointer;
+    color:var(--muted-2); font-size:11.5px; padding:2px 4px; opacity:0;
+    transition:opacity .2s ease, color .2s ease;
+  }
+  .seat:hover .release, .seat .release:focus-visible{ opacity:1; }
+  .seat .release:hover{ color:var(--danger); }
+
+  /* claimed sweep */
+  .seat.fresh .name::after{
+    content:""; position:absolute; left:0; bottom:-3px; height:1px; width:100%;
+    background:var(--brass); transform-origin:left; animation:sweep .7s cubic-bezier(.22,.8,.3,1);
+  }
+  @keyframes sweep{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+  .seat.fresh{ animation:settle .7s ease; }
+  @keyframes settle{
+    0%{ border-color:var(--brass); background:rgba(210,168,87,.1); }
+    100%{ border-color:var(--line-soft); }
+  }
+
+  /* inline sign-up field */
+  .seat.editing{ border-style:solid; border-color:var(--brass-dim); background:var(--board); cursor:default; }
+  .seat input.namefield{
+    width:100%; background:transparent; border:0; border-bottom:1px solid var(--line);
+    color:var(--chalk); font-family:var(--serif); font-size:18px; padding:2px 0 5px;
+    outline:none;
+  }
+  .seat input.namefield::placeholder{ color:var(--muted-2); font-style:italic; }
+  .seat .hint{ font-size:11px; color:var(--muted-2); margin-top:7px; }
+
+  /* load-in */
+  .stagger{ opacity:0; transform:translateY(8px); animation:rise .55s ease forwards; }
+  @keyframes rise{ to{ opacity:1; transform:none; } }
+  .hero .plaque,.hero .session-title,.hero .session-when,.hero .countdown{
+    opacity:0; animation:rise .85s cubic-bezier(.22,.8,.3,1) forwards;
+  }
+  .hero .plaque{ animation-delay:.05s }
+  .hero .session-title{ animation-delay:.2s } .hero .session-when{ animation-delay:.32s }
+  .hero .countdown{ animation-delay:.42s }
+
+  .empty-note{
+    border:1px dashed var(--line); border-radius:var(--r); padding:22px;
+    color:var(--muted-2); font-size:14px; text-align:center;
+  }
+
+  /* ---------- sign-up popup ---------- */
+  .panel.compact{ max-width:330px; padding:22px 22px 20px; }
+  .panel.compact h3{ font-size:19px; margin:0 0 3px; }
+  .panel.compact .for{ color:var(--muted); font-size:12.5px; margin:0 0 16px; }
+  .panel.compact input{
+    width:100%; background:var(--ground); border:1px solid var(--line); border-radius:var(--r);
+    color:var(--chalk); font-family:var(--serif); font-size:18px; padding:11px 13px;
+    transition:border-color .2s ease;
+  }
+  .panel.compact input:focus{ border-color:var(--brass); outline:none; }
+  .panel.compact input::placeholder{ color:var(--muted-2); font-style:italic; font-size:16px; }
+  .panel.compact .panel-actions{ margin-top:16px; }
+  .panel.compact .err{ text-align:left; }
+
+  .seat .status{ font-size:11px; color:var(--muted-2); letter-spacing:.04em; }
+
+  /* ---------- modal ---------- */
+  .scrim{
+    position:fixed; inset:0; background:rgba(6,11,10,.72); backdrop-filter:blur(3px);
+    display:flex; align-items:flex-start; justify-content:center; padding:6vh 18px 40px;
+    z-index:50; overflow-y:auto; animation:fade .25s ease;
+  }
+  @keyframes fade{ from{ opacity:0 } }
+  .panel{
+    width:100%; max-width:520px; background:var(--board); border:1px solid var(--line);
+    border-radius:4px; padding:26px; animation:pop .32s cubic-bezier(.22,.8,.3,1);
+  }
+  @keyframes pop{ from{ opacity:0; transform:translateY(10px) } }
+  .panel h3{ font-family:var(--serif); font-weight:400; font-size:22px; margin:0 0 6px; }
+  .panel p.sub{ color:var(--muted); font-size:13.5px; margin:0 0 22px; }
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; }
+  .field input, .field textarea{
+    width:100%; background:var(--ground); border:1px solid var(--line); border-radius:var(--r);
+    color:var(--chalk); font-family:var(--sans); font-size:14.5px; padding:10px 12px;
+    transition:border-color .2s ease;
+  }
+  .field input:focus{ border-color:var(--brass-dim); outline:none; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .panel-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:24px; flex-wrap:wrap; }
+  .btn{
+    border:1px solid var(--brass-dim); background:rgba(210,168,87,.1); color:var(--brass);
+    padding:9px 18px; border-radius:var(--r); font-size:13.5px; cursor:pointer;
+    transition:background .22s ease, transform .15s ease;
+  }
+  .btn:hover{ background:rgba(210,168,87,.18); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.quiet{ border-color:var(--line); background:transparent; color:var(--muted); }
+  .btn.quiet:hover{ color:var(--chalk); background:rgba(255,255,255,.03); }
+  .btn.warn{ border-color:rgba(217,138,120,.45); background:rgba(217,138,120,.08); color:var(--danger); }
+  .btn.warn:hover{ background:rgba(217,138,120,.16); }
+  .danger-zone{ margin-top:26px; padding-top:20px; border-top:1px solid var(--line-soft); }
+  .danger-zone h4{ font-family:var(--serif); font-weight:400; font-size:15px; margin:0 0 4px; }
+  .danger-zone p{ color:var(--muted-2); font-size:12.5px; margin:0 0 14px; }
+  .err{ color:var(--danger); font-size:12.5px; margin-top:10px; min-height:16px; }
+
+  /* toast */
+  .toast{
+    position:fixed; left:50%; bottom:calc(26px + env(safe-area-inset-bottom,0px));
+    transform:translateX(-50%); background:var(--board-2); border:1px solid var(--line);
+    color:var(--chalk); padding:11px 18px; border-radius:var(--r); font-size:13.5px;
+    z-index:60; animation:toastin .35s cubic-bezier(.22,.8,.3,1); max-width:88vw; text-align:center;
+  }
+  @keyframes toastin{ from{ opacity:0; transform:translate(-50%,14px) } }
+
+  footer{ margin-top:80px; text-align:center; color:var(--muted-2); font-size:12px; }
+
+  @media (max-width:560px){
+    .countdown{ gap:10px; }
+    .unit{ min-width:42px; }
+    .grid.members{ grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
+    .seat .release{ opacity:1; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{ animation:none !important; transition:none !important; }
+    .stagger,.hero .plaque,.hero .session-title,.hero .session-when,.hero .countdown,.poster{ opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+<div class="railbar" id="railbar" aria-hidden="true">
+  <div class="inner">
+    <span class="rb-title" id="rbTitle"></span>
+    <span class="rb-cd" id="rbCd"></span>
+    <button class="rb-go" id="rbGo" type="button">Take a seat</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="mark"><span class="dot"></span><span>GCGS Junior High</span></div>
+    <button class="ghost" id="adminBtn">Admin</button>
+  </div>
+
+  <header class="hero">
+    <div class="plaque"><i></i><h1 class="masthead">Junior High School Faculty Forum</h1><i></i></div>
+    <p class="session-title empty" id="sessionTitle">Next session to be announced</p>
+    <p class="session-when" id="sessionWhen">&nbsp;</p>
+    <p class="session-where" id="sessionWhere"></p>
+
+    <div class="countdown" id="countdown" aria-live="off"></div>
+    <p class="cd-note" id="cdNote"></p>
+
+    <figure class="poster" id="posterWrap" hidden>
+      <button class="frame" id="posterFrame" type="button" aria-label="View the session poster full size">
+        <img id="posterImg" alt="Poster for this faculty forum session">
+      </button>
+      <figcaption>Tap the poster to see it full size</figcaption>
+    </figure>
+  </header>
+
+  <section id="speakerSection" hidden>
+    <div class="sec-head">
+      <h2>Featured speakers</h2>
+      <span class="tally" id="speakerTally"></span>
+    </div>
+    <div class="hair"></div>
+    <div class="grid speakers" id="speakerGrid"></div>
+  </section>
+
+  <section id="memberSection">
+    <div class="sec-head">
+      <h2>Discussion members</h2>
+      <span class="tally"><span class="meter"><i id="meterFill"></i></span><span id="memberTally"></span></span>
+    </div>
+    <div class="hair"></div>
+    <p class="lede" id="signupLede">Pick an open seat and add your name. You can release your own seat at any time.</p>
+    <div class="stage">front of the room</div>
+    <div class="grid members" id="memberGrid"></div>
+  </section>
+
+  <footer id="footNote">Sign-ups are shared live with everyone viewing this page.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+/* ------------------------------------------------------------------
+   SETUP - fill these in from your Supabase project:
+   Project Settings -> API -> Project URL, and the anon/public key.
+   The anon key is meant to be public; the row level security in
+   faculty-forum-setup.sql is what protects the data.
+------------------------------------------------------------------- */
+var SUPABASE_URL  = "https://gkbnvozuvtywipxuofve.supabase.co";
+var SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdrYm52b3p1dnR5d2lweHVvZnZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMTgyNTMsImV4cCI6MjEwNTY5NDI1M30.hTj-XF3vMsqgJTVUgsh0fzsSWpu6P3VzIpvavQQPnhc";
+var POSTER_BUCKET = "forum-posters";
+</script>
+<script>
+(function(){
+  "use strict";
+
+  var DEFAULTS = { title:"", startsAt:"", location:"", speakerSlots:0, memberSlots:20, passcode:"", posterId:"" };
+  var state = {
+    cfg: Object.assign({}, DEFAULTS),
+    cfgExists: false,
+    signups: {},          // slotId -> {name, kind, index, at, by}
+    db: null,
+    sb: null,
+    assets: null,
+    me: null,             // viewer id
+    canEdit: false,
+    canWrite: null,
+    adminMode: false,
+    readOnlyWhy: "",
+    readOnly: false,
+    fresh: {},            // slotId -> true for one render
+    holder: "h" + Math.random().toString(36).slice(2)
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------------- countdown ---------------- */
+  var lastCd = {};
+  function buildCountdown(){
+    var cd = $("countdown");
+    cd.innerHTML = "";
+    ["days","hours","minutes","seconds"].forEach(function(k, i){
+      if (i) {
+        var s = document.createElement("span");
+        s.className = "sep";
+        cd.appendChild(s);
+      }
+      var u = document.createElement("div");
+      u.className = "unit";
+      var d = document.createElement("strong");
+      d.className = "digits"; d.id = "cd_" + k;
+      d.appendChild(document.createElement("span"));
+      var l = document.createElement("small");
+      l.textContent = k;
+      u.appendChild(d); u.appendChild(l);
+      cd.appendChild(u);
+    });
+  }
+
+  function setUnit(k, val){
+    var el = $("cd_" + k);
+    if (!el) return;
+    var txt = String(val).padStart(2, "0");
+    if (lastCd[k] === txt) return;
+    lastCd[k] = txt;
+    el.firstChild.textContent = txt;
+    el.classList.remove("roll");
+    void el.offsetWidth;
+    el.classList.add("roll");
+  }
+
+  function tick(){
+    var note = $("cdNote");
+    var when = state.cfg.startsAt ? new Date(state.cfg.startsAt) : null;
+    if (!when || isNaN(when.getTime())){
+      setUnit("days","--"); setUnit("hours","--"); setUnit("minutes","--"); setUnit("seconds","--");
+      note.textContent = "";
+      return;
+    }
+    var diff = when.getTime() - Date.now();
+    if (diff <= 0){
+      var since = -diff;
+      if (since < 1000 * 60 * 180){
+        setUnit("days",0); setUnit("hours",0); setUnit("minutes",0); setUnit("seconds",0);
+        note.textContent = "This session is under way.";
+      } else {
+        setUnit("days",0); setUnit("hours",0); setUnit("minutes",0); setUnit("seconds",0);
+        note.textContent = "This session has finished. A new date will be posted here.";
+      }
+      return;
+    }
+    note.textContent = "";
+    var s = Math.floor(diff / 1000);
+    setUnit("days", Math.floor(s / 86400));
+    setUnit("hours", Math.floor(s % 86400 / 3600));
+    setUnit("minutes", Math.floor(s % 3600 / 60));
+    setUnit("seconds", s % 60);
+  }
+
+  /* ---------------- header ---------------- */
+  function renderHeader(){
+    var t = $("sessionTitle");
+    if (state.cfg.title){
+      t.textContent = state.cfg.title;
+      t.classList.remove("empty");
+    } else {
+      t.textContent = "Next session to be announced";
+      t.classList.add("empty");
+    }
+    var w = $("sessionWhen");
+    var d = state.cfg.startsAt ? new Date(state.cfg.startsAt) : null;
+    if (d && !isNaN(d.getTime())){
+      w.textContent = d.toLocaleDateString(undefined, {
+        weekday:"long", year:"numeric", month:"long", day:"numeric"
+      }) + " at " + d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+    } else {
+      w.textContent = "Date to be confirmed";
+    }
+    $("sessionWhere").textContent = state.cfg.location || "";
+    renderPoster();
+  }
+
+  var shownPoster = null;
+  function renderPoster(){
+    var wrap = $("posterWrap"), img = $("posterImg");
+    var id = state.cfg.posterId || "";
+    if (!id){
+      wrap.hidden = true;
+      shownPoster = null;
+      img.removeAttribute("src");
+      return;
+    }
+    if (shownPoster !== id){
+      shownPoster = id;
+      img.src = posterUrl(id);
+      img.alt = state.cfg.title
+        ? "Poster for " + state.cfg.title
+        : "Poster for this faculty forum session";
+    }
+    wrap.hidden = false;
+  }
+
+  function openLightbox(){
+    if (!state.cfg.posterId) return;
+    var box = document.createElement("div");
+    box.className = "lightbox";
+    var big = document.createElement("img");
+    big.src = posterUrl(state.cfg.posterId);
+    big.alt = $("posterImg").alt;
+    box.appendChild(big);
+    function shut(){ box.remove(); document.removeEventListener("keydown", key); }
+    function key(e){ if (e.key === "Escape") shut(); }
+    box.addEventListener("click", shut);
+    document.addEventListener("keydown", key);
+    document.body.appendChild(box);
+  }
+
+  /* ---------------- seats ---------------- */
+  function slotId(kind, i){ return (kind === "speaker" ? "s" : "m") + i; }
+
+  function initials(name){
+    var parts = String(name).trim().split(/[\s·]+/).filter(Boolean);
+    if (!parts.length) return "";
+    var first = parts[0].charAt(0);
+    var last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : "";
+    return (first + last).toUpperCase();
+  }
+
+  function buildSeat(kind, i, first){
+    var id = slotId(kind, i);
+    var rec = state.signups[id];
+    var el = document.createElement(rec ? "div" : "button");
+    el.className = "seat";
+    el.dataset.slot = id;
+    if (first){
+      el.classList.add("stagger");
+      el.style.animationDelay = Math.min(i * 22, 520) + "ms";
+    }
+
+    var num = document.createElement("span");
+    num.className = "idx";
+    num.textContent = (kind === "speaker" ? "" : "Seat ") + (i + 1);
+
+    if (rec){
+      el.classList.add("taken");
+      if (state.fresh[id]) el.classList.add("fresh");
+      if (state.me && rec.by === state.me) el.classList.add("mine");
+      if (kind === "speaker"){
+        var role = document.createElement("span");
+        role.className = "role";
+        role.textContent = "Featured speaker";
+        el.appendChild(role);
+      }
+      var who = document.createElement("span");
+      who.className = "who";
+      var mono = document.createElement("span");
+      mono.className = "mono";
+      mono.setAttribute("aria-hidden", "true");
+      mono.textContent = initials(rec.name);
+      var nm = document.createElement("span");
+      nm.className = "name";
+      nm.textContent = rec.name;
+      who.appendChild(mono); who.appendChild(nm);
+      el.appendChild(who);
+      var st = document.createElement("span");
+      st.className = "status";
+      st.textContent = kind === "speaker" ? "Speaking" : "Seat taken";
+      el.appendChild(st);
+      el.appendChild(num);
+
+      if (!state.readOnly && (state.adminMode || (state.me && rec.by === state.me))){
+        var rel = document.createElement("button");
+        rel.className = "release";
+        rel.type = "button";
+        rel.textContent = state.adminMode && rec.by !== state.me ? "Remove" : "Release";
+        rel.setAttribute("aria-label", "Release the seat held by " + rec.name);
+        rel.addEventListener("click", function(ev){ ev.stopPropagation(); release(id, rec.name); });
+        el.appendChild(rel);
+      }
+    } else {
+      el.classList.add("open");
+      el.type = "button";
+      var plus = document.createElement("span"); plus.className = "plus";
+      var lab = document.createElement("span"); lab.className = "label";
+      lab.textContent = kind === "speaker" ? "Offer to speak" : "Take this seat";
+      el.appendChild(plus); el.appendChild(lab); el.appendChild(num);
+      el.addEventListener("click", function(){
+        if (state.readOnly){ toast(state.readOnlyWhy || "Sign-ups aren't available right now."); return; }
+        openSignup(id, kind, i);
+      });
+    }
+    return el;
+  }
+
+  var firstPaint = true;
+  function render(){
+    renderHeader();
+
+    var sp = Math.max(0, Math.min(3, Number(state.cfg.speakerSlots) || 0));
+    var mm = Math.max(1, Math.min(40, Number(state.cfg.memberSlots) || 20));
+
+    var secS = $("speakerSection");
+    secS.hidden = sp === 0;
+    if (sp > 0){
+      var gs = $("speakerGrid");
+      gs.innerHTML = "";
+      var takenS = 0;
+      for (var i = 0; i < sp; i++){
+        if (state.signups[slotId("speaker", i)]) takenS++;
+        gs.appendChild(buildSeat("speaker", i, firstPaint));
+      }
+      $("speakerTally").textContent = takenS + " of " + sp + " confirmed";
+    }
+
+    var gm = $("memberGrid");
+    gm.innerHTML = "";
+    var takenM = 0;
+    for (var j = 0; j < mm; j++){
+      if (state.signups[slotId("member", j)]) takenM++;
+      gm.appendChild(buildSeat("member", j, firstPaint));
+    }
+    $("memberTally").textContent = takenM + " of " + mm + " seats taken";
+    $("meterFill").style.width = Math.round(takenM / mm * 100) + "%";
+    $("signupLede").textContent = state.readOnly
+      ? (state.readOnlyWhy || "Sign-ups aren't available right now.")
+      : (takenM >= mm
+          ? "Every seat is taken. Check back after the next session is posted."
+          : "Pick an open seat and add your name. You can release your own seat at any time.");
+
+    state.fresh = {};
+    firstPaint = false;
+
+  }
+
+  /* ---------------- toast ---------------- */
+  var toastEl = null, toastTimer = null;
+  function toast(msg){
+    if (toastEl) toastEl.remove();
+    toastEl = document.createElement("div");
+    toastEl.className = "toast";
+    toastEl.setAttribute("role","status");
+    toastEl.textContent = msg;
+    document.body.appendChild(toastEl);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ if (toastEl){ toastEl.remove(); toastEl = null; } }, 3600);
+  }
+
+  /* ---------------- writes ---------------- */
+  function handleWriteError(e){
+    var code = e && e.code;
+    if (code === "invalid_argument"){
+      state.readOnly = true;
+      state.readOnlyWhy = "Sign-ups can't be saved from this account.";
+      render();
+      toast(state.readOnlyWhy);
+    } else if (code === "quota_exceeded"){
+      toast("The forum's storage is full. An admin needs to clear old sign-ups.");
+    } else if (code === "resource_exhausted"){
+      toast("Too many people at once. Try again in a moment.");
+    } else {
+      toast("That didn't save. Try again in a moment.");
+    }
+  }
+
+  /* Resolves true when the seat is yours, false when someone beat you to it.
+     Rejects only on a real failure, so the sign-up page can keep you there. */
+  function claim(id, kind, index, raw){
+    var name = (raw || "").trim().replace(/\s+/g, " ");
+    if (!name) return Promise.resolve(false);
+    if (!state.db) return Promise.reject({ code: "offline" });
+    var ref = state.db.doc("signups/" + id);
+
+    return ref.acquire({ holder: state.holder, ttlMs: 4000 }).then(function(res){
+      if (!res.acquired) return false;
+      return ref.get().then(function(snap){
+        var body = snap.exists ? snap.data() : null;
+        if (body && body.name) return false;
+        return ref.set({
+          name: name,
+          kind: kind,
+          index: index,
+          by: state.me || "",
+          at: new Date().toISOString()
+        }).then(function(){
+          state.fresh[id] = true;
+          return true;
+        });
+      });
+    });
+  }
+
+  /* ---------------- sign-up popup ---------------- */
+  function openSignup(id, kind, index){
+    openModal(function(p){
+      p.className = "panel compact";
+
+      var h = document.createElement("h3");
+      h.textContent = kind === "speaker" ? "Featured speaker" : "Seat " + (index + 1);
+
+      var forWhat = document.createElement("p");
+      forWhat.className = "for";
+      forWhat.textContent = state.cfg.title || "Faculty forum";
+
+      var input = document.createElement("input");
+      input.type = "text"; input.maxLength = 48; input.autocomplete = "name";
+      input.placeholder = "Your name";
+      input.setAttribute("aria-label", "Your name");
+
+      var err = document.createElement("div"); err.className = "err";
+
+      var acts = document.createElement("div"); acts.className = "panel-actions";
+      var cancel = document.createElement("button");
+      cancel.className = "btn quiet"; cancel.type = "button"; cancel.textContent = "Cancel";
+      cancel.addEventListener("click", closeModal);
+      var go = document.createElement("button");
+      go.className = "btn"; go.type = "button"; go.textContent = "Confirm";
+
+      function finish(){
+        var name = input.value.trim();
+        if (name.length < 2){ err.textContent = "Type your name to take this seat."; input.focus(); return; }
+        err.textContent = "";
+        go.disabled = true; cancel.disabled = true; go.textContent = "Saving\u2026";
+        claim(id, kind, index, name).then(function(ok){
+          if (ok){ closeModal(); toast("You're signed up, " + name + "."); return; }
+          go.disabled = false; cancel.disabled = false; go.textContent = "Confirm";
+          err.textContent = "Someone just took this seat. Pick another.";
+        }).catch(function(e){
+          go.disabled = false; cancel.disabled = false; go.textContent = "Confirm";
+          err.textContent = (e && e.code === "offline")
+            ? "Still connecting. Try again in a second."
+            : "That didn't save. Try again.";
+        });
+      }
+
+      go.addEventListener("click", finish);
+      input.addEventListener("keydown", function(e){ if (e.key === "Enter"){ e.preventDefault(); finish(); } });
+
+      acts.appendChild(cancel); acts.appendChild(go);
+      p.appendChild(h); p.appendChild(forWhat); p.appendChild(input); p.appendChild(err); p.appendChild(acts);
+    });
+  }
+
+  function release(id, name){
+    if (!state.db) return;
+    if (!window.confirm("Release the seat held by " + name + "?")) return;
+    state.db.doc("signups/" + id).delete().then(function(){
+      toast("Seat released.");
+    }).catch(handleWriteError);
+  }
+
+  /* ---------------- admin ---------------- */
+  var scrim = null;
+  function closeModal(){
+    if (scrim){ scrim.remove(); scrim = null; }
+    document.removeEventListener("keydown", escClose);
+  }
+  function escClose(e){ if (e.key === "Escape") closeModal(); }
+
+  function openModal(build){
+    closeModal();
+    scrim = document.createElement("div");
+    scrim.className = "scrim";
+    var panel = document.createElement("div");
+    panel.className = "panel";
+    build(panel);
+    scrim.appendChild(panel);
+    scrim.addEventListener("mousedown", function(e){ if (e.target === scrim) closeModal(); });
+    document.body.appendChild(scrim);
+    document.addEventListener("keydown", escClose);
+    var f = panel.querySelector("input, button");
+    if (f) setTimeout(function(){ f.focus(); }, 30);
+  }
+
+  function field(label, id, type, value, attrs){
+    var wrap = document.createElement("div");
+    wrap.className = "field";
+    var l = document.createElement("label");
+    l.textContent = label; l.htmlFor = id;
+    var inp = document.createElement("input");
+    inp.id = id; inp.type = type; inp.value = value == null ? "" : value;
+    if (attrs) Object.keys(attrs).forEach(function(k){ inp.setAttribute(k, attrs[k]); });
+    wrap.appendChild(l); wrap.appendChild(inp);
+    return { wrap: wrap, input: inp };
+  }
+
+  function adminEntry(){
+    if (!state.db){ toast("Still connecting to the database. Try again in a second."); return; }
+    if (state.adminMode){ adminPanel(); return; }
+    openModal(function(p){
+      var h = document.createElement("h3"); h.textContent = "Admin sign-in";
+      var s = document.createElement("p"); s.className = "sub";
+      s.textContent = "Sign in with the forum's admin account to post a session or clear sign-ups.";
+      var em = field("Email", "adm_em", "email", "", { autocomplete: "username" });
+      var pw = field("Password", "adm_pw", "password", "", { autocomplete: "current-password" });
+      var err = document.createElement("div"); err.className = "err";
+      var acts = document.createElement("div"); acts.className = "panel-actions";
+      var cancel = document.createElement("button"); cancel.className = "btn quiet"; cancel.textContent = "Cancel";
+      cancel.addEventListener("click", closeModal);
+      var go = document.createElement("button"); go.className = "btn"; go.textContent = "Sign in";
+      function attempt(){
+        err.textContent = ""; go.disabled = true; go.textContent = "Signing in\u2026";
+        state.sb.auth.signInWithPassword({ email: em.input.value.trim(), password: pw.input.value })
+          .then(function(res){
+            go.disabled = false; go.textContent = "Sign in";
+            if (res.error){
+              err.textContent = "That email and password didn't match.";
+              pw.input.value = ""; pw.input.focus();
+              return;
+            }
+            state.adminMode = true;
+            $("adminBtn").textContent = "Admin panel";
+            render();
+            adminPanel();
+          });
+      }
+      go.addEventListener("click", attempt);
+      pw.input.addEventListener("keydown", function(e){ if (e.key === "Enter") attempt(); });
+      acts.appendChild(cancel); acts.appendChild(go);
+      p.appendChild(h); p.appendChild(s); p.appendChild(em.wrap); p.appendChild(pw.wrap);
+      p.appendChild(err); p.appendChild(acts);
+    });
+  }
+
+  function toLocalInput(iso){
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d.getTime())) return "";
+    var pad = function(n){ return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) +
+           "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  function adminPanel(){
+    openModal(function(p){
+      var h = document.createElement("h3"); h.textContent = "Session settings";
+      var s = document.createElement("p"); s.className = "sub";
+      s.textContent = "Changes appear for everyone viewing the page.";
+      p.appendChild(h); p.appendChild(s);
+
+      var title = field("Session title", "f_title", "text", state.cfg.title, { maxlength: 90, placeholder: "e.g. Assessing criterion C across MYP phases" });
+      var when  = field("Starts", "f_when", "datetime-local", toLocalInput(state.cfg.startsAt));
+      var where = field("Room or location (optional)", "f_where", "text", state.cfg.location, { maxlength: 70, placeholder: "e.g. Library seminar room" });
+      var row = document.createElement("div"); row.className = "row2";
+      var spk = field("Featured speaker spots (0–3)", "f_spk", "number", state.cfg.speakerSlots, { min: 0, max: 3, step: 1 });
+      var mem = field("Discussion seats", "f_mem", "number", state.cfg.memberSlots, { min: 1, max: 40, step: 1 });
+      row.appendChild(spk.wrap); row.appendChild(mem.wrap);
+
+      p.appendChild(title.wrap); p.appendChild(when.wrap); p.appendChild(where.wrap); p.appendChild(row);
+
+      /* featured poster */
+      var pendingPoster = state.cfg.posterId || "";
+      var pf = document.createElement("div"); pf.className = "field";
+      var pl = document.createElement("label"); pl.textContent = "Featured poster (optional)";
+      var tools = document.createElement("div"); tools.className = "poster-tools";
+      var thumb = document.createElement("img"); thumb.className = "thumb"; thumb.alt = "";
+      var picker = document.createElement("input");
+      picker.type = "file"; picker.accept = "image/*"; picker.style.display = "none";
+      var pick = document.createElement("button");
+      pick.type = "button"; pick.className = "filebtn";
+      var drop = document.createElement("button");
+      drop.type = "button"; drop.className = "btn quiet"; drop.textContent = "Remove";
+
+      function syncPoster(){
+        if (pendingPoster){
+          thumb.src = posterUrl(pendingPoster);
+          thumb.hidden = false; drop.hidden = false;
+          pick.textContent = "Replace poster";
+        } else {
+          thumb.hidden = true; drop.hidden = true;
+          pick.textContent = "Choose an image";
+        }
+      }
+      pick.addEventListener("click", function(){ picker.click(); });
+      drop.addEventListener("click", function(){ pendingPoster = ""; syncPoster(); });
+      picker.addEventListener("change", function(){
+        var f = picker.files && picker.files[0];
+        picker.value = "";
+        if (!f) return;
+        if (!state.assets){ err.textContent = "Uploading isn't available for this account."; return; }
+        if (f.size > 18 * 1024 * 1024){ err.textContent = "That image is too large. Keep it under 18 MB."; return; }
+        if (f.type === "image/svg+xml" && f.size > 2 * 1024 * 1024){ err.textContent = "SVG posters must be under 2 MB."; return; }
+        err.textContent = "";
+        pick.disabled = true; pick.textContent = "Uploading…";
+        state.assets.upload(f).then(function(res){
+          pendingPoster = res.id;
+          pick.disabled = false; syncPoster();
+        }).catch(function(){
+          pick.disabled = false; syncPoster();
+          err.textContent = "That image didn't upload. Try a smaller JPG or PNG.";
+        });
+      });
+      tools.appendChild(thumb); tools.appendChild(pick); tools.appendChild(drop); tools.appendChild(picker);
+      pf.appendChild(pl); pf.appendChild(tools);
+      p.appendChild(pf);
+
+      var err = document.createElement("div"); err.className = "err";
+      syncPoster();
+      var acts = document.createElement("div"); acts.className = "panel-actions";
+      var out = document.createElement("button"); out.className = "btn quiet"; out.textContent = "Sign out";
+      out.addEventListener("click", function(){
+        state.sb.auth.signOut();
+        state.adminMode = false; $("adminBtn").textContent = "Admin"; render(); closeModal();
+      });
+      var save = document.createElement("button"); save.className = "btn"; save.textContent = "Save session";
+      save.addEventListener("click", function(){
+        var iso = "";
+        if (when.input.value){
+          var d = new Date(when.input.value);
+          if (!isNaN(d.getTime())) iso = d.toISOString();
+        }
+        var cfg = {
+          title: title.input.value.trim(),
+          startsAt: iso,
+          location: where.input.value.trim(),
+          speakerSlots: Math.max(0, Math.min(3, parseInt(spk.input.value, 10) || 0)),
+          memberSlots: Math.max(1, Math.min(40, parseInt(mem.input.value, 10) || 20)),
+          posterId: pendingPoster
+        };
+        state.db.doc("config/session").set(cfg).then(function(){
+          closeModal(); toast("Session saved.");
+        }).catch(function(e){
+          err.textContent = (e && e.code === "invalid_argument")
+            ? "This account can't edit the forum."
+            : "That didn't save. Try again in a moment.";
+        });
+      });
+      acts.appendChild(out); acts.appendChild(save);
+      p.appendChild(err); p.appendChild(acts);
+
+      /* danger zone */
+      var dz = document.createElement("div"); dz.className = "danger-zone";
+      var dh = document.createElement("h4"); dh.textContent = "Start a new round of sign-ups";
+      var dp = document.createElement("p");
+      dp.textContent = "Removes every name from the speaker and seat lists. The session title and date stay as you set them above.";
+      var clear = document.createElement("button"); clear.className = "btn warn"; clear.textContent = "Clear all sign-ups";
+      clear.addEventListener("click", function(){
+        var n = Object.keys(state.signups).length;
+        if (!n){ toast("There are no sign-ups to clear."); return; }
+        if (!window.confirm("Clear all " + n + " sign-ups? This can't be undone.")) return;
+        clear.disabled = true; clear.textContent = "Clearing…";
+        var ids = Object.keys(state.signups);
+        var chain = Promise.resolve();
+        ids.forEach(function(id){
+          chain = chain.then(function(){ return state.db.doc("signups/" + id).delete(); });
+        });
+        chain.then(function(){
+          clear.disabled = false; clear.textContent = "Clear all sign-ups";
+          toast("Sign-ups cleared. The board is open again.");
+        }).catch(function(e){
+          clear.disabled = false; clear.textContent = "Clear all sign-ups";
+          err.textContent = "Some sign-ups couldn't be cleared. Try again.";
+        });
+      });
+      dz.appendChild(dh); dz.appendChild(dp); dz.appendChild(clear);
+
+      p.appendChild(dz);
+    });
+  }
+
+  /* ---------------- boot ---------------- */
+  buildCountdown();
+  render();
+  tick();
+  setInterval(tick, 1000);
+  $("adminBtn").addEventListener("click", adminEntry);
+  $("posterFrame").addEventListener("click", openLightbox);
+
+  /* ---------------- ambience & interaction ---------------- */
+  var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* torchlight follows the cursor across a seat.
+     The seat's box is measured once on entry and reused, so moving the
+     pointer never forces a layout read — the highlight keeps up exactly. */
+  (function torch(){
+    var lit = null, box = null, queued = false, px = 0, py = 0;
+
+    function paint(){
+      queued = false;
+      if (!lit || !box) return;
+      lit.style.setProperty("--mx", ((px - box.left) / box.width * 100) + "%");
+      lit.style.setProperty("--my", ((py - box.top) / box.height * 100) + "%");
+    }
+    function douse(){
+      if (lit){ lit.classList.remove("lit"); lit = null; box = null; }
+    }
+    function light(seat, x, y){
+      if (seat !== lit){
+        douse();
+        lit = seat; box = seat.getBoundingClientRect();
+        seat.classList.add("lit");
+      }
+      px = x; py = y;
+      if (!queued){ queued = true; requestAnimationFrame(paint); }
+    }
+
+    document.addEventListener("pointermove", function(e){
+      var seat = e.target.closest ? e.target.closest(".seat") : null;
+      if (!seat){ douse(); return; }
+      light(seat, e.clientX, e.clientY);
+    }, { passive: true });
+
+    /* a tap lights the seat under the finger too */
+    document.addEventListener("pointerdown", function(e){
+      var seat = e.target.closest ? e.target.closest(".seat") : null;
+      if (seat) light(seat, e.clientX, e.clientY);
+    }, { passive: true });
+
+    document.addEventListener("pointerleave", douse, { passive: true });
+    window.addEventListener("scroll", function(){ if (lit) box = lit.getBoundingClientRect(); }, { passive: true });
+    window.addEventListener("blur", douse);
+  })();
+
+  /* the poster leans toward the cursor */
+  (function tilt(){
+    var frame = $("posterFrame");
+    if (!frame || calm.matches) return;
+    frame.addEventListener("pointermove", function(e){
+      var b = frame.getBoundingClientRect();
+      var rx = ((e.clientY - b.top) / b.height - 0.5) * -5.5;
+      var ry = ((e.clientX - b.left) / b.width - 0.5) * 6.5;
+      frame.style.transform = "perspective(1100px) rotateX(" + rx + "deg) rotateY(" + ry + "deg) translateY(-3px)";
+    });
+    frame.addEventListener("pointerleave", function(){ frame.style.transform = ""; });
+  })();
+
+  /* section rules draw themselves as they arrive */
+  (function hairlines(){
+    var rules = document.querySelectorAll(".hair");
+    if (calm.matches || !("IntersectionObserver" in window)){
+      rules.forEach(function(r){ r.classList.add("drawn"); });
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting){ en.target.classList.add("drawn"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.4 });
+    rules.forEach(function(r){ io.observe(r); });
+  })();
+
+  /* the rail bar takes over once the hero leaves */
+  (function rail(){
+    var bar = $("railbar"), hero = document.querySelector(".hero");
+    if (!bar || !hero) return;
+    $("rbGo").addEventListener("click", function(){
+      var open = document.querySelector(".seat.open") || $("memberGrid");
+      open.scrollIntoView({ behavior: calm.matches ? "auto" : "smooth", block: "center" });
+      if (open.classList.contains("open")) setTimeout(function(){ open.focus(); }, 520);
+    });
+    if ("IntersectionObserver" in window){
+      new IntersectionObserver(function(en){
+        bar.classList.toggle("show", !en[0].isIntersecting);
+      }, { threshold: 0, rootMargin: "-88px 0px 0px 0px" }).observe(hero);
+    }
+  })();
+
+  function railText(){
+    $("rbTitle").textContent = state.cfg.title || "Junior High School Faculty Forum";
+    var d = state.cfg.startsAt ? new Date(state.cfg.startsAt) : null;
+    if (!d || isNaN(d.getTime())){ $("rbCd").textContent = ""; return; }
+    var diff = d.getTime() - Date.now();
+    if (diff <= 0){ $("rbCd").textContent = ""; return; }
+    var s = Math.floor(diff / 1000);
+    var dd = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm2 = Math.floor(s % 3600 / 60);
+    $("rbCd").textContent = dd > 0 ? dd + "d " + hh + "h" : (hh > 0 ? hh + "h " + mm2 + "m" : mm2 + "m");
+  }
+  setInterval(railText, 1000);
+  railText();
+
+  /* ---------------- Supabase data layer ----------------
+     A thin adapter, so the rest of the page keeps the same shape:
+       db.doc("config/session")  -> the one row in forum_config
+       db.doc("signups/<slot>")  -> one row in forum_signups
+       db.collection("signups")  -> the whole board, live
+  --------------------------------------------------------- */
+  function posterUrl(idOrUrl){
+    if (!idOrUrl) return "";
+    if (/^https?:\/\//.test(idOrUrl)) return idOrUrl;
+    return state.sb.storage.from(POSTER_BUCKET).getPublicUrl(idOrUrl).data.publicUrl;
+  }
+
+  function makeAdapter(sb){
+    var cfgListeners = [], signupListeners = [];
+    function fail(code, message){ var e = new Error(message || code); e.code = code; return e; }
+
+    function pushCfg(row){
+      var snap = { exists: !!row, data: function(){ return row ? row.data : undefined; } };
+      cfgListeners.forEach(function(fn){ fn(snap); });
+    }
+    function pushSignups(rows){
+      var snap = { docs: (rows || []).map(function(r){
+        return { id: r.slot_id, exists: true, data: function(){
+          return { name: r.name, kind: r.kind, index: r.idx, by: r.claimed_by, at: r.created_at };
+        } };
+      }) };
+      signupListeners.forEach(function(fn){ fn(snap); });
+    }
+    function loadCfg(){
+      return sb.from("forum_config").select("data").eq("id", 1).maybeSingle()
+        .then(function(r){ pushCfg(r.data ? { data: r.data.data } : null); });
+    }
+    function loadSignups(){
+      return sb.from("forum_signups").select("*").order("slot_id")
+        .then(function(r){ if (!r.error) pushSignups(r.data); });
+    }
+
+    sb.channel("forum-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "forum_signups" }, loadSignups)
+      .on("postgres_changes", { event: "*", schema: "public", table: "forum_config" }, loadCfg)
+      .subscribe();
+
+    /* a slow safety net in case the realtime socket drops on school wifi */
+    setInterval(function(){ if (!document.hidden) loadSignups(); }, 25000);
+
+    return {
+      doc: function(path){
+        var parts = path.split("/");
+        if (parts[0] === "config"){
+          return {
+            get: function(){
+              return sb.from("forum_config").select("data").eq("id", 1).maybeSingle()
+                .then(function(r){ return { exists: !!r.data, data: function(){ return r.data && r.data.data; } }; });
+            },
+            set: function(body){
+              return sb.from("forum_config").upsert({ id: 1, data: body, updated_at: new Date().toISOString() })
+                .then(function(r){ if (r.error) throw fail("invalid_argument", r.error.message); return loadCfg(); });
+            },
+            update: function(patch){ return this.set(Object.assign({}, state.cfg, patch)); },
+            onSnapshot: function(next){ cfgListeners.push(next); loadCfg(); return function(){}; },
+            acquire: function(){ return Promise.resolve({ acquired: true }); }
+          };
+        }
+        var slot = parts[1];
+        return {
+          get: function(){
+            return sb.from("forum_signups").select("*").eq("slot_id", slot).maybeSingle()
+              .then(function(r){
+                return { exists: !!r.data, data: function(){ return r.data ? { name: r.data.name } : undefined; } };
+              });
+          },
+          /* the primary key on slot_id settles a race: whoever inserts
+             second is rejected here, and is told to pick another seat */
+          set: function(body){
+            return sb.from("forum_signups").insert({
+              slot_id: slot, name: body.name, kind: body.kind,
+              idx: body.index, claimed_by: body.by || null
+            }).then(function(r){
+              if (r.error){
+                if (String(r.error.code) === "23505") return false;
+                throw fail("invalid_argument", r.error.message);
+              }
+              return loadSignups();
+            });
+          },
+          delete: function(){
+            return sb.from("forum_signups").delete().eq("slot_id", slot)
+              .then(function(r){
+                if (r.error) throw fail("invalid_argument", r.error.message);
+                return loadSignups();
+              });
+          },
+          acquire: function(){ return Promise.resolve({ acquired: true }); }
+        };
+      },
+      collection: function(){
+        return {
+          onSnapshot: function(next){ signupListeners.push(next); loadSignups(); return function(){}; },
+          get: function(){
+            return sb.from("forum_signups").select("slot_id").then(function(r){
+              return { docs: (r.data || []).map(function(x){ return { id: x.slot_id }; }) };
+            });
+          }
+        };
+      }
+    };
+  }
+
+  function makeStorage(sb){
+    return {
+      upload: function(file){
+        var ext = (file.name.split(".").pop() || "png").toLowerCase();
+        var path = "poster-" + Date.now() + "." + ext;
+        return sb.storage.from(POSTER_BUCKET).upload(path, file, { upsert: true, cacheControl: "3600" })
+          .then(function(r){ if (r.error) throw r.error; return { id: path }; });
+      }
+    };
+  }
+
+  (function connect(){
+    if (typeof supabase === "undefined" || SUPABASE_ANON.length < 40){
+      $("footNote").textContent = "Not connected to a database yet.";
+      state.readOnly = true;
+      state.readOnlyWhy = "This page isn't connected to its database yet \u2014 paste your Supabase anon key at the top of the file.";
+      render();
+      return;
+    }
+
+    var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    state.sb = sb;
+
+    /* a local id, so a visitor can release the seat they took.
+       No account, no login - anyone who opens the page can sign up. */
+    try {
+      state.me = localStorage.getItem("ff_visitor");
+      if (!state.me){
+        state.me = "v" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem("ff_visitor", state.me);
+      }
+    } catch (e) { state.me = null; }
+
+    state.db = makeAdapter(sb);
+    state.assets = makeStorage(sb);
+
+    sb.auth.getSession().then(function(res){
+      if (res.data && res.data.session){
+        state.adminMode = true;
+        $("adminBtn").textContent = "Admin panel";
+        render();
+      }
+    });
+
+    state.db.doc("config/session").onSnapshot(function(snap){
+      if (snap.exists){
+        state.cfgExists = true;
+        state.cfg = Object.assign({}, DEFAULTS, snap.data());
+      } else {
+        state.cfgExists = false;
+        state.cfg = Object.assign({}, DEFAULTS);
+      }
+      lastCd = {};
+      render();
+      tick();
+    });
+
+    state.db.collection("signups").onSnapshot(function(snap){
+      var next = {};
+      snap.docs.forEach(function(d){
+        var b = d.data();
+        if (b && b.name) next[d.id] = b;
+      });
+      state.signups = next;
+      render();
+    });
+  })();
+})();
+</script>
+</body>
+</html>
