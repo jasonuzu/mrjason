@@ -988,7 +988,7 @@ var POSTER_BUCKET = "forum-posters";
       p.appendChild(h); p.appendChild(s);
 
       var title = field("Session title", "f_title", "text", state.cfg.title, { maxlength: 90, placeholder: "e.g. Assessing criterion C across MYP phases" });
-      var when  = field("Starts", "f_when", "datetime-local", toLocalInput(state.cfg.startsAt));
+      var when  = field("Starts (date and time)", "f_when", "datetime-local", toLocalInput(state.cfg.startsAt));
       var where = field("Room or location (optional)", "f_where", "text", state.cfg.location, { maxlength: 70, placeholder: "e.g. Library seminar room" });
       var row = document.createElement("div"); row.className = "row2";
       var spk = field("Featured speaker spots (0–3)", "f_spk", "number", state.cfg.speakerSlots, { min: 0, max: 3, step: 1 });
@@ -1053,10 +1053,23 @@ var POSTER_BUCKET = "forum-posters";
       });
       var save = document.createElement("button"); save.className = "btn"; save.textContent = "Save session";
       save.addEventListener("click", function(){
+        var raw = when.input.value;
         var iso = "";
-        if (when.input.value){
-          var d = new Date(when.input.value);
+        if (raw){
+          /* a date with no time comes back as "2026-10-08" — assume an
+             after-school start rather than midnight */
+          if (raw.length === 10) raw += "T15:30";
+          var d = new Date(raw);
           if (!isNaN(d.getTime())) iso = d.toISOString();
+        }
+        if (!iso && when.input.value !== ""){
+          err.textContent = "That date didn't read properly. Pick it again from the calendar.";
+          when.input.focus();
+          return;
+        }
+        if (!iso && !window.confirm("No date is set, so the countdown will stay blank. Save anyway?")){
+          when.input.focus();
+          return;
         }
         var cfg = {
           title: title.input.value.trim(),
@@ -1340,7 +1353,7 @@ var POSTER_BUCKET = "forum-posters";
     if (typeof supabase === "undefined" || SUPABASE_ANON.length < 40){
       $("footNote").textContent = "Not connected to a database yet.";
       state.readOnly = true;
-      state.readOnlyWhy = "This page isn't connected to its database yet \u2014 paste your Supabase anon key at the top of the file.";
+      state.readOnlyWhy = "This page isn't connected to its database yet \u2014 add your Supabase URL and key at the top of the file.";
       render();
       return;
     }
