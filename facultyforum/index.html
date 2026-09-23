@@ -127,10 +127,17 @@
   @media (max-width:620px){ .masthead{ white-space:normal; letter-spacing:.09em; } .plaque i{ display:none; } }
   .session-title{
     font-family:var(--serif); font-weight:300; font-size:clamp(32px,6.4vw,62px);
-    line-height:1.1; margin:30px auto 0; max-width:17ch; color:var(--chalk);
+    line-height:1.12; margin:30px auto 0; max-width:17ch; color:var(--chalk);
     letter-spacing:-.012em;
     text-shadow:0 1px 0 rgba(0,0,0,.5);
+    /* never more than two lines, however long the title runs */
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+    overflow:hidden; text-wrap:balance;
   }
+  /* the type steps down as the title grows, so two lines stay full ones */
+  .session-title[data-len="m"]{ font-size:clamp(27px,5.2vw,46px); max-width:22ch; }
+  .session-title[data-len="l"]{ font-size:clamp(23px,4.2vw,36px); max-width:27ch; line-height:1.18; }
+  .session-title[data-len="xl"]{ font-size:clamp(20px,3.4vw,29px); max-width:33ch; line-height:1.22; }
   .session-title.empty{ color:var(--muted-2); font-style:italic; font-size:clamp(26px,4.8vw,42px); }
   .session-when{
     margin:22px 0 0; color:var(--chalk); font-size:15px; font-weight:400; letter-spacing:.005em;
@@ -614,9 +621,14 @@ var POSTER_BUCKET = "forum-posters";
     if (state.cfg.title){
       t.textContent = state.cfg.title;
       t.classList.remove("empty");
+      var n = state.cfg.title.length;
+      t.setAttribute("data-len", n <= 32 ? "s" : n <= 60 ? "m" : n <= 96 ? "l" : "xl");
+      t.title = state.cfg.title;
     } else {
       t.textContent = "Next session to be announced";
       t.classList.add("empty");
+      t.removeAttribute("data-len");
+      t.removeAttribute("title");
     }
     var w = $("sessionWhen");
     var d = state.cfg.startsAt ? new Date(state.cfg.startsAt) : null;
