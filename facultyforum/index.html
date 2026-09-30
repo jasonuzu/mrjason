@@ -126,18 +126,11 @@
   }
   @media (max-width:620px){ .masthead{ white-space:normal; letter-spacing:.09em; } .plaque i{ display:none; } }
   .session-title{
-    font-family:var(--serif); font-weight:300; font-size:clamp(32px,6.4vw,62px);
-    line-height:1.12; margin:30px auto 0; max-width:17ch; color:var(--chalk);
-    letter-spacing:-.012em;
-    text-shadow:0 1px 0 rgba(0,0,0,.5);
-    /* never more than two lines, however long the title runs */
-    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
-    overflow:hidden; text-wrap:balance;
+    font-family:var(--serif); font-weight:300; font-size:62px;
+    line-height:1.14; margin:30px auto 0; color:var(--chalk);
+    letter-spacing:-.012em; text-shadow:0 1px 0 rgba(0,0,0,.5);
+    max-width:min(880px, 94%); text-wrap:balance;
   }
-  /* the type steps down as the title grows, so two lines stay full ones */
-  .session-title[data-len="m"]{ font-size:clamp(27px,5.2vw,46px); max-width:22ch; }
-  .session-title[data-len="l"]{ font-size:clamp(23px,4.2vw,36px); max-width:27ch; line-height:1.18; }
-  .session-title[data-len="xl"]{ font-size:clamp(20px,3.4vw,29px); max-width:33ch; line-height:1.22; }
   .session-title.empty{ color:var(--muted-2); font-style:italic; font-size:clamp(26px,4.8vw,42px); }
   .session-when{
     margin:22px 0 0; color:var(--chalk); font-size:15px; font-weight:400; letter-spacing:.005em;
@@ -628,14 +621,11 @@ var POSTER_BUCKET = "forum-posters";
     if (state.cfg.title){
       t.textContent = state.cfg.title;
       t.classList.remove("empty");
-      var n = state.cfg.title.length;
-      t.setAttribute("data-len", n <= 32 ? "s" : n <= 60 ? "m" : n <= 96 ? "l" : "xl");
-      t.title = state.cfg.title;
+      fitTitle();
     } else {
       t.textContent = "Next session to be announced";
       t.classList.add("empty");
-      t.removeAttribute("data-len");
-      t.removeAttribute("title");
+      t.style.fontSize = "";
     }
     var w = $("sessionWhen");
     var d = state.cfg.startsAt ? new Date(state.cfg.startsAt) : null;
@@ -652,6 +642,37 @@ var POSTER_BUCKET = "forum-posters";
     bl.hidden = !state.cfg.blurb;
     renderPoster();
   }
+
+  /* Shrink the session title until it sits on two lines at most.
+     Binary search on font size — the full title always shows, never clipped. */
+  function fitTitle(){
+    var el = $("sessionTitle");
+    if (!el || el.classList.contains("empty")) return;
+
+    function linesAt(px){
+      el.style.fontSize = px + "px";
+      var lh = parseFloat(getComputedStyle(el).lineHeight) || px * 1.14;
+      return el.scrollHeight / lh;
+    }
+
+    var hi = Math.min(62, Math.max(24, window.innerWidth * 0.062));
+    var lo = 13;
+    if (linesAt(hi) <= 2.05){ return; }           // already fits at full size
+    var best = lo;
+    for (var i = 0; i < 18 && hi - lo > 0.4; i++){
+      var mid = (lo + hi) / 2;
+      if (linesAt(mid) <= 2.05){ best = mid; lo = mid; } else { hi = mid; }
+    }
+    el.style.fontSize = best + "px";
+  }
+
+  /* re-fit when the window changes width, and once the serif has loaded */
+  var fitTimer;
+  window.addEventListener("resize", function(){
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitTitle, 140);
+  });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTitle);
 
   var shownPoster = null;
   function renderPoster(){
