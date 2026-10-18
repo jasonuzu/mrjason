@@ -434,6 +434,34 @@
     display: flex; align-items: center; justify-content: center;
   }
   .record-delete:hover { background: var(--red-bg); color: var(--red); border-color: var(--red-border); }
+  .record-archive {
+    width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--rule);
+    background: var(--paper-raised); color: var(--ink-faint); font-size: 13px; line-height: 1;
+    cursor: pointer; font-family: inherit; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .record-archive:hover { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow-border); }
+
+  /* ── Archived students ── */
+  .archive-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--paper-raised); border: 1px solid var(--rule-soft);
+    border-left: 5px solid var(--ink-faint); border-radius: 6px;
+    padding: 12px 15px; margin-bottom: 10px; box-shadow: var(--shadow);
+  }
+  .archive-row .ar-info { flex: 1; min-width: 0; }
+  .archive-row .ar-name { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+  .archive-row .ar-meta { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+  .archive-row .ar-note {
+    font-size: 12.5px; color: var(--ink-soft); font-style: italic; margin-top: 5px;
+    border-left: 3px solid var(--rule); padding-left: 8px;
+  }
+  .archive-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .archive-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  @media (max-width: 640px) {
+    .archive-row { flex-wrap: wrap; }
+    .archive-actions { width: 100%; justify-content: flex-start; }
+  }
 
   /* ── Report page — student meta card & notes ── */
   .student-meta-card {
@@ -1642,7 +1670,7 @@ const db = {
 
   // Which optional schema pieces exist. Probed once after connecting so a
   // migration that hasn't been run can never break every student write.
-  caps: { studentRoles: null, rolesTable: null },
+  caps: { studentRoles: null, rolesTable: null, archived: null },
 
   async probeCaps(){
     if(!db.isConnected()) return;
@@ -1654,8 +1682,25 @@ const db = {
       const { error } = await db.client.from('roles').select('role_id').limit(1);
       db.caps.rolesTable = !error;
     }catch(e){ db.caps.rolesTable = false; }
+    try{
+      const { error } = await db.client.from('students').select('archived').limit(1);
+      db.caps.archived = !error;
+    }catch(e){ db.caps.archived = false; }
   },
 };
+
+/* One-line migration that turns on database-side archiving. Until it is run,
+   archiving still works but is held in the browser that did it. */
+const ARCHIVE_MIGRATION_SQL =
+`-- Learner Profile System — archive support
+-- Paste into Supabase → SQL Editor → Run, then reload the app.
+
+ALTER TABLE students ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS archived_note TEXT DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_students_archived ON students (archived);
+`;
 
 // ── Field mapping: JS camelCase <-> SQL snake_case ──
 const FIELD_MAP = {
@@ -1670,6 +1715,7 @@ const FIELD_MAP = {
   physicalMedicalNotes:'physical_medical_notes', supportNetwork:'support_network',
   bestTimeOfDay:'best_time_of_day', communicationPreferences:'communication_preferences',
   groupRoleTendency:'group_role_tendency', userId:'user_id',
+  archivedAt:'archived_at', archivedNote:'archived_note',
   createdAt:'created_at', updatedAt:'updated_at',
 };
 const FIELD_MAP_REV = {};
@@ -1682,12 +1728,15 @@ function recToRow(rec){
     if(k === 'id'){ row.student_id = v; return; }
     if(k.startsWith('_')) return;
     if(k === 'roles' && db.caps.studentRoles === false) return;  // column not migrated yet
+    // Archive columns are optional too — skip them until the migration is run
+    if((k === 'archived' || k === 'archivedAt' || k === 'archivedNote') && db.caps.archived === false) return;
     // Convert JS millisecond timestamps → Postgres ISO strings for TIMESTAMPTZ columns
-    if((k === 'createdAt' || k === 'updatedAt')){
-      if(typeof v === 'number'){ row[sqlKey] = new Date(v).toISOString(); return; }
+    if((k === 'createdAt' || k === 'updatedAt' || k === 'archivedAt')){
+      if(typeof v === 'number' && v){ row[sqlKey] = new Date(v).toISOString(); return; }
       if(typeof v === 'string' && /^\d+$/.test(v)){ row[sqlKey] = new Date(Number(v)).toISOString(); return; }
       // already a date string or empty — pass through if valid, else skip
-      if(v){ row[sqlKey] = v; }
+      if(v){ row[sqlKey] = v; return; }
+      if(k === 'archivedAt') row[sqlKey] = null;   // cleared on restore
       return;
     }
     row[sqlKey] = v;
@@ -1705,7 +1754,7 @@ function rowToRec(row){
     if(k === 'owner_id') return; // internal, not needed in app model
     const jsKey = FIELD_MAP_REV[k] || k;
     // Convert Postgres ISO date strings → JS millisecond timestamps
-    if((jsKey === 'createdAt' || jsKey === 'updatedAt') && v){
+    if((jsKey === 'createdAt' || jsKey === 'updatedAt' || jsKey === 'archivedAt') && v){
       const ms = new Date(v).getTime();
       rec[jsKey] = isNaN(ms) ? Date.now() : ms;
       return;
@@ -1722,15 +1771,27 @@ async function loadAllStudentsAsync(){
     try{
       const { data, error } = await db.client.from('students').select('*').order('updated_at', { ascending: false });
       if(error) throw error;
-      const students = data.map(row => migrateStudent(rowToRec(row)));
-      // Mirror to localStorage cache
-      students.forEach(rec => local.set('student:'+rec.id, JSON.stringify(rec)));
-      return students;
+      const all = data.map(row => migrateStudent(rowToRec(row)));
+      const active = [], archived = [];
+      all.forEach(rec => {
+        if(rec.archived){
+          archived.push(rec);
+          try{ local.set('archive:'+rec.id, JSON.stringify(rec)); local.del('student:'+rec.id); }catch(e){}
+        } else {
+          active.push(rec);
+          try{ local.set('student:'+rec.id, JSON.stringify(rec)); local.del('archive:'+rec.id); }catch(e){}
+        }
+      });
+      // Archives held only in this browser (database without the archive
+      // columns) are kept alongside, so nothing silently disappears.
+      state.archivedStudents = mergeArchivedLists(archived);
+      return active;
     }catch(e){
       console.error('DB load failed, falling back to local:', e);
     }
   }
   // Fallback to localStorage
+  state.archivedStudents = loadArchivedLocal();
   return loadAllStudentsLocal();
 }
 
@@ -1740,11 +1801,94 @@ function loadAllStudentsLocal(){
   for(const k of keys){
     try{
       const raw = local.get(k);
-      if(raw) out.push(migrateStudent(JSON.parse(raw)));
+      if(!raw) continue;
+      const rec = migrateStudent(JSON.parse(raw));
+      if(rec.archived) continue;   // belongs in the archive, not the class list
+      out.push(rec);
     }catch(e){}
   }
   out.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   return out;
+}
+
+/* ── Archived students ──
+   An archived student keeps their whole record but drops out of every class
+   list, gradebook and analytic. Stored under archive:<id> locally, and flagged
+   with archived = true in the database once the archive columns exist. */
+
+function loadArchivedLocal(){
+  const out = [];
+  local.keys('archive:').forEach(k => {
+    try{
+      const raw = local.get(k);
+      if(raw) out.push(migrateStudent(JSON.parse(raw)));
+    }catch(e){}
+  });
+  return sortArchived(out);
+}
+
+function sortArchived(list){
+  return list.sort((a,b) => (b.archivedAt || b.updatedAt || 0) - (a.archivedAt || a.updatedAt || 0));
+}
+
+function mergeArchivedLists(fromDb){
+  const byId = {};
+  loadArchivedLocal().forEach(r => { byId[r.id] = r; });
+  (fromDb || []).forEach(r => { byId[r.id] = r; });   // database copy wins
+  return sortArchived(Object.values(byId));
+}
+
+async function archiveStudentRecord(rec, note){
+  rec.archived = true;
+  rec.archivedAt = Date.now();
+  rec.archivedNote = note || '';
+  rec.updatedAt = Date.now();
+  try{ local.set('archive:'+rec.id, JSON.stringify(rec)); local.del('student:'+rec.id); }catch(e){}
+  if(db.isConnected()){
+    if(db.caps.archived === false){
+      // No archive columns yet: take the row out of the shared table so the
+      // student stops appearing everywhere, and keep the record in this browser.
+      try{
+        const { error } = await db.client.from('students').delete().eq('student_id', rec.id);
+        if(error) throw error;
+      }catch(e){ return { ok:true, warning:e.message }; }
+      return { ok:true, localOnly:true };
+    }
+    try{
+      const { error } = await db.client.from('students').upsert(recToRow(rec), { onConflict: 'student_id' });
+      if(error) throw error;
+    }catch(e){ return { ok:true, warning:e.message }; }
+  }
+  return { ok:true };
+}
+
+async function restoreStudentRecord(rec){
+  rec.archived = false;
+  rec.archivedAt = null;
+  rec.archivedNote = '';
+  rec.updatedAt = Date.now();
+  try{ local.set('student:'+rec.id, JSON.stringify(rec)); local.del('archive:'+rec.id); }catch(e){}
+  if(db.isConnected()){
+    try{
+      const { error } = await db.client.from('students').upsert(recToRow(rec), { onConflict: 'student_id' });
+      if(error) throw error;
+    }catch(e){ return { ok:true, warning:e.message }; }
+  }
+  return { ok:true };
+}
+
+function purgeArchivedRecord(id){
+  try{ local.del('archive:'+id); }catch(e){}
+  if(db.isConnected()){
+    db.client.from('students').delete().eq('student_id', id).then(({error})=>{
+      if(error) console.error('Archive purge failed:', error.message);
+    });
+  }
+}
+
+function archivedInClass(className){
+  const target = (className||'').trim();
+  return (state.archivedStudents || []).filter(s => (s.className||'').trim() === target);
 }
 
 // Synchronous version for backward compatibility (uses cached local data)
@@ -2742,6 +2886,19 @@ async function syncLocalToDb(){
     }
   }
 
+  // Sync archived students (only once the archive columns exist)
+  if(db.caps.archived){
+    for(const rec of loadArchivedLocal()){
+      try{
+        const row = recToRow(rec);
+        row.owner_id = state.userId;
+        const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+        if(error) throw error;
+        synced++;
+      }catch(e){ errors++; if(!firstError) firstError = e.message; }
+    }
+  }
+
   // Sync classes
   const classes = loadClassRegistry();
   for(const entry of Object.values(classes)){
@@ -2768,7 +2925,8 @@ async function syncDbToLocal(){
     if(error) throw error;
     data.forEach(row => {
       const rec = migrateStudent(rowToRec(row));
-      local.set('student:'+rec.id, JSON.stringify(rec));
+      if(rec.archived){ local.set('archive:'+rec.id, JSON.stringify(rec)); local.del('student:'+rec.id); }
+      else { local.set('student:'+rec.id, JSON.stringify(rec)); local.del('archive:'+rec.id); }
       pulled++;
     });
   }catch(e){ errors++; }
@@ -2788,6 +2946,9 @@ async function syncDbToLocal(){
 // Migrate records from earlier versions of this tool so they work with new features
 function migrateStudent(rec){
   if(!rec.roles) rec.roles = [];
+  if(rec.archived === undefined || rec.archived === null) rec.archived = false;
+  if(rec.archivedAt === undefined) rec.archivedAt = null;
+  if(rec.archivedNote === undefined || rec.archivedNote === null) rec.archivedNote = '';
   if(!rec.history) rec.history = [];
   if(rec.notes === undefined) rec.notes = '';
   if(rec.className === undefined) rec.className = '';
@@ -3017,6 +3178,7 @@ async function init(){
     }
   } else {
     state.students = loadAllStudentsLocal();
+    state.archivedStudents = loadArchivedLocal();
     state.roles = loadRolesLocal();
     state.view = 'dashboard';
   }
@@ -3070,13 +3232,19 @@ function render(opts){
   else if(state.view === 'gradebookWeek') body = renderGradebookWeek();
   else if(state.view === 'parentRoster') body = renderParentRoster();
   else if(state.view === 'parentReport') body = renderParentReport();
+  else if(state.view === 'archive') body = renderArchive();
 
   const chrome = (state.view !== 'loading' && state.view !== 'login' && state.view !== 'signup' && !state.parentMode);
   app.innerHTML = `
     ${chrome ? renderTopbar() : ''}
     ${body}
     ${chrome ? renderSiteFooter() : ''}
+    ${chrome && state.quickAdd ? renderQuickAddModal() : ''}
   `;
+  if(state.quickAdd && !opts.keepFocus){
+    const el = document.getElementById('qa-name');
+    if(el) el.focus();
+  }
   if(!opts.preserveScroll) window.scrollTo(0,0);
 }
 
@@ -3118,6 +3286,7 @@ function renderTopbar(){
         <a onclick="App.goDashboard()">Records</a>
         <a onclick="App.navClassOverview()">Class Overview</a>
         <a onclick="App.navGradebook()">Gradebook</a>
+        <a onclick="App.goArchive()">Archive${(state.archivedStudents && state.archivedStudents.length) ? ' (' + state.archivedStudents.length + ')' : ''}</a>
       </div>
     </div>
   </div>`;
@@ -3201,6 +3370,7 @@ function renderDashboard(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         ${students.length > 0 ? `<button class="btn btn-ghost" onclick="App.toggleSelectMode()">${selectMode ? '✕ Exit select' : '☐ Select students'}</button>` : ''}
+        <button class="btn btn-primary" title="Add one student to a class — no assessment needed yet" onclick="App.openQuickAdd('')">+ Add Student</button>
         <button class="btn btn-primary" onclick="App.startNew()">+ New Assessment</button>
         <button class="btn btn-ghost" onclick="App.openBulkImport()">📋 Bulk Import Class</button>
         <button class="btn btn-ghost" title="Download the printable bilingual intake questionnaire (Grades 6–8)" onclick="App.downloadIntakeForm()">📄 Intake Form (PDF)</button>
@@ -3245,7 +3415,8 @@ function renderClassGroup(g, selectMode){
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="class-group-count">${g.students.length} student${g.students.length===1?'':'s'}</div>
-        ${(!g.isUnassigned && !selectMode) ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();App.openClassOverview('${escapeAttr(g.name)}')">Overview →</button>
+        ${(!g.isUnassigned && !selectMode) ? `<button class="btn btn-ghost btn-sm" title="Add one student to ${escapeAttr(g.name)}" onclick="event.stopPropagation();App.openQuickAdd('${escapeAttr(g.name)}')">+ Student</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();App.openClassOverview('${escapeAttr(g.name)}')">Overview →</button>
         <button class="btn btn-ghost btn-sm class-del-btn" title="Delete this class" onclick="event.stopPropagation();App.confirmDeleteClass('${escapeAttr(g.name)}')">🗑</button>` : ''}
       </div>
     </div>
@@ -3292,8 +3463,169 @@ function renderRecordCard(rec, selectMode){
       <select class="record-move" onchange="App.quickMove('${rec.id}', this.value); this.value='';" onclick="event.stopPropagation()" title="Move to a different class">
         ${moveOptions}
       </select>
-      <button class="record-delete" onclick="event.stopPropagation(); App.confirmDelete('${rec.id}')" title="Delete record">×</button>
+      <button class="record-archive" onclick="event.stopPropagation(); App.confirmArchive('${rec.id}')" title="Remove from this class and archive their record">📦</button>
+      <button class="record-delete" onclick="event.stopPropagation(); App.confirmDelete('${rec.id}')" title="Delete record permanently">×</button>
     </div>`}
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   QUICK ADD — one student into an existing class, no assessment yet
+   ══════════════════════════════════════════════════════════════ */
+
+function renderQuickAddModal(){
+  const q = state.quickAdd;
+  if(!q) return '';
+  const classes = getAllClassNames();
+  const age = computeAge(q.birthdate);
+  const inputStyle = 'width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid var(--rule);font-size:14px;font-family:inherit;background:var(--paper-raised);color:var(--ink);outline:none;box-sizing:border-box;';
+  return `
+  <div class="gb-modal-overlay no-print" onclick="if(event.target===this)App.closeQuickAdd()">
+    <div class="gb-modal" style="max-width:500px;">
+      <div class="gb-modal-head">
+        <div style="font-weight:700;font-size:15px;">Add a student${q.className ? ' to ' + escapeHtml(q.className) : ''}</div>
+        <button class="btn btn-ghost btn-sm" onclick="App.closeQuickAdd()">✕ Close</button>
+      </div>
+      <div class="gb-modal-body">
+        ${q.error ? `<div style="background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);padding:9px 12px;border-radius:6px;font-size:13px;margin-bottom:12px;">${escapeHtml(q.error)}</div>` : ''}
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">English name <span style="color:var(--red);">*</span></label>
+          <input type="text" id="qa-name" value="${escapeHtml(q.name||'')}" placeholder="e.g. Amy Zhang" autocomplete="off"
+            style="${inputStyle}"
+            oninput="App.quickAddField('name', this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();App.submitQuickAdd();}">
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Official name <span style="font-weight:400;color:var(--ink-faint);">(optional)</span></label>
+          <input type="text" value="${escapeHtml(q.chineseName||'')}" placeholder="中文名" autocomplete="off"
+            style="${inputStyle}"
+            oninput="App.quickAddField('chineseName', this.value)"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();App.submitQuickAdd();}">
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Class</label>
+          <input type="text" list="qa-class-list" value="${escapeHtml(q.className||'')}" placeholder="Leave blank for Unassigned" autocomplete="off"
+            style="${inputStyle}"
+            oninput="App.quickAddField('className', this.value)">
+          <datalist id="qa-class-list">
+            ${classes.map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}
+          </datalist>
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Birthdate <span style="font-weight:400;color:var(--ink-faint);">(optional${age !== null ? ' — age ' + age : ''})</span></label>
+          <input type="date" value="${escapeHtml(q.birthdate||'')}"
+            style="${inputStyle}"
+            oninput="App.quickAddField('birthdate', this.value)">
+        </div>
+
+        <div class="gb-form-group">
+          <label class="gb-form-label">Assessment level</label>
+          <div class="level-options">
+            ${Object.values(LEVEL_META).map(lvl => `
+              <div class="level-opt ${q.level===lvl.key?'selected':''}"
+                   style="${q.level===lvl.key ? `border-color:${lvl.color};background:${lvl.light};` : ''}"
+                   onclick="App.quickAddField('level','${lvl.key}')">
+                <div class="lo-label" style="color:${q.level===lvl.key?lvl.color:'var(--ink)'};">${lvl.label}</div>
+                <div class="lo-grades">${lvl.grades}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="App.submitQuickAdd()">Add student</button>
+          <button class="btn btn-ghost" onclick="App.closeQuickAdd()">Cancel</button>
+        </div>
+        <div style="font-size:11.5px;color:var(--ink-faint);margin-top:10px;line-height:1.55;">
+          A User ID and password are generated automatically. The questionnaire can be filled in later — open their profile and click <strong>Reassess</strong>.
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ARCHIVED STUDENTS
+   ══════════════════════════════════════════════════════════════ */
+
+function renderArchive(){
+  const all = state.archivedStudents || [];
+  const filter = state.archiveClassFilter || '';
+  const list = filter ? all.filter(s => (s.className||'').trim() === filter) : all;
+  const classNames = Array.from(new Set(all.map(s => (s.className||'').trim()))).sort((a,b)=>a.localeCompare(b));
+  const needsMigration = db.isConnected() && db.caps.archived === false;
+
+  return `
+  <div class="wrap">
+    <button class="btn btn-ghost btn-sm no-print" onclick="App.goDashboard()" style="margin-bottom:18px;">← All records</button>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+      <div>
+        <div class="report-eyebrow">Archive</div>
+        <h1 style="font-size:24px;font-family:Georgia,serif;">Archived Students</h1>
+        <p style="color:var(--ink-faint);font-size:13px;margin-top:4px;max-width:620px;line-height:1.55;">
+          These students are out of every class list, gradebook and analytic, but their full record is kept — assessment answers, notes, posts, test scores and credentials. Restore one and they reappear exactly as they were.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="App.reloadArchive()">↻ Refresh</button>
+        ${all.length ? `<button class="btn btn-ghost" onclick="App.downloadArchiveBackup()">💾 Download archive (JSON)</button>` : ''}
+      </div>
+    </div>
+
+    ${needsMigration ? `
+      <div class="info-callout no-print" style="background:var(--yellow-bg);border-color:var(--yellow-border);color:var(--ink);">
+        <strong style="color:var(--yellow);">Archive is stored on this browser only</strong>
+        Your database doesn't have the archive columns yet, so archived students are kept here and their row is removed from the shared database. Run the one-line migration and archives will sync across your devices like everything else.
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-sm" onclick="App.downloadArchiveMigration()">💾 Download archive-migration.sql</button>
+          <button class="btn btn-ghost btn-sm" onclick="App.copyArchiveMigration()">📋 Copy SQL</button>
+        </div>
+      </div>
+    ` : ''}
+
+    ${all.length === 0 ? `
+      <div class="empty-state card">
+        <h3>No archived students</h3>
+        <p>Archive a student from their record card (📦) or from their profile page when they leave your class.</p>
+        <button class="btn btn-ghost" onclick="App.goDashboard()">← Back to records</button>
+      </div>
+    ` : `
+      ${classNames.length > 1 ? `
+        <div class="archive-filter no-print">
+          <button class="radio-chip ${!filter?'selected':''}" onclick="App.setArchiveFilter('')">All (${all.length})</button>
+          ${classNames.map(c => `<button class="radio-chip ${filter===c?'selected':''}" onclick="App.setArchiveFilter('${escapeAttr(c)}')">${escapeHtml(c || 'Unassigned')} (${all.filter(s => (s.className||'').trim()===c).length})</button>`).join('')}
+        </div>` : ''}
+
+      ${list.length === 0 ? `<div class="card" style="padding:16px;color:var(--ink-faint);font-size:13px;">No archived students in ${escapeHtml(filter||'this class')}.</div>`
+        : list.map(renderArchiveRow).join('')}
+    `}
+  </div>`;
+}
+
+function renderArchiveRow(rec){
+  const lvl = LEVEL_META[rec.level] || LEVEL_META.junior;
+  const when = rec.archivedAt ? new Date(rec.archivedAt).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}) : '—';
+  const cls = (rec.className||'').trim();
+  const answered = Object.keys(rec.answers||{}).length;
+  const posts = (rec.posts||[]).length;
+  return `
+  <div class="archive-row">
+    <div class="ar-info">
+      <div class="ar-name">${escapeHtml(rec.name||'(unnamed)')}${rec.chineseName ? ` <span style="color:var(--ink-faint);font-weight:400;">(${escapeHtml(rec.chineseName)})</span>` : ''}</div>
+      <div class="ar-meta">
+        Archived ${when} · from ${escapeHtml(cls || 'Unassigned')} · ${lvl.label}
+        · ${answered} answer${answered===1?'':'s'} · ${posts} post${posts===1?'':'s'}
+        · <span class="mono">${escapeHtml(rec.userId||'')}</span>
+      </div>
+      ${rec.archivedNote ? `<div class="ar-note">${escapeHtml(rec.archivedNote)}</div>` : ''}
+    </div>
+    <div class="archive-actions no-print">
+      <button class="btn btn-primary btn-sm" onclick="App.restoreArchived('${escapeAttr(rec.id)}')">↩ Restore</button>
+      <button class="btn btn-danger-ghost btn-sm" onclick="App.confirmPurgeArchived('${escapeAttr(rec.id)}')">🗑 Delete forever</button>
+    </div>
   </div>`;
 }
 
@@ -3739,6 +4071,7 @@ function renderReport(){
       <button class="btn btn-ghost" onclick="App.exportStudentCSV('${rec.id}')">📊 Export CSV</button>
       <button class="btn btn-ghost" onclick="App.startReassessment('${rec.id}')">Reassess</button>
       <button class="btn btn-ghost" onclick="App.editRecord('${rec.id}')">Edit Answers</button>
+      <button class="btn btn-ghost" title="Remove from the class but keep the full record" onclick="App.confirmArchive('${rec.id}')">📦 Archive Student</button>
       <button class="btn btn-danger-ghost" onclick="App.confirmDelete('${rec.id}')">Delete Record</button>
     </div>
   </div>`;
@@ -5386,11 +5719,13 @@ function renderClassOverview(){
     </div>
 
     <div class="class-actions-bar no-print">
+      <button class="btn btn-primary" title="Add one student to this class" onclick="App.openQuickAdd('${escapeAttr(className)}')">+ Add Student</button>
       <button class="btn btn-primary" onclick="App.openCompare('${escapeAttr(className)}')">🔍 Compare Students</button>
       <button class="btn btn-primary" onclick="App.openGrouping('${escapeAttr(className)}')">👥 Suggest Groupings</button>
       <button class="btn btn-primary" onclick="App.openGradebook('${escapeAttr(className)}')">📖 Gradebook</button>
       <button class="btn btn-ghost" onclick="App.openClassCredentials('${escapeAttr(className)}')">🔑 View IDs &amp; Passwords</button>      <button class="btn btn-ghost" onclick="App.exportClassCSV('${escapeAttr(className)}')">📊 Export Class CSV</button>
       <button class="btn btn-ghost" title="Change which assessment version this whole class uses" onclick="App.changeClassAssessmentLevel('${escapeAttr(className)}')">🎚 Change Assessment Level</button>
+      <button class="btn btn-ghost" title="Students archived out of this class" onclick="App.goArchive('${escapeAttr(className)}')">📦 Archived${archivedInClass(className).length ? ' (' + archivedInClass(className).length + ')' : ''}</button>
       <button class="btn btn-ghost" onclick="window.print()">Print Overview</button>
     </div>
 
@@ -6751,18 +7086,22 @@ const App = {
   },
 
   wipeLocal(){
-    if(!confirm('⚠ CLEAR LOCAL DATA\n\nThis will remove all student and class records from THIS BROWSER only. The database is untouched.\n\nAfter this, you can pull from the database to get a clean copy. Continue?')) return;
+    const archivedCount = local.keys('archive:').length;
+    if(!confirm('⚠ CLEAR LOCAL DATA\n\nThis will remove all active student and class records from THIS BROWSER only. The database is untouched.' +
+      (archivedCount ? '\n\nYour ' + archivedCount + ' archived student' + (archivedCount===1?'':'s') + ' will be KEPT — use the Archive page to download or delete those.' : '') +
+      '\n\nAfter this, you can pull from the database to get a clean copy. Continue?')) return;
     const keys = local.keys('student:');
     keys.forEach(k => local.del(k));
     const classKeys = local.keys('classreg:');
     classKeys.forEach(k => local.del(k));
-    alert(`Cleared ${keys.length} students and ${classKeys.length} classes from browser.`);
+    alert(`Cleared ${keys.length} students and ${classKeys.length} classes from browser.` +
+      (archivedCount ? `\n\n${archivedCount} archived student${archivedCount===1?'':'s'} kept.` : ''));
     state.students = [];
     render();
   },
 
   downloadSchema(){
-    const schema = `-- Learner Profile System Database Schema\n-- Run this in Supabase SQL Editor\n\nCREATE TABLE IF NOT EXISTS classes (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  class_id TEXT UNIQUE NOT NULL,\n  name TEXT NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE TABLE IF NOT EXISTS students (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  student_id TEXT UNIQUE NOT NULL,\n  user_id TEXT UNIQUE NOT NULL,\n  password TEXT NOT NULL DEFAULT '',\n  name TEXT NOT NULL DEFAULT '',\n  chinese_name TEXT DEFAULT '',\n  age TEXT DEFAULT '',\n  birthdate TEXT DEFAULT '',\n  class_name TEXT DEFAULT '',\n  level TEXT NOT NULL DEFAULT 'junior',\n  goal TEXT DEFAULT '',\n  notes TEXT DEFAULT '',\n  likes TEXT DEFAULT '',\n  dislikes TEXT DEFAULT '',\n  subject_strengths JSONB DEFAULT '[]'::jsonb,\n  posts JSONB DEFAULT '[]'::jsonb,\n  answers JSONB DEFAULT '{}'::jsonb,\n  interests_checked JSONB DEFAULT '[]'::jsonb,\n  interests_free TEXT DEFAULT '',\n  teacher_obs JSONB DEFAULT '{}',\n  history JSONB DEFAULT '[]'::jsonb,\n  accommodations JSONB DEFAULT '[]'::jsonb,\n  accommodation_notes TEXT DEFAULT '',\n  attendance_pattern TEXT DEFAULT '',\n  attendance_note TEXT DEFAULT '',\n  first_language TEXT DEFAULT '',\n  other_languages TEXT DEFAULT '',\n  english_proficiency TEXT DEFAULT '',\n  chinese_proficiency TEXT DEFAULT '',\n  cefr_level TEXT DEFAULT '',\n  cambridge_exams JSONB DEFAULT '[]'::jsonb,\n  other_english_tests JSONB DEFAULT '[]'::jsonb,\n  family_context TEXT DEFAULT '',\n  physical_medical_notes TEXT DEFAULT '',\n  support_network TEXT DEFAULT '',\n  best_time_of_day TEXT DEFAULT '',\n  communication_preferences JSONB DEFAULT '[]'::jsonb,\n  group_role_tendency TEXT DEFAULT '',\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE INDEX IF NOT EXISTS idx_students_class ON students (class_name);\nCREATE INDEX IF NOT EXISTS idx_students_user_id ON students (user_id);\n\nCREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN NEW.updated_at = NOW(); RETURN NEW; END;\n$$ LANGUAGE plpgsql;\n\nDROP TRIGGER IF EXISTS students_updated_at ON students;\nCREATE TRIGGER students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\nALTER TABLE students ENABLE ROW LEVEL SECURITY;\nALTER TABLE classes ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow all" ON students FOR ALL USING (true) WITH CHECK (true);\nCREATE POLICY "Allow all" ON classes FOR ALL USING (true) WITH CHECK (true);\n`;
+    const schema = `-- Learner Profile System Database Schema\n-- Run this in Supabase SQL Editor\n\nCREATE TABLE IF NOT EXISTS classes (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  class_id TEXT UNIQUE NOT NULL,\n  name TEXT NOT NULL,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE TABLE IF NOT EXISTS students (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  student_id TEXT UNIQUE NOT NULL,\n  user_id TEXT UNIQUE NOT NULL,\n  password TEXT NOT NULL DEFAULT '',\n  name TEXT NOT NULL DEFAULT '',\n  chinese_name TEXT DEFAULT '',\n  age TEXT DEFAULT '',\n  birthdate TEXT DEFAULT '',\n  class_name TEXT DEFAULT '',\n  level TEXT NOT NULL DEFAULT 'junior',\n  goal TEXT DEFAULT '',\n  notes TEXT DEFAULT '',\n  likes TEXT DEFAULT '',\n  dislikes TEXT DEFAULT '',\n  subject_strengths JSONB DEFAULT '[]'::jsonb,\n  posts JSONB DEFAULT '[]'::jsonb,\n  answers JSONB DEFAULT '{}'::jsonb,\n  interests_checked JSONB DEFAULT '[]'::jsonb,\n  interests_free TEXT DEFAULT '',\n  teacher_obs JSONB DEFAULT '{}',\n  history JSONB DEFAULT '[]'::jsonb,\n  accommodations JSONB DEFAULT '[]'::jsonb,\n  accommodation_notes TEXT DEFAULT '',\n  attendance_pattern TEXT DEFAULT '',\n  attendance_note TEXT DEFAULT '',\n  first_language TEXT DEFAULT '',\n  other_languages TEXT DEFAULT '',\n  english_proficiency TEXT DEFAULT '',\n  chinese_proficiency TEXT DEFAULT '',\n  cefr_level TEXT DEFAULT '',\n  cambridge_exams JSONB DEFAULT '[]'::jsonb,\n  other_english_tests JSONB DEFAULT '[]'::jsonb,\n  family_context TEXT DEFAULT '',\n  physical_medical_notes TEXT DEFAULT '',\n  support_network TEXT DEFAULT '',\n  best_time_of_day TEXT DEFAULT '',\n  communication_preferences JSONB DEFAULT '[]'::jsonb,\n  group_role_tendency TEXT DEFAULT '',\n  archived BOOLEAN DEFAULT FALSE,\n  archived_at TIMESTAMPTZ,\n  archived_note TEXT DEFAULT '',\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  updated_at TIMESTAMPTZ DEFAULT NOW()\n);\n\nCREATE INDEX IF NOT EXISTS idx_students_class ON students (class_name);\nCREATE INDEX IF NOT EXISTS idx_students_user_id ON students (user_id);\nCREATE INDEX IF NOT EXISTS idx_students_archived ON students (archived);\n\nCREATE OR REPLACE FUNCTION update_updated_at_column()\nRETURNS TRIGGER AS $$\nBEGIN NEW.updated_at = NOW(); RETURN NEW; END;\n$$ LANGUAGE plpgsql;\n\nDROP TRIGGER IF EXISTS students_updated_at ON students;\nCREATE TRIGGER students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();\n\nALTER TABLE students ENABLE ROW LEVEL SECURITY;\nALTER TABLE classes ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Allow all" ON students FOR ALL USING (true) WITH CHECK (true);\nCREATE POLICY "Allow all" ON classes FOR ALL USING (true) WITH CHECK (true);\n`;
     const blob = new Blob([schema], { type: 'text/sql;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -7825,10 +8164,247 @@ const App = {
   confirmDelete(id){
     const rec = state.students.find(s=>s.id===id);
     if(!rec) return;
-    if(!confirm('Delete the record for '+rec.name+'? This cannot be undone.')) return;
+    if(!confirm('Delete the record for '+rec.name+'? This cannot be undone.\n\nIf they are simply leaving your class, use Archive instead — that keeps everything and can be undone.')) return;
     deleteStudentRecord(id);
     state.students = state.students.filter(s=>s.id!==id);
     App.goDashboard();
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     ADD ONE STUDENT to an existing class
+     ══════════════════════════════════════════════════════════ */
+
+  openQuickAdd(className){
+    const target = (className||'').trim();
+    // Default the level to whatever the rest of that class is using
+    const inClass = state.students.filter(s => (s.className||'').trim() === target);
+    const counts = {};
+    inClass.forEach(s => { if(s.level) counts[s.level] = (counts[s.level]||0)+1; });
+    const common = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+    state.quickAdd = {
+      name:'', chineseName:'', className: target, birthdate:'',
+      level: common || 'junior', error:'',
+    };
+    render({preserveScroll:true});
+  },
+
+  closeQuickAdd(){
+    state.quickAdd = null;
+    render({preserveScroll:true});
+  },
+
+  quickAddField(field, val){
+    if(!state.quickAdd) return;
+    state.quickAdd[field] = val;
+    state.quickAdd.error = '';
+    // Only the level chips need a repaint; text and date fields must not be
+    // repainted while they are being filled in, or they lose focus mid-entry.
+    if(field === 'level') render({preserveScroll:true, keepFocus:true});
+  },
+
+  async submitQuickAdd(){
+    const q = state.quickAdd;
+    if(!q) return;
+    const name = (q.name||'').trim();
+    if(!name){
+      q.error = "Please enter the student's English name.";
+      render({preserveScroll:true, keepFocus:true});
+      return;
+    }
+    const className = (q.className||'').trim();
+
+    const dupe = state.students.find(s =>
+      (s.className||'').trim() === className &&
+      (s.name||'').trim().toLowerCase() === name.toLowerCase());
+    if(dupe && !confirm(name + ' is already in ' + (className||'Unassigned') + '.\n\nAdd a second record anyway?')) return;
+
+    const archivedDupe = (state.archivedStudents||[]).find(s =>
+      (s.name||'').trim().toLowerCase() === name.toLowerCase());
+    if(archivedDupe && !confirm(name + ' is in your archive (archived from ' +
+        ((archivedDupe.className||'').trim() || 'Unassigned') + ').\n\n' +
+        'Restoring them from Archived Students keeps their history. Create a brand-new blank record instead?')) return;
+
+    if(className) getOrCreateClassEntry(className);
+    const age = computeAge(q.birthdate);
+
+    const rec = {
+      id: uid(), name: name, chineseName: (q.chineseName||'').trim(),
+      age: age !== null ? String(age) : '', birthdate: q.birthdate || '',
+      level: q.level || 'junior', className: className, notes:'', goal:'',
+      userId: generateUserId(), password: generatePassword(),
+      roles: [], subjectStrengths:[], likes:'', dislikes:'', posts:[],
+      accommodations:[], accommodationNotes:'', attendancePattern:'', attendanceNote:'',
+      firstLanguage:'', otherLanguages:'', englishProficiency:'', chineseProficiency:'',
+      cefrLevel:'', cambridgeExams:[], otherEnglishTests:[],
+      familyContext:'', physicalMedicalNotes:'',
+      supportNetwork:'', bestTimeOfDay:'', communicationPreferences:[], groupRoleTendency:'',
+      answers:{}, interestsChecked:[], interestsFree:'',
+      teacherObs:{ attention:'', social:'', emotional:'', workHabits:'' },
+      history:[], archived:false, archivedAt:null, archivedNote:'',
+      createdAt: Date.now(), updatedAt: Date.now(),
+    };
+
+    try{ local.set('student:'+rec.id, JSON.stringify(rec)); }catch(e){}
+
+    let dbError = '';
+    if(db.isConnected()){
+      try{
+        const row = recToRow(rec);
+        const { error } = await db.client.from('students').upsert(row, { onConflict: 'student_id' });
+        if(error) throw error;
+      }catch(e){
+        dbError = e.message || String(e);
+        state.dbSyncErrors = state.dbSyncErrors || [];
+        state.dbSyncErrors.push({ name: rec.name, error: dbError, time: Date.now() });
+      }
+    }
+
+    state.students.unshift(rec);
+    if(className){
+      if(!state.expandedClasses) state.expandedClasses = new Set();
+      state.expandedClasses.add(className);   // so the new student is visible
+    }
+    state.quickAdd = null;
+    render();
+
+    if(dbError){
+      alert('Added ' + rec.name + ' on this device, but the database save failed:\n\n' + dbError +
+        '\n\n' + diagnoseErrorMessage(dbError));
+    } else {
+      alert('Added ' + rec.name + ' to ' + (className || 'Unassigned') + '.\n\n' +
+        'User ID: ' + rec.userId + '\nPassword: ' + rec.password +
+        '\n\nOpen their profile to fill in the questionnaire and the rest of their details.');
+    }
+  },
+
+  /* ══════════════════════════════════════════════════════════
+     ARCHIVE / RESTORE
+     ══════════════════════════════════════════════════════════ */
+
+  async confirmArchive(id){
+    const rec = state.students.find(s=>s.id===id);
+    if(!rec) return;
+    const where = (rec.className||'').trim() || 'Unassigned';
+    let msg = 'Archive ' + (rec.name || 'this student') + '?\n\n' +
+      'They are removed from ' + where + ' and from every class list, gradebook and analytic.\n\n' +
+      'Their full record is kept — assessment answers, notes, posts, test scores, ID and password — and you can restore them at any time from Archived Students.';
+    if(!db.isConnected()){
+      msg += '\n\nYou are working offline, so the archive is stored on this device.';
+    } else if(db.caps.archived === false){
+      msg += '\n\n⚠ Your database does not have the archive columns yet, so this archive is kept in THIS BROWSER only and the row is removed from the shared database. The Archive page has the one-line SQL that fixes that.';
+    }
+    if(!confirm(msg)) return;
+
+    const note = prompt('Optional note — why are they being archived?\n(e.g. left the school, moved to 8B, repeating the year)', '');
+    if(note === null) return;   // cancelled at the note step
+
+    const result = await archiveStudentRecord(rec, note.trim());
+
+    state.students = state.students.filter(s => s.id !== id);
+    state.archivedStudents = sortArchived([rec].concat((state.archivedStudents||[]).filter(s => s.id !== id)));
+    if(state.selectedIds) state.selectedIds.delete(id);
+    if(state.activeId === id){ state.activeId = null; state.view = 'dashboard'; }
+    render();
+
+    if(result.warning){
+      alert('Archived on this device, but the database could not be updated:\n\n' + result.warning +
+        '\n\nThe student still shows as active for anyone else until this syncs.');
+    }
+  },
+
+  async restoreArchived(id){
+    const rec = (state.archivedStudents||[]).find(s => s.id === id);
+    if(!rec) return;
+    const target = (rec.className||'').trim();
+    const classGone = target && !getAllClassNames().includes(target);
+    if(!confirm('Restore ' + (rec.name||'this student') + ' to ' + (target || 'Unassigned') + '?\n\n' +
+      'Their record goes straight back into the active class list, exactly as it was.' +
+      (classGone ? '\n\nNote: "' + target + '" has no other students right now — restoring will recreate that class.' : ''))) return;
+
+    const result = await restoreStudentRecord(rec);
+    if(target) getOrCreateClassEntry(target);
+    state.archivedStudents = (state.archivedStudents||[]).filter(s => s.id !== id);
+    state.students.unshift(rec);
+    render({preserveScroll:true});
+
+    if(result.warning){
+      alert('Restored on this device, but the database could not be updated:\n\n' + result.warning);
+    }
+  },
+
+  confirmPurgeArchived(id){
+    const rec = (state.archivedStudents||[]).find(s => s.id === id);
+    if(!rec) return;
+    if(!confirm('Permanently delete ' + (rec.name||'this student') + '?\n\n' +
+      'Everything goes — assessment, notes, posts, test scores. This cannot be undone, and Restore will no longer be possible.')) return;
+    if(!confirm('Last check — really delete ' + (rec.name||'this record') + ' forever?\n\nClick OK to delete, or Cancel to keep them archived.')) return;
+    purgeArchivedRecord(id);
+    state.archivedStudents = (state.archivedStudents||[]).filter(s => s.id !== id);
+    render({preserveScroll:true});
+  },
+
+  goArchive(className){
+    state.archiveClassFilter = (className||'').trim();
+    if(!state.archivedStudents) state.archivedStudents = loadArchivedLocal();
+    state.view = 'archive';
+    render();
+  },
+
+  setArchiveFilter(className){
+    state.archiveClassFilter = className || '';
+    render({preserveScroll:true});
+  },
+
+  async reloadArchive(){
+    if(db.isConnected() && db.caps.archived){
+      try{
+        const { data, error } = await db.client.from('students').select('*').eq('archived', true);
+        if(error) throw error;
+        const fromDb = (data||[]).map(r => migrateStudent(rowToRec(r)));
+        fromDb.forEach(r => { try{ local.set('archive:'+r.id, JSON.stringify(r)); }catch(e){} });
+        state.archivedStudents = mergeArchivedLists(fromDb);
+      }catch(e){
+        alert('Could not refresh from the database: ' + e.message);
+      }
+    } else {
+      state.archivedStudents = loadArchivedLocal();
+    }
+    render({preserveScroll:true});
+  },
+
+  downloadArchiveBackup(){
+    const payload = {
+      _tool: 'Learner Profile System',
+      _type: 'archived-students',
+      exportedAt: new Date().toISOString(),
+      students: state.archivedStudents || [],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `archived-students-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  downloadArchiveMigration(){
+    const blob = new Blob([ARCHIVE_MIGRATION_SQL], { type:'text/sql;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'archive-migration.sql';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  copyArchiveMigration(){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ARCHIVE_MIGRATION_SQL)
+        .then(() => alert('SQL copied. Paste it into Supabase → SQL Editor and click Run, then reload this page.'),
+              () => fallbackCopy(ARCHIVE_MIGRATION_SQL));
+    } else {
+      fallbackCopy(ARCHIVE_MIGRATION_SQL);
+    }
   },
 
   /* ── Reassessment ── */
