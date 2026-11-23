@@ -1,0 +1,102 @@
+@import '@fontsource-variable/archivo';
+@import '@fontsource/ibm-plex-mono/400.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper-0: oklch(0.995 0.003 150);
+    --paper-1: oklch(1 0 0);
+    --ink-900: oklch(0.25 0.035 250);
+    --ink-650: oklch(0.46 0.03 245);
+    --line-300: oklch(0.85 0.018 240);
+    --green-700: oklch(0.48 0.12 145);
+    --green-300: oklch(0.9 0.13 135);
+    --yellow-200: oklch(0.96 0.09 105);
+    --blue-200: oklch(0.92 0.025 245);
+    --red-200: oklch(0.92 0.035 35);
+
+    --color-page: var(--paper-0);
+    --color-surface: var(--paper-1);
+    --color-text: var(--ink-900);
+    --color-muted: var(--ink-650);
+    --color-border: var(--line-300);
+    --color-action: var(--green-700);
+
+    --timetable-grid: var(--color-border);
+    --timetable-heading: oklch(0.97 0.008 240);
+    --timetable-break: oklch(0.965 0.012 240);
+
+    --background: 150 20% 99%;
+    --foreground: 222 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 30% 15%;
+    --primary: 139 54% 27%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 95%;
+    --secondary-foreground: 213 28% 24%;
+    --muted: 210 20% 95%;
+    --muted-foreground: 213 13% 38%;
+    --accent: 132 60% 91%;
+    --accent-foreground: 139 54% 24%;
+    --destructive: 4 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 17% 82%;
+    --input: 210 17% 75%;
+    --ring: 139 54% 32%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 0;
+    background: var(--color-page);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-width: 0;
+    min-height: 100dvh;
+    font-family: 'Archivo Variable', 'Helvetica Neue', sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button,
+  [role='button'],
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: var(--yellow-200);
+    color: var(--color-text);
+  }
+}
