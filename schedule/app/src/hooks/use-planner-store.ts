@@ -222,13 +222,23 @@ export function usePlannerStore(userId: string | null) {
   }
 
   const deleteTodo = (weekKey: string, todoId: string) => {
-    setStore((current) => ({
-      ...current,
-      todos: {
-        ...current.todos,
-        [weekKey]: (current.todos[weekKey] ?? []).filter((todo) => todo.id !== todoId),
-      },
-    }))
+    setStore((current) => {
+      const week = current.weeks[weekKey]
+      const cells = week
+        ? Object.fromEntries(Object.entries(week.cells).map(([key, entries]) => [
+            key,
+            entries.filter((entry) => entry.todoId !== todoId),
+          ]))
+        : undefined
+      return {
+        ...current,
+        weeks: week ? { ...current.weeks, [weekKey]: { ...week, cells: cells ?? week.cells } } : current.weeks,
+        todos: {
+          ...current.todos,
+          [weekKey]: (current.todos[weekKey] ?? []).filter((todo) => todo.id !== todoId),
+        },
+      }
+    })
   }
 
   const addNote = (weekKey: string) => {

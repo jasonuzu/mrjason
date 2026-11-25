@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { ListTodo, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import type { EntryKind, Period, ScheduleEntry } from '@/types/planner'
+import type { EntryKind, Period, ScheduleEntry, Todo } from '@/types/planner'
 
 interface CellEditorProps {
   open: boolean
@@ -18,6 +18,7 @@ interface CellEditorProps {
   period?: Period
   dayLabel: string
   entries: ScheduleEntry[]
+  todos: Todo[]
   onSave: (entries: ScheduleEntry[]) => void
 }
 
@@ -25,6 +26,7 @@ const kindLabels: Record<EntryKind, string> = {
   jason: "Jason’s class",
   class: 'Class',
   task: 'Task',
+  todo: 'Linked to-do',
   duty: 'Special note / duty',
   notice: 'Time notice',
   info: 'Information',
@@ -33,14 +35,16 @@ const kindLabels: Record<EntryKind, string> = {
 
 const newId = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-export function CellEditor({ open, onOpenChange, period, dayLabel, entries, onSave }: CellEditorProps) {
+export function CellEditor({ open, onOpenChange, period, dayLabel, entries, todos, onSave }: CellEditorProps) {
   const [draft, setDraft] = useState<ScheduleEntry[]>([])
+  const [selectedTodoId, setSelectedTodoId] = useState('')
   const [error, setError] = useState('')
   const isClassBreak = period?.id.startsWith('class-break-') ?? false
 
   useEffect(() => {
     if (open) {
       setDraft(entries.map((entry) => ({ ...entry })))
+      setSelectedTodoId('')
       setError('')
     }
   }, [open, entries])
@@ -64,9 +68,31 @@ export function CellEditor({ open, onOpenChange, period, dayLabel, entries, onSa
     ])
   }
 
+  const addLinkedTodo = () => {
+    const todo = todos.find((item) => item.id === selectedTodoId)
+    if (!todo) return
+    setDraft((current) => [
+      ...current,
+      {
+        id: newId(),
+        kind: 'todo',
+        todoId: todo.id,
+        className: '',
+        person: '',
+        room: '',
+        label: todo.text,
+        detail: '',
+      },
+    ])
+    setSelectedTodoId('')
+  }
+
+  const availableTodos = todos.filter((todo) => !draft.some((entry) => entry.todoId === todo.id))
+
   const save = () => {
     const invalid = draft.some((entry) => {
       if (entry.kind === 'class' || entry.kind === 'jason') return !entry.className.trim() || !entry.person.trim()
+      if (entry.kind === 'todo') return !entry.todoId
       return !entry.label.trim()
     })
     if (invalid) {
@@ -98,20 +124,28 @@ export function CellEditor({ open, onOpenChange, period, dayLabel, entries, onSa
 
           {draft.map((entry, index) => {
             const isLesson = entry.kind === 'class' || entry.kind === 'jason'
+            const isLinkedTodo = entry.kind === 'todo'
+            const linkedTodo = isLinkedTodo ? todos.find((todo) => todo.id === entry.todoId) : undefined
             return (
               <section key={entry.id} className="border-b border-[#d8e0e6] py-5 first:pt-1 last:border-b-0" aria-label={`Entry ${index + 1}`}>
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <label className="sr-only" htmlFor={`kind-${entry.id}`}>Entry type</label>
-                  <select
-                    id={`kind-${entry.id}`}
-                    value={entry.kind}
-                    onChange={(event) => updateEntry(entry.id, { kind: event.target.value as EntryKind })}
-                    className="min-h-11 rounded-md border border-[#b9c6d2] bg-white px-3 text-sm font-semibold text-[#243447] outline-none focus-visible:ring-2 focus-visible:ring-[#287f3c]"
-                  >
-                    {Object.entries(kindLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
+                  {isLinkedTodo ? (
+                    <span className="linked-todo-kind"><ListTodo aria-hidden="true" /> Linked to-do</span>
+                  ) : (
+                    <>
+                      <label className="sr-only" htmlFor={`kind-${entry.id}`}>Entry type</label>
+                      <select
+                        id={`kind-${entry.id}`}
+                        value={entry.kind}
+                        onChange={(event) => updateEntry(entry.id, { kind: event.target.value as EntryKind })}
+                        className="min-h-11 rounded-md border border-[#b9c6d2] bg-white px-3 text-sm font-semibold text-[#243447] outline-none focus-visible:ring-2 focus-visible:ring-[#287f3c]"
+                      >
+                        {Object.entries(kindLabels).filter(([value]) => value !== 'todo').map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
@@ -125,7 +159,12 @@ export function CellEditor({ open, onOpenChange, period, dayLabel, entries, onSa
                   </Button>
                 </div>
 
-                {isLesson ? (
+                {isLinkedTodo ? (
+                  <div className="linked-todo-editor-item">
+                    <strong>{linkedTodo?.text ?? entry.label}</strong>
+                    <span>{linkedTodo?.completed ? 'Completed' : 'Open'} · Completion stays synchronized with the To-dos tab.</span>
+                  </div>
+                ) : isLesson ? (
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
                       <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#536274]" htmlFor={`class-${entry.id}`}>Class</label>
@@ -160,6 +199,28 @@ export function CellEditor({ open, onOpenChange, period, dayLabel, entries, onSa
         </div>
 
         {error && <p role="alert" className="mt-3 text-sm font-semibold text-[#a13c3c]">{error}</p>}
+
+        <div className="linked-todo-picker">
+          <div>
+            <label htmlFor="existing-todo">Add an existing to-do</label>
+            <p>It will appear here with a checkbox linked to your To-dos tab.</p>
+          </div>
+          {todos.length ? (
+            <div className="linked-todo-picker-controls">
+              <select id="existing-todo" value={selectedTodoId} onChange={(event) => setSelectedTodoId(event.target.value)}>
+                <option value="">Choose a to-do…</option>
+                {availableTodos.map((todo) => (
+                  <option key={todo.id} value={todo.id}>{todo.text}{todo.completed ? ' (completed)' : ''}</option>
+                ))}
+              </select>
+              <Button type="button" variant="outline" onClick={addLinkedTodo} disabled={!selectedTodoId} className="min-h-11 border-[#8ea2b2]">
+                <Plus /> Add to slot
+              </Button>
+            </div>
+          ) : (
+            <p className="linked-todo-empty">Create a to-do in the To-dos tab first, then return to this time slot.</p>
+          )}
+        </div>
 
         <Button type="button" variant="outline" onClick={addEntry} className="mt-4 min-h-11 w-full border-dashed border-[#8ea2b2] bg-transparent text-[#29475d] hover:bg-[#edf4f6]">
           <Plus className="mr-2 h-4 w-4" /> {isClassBreak ? 'Add task' : 'Add entry'}

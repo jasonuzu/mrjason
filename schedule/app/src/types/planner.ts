@@ -1,8 +1,9 @@
-export type EntryKind = 'jason' | 'class' | 'task' | 'duty' | 'notice' | 'info' | 'time'
+export type EntryKind = 'jason' | 'class' | 'task' | 'todo' | 'duty' | 'notice' | 'info' | 'time'
 
 export interface ScheduleEntry {
   id: string
   kind: EntryKind
+  todoId?: string
   className: string
   person: string
   room: string

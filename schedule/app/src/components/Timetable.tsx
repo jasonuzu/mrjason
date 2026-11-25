@@ -11,12 +11,13 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { AlarmClock, ChevronDown, Flag, Info, ListTodo, Pencil, Plus, Timer } from 'lucide-react'
+import { AlarmClock, Check, ChevronDown, Flag, Info, ListTodo, Pencil, Plus, Timer } from 'lucide-react'
 import { CLASS_BREAKS, DAYS, DEFAULT_PERIODS, getCellEntries } from '@/data/schedule'
-import type { CellLocation, Period, ScheduleEntry, WeekData } from '@/types/planner'
+import type { CellLocation, Period, ScheduleEntry, Todo, WeekData } from '@/types/planner'
 
 interface TimetableProps {
   week: WeekData
+  todos: Todo[]
   editMode: boolean
   highlightJason: boolean
   exporting: boolean
@@ -26,6 +27,7 @@ interface TimetableProps {
   onEditCell: (periodId: string, day: string) => void
   onEditPeriod: (period: Period) => void
   onRequestMove: (source: CellLocation, target: CellLocation, entry: ScheduleEntry) => void
+  onToggleTodo: (todoId: string) => void
 }
 
 interface DragData {
@@ -38,7 +40,32 @@ interface LinePosition {
   left: number
 }
 
-function EntryView({ entry }: { entry: ScheduleEntry }) {
+function EntryView({ entry, todo, onToggleTodo }: { entry: ScheduleEntry; todo?: Todo; onToggleTodo?: (todoId: string) => void }) {
+  if (entry.kind === 'todo') {
+    const label = todo?.text ?? entry.label
+    const completed = todo?.completed ?? false
+    return (
+      <div className={`entry-todo ${completed ? 'entry-todo-complete' : ''}`}>
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={completed}
+          aria-label={`Mark ${label} as ${completed ? 'open' : 'complete'}`}
+          className="entry-todo-checkbox"
+          disabled={!todo || !onToggleTodo}
+          title={todo ? undefined : 'This to-do is not available in the selected week'}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (todo) onToggleTodo?.(todo.id)
+          }}
+        >
+          <span aria-hidden="true">{completed && <Check />}</span>
+        </button>
+        <span className="entry-todo-label">{label}</span>
+      </div>
+    )
+  }
   if (entry.kind === 'class' || entry.kind === 'jason') {
     return (
       <div className="lesson-line">
@@ -83,7 +110,7 @@ function EntryView({ entry }: { entry: ScheduleEntry }) {
   )
 }
 
-function DraggableEntry({ entry, source, scope, editMode, exporting }: { entry: ScheduleEntry; source: CellLocation; scope: string; editMode: boolean; exporting: boolean }) {
+function DraggableEntry({ entry, source, scope, editMode, exporting, todo, onToggleTodo }: { entry: ScheduleEntry; source: CellLocation; scope: string; editMode: boolean; exporting: boolean; todo?: Todo; onToggleTodo?: (todoId: string) => void }) {
   const isLesson = entry.kind === 'class' || entry.kind === 'jason'
   const enabled = isLesson && editMode && !exporting
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -92,7 +119,7 @@ function DraggableEntry({ entry, source, scope, editMode, exporting }: { entry: 
     disabled: !enabled,
   })
 
-  if (!isLesson) return <EntryView entry={entry} />
+  if (!isLesson) return <EntryView entry={entry} todo={todo} onToggleTodo={onToggleTodo} />
 
   return (
     <div
@@ -110,6 +137,7 @@ function DraggableEntry({ entry, source, scope, editMode, exporting }: { entry: 
 
 interface CellContentProps {
   entries: ScheduleEntry[]
+  todos: Todo[]
   editMode: boolean
   exporting: boolean
   highlightJason: boolean
@@ -118,10 +146,11 @@ interface CellContentProps {
   day: string
   scope: string
   onEdit: () => void
+  onToggleTodo: (todoId: string) => void
   allDay?: boolean
 }
 
-function CellContent({ entries, editMode, exporting, highlightJason, label, periodId, day, scope, onEdit, allDay = false }: CellContentProps) {
+function CellContent({ entries, todos, editMode, exporting, highlightJason, label, periodId, day, scope, onEdit, onToggleTodo, allDay = false }: CellContentProps) {
   const highlighted = highlightJason && entries.some((entry) => entry.kind === 'jason')
   const { isOver, setNodeRef } = useDroppable({
     id: `${scope}-cell-${periodId}-${day}`,
@@ -136,7 +165,16 @@ function CellContent({ entries, editMode, exporting, highlightJason, label, peri
     >
       <span className={`cell-entries ${allDay ? 'items-center text-center' : ''}`}>
         {entries.map((entry) => (
-          <DraggableEntry key={entry.id} entry={entry} source={{ periodId, day }} scope={scope} editMode={editMode} exporting={exporting} />
+          <DraggableEntry
+            key={entry.id}
+            entry={entry}
+            source={{ periodId, day }}
+            scope={scope}
+            editMode={editMode}
+            exporting={exporting}
+            todo={entry.todoId ? todos.find((todo) => todo.id === entry.todoId) : undefined}
+            onToggleTodo={onToggleTodo}
+          />
         ))}
       </span>
       {editMode && (
@@ -199,7 +237,7 @@ function resolvePeriods(overrides: WeekData['periodOverrides'], includeBreaks: b
   })
 }
 
-export function Timetable({ week, editMode, highlightJason, exporting, selectedDay, isCurrentWeek, onSelectedDay, onEditCell, onEditPeriod, onRequestMove }: TimetableProps) {
+export function Timetable({ week, todos, editMode, highlightJason, exporting, selectedDay, isCurrentWeek, onSelectedDay, onEditCell, onEditPeriod, onRequestMove, onToggleTodo }: TimetableProps) {
   const [showBreaks, setShowBreaks] = useState(false)
   const periods = useMemo(() => resolvePeriods(week.periodOverrides, showBreaks), [showBreaks, week.periodOverrides])
   const timePeriods = useMemo(() => resolvePeriods(week.periodOverrides, true), [week.periodOverrides])
@@ -289,6 +327,7 @@ export function Timetable({ week, editMode, highlightJason, exporting, selectedD
   const renderCell = (period: Period, day: string, scope: string, allDay = false) => (
     <CellContent
       entries={getCellEntries(week, period.id, day)}
+      todos={todos}
       editMode={editMode}
       exporting={exporting}
       highlightJason={highlightJason}
@@ -297,6 +336,7 @@ export function Timetable({ week, editMode, highlightJason, exporting, selectedD
       day={day}
       scope={scope}
       onEdit={() => onEditCell(period.id, day)}
+      onToggleTodo={onToggleTodo}
       allDay={allDay}
     />
   )
@@ -411,6 +451,7 @@ export function Timetable({ week, editMode, highlightJason, exporting, selectedD
           <span><i className="legend-swatch legend-jason" />Jason’s class</span>
           <span><i className="legend-swatch legend-duty" />Special note / duty</span>
           <span><i className="legend-swatch legend-task" />Break task</span>
+          <span><ListTodo aria-hidden="true" />Linked to-do</span>
           <span><i className="legend-swatch legend-class" />Class (6B1 / 6B4)</span>
           <span><i className="legend-swatch legend-room" />Room (D313 / D328)</span>
           <span><i className="legend-swatch legend-notice" />N/A / time notice</span>

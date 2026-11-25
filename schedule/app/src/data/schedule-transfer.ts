@@ -5,7 +5,7 @@ const FORMAT = 'grade-6-weekly-planner-schedule'
 const VERSION = 1
 export const MAX_LAYOUT_FILE_SIZE = 1024 * 1024
 
-const ENTRY_KINDS: EntryKind[] = ['jason', 'class', 'task', 'duty', 'notice', 'info', 'time']
+const ENTRY_KINDS: EntryKind[] = ['jason', 'class', 'task', 'todo', 'duty', 'notice', 'info', 'time']
 const DAYS_AND_ALL = [...DAYS.map((day) => day.id), 'all']
 
 interface ScheduleLayoutFile {
@@ -36,12 +36,15 @@ function parsePeriod(value: unknown): Period | null {
 
 function parseEntry(value: unknown): ScheduleEntry | null {
   if (!isRecord(value)) return null
-  const { id, kind, className, person, room, label, detail } = value
+  const { id, kind, todoId, className, person, room, label, detail } = value
   if (!isShortString(id, 150) || !id || !ENTRY_KINDS.includes(kind as EntryKind)) return null
   if (![className, person, room, label, detail].every((field) => isShortString(field))) return null
+  if (todoId !== undefined && (!isShortString(todoId, 150) || !todoId)) return null
+  if (kind === 'todo' && !todoId) return null
   return {
     id,
     kind: kind as EntryKind,
+    ...(todoId !== undefined ? { todoId } : {}),
     className: className as string,
     person: person as string,
     room: room as string,

@@ -12,6 +12,7 @@ A responsive, editable recreation of the Grade 6 weekly timetable, with week-spe
 - Live red current-time line positioned within the matching period on the current school week
 - Full-column highlight and “Today” label for the current weekday on the current week
 - Week navigation with independent todos and notes
+- Existing todos can be attached to timetable slots with two-way synchronized checkboxes
 - Automatic browser-local persistence via `localStorage`
 - Optional Supabase cloud sync with private email-link accounts and automatic saves
 - Per-account row-level security; signed-out use remains browser-local

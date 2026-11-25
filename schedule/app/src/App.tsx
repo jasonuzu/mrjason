@@ -126,8 +126,17 @@ export default function App() {
         toast.error(result.error)
         return
       }
+      const importedWeek: WeekData = {
+        ...result.week,
+        cells: Object.fromEntries(Object.entries(result.week.cells).map(([key, entries]) => [
+          key,
+          entries.map((entry) => entry.kind === 'todo' && !todos.some((todo) => todo.id === entry.todoId)
+            ? { ...entry, kind: 'task' as const, todoId: undefined }
+            : entry),
+        ])),
+      }
       setPendingImport({
-        week: result.week,
+        week: importedWeek,
         fileName: file.name,
         sourceWeek: result.sourceWeek,
         targetWeekKey: weekKey,
@@ -288,6 +297,7 @@ export default function App() {
             <div ref={exportRef} className="export-area">
               <Timetable
                 week={week}
+                todos={todos}
                 editMode={editMode}
                 highlightJason={highlightJason}
                 exporting={exporting}
@@ -297,6 +307,7 @@ export default function App() {
                 onEditCell={(periodId, day) => setEditingCell({ periodId, day })}
                 onEditPeriod={setEditingPeriod}
                 onRequestMove={(source, target, entry) => setPendingMove({ source, target, entry })}
+                onToggleTodo={(todoId) => planner.toggleTodo(weekKey, todoId)}
               />
             </div>
           </div>
@@ -335,6 +346,7 @@ export default function App() {
         period={activePeriod}
         dayLabel={editingCell?.day === 'all' ? 'all weekdays' : DAYS.find((day) => day.id === editingCell?.day)?.label ?? ''}
         entries={editingEntries}
+        todos={todos}
         onSave={(entries) => {
           if (!editingCell) return
           planner.updateCell(weekKey, editingCell.periodId, editingCell.day, entries)

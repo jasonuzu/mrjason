@@ -588,6 +588,12 @@
   pointer-events: none;
 }
 
+.schedule-cell-editable .entry-todo {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
 .cell-edit-trigger {
   position: absolute;
   z-index: 1;
@@ -794,6 +800,160 @@
 .entry-task {
   background: #dff2ec;
   color: #245f51;
+}
+
+.entry-todo {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0;
+  padding: 4px 7px 4px 3px;
+  border: 1px solid #bfd1c5;
+  border-radius: 8px;
+  background: #eef7f0;
+  color: #294c35;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.entry-todo-checkbox {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #216b36;
+}
+
+.entry-todo-checkbox > span {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #6e8d78;
+  border-radius: 4px;
+  background: #fbfdfc;
+}
+
+.entry-todo-checkbox > span:has(svg) {
+  border-color: #216b36;
+  background: #216b36;
+  color: #fbfdfc;
+}
+
+.entry-todo-checkbox svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+.entry-todo-checkbox:hover {
+  background: #dcebdd;
+}
+
+.entry-todo-checkbox:focus-visible {
+  outline: 3px solid #91b69a;
+  outline-offset: 1px;
+}
+
+.entry-todo-checkbox:disabled {
+  opacity: 0.55;
+}
+
+.entry-todo-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entry-todo-complete .entry-todo-label {
+  color: #64736a;
+  text-decoration: line-through;
+}
+
+.linked-todo-kind {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  color: #2d5d3c;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.linked-todo-kind svg {
+  width: 18px;
+  height: 18px;
+}
+
+.linked-todo-editor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid #c4d5c8;
+  border-radius: 8px;
+  background: #eff7f0;
+  color: #294c35;
+}
+
+.linked-todo-editor-item span {
+  color: #52675a;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.linked-todo-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 15px;
+  border: 1px solid #c5d3ca;
+  border-radius: 10px;
+  background: #f2f7f3;
+}
+
+.linked-todo-picker label {
+  display: block;
+  color: #294c35;
+  font-size: 0.875rem;
+  font-weight: 750;
+}
+
+.linked-todo-picker p {
+  margin: 4px 0 0;
+  color: #5b6d61;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.linked-todo-picker-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linked-todo-picker-controls select {
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid #a9baae;
+  border-radius: 7px;
+  background: #fbfdfc;
+  color: #263e2e;
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.linked-todo-empty {
+  padding: 10px;
+  border: 1px dashed #b4c2b8;
+  border-radius: 7px;
 }
 
 .entry-notice {
@@ -1256,6 +1416,14 @@ a {
   transition: transform 140ms ease-out, opacity 140ms ease-out;
 }
 
+@media (max-width: 1099px) {
+  .entry-todo-checkbox {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+}
+
 @media (min-width: 640px) {
   .app-shell {
     padding: 26px 24px 30px;
@@ -1265,6 +1433,14 @@ a {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .linked-todo-picker-controls {
+    flex-direction: row;
+  }
+
+  .linked-todo-picker-controls select {
+    flex: 1;
   }
 
   .panel-heading {
